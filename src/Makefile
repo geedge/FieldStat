@@ -1,0 +1,24 @@
+CC		= g++
+CFLAGS		= -Wall
+CFLAGS		+= -g -fPIC
+SOURCES		= MESA_field_stat.c
+OBJS		= $(SOURCES:.c=.o)
+TARGETSLIB	= libMESA_field_stat.a
+TARGETSO	= libMESA_field_stat.so
+
+.PHONY: all clean deps
+
+all: $(TARGETSLIB) $(TARGETSO)
+
+deps:
+	@$(CC) -MM $(SOURCES) $(CFLAGS)
+
+$(TARGETSLIB): MESA_field_stat.o
+	ar -r $@ $^
+$(TARGETSO): MESA_field_stat.o
+	$(CC) -o $(TARGETSO) $(CFLAGS) $^ -shared -lrt
+
+MESA_prof_load.o: MESA_field_stat.c field_stat.h
+
+clean:
+	rm -f $(TARGETSLIB) $(TARGETSO) *.o core core.*
