@@ -3,8 +3,8 @@ CFLAGS		= -Wall
 CFLAGS		+= -g -fPIC
 SOURCES		= MESA_field_stat.c
 OBJS		= $(SOURCES:.c=.o)
-TARGETSLIB	= libMESA_field_stat.a
-TARGETSO	= libMESA_field_stat.so
+TARGETSLIB	= libMESA_field_stat2.a
+TARGETSO	= libMESA_field_stat2.so
 
 .PHONY: all clean deps
 
