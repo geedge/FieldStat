@@ -644,30 +644,4 @@ void *thread_screen_print(void *arg)
 	return NULL;
 }
 
-screen_stat_handle_t init_screen_stat(FILE* output_fp,int stat_cycle,int screen_print_trigger)
-{
-	struct FS_space_t* handle=(struct FS_space_t* )FS_create_handle();
-	handle->fp=output_fp;
-	FS_set_para(handle, STAT_CYCLE,&stat_cycle, (int)sizeof(stat_cycle));
-	FS_set_para(handle, PRINT_TRIGGER,&screen_print_trigger, (int)sizeof(screen_print_trigger));
-	FS_set_para(handle, CREATE_THREAD,&screen_print_trigger, (int)sizeof(screen_print_trigger));
-
-	FS_start(handle);
-	return handle;
-}
-
-int stat_field_register(screen_stat_handle_t handle,const char* field_name)
-{
-	int ret=0;
-	ret=FS_register(handle,FS_STYLE_FIELD,FS_CALC_SPEED, field_name);
-	return ret;
-}
-
-int stat_field_operation(screen_stat_handle_t handle,int field_id,int operation,long long value)
-{
-	int ret=0;
-	ret=FS_operate( handle, field_id, 0,(enum field_op)operation, value);
-	return ret;
-}
-
 

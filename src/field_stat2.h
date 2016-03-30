@@ -57,15 +57,5 @@ int FS_operate(screen_stat_handle_t handle,int id,int column_id,enum field_op op
 
 void FS_passive_output(screen_stat_handle_t handle);
 
-screen_stat_handle_t init_screen_stat(FILE* output_fp,int stat_cycle,int screen_print_trigger);
-
-//return field_id >=0 when success, return -1 when failed.
-int stat_field_register(screen_stat_handle_t handle,const char* field_name);
-
-//return >=0 when success, return -1 when failed.
-#define	FS_OP_TYPE_ADD	(FS_OP_ADD)
-#define	FS_OP_TYPE_SET	(FS_OP_SET)
-int stat_field_operation(screen_stat_handle_t handle,int field_id,int operation,long long value);
-
 #endif
 
