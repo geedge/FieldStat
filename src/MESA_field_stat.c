@@ -8,12 +8,12 @@
 #include <assert.h>
 #include <sys/time.h>
 
-#define	MAX_STAT_FIELD_NUM	64
+#define	INIT_STAT_FIELD_NUM	64
 #define	MAX_STAT_COLUMN_NUM	32
 
 #define	STATUS_PER_LINE	6
 #define	FIELD_PER_LINE		8
-int FIELD_STAT_VERSION_2_20160211=0;
+int FIELD_STAT_VERSION_2_20160509=0;
 #ifndef atomic_read
 #define atomic_read(x) __sync_add_and_fetch((x),0)
 #endif
@@ -66,7 +66,8 @@ struct FS_space_t
 	int matrix_base;
 	int column_cnt;
 	int cloumn_id[MAX_STAT_COLUMN_NUM];
-	struct display_manifest_t display[MAX_STAT_FIELD_NUM];
+	int display_size;
+	struct display_manifest_t *display;
 
 	struct stat_unit_t* stat_array;//for styple STATUS/FIELD
 	char* output_file;
@@ -83,7 +84,8 @@ screen_stat_handle_t FS_create_handle(void)
 	handle->print_mode=1;
 	handle->stat_cycle=2;
 	handle->create_thread=1;
-	
+	handle->display_size=INIT_STAT_FIELD_NUM;
+	handle->display=(struct display_manifest_t *)calloc(sizeof(struct display_manifest_t )*handle->display_size);
 	return handle;
 }
 int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* value,int size)
@@ -198,6 +200,7 @@ void FS_stop(screen_stat_handle_t* handle)
 		free(_handle->display[i].name);
 		_handle->display[i].name=NULL;
 	}
+	free(_handle->display);
 	free(_handle->stat_array);
 	_handle->stat_array=NULL;
 	free(_handle->output_file);
@@ -233,6 +236,11 @@ int FS_register(screen_stat_handle_t handle,enum field_dsp_style_t style,enum fi
 	}
 	id=_handle->display_cnt;
 	_handle->display_cnt++;
+	if(_handle->display_cnt==_handle->display_size)
+	{
+		_handle->display_size+=INIT_STAT_FIELD_NUM;
+		_handle->display=(struct display_manifest_t *)realloc(sizeof(struct display_manifest_t )*_handle->display_size);
+	}
 	choosen=&(_handle->display[id]);
 	choosen->calc_type=calc_type;
 	choosen->style=style;
@@ -274,6 +282,11 @@ int FS_register_ratio(screen_stat_handle_t handle,int numerator_id,int denominat
 
 	id=_handle->display_cnt;
 	_handle->display_cnt++;
+	if(_handle->display_cnt==_handle->display_size)
+	{
+		_handle->display_size+=INIT_STAT_FIELD_NUM;
+		_handle->display=(struct display_manifest_t *)realloc(sizeof(struct display_manifest_t )*_handle->display_size);
+	}
 	choosen=&(_handle->display[id]);
 	choosen->calc_type=calc_type;
 	choosen->style=style;
@@ -453,7 +466,7 @@ static int output_style_field(struct FS_space_t* _handle,long long interval_ms,c
 	long long value=0;
 	double ratio=0.0;
 	char* pos=print_buf;
-	int field_id[MAX_STAT_FIELD_NUM]={0};
+	int field_id[INIT_STAT_FIELD_NUM]={0};
 	int field_cnt=0;
 	
 	for(i=0;i<_handle->display_cnt;i++)
