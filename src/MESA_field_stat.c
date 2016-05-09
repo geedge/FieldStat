@@ -85,7 +85,7 @@ screen_stat_handle_t FS_create_handle(void)
 	handle->stat_cycle=2;
 	handle->create_thread=1;
 	handle->display_size=INIT_STAT_FIELD_NUM;
-	handle->display=(struct display_manifest_t *)calloc(sizeof(struct display_manifest_t )*handle->display_size);
+	handle->display=(struct display_manifest_t *)calloc(sizeof(struct display_manifest_t ),handle->display_size);
 	return handle;
 }
 int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* value,int size)
@@ -239,7 +239,7 @@ int FS_register(screen_stat_handle_t handle,enum field_dsp_style_t style,enum fi
 	if(_handle->display_cnt==_handle->display_size)
 	{
 		_handle->display_size+=INIT_STAT_FIELD_NUM;
-		_handle->display=(struct display_manifest_t *)realloc(sizeof(struct display_manifest_t )*_handle->display_size);
+		_handle->display=(struct display_manifest_t *)realloc(_handle->display,sizeof(struct display_manifest_t )*_handle->display_size);
 	}
 	choosen=&(_handle->display[id]);
 	choosen->calc_type=calc_type;
@@ -285,7 +285,7 @@ int FS_register_ratio(screen_stat_handle_t handle,int numerator_id,int denominat
 	if(_handle->display_cnt==_handle->display_size)
 	{
 		_handle->display_size+=INIT_STAT_FIELD_NUM;
-		_handle->display=(struct display_manifest_t *)realloc(sizeof(struct display_manifest_t )*_handle->display_size);
+		_handle->display=(struct display_manifest_t *)realloc(_handle->display,sizeof(struct display_manifest_t )*_handle->display_size);
 	}
 	choosen=&(_handle->display[id]);
 	choosen->calc_type=calc_type;
