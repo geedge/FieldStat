@@ -1,1 +1,1 @@
-使用Demo可参考MAAT中 maat_stat.cpp。
+See maat_stat.cpp in MAAT project for more guidance.
