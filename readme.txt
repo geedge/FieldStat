@@ -1,0 +1,1 @@
+使用Demo可参考MAAT中 maat_stat.cpp。
