@@ -440,7 +440,7 @@ static int output_style_status(struct FS_space_t* _handle,long long interval_ms,
 			{
 				value=value*p->output_scaling*1000/interval_ms;
 			}
-			pos+=snprintf(pos,size-(pos-print_buf),"%s: %lld\t",p->name,value);
+			pos+=snprintf(pos,size-(pos-print_buf),"%s: %-10lld\t",p->name,value);
 		}
 		j++;
 		if(j==STATUS_PER_LINE)
