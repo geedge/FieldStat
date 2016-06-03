@@ -14,16 +14,25 @@
 #define	STATUS_PER_LINE	6
 #define	FIELD_PER_LINE		8
 int FIELD_STAT_VERSION_2_20160509=0;
-#ifndef atomic_read
-#define atomic_read(x) __sync_add_and_fetch((x),0)
-#endif
 
-#ifndef atomic_add 
+#if(__GNUC__ * 100 + __GNUC_MINOR__ * 10 + __GNUC_PATCHLEVEL__ >= 410)
+#define atomic_inc(x) __sync_add_and_fetch((x),1)
+#define atomic_dec(x) __sync_sub_and_fetch((x),1)
 #define atomic_add(x,y) __sync_add_and_fetch((x),(y))
-#endif
-
-#ifndef atomic_set
+#define atomic_sub(x,y) __sync_sub_and_fetch((x),(y))
+typedef long atomic_t;
+#define ATOMIC_INIT(i)  { (i) }
+#define atomic_read(x) __sync_add_and_fetch((x),0)
 #define atomic_set(x,y) __sync_lock_test_and_set((x),y)
+#else 
+typedef long atomic_t;
+#define atomic_inc(x)	((*(x))++)
+#define atomic_dec(x)	((*(x))--)
+#define atomic_add(x,y) ((*(x))+=(y))
+#define atomic_sub(x,y) ((*(x))-=(y))
+#define ATOMIC_INIT(i)  { (i) }
+#define atomic_read(x) 	(*(x))
+#define atomic_set(x,y)	((*(x))=(y))
 #endif 
 const char* draw_line="________________________________________________________________________________________________________________________________________________";
 const char* draw_boundary="============================================================";
