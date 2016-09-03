@@ -68,6 +68,7 @@ struct FS_space_t
 	int screen_print_trigger;
 	int print_mode;	//1:Rewrite ,2: Append
 	int create_thread;
+	int running;
 	
 	int line_cnt;
 	int display_cnt;
@@ -94,6 +95,7 @@ screen_stat_handle_t FS_create_handle(void)
 	handle->stat_cycle=2;
 	handle->create_thread=1;
 	handle->display_size=INIT_STAT_FIELD_NUM;
+	handle->running=0;
 	handle->display=(struct display_manifest_t *)calloc(sizeof(struct display_manifest_t ),handle->display_size);
 	return handle;
 }
@@ -102,6 +104,10 @@ int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* va
 	struct FS_space_t* _handle=(struct FS_space_t*)handle;
 	FILE* fp=NULL;
 	int int_val=0;
+	if(_handle->running==1)
+	{
+		return -1;
+	}
 	if(type!=OUTPUT_DEVICE)
 	{
 		int_val=*(const int*)value;
@@ -192,6 +198,7 @@ void FS_start(screen_stat_handle_t handle)
 	}
 	assert(j==_handle->column_cnt);
 	_handle->stat_array=(struct stat_unit_t*)calloc(sizeof(struct stat_unit_t),stat_unit_cnt);
+	_handle->running=1;
 	clock_gettime(CLOCK_MONOTONIC,&(_handle->last_display_time));
 	if(_handle->create_thread==1)
 	{
@@ -228,6 +235,10 @@ int FS_register(screen_stat_handle_t handle,enum field_dsp_style_t style,enum fi
 	struct FS_space_t* _handle=(struct FS_space_t*)handle;
 	struct display_manifest_t * choosen=NULL;
 	int id=0;
+	if(_handle->running==1)
+	{
+		return -1;
+	}
 	switch(style)
 	{
 		case	FS_STYLE_FIELD:
@@ -264,6 +275,10 @@ int FS_register_ratio(screen_stat_handle_t handle,int numerator_id,int denominat
 	struct FS_space_t* _handle=(struct FS_space_t*)handle;
 	struct display_manifest_t * choosen=NULL;
 	int id=0;
+	if(_handle->running==1)
+	{
+		return -1;
+	}
 	if(numerator_id>=_handle->display_cnt||denominator_id>=_handle->display_cnt)
 	{
 		return -1;
@@ -623,6 +638,10 @@ void FS_passive_output(screen_stat_handle_t handle)
 	char print_buf[1024*64]={0};
 	char*pos=NULL;
 	time(&current);
+	if(_handle->running==0)
+	{
+		return;
+	}
 	if(_handle->screen_print_trigger==0)
 	{
 		return;
