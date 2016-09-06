@@ -299,11 +299,21 @@ int FS_register_ratio(screen_stat_handle_t handle,int numerator_id,int denominat
 	{
 		return -1;
 	}
-	if(style==FS_STYLE_COLUMN)
+	switch(style)
 	{
-		_handle->column_cnt++;
+		case	FS_STYLE_FIELD:
+		case	FS_STYLE_STATUS:
+			_handle->single_cnt++;
+			break;
+		case	FS_STYLE_LINE:
+			_handle->line_cnt++;
+			break;
+		case	FS_STYLE_COLUMN:
+			_handle->column_cnt++;
+			break;
+		default:
+			return -1;
 	}
-
 	id=_handle->display_cnt;
 	_handle->display_cnt++;
 	if(_handle->display_cnt==_handle->display_size)
