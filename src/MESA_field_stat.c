@@ -96,6 +96,7 @@ screen_stat_handle_t FS_create_handle(void)
 	handle->create_thread=1;
 	handle->display_size=INIT_STAT_FIELD_NUM;
 	handle->running=0;
+	handle->fp=stdout;
 	handle->display=(struct display_manifest_t *)calloc(sizeof(struct display_manifest_t ),handle->display_size);
 	return handle;
 }
