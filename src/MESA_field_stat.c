@@ -13,7 +13,7 @@
 
 #define	STATUS_PER_LINE	6
 #define	FIELD_PER_LINE		8
-int FIELD_STAT_VERSION_2_20160509=0;
+int FIELD_STAT_VERSION_2_20160920=0;
 
 #if(__GNUC__ * 100 + __GNUC_MINOR__ * 10 + __GNUC_PATCHLEVEL__ >= 410)
 #define atomic_inc(x) __sync_add_and_fetch((x),1)
@@ -557,7 +557,7 @@ static int output_style_field(struct FS_space_t* _handle,long long interval_ms,c
 				pos+=snprintf(pos,size-(pos-print_buf),"%10lld\t",value*1000/interval_ms);
 			}
 		}
-		i+=j;
+		i+=(j-1);
 		pos+=snprintf(pos,sizeof(print_buf)-(pos-print_buf),"\n");
 	}
 	if(pos-print_buf>0)
