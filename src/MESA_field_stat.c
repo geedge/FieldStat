@@ -85,7 +85,6 @@ struct FS_space_t
 	struct timespec last_display_time;
 };
 
-void *thread_screen_print(void *arg);
 
 screen_stat_handle_t FS_create_handle(void)
 {
@@ -203,7 +202,7 @@ void FS_start(screen_stat_handle_t handle)
 	clock_gettime(CLOCK_MONOTONIC,&(_handle->last_display_time));
 	if(_handle->create_thread==1)
 	{
-		pthread_create(&cfg_mon_t, NULL, thread_screen_print, (void*)handle);
+		pthread_create(&cfg_mon_t, NULL, fs2_thread_screen_print, (void*)handle);
 	}
 	return;
 }
@@ -685,7 +684,7 @@ void FS_passive_output(screen_stat_handle_t handle)
 	fflush(_handle->fp);
 	memcpy(&(_handle->last_display_time),&now,sizeof(now));
 }
-void *thread_screen_print(void *arg)
+void *fs2_thread_screen_print(void *arg)
 {
 	struct FS_space_t* handle=(struct FS_space_t*)arg;
 	while(handle->create_thread)
