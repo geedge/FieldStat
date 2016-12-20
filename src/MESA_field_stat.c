@@ -84,7 +84,7 @@ struct FS_space_t
 	FILE* fp;
 	struct timespec last_display_time;
 };
-
+void *fs2_thread_screen_print(void *arg);
 
 screen_stat_handle_t FS_create_handle(void)
 {
