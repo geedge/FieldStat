@@ -10,10 +10,11 @@
 
 #define	INIT_STAT_FIELD_NUM	64
 #define	MAX_STAT_COLUMN_NUM	32
+#define MAX_PATH_LEN	256
 
 #define	STATUS_PER_LINE	6
 #define	FIELD_PER_LINE		8
-int FIELD_STAT_VERSION_2_20160920=0;
+int FIELD_STAT_VERSION_2_20170216=0;
 
 #if(__GNUC__ * 100 + __GNUC_MINOR__ * 10 + __GNUC_PATCHLEVEL__ >= 410)
 #define atomic_inc(x) __sync_add_and_fetch((x),1)
@@ -77,13 +78,39 @@ struct FS_space_t
 	int column_cnt;
 	int cloumn_id[MAX_STAT_COLUMN_NUM];
 	int display_size;
+	int current_date;
+	int flush_by_date;
 	struct display_manifest_t *display;
 
 	struct stat_unit_t* stat_array;//for styple STATUS/FIELD
-	char* output_file;
+	char appoint_output_file[MAX_PATH_LEN];
+	char current_output_file[MAX_PATH_LEN];
 	FILE* fp;
 	struct timespec last_display_time;
 };
+int current_day(char* day_buff,int size)
+{
+	
+	int current_day;
+	int year;
+	int month;
+	int day;
+
+	time_t t;
+	struct tm *local_time;
+
+	t = time(NULL);
+	local_time=localtime(&t); /*取得当地时间*/
+
+	snprintf(day_buff, size,"%04d-%02d-%02d", 	(local_time->tm_year + 1900), (local_time->tm_mon + 1), local_time->tm_mday);
+
+	year = local_time->tm_year + 1900;
+	month = local_time->tm_mon + 1;
+	day = local_time->tm_mday;
+	current_day = year*10000 + month*100 + day;
+
+	return current_day;
+}
 void *fs2_thread_screen_print(void *arg);
 
 screen_stat_handle_t FS_create_handle(void)
@@ -96,13 +123,14 @@ screen_stat_handle_t FS_create_handle(void)
 	handle->display_size=INIT_STAT_FIELD_NUM;
 	handle->running=0;
 	handle->fp=stdout;
+	memset(handle->appoint_output_file,0,sizeof(handle->appoint_output_file));
+	memset(handle->current_output_file,0,sizeof(handle->current_output_file));
 	handle->display=(struct display_manifest_t *)calloc(sizeof(struct display_manifest_t ),handle->display_size);
 	return handle;
 }
 int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* value,int size)
 {
 	struct FS_space_t* _handle=(struct FS_space_t*)handle;
-	FILE* fp=NULL;
 	int int_val=0;
 	if(_handle->running==1)
 	{
@@ -115,16 +143,8 @@ int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* va
 	switch(type)
 	{
 		case	OUTPUT_DEVICE:
-			fp=fopen((const char*)value,"w");
-			if(fp==NULL)
-			{
-				printf("Field Stat: open %s failed.\n",(const char*)value);
-				return -1;
-			}
-			_handle->fp=fp;
-			_handle->output_file=(char*)calloc(sizeof(char),size);
-			memcpy(_handle->output_file,value,size);
-			fp=NULL;
+			assert((unsigned int)size<sizeof(_handle->appoint_output_file));
+			memcpy(_handle->appoint_output_file,value,size);
 			break;
 		case	PRINT_MODE:
 			if(size!=4||(int_val!=1&&int_val!=2))
@@ -161,6 +181,12 @@ int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* va
 			}
 			_handle->display[int_val].is_invisible=1;
 			break;
+		case	FLUSH_BY_DATE:
+			if(int_val==1)
+			{
+				_handle->flush_by_date=1;
+			}	
+			break;
 		default:
 			return -1;
 	}
@@ -172,6 +198,7 @@ void FS_start(screen_stat_handle_t handle)
 	pthread_t cfg_mon_t;
 	int i=0,j=0,pos=0;
 	int stat_unit_cnt=0;
+	char date_buff[32]={0};
 	stat_unit_cnt=_handle->single_cnt+_handle->line_cnt*_handle->column_cnt;
 	for(i=0;i<_handle->display_cnt;i++)
 	{
@@ -199,6 +226,29 @@ void FS_start(screen_stat_handle_t handle)
 	assert(j==_handle->column_cnt);
 	_handle->stat_array=(struct stat_unit_t*)calloc(sizeof(struct stat_unit_t),stat_unit_cnt);
 	_handle->running=1;
+	if(strlen(_handle->appoint_output_file)>0)//otherwise use stdout;
+	{
+		if(_handle->flush_by_date==1)
+		{
+			_handle->current_date=current_day(date_buff, sizeof(date_buff));
+			snprintf(_handle->current_output_file,sizeof(_handle->current_output_file)
+						,"%s.%s",_handle->appoint_output_file,date_buff);
+		}
+		else
+		{
+			snprintf(_handle->current_output_file,sizeof(_handle->current_output_file)
+						,"%s",_handle->appoint_output_file);
+		}
+		
+		_handle->fp=fopen(_handle->current_output_file,"w");
+		if(_handle->fp==NULL)
+		{
+			printf("Field Stat: open %s failed.\n",_handle->appoint_output_file);
+			assert(0);
+			return;
+		}
+	}
+
 	clock_gettime(CLOCK_MONOTONIC,&(_handle->last_display_time));
 	if(_handle->create_thread==1)
 	{
@@ -219,10 +269,8 @@ void FS_stop(screen_stat_handle_t* handle)
 	free(_handle->display);
 	free(_handle->stat_array);
 	_handle->stat_array=NULL;
-	free(_handle->output_file);
-	_handle->output_file=NULL;
 	free(_handle);
-	if(strlen(_handle->output_file)>0)
+	if(strlen(_handle->appoint_output_file)>0)
 	{
 		fclose(_handle->fp);
 		_handle->fp=NULL;
@@ -645,8 +693,10 @@ void FS_passive_output(screen_stat_handle_t handle)
 	struct FS_space_t* _handle=(struct FS_space_t*)handle;
 	struct timespec now;
 	time_t current=0;
+	char date_buff[32];
 	char print_buf[1024*64]={0};
 	char*pos=NULL;
+	int today=0;
 	time(&current);
 	if(_handle->running==0)
 	{
@@ -655,6 +705,18 @@ void FS_passive_output(screen_stat_handle_t handle)
 	if(_handle->screen_print_trigger==0)
 	{
 		return;
+	}
+	if(strlen(_handle->appoint_output_file)>0&&_handle->flush_by_date==1)
+	{
+		today=current_day(date_buff, sizeof(date_buff));
+		if(today!=_handle->current_date)
+		{
+			snprintf(_handle->current_output_file,sizeof(_handle->current_output_file)
+						,"%s.%s",_handle->appoint_output_file,date_buff);
+			_handle->current_date=today;
+			fclose(_handle->fp);
+			_handle->fp=fopen(_handle->current_output_file,"w");
+		}
 	}
 	clock_gettime(CLOCK_MONOTONIC,&now);
 	long long interval_ms=(now.tv_sec-_handle->last_display_time.tv_sec)*1000+(now.tv_nsec-_handle->last_display_time.tv_nsec)/1000000;
@@ -673,7 +735,7 @@ void FS_passive_output(screen_stat_handle_t handle)
 
 	if(_handle->fp==NULL)
 	{
-		printf("Field Stat: open %s failed.\n",_handle->output_file);
+		printf("Field Stat: open %s failed.\n",_handle->appoint_output_file);
 		return;
 	}
 	if(_handle->print_mode==1)

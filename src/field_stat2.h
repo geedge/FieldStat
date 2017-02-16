@@ -36,6 +36,7 @@ enum FS_option
 	CREATE_THREAD,//VALUE is an interger,1: Create a print thread,0:not create,output by call passive_output function,
 					//and the STAT_CYCLE is meaningless.SIZE=4,DEFAULT:0.
 	ID_INVISBLE,//value is field_id/status_id/column_id, not output this string, SIZE=4,DEFAULT: shutdown NO one.
+	FLUSH_BY_DATE,//value is 1(ture) or 0(false),SIZE=4,DEFAULT: Do not flush by date.
 };
 
 //Always success.
