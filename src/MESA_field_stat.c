@@ -14,7 +14,7 @@
 
 #define	STATUS_PER_LINE	6
 #define	FIELD_PER_LINE		8
-int FIELD_STAT_VERSION_2_20170216=0;
+int FIELD_STAT_VERSION_2_20170301=0;
 
 #if(__GNUC__ * 100 + __GNUC_MINOR__ * 10 + __GNUC_PATCHLEVEL__ >= 410)
 #define atomic_inc(x) __sync_add_and_fetch((x),1)
@@ -87,6 +87,7 @@ struct FS_space_t
 	char current_output_file[MAX_PATH_LEN];
 	FILE* fp;
 	struct timespec last_display_time;
+	const char* write_mode;
 };
 int current_day(char* day_buff,int size)
 {
@@ -118,6 +119,7 @@ screen_stat_handle_t FS_create_handle(void)
 	struct FS_space_t* handle=(struct FS_space_t*)calloc(sizeof(struct FS_space_t),1);
 	handle->screen_print_trigger=1;
 	handle->print_mode=1;
+	handle->write_mode="w";
 	handle->stat_cycle=2;
 	handle->create_thread=1;
 	handle->display_size=INIT_STAT_FIELD_NUM;
@@ -152,6 +154,14 @@ int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* va
 				return -1;
 			}
 			_handle->print_mode=int_val;
+			if(_handle->print_mode==1)
+			{
+				_handle->write_mode="w";
+			}
+			else
+			{
+				_handle->write_mode="a+";
+			}
 			break;
 		case	STAT_CYCLE:
 			if(size!=4||(int_val==0))
@@ -240,7 +250,7 @@ void FS_start(screen_stat_handle_t handle)
 						,"%s",_handle->appoint_output_file);
 		}
 		
-		_handle->fp=fopen(_handle->current_output_file,"w");
+		_handle->fp=fopen(_handle->current_output_file,_handle->write_mode);
 		if(_handle->fp==NULL)
 		{
 			printf("Field Stat: open %s failed.\n",_handle->appoint_output_file);
@@ -715,7 +725,7 @@ void FS_passive_output(screen_stat_handle_t handle)
 						,"%s.%s",_handle->appoint_output_file,date_buff);
 			_handle->current_date=today;
 			fclose(_handle->fp);
-			_handle->fp=fopen(_handle->current_output_file,"w");
+			_handle->fp=fopen(_handle->current_output_file,_handle->write_mode);
 		}
 	}
 	clock_gettime(CLOCK_MONOTONIC,&now);
