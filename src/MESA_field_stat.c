@@ -1,8 +1,17 @@
 #include "field_stat2.h"
+#include <sys/socket.h>//socket
+#include <sys/types.h>//socket
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <string.h> //strerror
+#include <errno.h>//strerror
+#include <fcntl.h>//fcntl
+#include <unistd.h>//fcntl
+#include <net/if.h>//fcntl
+#include <sys/ioctl.h>//ioctl
 #include <stdio.h>
 #include <time.h>
 #include <unistd.h>
-#include <string.h>
 #include <stdlib.h>
 #include <pthread.h>
 #include <assert.h>
@@ -11,6 +20,7 @@
 #define	INIT_STAT_FIELD_NUM	64
 #define	MAX_STAT_COLUMN_NUM	32
 #define MAX_PATH_LEN	256
+#define	UDP_PAYLOAD_SIZE	1460
 
 #define	STATUS_PER_LINE	6
 #define	FIELD_PER_LINE		8
@@ -80,6 +90,17 @@ struct FS_space_t
 	int display_size;
 	int current_date;
 	int flush_by_date;
+	char str_ip[32];
+	char app_name[16];
+
+	int statsd_switch;
+	unsigned int server_ip;
+	unsigned short server_port;
+	int statsd_socket;
+
+	int snd_buf_off;
+	char send_buff[UDP_PAYLOAD_SIZE];
+	
 	struct display_manifest_t *display;
 
 	struct stat_unit_t* stat_array;//for styple STATUS/FIELD
@@ -112,6 +133,66 @@ int current_day(char* day_buff,int size)
 
 	return current_day;
 }
+static int startup_udp()
+{
+	int sd_udp=-1;
+	int flags;
+	struct ifreq ifr;
+ 	if(-1==(sd_udp = socket(AF_INET, SOCK_DGRAM, 0)))
+	{
+		printf("FS2: socket error: %d %s, restart socket.", errno, strerror(errno));
+		sd_udp=-1;
+	}
+	flags=fcntl(sd_udp,F_GETFL);
+	flags|=O_NONBLOCK;
+	if(fcntl(sd_udp,F_SETFL,flags)==-1)
+	{
+		printf("FS2: socket error: %d %s, restart socket.", errno, strerror(errno));
+		sd_udp=-1;
+	}
+	int opt=1;
+	if (setsockopt (sd_udp, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, sizeof(opt) ) < 0) {
+		printf("FS2:setsockopt error: %d %s, restart socket.", errno, strerror(errno));
+		close (sd_udp);
+		sd_udp=-1;
+		return sd_udp;
+	}
+
+	return sd_udp;
+}
+static int send_udp(int sd, unsigned int dest_ip, unsigned short dest_port, const char * data, int len)
+{
+	int to_send_len=len;
+	int already_sended_len=0,this_sended_len=0;
+	struct sockaddr_in addr;
+	addr.sin_family = AF_INET;
+	addr.sin_addr.s_addr =dest_ip;
+	addr.sin_port = htons(dest_port);
+
+	while(to_send_len>already_sended_len)
+	{
+		this_sended_len=sendto(sd,(void*)(data+already_sended_len),
+								to_send_len-already_sended_len,
+								0,
+								(struct sockaddr *)&(addr),
+								sizeof(addr));
+		if(this_sended_len==-1)
+		{
+			if((EAGAIN == errno)||( EINTR == errno )|| (EWOULDBLOCK==errno))
+			{
+				continue;
+			}
+			else
+			{
+				printf("FS2: at send,socket error: %d %s", errno, strerror(errno));
+				return -1;
+			}
+		}
+		already_sended_len=+this_sended_len;			
+	}
+	
+	return 0;
+}
 void *fs2_thread_screen_print(void *arg);
 
 screen_stat_handle_t FS_create_handle(void)
@@ -125,6 +206,7 @@ screen_stat_handle_t FS_create_handle(void)
 	handle->display_size=INIT_STAT_FIELD_NUM;
 	handle->running=0;
 	handle->fp=stdout;
+	strcpy(handle->app_name,"?");
 	memset(handle->appoint_output_file,0,sizeof(handle->appoint_output_file));
 	memset(handle->current_output_file,0,sizeof(handle->current_output_file));
 	handle->display=(struct display_manifest_t *)calloc(sizeof(struct display_manifest_t ),handle->display_size);
@@ -133,7 +215,7 @@ screen_stat_handle_t FS_create_handle(void)
 int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* value,int size)
 {
 	struct FS_space_t* _handle=(struct FS_space_t*)handle;
-	int int_val=0;
+	int int_val=0,ret=0;
 	if(_handle->running==1)
 	{
 		return -1;
@@ -197,6 +279,33 @@ int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* va
 				_handle->flush_by_date=1;
 			}	
 			break;
+		case	APP_NAME:
+			if(size>sizeof(_handle->app_name)-1)
+			{
+				return -1;
+			}
+			strncpy(_handle->app_name,(char*)value, size);
+			break;
+		case	STATS_SERVER_IP:
+			if(size>sizeof(_handle->str_ip)-1)
+			{
+				return -1;
+			}
+			strncpy(_handle->str_ip,(char*)value, size);
+			ret=inet_pton(AF_INET, _handle->str_ip, &(_handle->server_ip));
+			if(ret<0)
+			{
+				return -1;
+			}
+			_handle->statsd_switch=1;
+			break;
+		case	STATS_SERVER_PORT:
+			if(size!=sizeof(unsigned short))
+			{
+				return -1;
+			}
+			_handle->server_port=*((unsigned short *)value);
+			break;
 		default:
 			return -1;
 	}
@@ -209,6 +318,7 @@ void FS_start(screen_stat_handle_t handle)
 	int i=0,j=0,pos=0;
 	int stat_unit_cnt=0;
 	char date_buff[32]={0};
+	char statsd_buff[UDP_PAYLOAD_SIZE];
 	stat_unit_cnt=_handle->single_cnt+_handle->line_cnt*_handle->column_cnt;
 	for(i=0;i<_handle->display_cnt;i++)
 	{
@@ -258,7 +368,13 @@ void FS_start(screen_stat_handle_t handle)
 			return;
 		}
 	}
-
+	if(_handle->statsd_switch==1)
+	{
+		_handle->statsd_socket=startup_udp();
+		snprintf(statsd_buff,sizeof(statsd_buff),"%s_RESTART:1|s",_handle->app_name);
+		send_udp(_handle->statsd_socket,_handle->server_ip, _handle->server_port,
+					statsd_buff, strlen(statsd_buff));
+	}
 	clock_gettime(CLOCK_MONOTONIC,&(_handle->last_display_time));
 	if(_handle->create_thread==1)
 	{
@@ -499,6 +615,71 @@ static double get_stat_ratio(struct FS_space_t* _handle,int numerator_id,int den
 		}
 	}
 	return ratio;
+}
+void flush_metric(struct FS_space_t* _handle)
+{
+	send_udp(_handle->statsd_socket, _handle->server_ip, _handle->server_port,
+				_handle->send_buff, _handle->snd_buf_off+1);
+	_handle->snd_buf_off=0;
+	memset(_handle->send_buff,0,sizeof(_handle->send_buff));
+	return;
+}
+void append_metric(struct FS_space_t* _handle,const char* name, long long value)
+{
+	if(UDP_PAYLOAD_SIZE-_handle->snd_buf_off<strlen(name)+22)
+	{
+		flush_metric(_handle);
+	}
+	_handle->snd_buf_off+=snprintf(_handle,UDP_PAYLOAD_SIZE-_handle->snd_buf_off,"%s_%s:%lld|c",
+				_handle->app_name,name,value);
+	return;
+}
+void StatsD_output(struct FS_space_t* _handle)
+{
+	display_manifest_t* p=NULL,*p_column=NULL;
+	long long value=0;
+	int i=0,j=0,offset=0;
+	char metric_type='\0';
+	char name_buff[UDP_PAYLOAD_SIZE],*pos=NULL;
+	
+	for(i=0;i<_handle->display_cnt;i++)
+	{
+		p=&(_handle->display[i]);
+		if(p->is_invisible==1||p->is_ratio==1)
+		{
+			continue;
+		}
+		if(p->style!=FS_STYLE_STATUS&&p->style!=FS_STYLE_FIELD)
+		{
+			continue;
+		}
+		value=get_stat_unit_val(_handle,i, 0, FS_CALC_SPEED, 1);
+		append_metric(_handle, p->name,value);
+	}
+	for(i=0;i<_handle->display_cnt;i++)
+	{
+		p=&(_handle->display[i]);
+		if(p->style!=FS_STYLE_LINE)
+		{
+			continue;
+		}
+		if(p->is_invisible==1||p->is_ratio==1)
+		{
+			continue;
+		}
+		for(j=0;j<_handle->column_cnt;j++)
+		{
+			p_column=&(_handle->display[_handle->cloumn_id[j]]);
+			if(p_column->is_invisible==1||p_column->is_ratio==1)
+			{
+				continue;
+			}
+			snprintf(name_buff,sizeof(name_buff),"%s[%s]",p->name,p_column->name);
+			value=get_stat_unit_val(_handle,i, _handle->cloumn_id[j], FS_CALC_SPEED, 1);
+			append_metric(_handle,name_buff,value);		
+		}
+	}
+	flush_metric(_handle);
 }
 static int output_style_status(struct FS_space_t* _handle,long long interval_ms,char*print_buf, unsigned int size)
 {
@@ -755,6 +936,10 @@ void FS_passive_output(screen_stat_handle_t handle)
 	fwrite(print_buf,pos-print_buf,1,_handle->fp);
 	fflush(_handle->fp);
 	memcpy(&(_handle->last_display_time),&now,sizeof(now));
+	if(_handle->statsd_switch==1)
+	{
+		StatsD_output(_handle);
+	}
 }
 void *fs2_thread_screen_print(void *arg)
 {
