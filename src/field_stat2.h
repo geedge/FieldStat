@@ -50,7 +50,7 @@ void FS_start(screen_stat_handle_t handle);
 void FS_stop(screen_stat_handle_t* handle);
 
 //return field_id/line_id/column_id greater than zero if success,return an interger less than zero if failed.
-//should NOT include '\n','|' or ':' in the parameter name.
+//should NOT include "|:\n\r.\t<>[]#!@"or space in the parameter name.
 int FS_register(screen_stat_handle_t handle,enum field_dsp_style_t style,enum field_calc_algo calc_type,const char* name);
 
 //numerator_id and denominator_id must be column/field/status style.

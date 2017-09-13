@@ -112,10 +112,12 @@ struct FS_space_t
 };
 int is_valid_fs_name(const char* name)
 {
-	unsigned int i=0;
+	const char* reserverd="|:\n\r. \t<>[]#!@";
+	unsigned int i=0,j=0;
 	for(i=0;i<strlen(name);i++)
 	{
-		if(name[i]=='|'||name[i]==':'||name[i]=='\n'||name[i]==' ')
+		for(j=0;j<strlen(reserverd);j++)
+		if(name[i]==reserverd[j])
 		{
 			return 0;
 		}
@@ -382,7 +384,7 @@ void FS_start(screen_stat_handle_t handle)
 	if(_handle->statsd_switch==1)
 	{
 		_handle->statsd_socket=startup_udp();
-		snprintf(statsd_buff,sizeof(statsd_buff),"%s_RESTART:1|s",_handle->app_name);
+		snprintf(statsd_buff,sizeof(statsd_buff),"%s.RESTART:1|s\n",_handle->app_name);
 		send_udp(_handle->statsd_socket,_handle->server_ip, _handle->server_port,
 					statsd_buff, strlen(statsd_buff));
 	}
@@ -637,19 +639,28 @@ static double get_stat_ratio(struct FS_space_t* _handle,int numerator_id,int den
 }
 void flush_metric(struct FS_space_t* _handle)
 {
+	if(_handle->snd_buf_off==0)
+	{
+		return;
+	}
 	send_udp(_handle->statsd_socket, _handle->server_ip, _handle->server_port,
-				_handle->send_buff, _handle->snd_buf_off+1);
+				_handle->send_buff, _handle->snd_buf_off);
 	_handle->snd_buf_off=0;
 	memset(_handle->send_buff,0,sizeof(_handle->send_buff));
 	return;
 }
 void append_metric(struct FS_space_t* _handle,const char* name, long long value)
 {
-	if(UDP_PAYLOAD_SIZE-(unsigned int)_handle->snd_buf_off<strlen(name)+22)
+	if(value==0)
+	{
+		return;
+	}
+	if(UDP_PAYLOAD_SIZE-(unsigned int)_handle->snd_buf_off<strlen(name)+24)
 	{
 		flush_metric(_handle);
 	}
-	_handle->snd_buf_off+=snprintf(_handle->send_buff,UDP_PAYLOAD_SIZE-_handle->snd_buf_off,"%s_%s:%lld|c",
+	_handle->snd_buf_off+=snprintf(_handle->send_buff+_handle->snd_buf_off,UDP_PAYLOAD_SIZE-_handle->snd_buf_off,
+				"[%s]%s:%lld|c\n",
 				_handle->app_name,name,value);
 	return;
 }
@@ -692,7 +703,7 @@ void StatsD_output(struct FS_space_t* _handle)
 			{
 				continue;
 			}
-			snprintf(name_buff,sizeof(name_buff),"%s[%s]",p->name,p_column->name);
+			snprintf(name_buff,sizeof(name_buff),"%s#%s",p->name,p_column->name);
 			value=get_stat_unit_val(_handle,i, _handle->cloumn_id[j], FS_CALC_SPEED, 1);
 			append_metric(_handle,name_buff,value);		
 		}
