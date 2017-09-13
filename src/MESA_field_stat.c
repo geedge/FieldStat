@@ -24,7 +24,7 @@
 
 #define	STATUS_PER_LINE	6
 #define	FIELD_PER_LINE		8
-int FIELD_STAT_VERSION_2_20170301=0;
+int FIELD_STAT_VERSION_3_20170913=0;
 
 #if(__GNUC__ * 100 + __GNUC_MINOR__ * 10 + __GNUC_PATCHLEVEL__ >= 410)
 #define atomic_inc(x) __sync_add_and_fetch((x),1)
@@ -110,6 +110,18 @@ struct FS_space_t
 	struct timespec last_display_time;
 	const char* write_mode;
 };
+int is_valid_fs_name(const char* name)
+{
+	unsigned int i=0;
+	for(i=0;i<strlen(name);i++)
+	{
+		if(name[i]=='|'||name[i]==':'||name[i]=='\n'||name[i]==' ')
+		{
+			return 0;
+		}
+	}
+	return 1;
+}
 int current_day(char* day_buff,int size)
 {
 	
@@ -137,7 +149,6 @@ static int startup_udp()
 {
 	int sd_udp=-1;
 	int flags;
-	struct ifreq ifr;
  	if(-1==(sd_udp = socket(AF_INET, SOCK_DGRAM, 0)))
 	{
 		printf("FS2: socket error: %d %s, restart socket.", errno, strerror(errno));
@@ -280,14 +291,14 @@ int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* va
 			}	
 			break;
 		case	APP_NAME:
-			if(size>sizeof(_handle->app_name)-1)
+			if((unsigned int)size>sizeof(_handle->app_name)-1)
 			{
 				return -1;
 			}
 			strncpy(_handle->app_name,(char*)value, size);
 			break;
 		case	STATS_SERVER_IP:
-			if(size>sizeof(_handle->str_ip)-1)
+			if((unsigned int)size>sizeof(_handle->str_ip)-1)
 			{
 				return -1;
 			}
@@ -409,6 +420,10 @@ int FS_register(screen_stat_handle_t handle,enum field_dsp_style_t style,enum fi
 	struct FS_space_t* _handle=(struct FS_space_t*)handle;
 	struct display_manifest_t * choosen=NULL;
 	int id=0;
+	if(!is_valid_fs_name(name))
+	{
+		return -1;
+	}
 	if(_handle->running==1)
 	{
 		return -1;
@@ -450,6 +465,10 @@ int FS_register_ratio(screen_stat_handle_t handle,int numerator_id,int denominat
 	struct display_manifest_t * choosen=NULL;
 	int id=0;
 	if(_handle->running==1)
+	{
+		return -1;
+	}
+	if(!is_valid_fs_name(name))
 	{
 		return -1;
 	}
@@ -626,11 +645,11 @@ void flush_metric(struct FS_space_t* _handle)
 }
 void append_metric(struct FS_space_t* _handle,const char* name, long long value)
 {
-	if(UDP_PAYLOAD_SIZE-_handle->snd_buf_off<strlen(name)+22)
+	if(UDP_PAYLOAD_SIZE-(unsigned int)_handle->snd_buf_off<strlen(name)+22)
 	{
 		flush_metric(_handle);
 	}
-	_handle->snd_buf_off+=snprintf(_handle,UDP_PAYLOAD_SIZE-_handle->snd_buf_off,"%s_%s:%lld|c",
+	_handle->snd_buf_off+=snprintf(_handle->send_buff,UDP_PAYLOAD_SIZE-_handle->snd_buf_off,"%s_%s:%lld|c",
 				_handle->app_name,name,value);
 	return;
 }
@@ -638,9 +657,8 @@ void StatsD_output(struct FS_space_t* _handle)
 {
 	display_manifest_t* p=NULL,*p_column=NULL;
 	long long value=0;
-	int i=0,j=0,offset=0;
-	char metric_type='\0';
-	char name_buff[UDP_PAYLOAD_SIZE],*pos=NULL;
+	int i=0,j=0;
+	char name_buff[UDP_PAYLOAD_SIZE];
 	
 	for(i=0;i<_handle->display_cnt;i++)
 	{
