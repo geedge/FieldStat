@@ -24,7 +24,7 @@
 
 #define	STATUS_PER_LINE	6
 #define	FIELD_PER_LINE		8
-int FIELD_STAT_VERSION_3_20170913=0;
+int FIELD_STAT_VERSION_3_20170915=0;
 
 #if(__GNUC__ * 100 + __GNUC_MINOR__ * 10 + __GNUC_PATCHLEVEL__ >= 410)
 #define atomic_inc(x) __sync_add_and_fetch((x),1)
@@ -331,7 +331,6 @@ void FS_start(screen_stat_handle_t handle)
 	int i=0,j=0,pos=0;
 	int stat_unit_cnt=0;
 	char date_buff[32]={0};
-	char statsd_buff[UDP_PAYLOAD_SIZE];
 	stat_unit_cnt=_handle->single_cnt+_handle->line_cnt*_handle->column_cnt;
 	for(i=0;i<_handle->display_cnt;i++)
 	{
@@ -384,9 +383,8 @@ void FS_start(screen_stat_handle_t handle)
 	if(_handle->statsd_switch==1)
 	{
 		_handle->statsd_socket=startup_udp();
-		snprintf(statsd_buff,sizeof(statsd_buff),"%s.RESTART:1|s\n",_handle->app_name);
-		send_udp(_handle->statsd_socket,_handle->server_ip, _handle->server_port,
-					statsd_buff, strlen(statsd_buff));
+		append_metric(_handle, "RESTART", 1);
+		flush_metric(_handle);
 	}
 	clock_gettime(CLOCK_MONOTONIC,&(_handle->last_display_time));
 	if(_handle->create_thread==1)
