@@ -110,6 +110,66 @@ struct FS_space_t
 	struct timespec last_display_time;
 	const char* write_mode;
 };
+static int send_udp(int sd, unsigned int dest_ip, unsigned short dest_port, const char * data, int len)
+{
+	int to_send_len=len;
+	int already_sended_len=0,this_sended_len=0;
+	struct sockaddr_in addr;
+	addr.sin_family = AF_INET;
+	addr.sin_addr.s_addr =dest_ip;
+	addr.sin_port = htons(dest_port);
+
+	while(to_send_len>already_sended_len)
+	{
+		this_sended_len=sendto(sd,(void*)(data+already_sended_len),
+								to_send_len-already_sended_len,
+								0,
+								(struct sockaddr *)&(addr),
+								sizeof(addr));
+		if(this_sended_len==-1)
+		{
+			if((EAGAIN == errno)||( EINTR == errno )|| (EWOULDBLOCK==errno))
+			{
+				continue;
+			}
+			else
+			{
+				printf("FS2: at send,socket error: %d %s", errno, strerror(errno));
+				return -1;
+			}
+		}
+		already_sended_len=+this_sended_len;			
+	}
+	
+	return 0;
+}
+void flush_metric(struct FS_space_t* _handle)
+{
+	if(_handle->snd_buf_off==0)
+	{
+		return;
+	}
+	send_udp(_handle->statsd_socket, _handle->server_ip, _handle->server_port,
+				_handle->send_buff, _handle->snd_buf_off);
+	_handle->snd_buf_off=0;
+	memset(_handle->send_buff,0,sizeof(_handle->send_buff));
+	return;
+}
+void append_metric(struct FS_space_t* _handle,const char* name, long long value)
+{
+	if(value==0)
+	{
+		return;
+	}
+	if(UDP_PAYLOAD_SIZE-(unsigned int)_handle->snd_buf_off<strlen(name)+24)
+	{
+		flush_metric(_handle);
+	}
+	_handle->snd_buf_off+=snprintf(_handle->send_buff+_handle->snd_buf_off,UDP_PAYLOAD_SIZE-_handle->snd_buf_off,
+				"[%s]%s:%lld|c\n",
+				_handle->app_name,name,value);
+	return;
+}
 int is_valid_fs_name(const char* name)
 {
 	const char* reserverd="|:\n\r. \t<>[]#!@";
@@ -173,39 +233,7 @@ static int startup_udp()
 
 	return sd_udp;
 }
-static int send_udp(int sd, unsigned int dest_ip, unsigned short dest_port, const char * data, int len)
-{
-	int to_send_len=len;
-	int already_sended_len=0,this_sended_len=0;
-	struct sockaddr_in addr;
-	addr.sin_family = AF_INET;
-	addr.sin_addr.s_addr =dest_ip;
-	addr.sin_port = htons(dest_port);
 
-	while(to_send_len>already_sended_len)
-	{
-		this_sended_len=sendto(sd,(void*)(data+already_sended_len),
-								to_send_len-already_sended_len,
-								0,
-								(struct sockaddr *)&(addr),
-								sizeof(addr));
-		if(this_sended_len==-1)
-		{
-			if((EAGAIN == errno)||( EINTR == errno )|| (EWOULDBLOCK==errno))
-			{
-				continue;
-			}
-			else
-			{
-				printf("FS2: at send,socket error: %d %s", errno, strerror(errno));
-				return -1;
-			}
-		}
-		already_sended_len=+this_sended_len;			
-	}
-	
-	return 0;
-}
 void *fs2_thread_screen_print(void *arg);
 
 screen_stat_handle_t FS_create_handle(void)
@@ -635,33 +663,7 @@ static double get_stat_ratio(struct FS_space_t* _handle,int numerator_id,int den
 	}
 	return ratio;
 }
-void flush_metric(struct FS_space_t* _handle)
-{
-	if(_handle->snd_buf_off==0)
-	{
-		return;
-	}
-	send_udp(_handle->statsd_socket, _handle->server_ip, _handle->server_port,
-				_handle->send_buff, _handle->snd_buf_off);
-	_handle->snd_buf_off=0;
-	memset(_handle->send_buff,0,sizeof(_handle->send_buff));
-	return;
-}
-void append_metric(struct FS_space_t* _handle,const char* name, long long value)
-{
-	if(value==0)
-	{
-		return;
-	}
-	if(UDP_PAYLOAD_SIZE-(unsigned int)_handle->snd_buf_off<strlen(name)+24)
-	{
-		flush_metric(_handle);
-	}
-	_handle->snd_buf_off+=snprintf(_handle->send_buff+_handle->snd_buf_off,UDP_PAYLOAD_SIZE-_handle->snd_buf_off,
-				"[%s]%s:%lld|c\n",
-				_handle->app_name,name,value);
-	return;
-}
+
 void StatsD_output(struct FS_space_t* _handle)
 {
 	display_manifest_t* p=NULL,*p_column=NULL;
