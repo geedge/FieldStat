@@ -39,7 +39,7 @@ enum FS_option
 	FLUSH_BY_DATE,		//value is 1(ture) or 0(false),SIZE=4,DEFAULT: Do not flush by date.
 	APP_NAME,			//VALUE is a const char*, MUST end with '\0', SIZE= strlen(string+'\0')+1. DEFAULT is "?".
 	STATS_SERVER_IP, 	//VALUE is a const char*, MUST end with '\0', SIZE= strlen(string+'\0')+1. No DEFAULT.
-	STATS_SERVER_PORT, 	//VALUE is a unsigned short, host order, SIZE= sizeof(unsigned short). No DEFAULT.
+	STATS_SERVER_PORT, 	//VALUE is a unsigned short or a signed int, host order, SIZE= sizeof(unsigned short) or sizeof(int). No DEFAULT.
 };
 
 //Always success.

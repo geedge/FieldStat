@@ -24,7 +24,7 @@
 
 #define	STATUS_PER_LINE	6
 #define	FIELD_PER_LINE		8
-int FIELD_STAT_VERSION_3_20170915=0;
+int FIELD_STAT_VERSION_3_20170930=0;
 
 #if(__GNUC__ * 100 + __GNUC_MINOR__ * 10 + __GNUC_PATCHLEVEL__ >= 410)
 #define atomic_inc(x) __sync_add_and_fetch((x),1)
@@ -149,7 +149,7 @@ void flush_metric(struct FS_space_t* _handle)
 	{
 		return;
 	}
-	send_udp(_handle->statsd_socket, _handle->server_ip, _handle->server_port,
+	send_udp(_handle->statsd_socket, _handle->server_ip,(unsigned short) _handle->server_port,
 				_handle->send_buff, _handle->snd_buf_off);
 	_handle->snd_buf_off=0;
 	memset(_handle->send_buff,0,sizeof(_handle->send_buff));
@@ -341,6 +341,18 @@ int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* va
 			_handle->statsd_switch=1;
 			break;
 		case	STATS_SERVER_PORT:
+			if((size_t)size==sizeof(unsigned short))
+			{
+				_handle->server_port=*((unsigned short *)value);
+			}
+			else if((size_t)size==sizeof(int))
+			{
+				_handle->server_port=*((int*)value);
+			}
+			else
+			{
+				return -1;
+			}
 			if(size!=sizeof(unsigned short))
 			{
 				return -1;
