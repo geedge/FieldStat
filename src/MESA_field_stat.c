@@ -17,14 +17,14 @@
 #include <assert.h>
 #include <sys/time.h>
 
-#define	INIT_STAT_FIELD_NUM	64
+#define	INIT_STAT_FIELD_NUM	2048
 #define	MAX_STAT_COLUMN_NUM	32
 #define MAX_PATH_LEN	256
 #define	UDP_PAYLOAD_SIZE	1460
 
 #define	STATUS_PER_LINE	6
 #define	FIELD_PER_LINE		8
-int FIELD_STAT_VERSION_3_20170930=0;
+int FIELD_STAT_VERSION_3_20180618=0;
 
 #if(__GNUC__ * 100 + __GNUC_MINOR__ * 10 + __GNUC_PATCHLEVEL__ >= 410)
 #define atomic_inc(x) __sync_add_and_fetch((x),1)
@@ -53,6 +53,12 @@ struct stat_field_t
 	long long current_value;
 	long long last_output_value;
 };
+struct stat_unit_t
+{
+	long long current_value;
+	long long last_output_value;
+	long long last_diff;
+};
 
 struct display_manifest_t
 {
@@ -65,13 +71,9 @@ struct display_manifest_t
 	int output_scaling;	//negative value: zoom in; positive value: zoom out;
 	enum field_dsp_style_t style;
 	enum field_calc_algo calc_type;
+	struct stat_unit_t stat_unit;//for status and field
 };
-struct stat_unit_t
-{
-	long long current_value;
-	long long last_output_value;
-	long long last_diff;
-};
+
 
 struct FS_space_t
 {
@@ -101,9 +103,10 @@ struct FS_space_t
 	int snd_buf_off;
 	char send_buff[UDP_PAYLOAD_SIZE];
 	
-	struct display_manifest_t *display;
+	pthread_mutex_t reg_lock;
+	struct display_manifest_t **display;
 
-	struct stat_unit_t* stat_array;//for styple STATUS/FIELD
+	struct stat_unit_t* stat_matrix;//for styple column/line
 	char appoint_output_file[MAX_PATH_LEN];
 	char current_output_file[MAX_PATH_LEN];
 	FILE* fp;
@@ -250,7 +253,8 @@ screen_stat_handle_t FS_create_handle(void)
 	strcpy(handle->app_name,"?");
 	memset(handle->appoint_output_file,0,sizeof(handle->appoint_output_file));
 	memset(handle->current_output_file,0,sizeof(handle->current_output_file));
-	handle->display=(struct display_manifest_t *)calloc(sizeof(struct display_manifest_t ),handle->display_size);
+	pthread_mutex_init(&(handle->reg_lock),NULL);
+	handle->display=(struct display_manifest_t **)calloc(sizeof(struct display_manifest_t *),handle->display_size);
 	return handle;
 }
 int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* value,int size)
@@ -312,7 +316,7 @@ int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* va
 			{
 				return -1;
 			}
-			_handle->display[int_val].is_invisible=1;
+			_handle->display[int_val]->is_invisible=1;
 			break;
 		case	FLUSH_BY_DATE:
 			if(int_val==1)
@@ -369,25 +373,24 @@ void FS_start(screen_stat_handle_t handle)
 	struct FS_space_t* _handle=(struct FS_space_t*)handle;
 	pthread_t cfg_mon_t;
 	int i=0,j=0,pos=0;
-	int stat_unit_cnt=0;
+	int stat_matrix_size=0;
 	char date_buff[32]={0};
-	stat_unit_cnt=_handle->single_cnt+_handle->line_cnt*_handle->column_cnt;
+	stat_matrix_size=_handle->line_cnt*_handle->column_cnt;
 	for(i=0;i<_handle->display_cnt;i++)
 	{
-		switch(_handle->display[i].style)
+		switch(_handle->display[i]->style)
 		{
 			case	FS_STYLE_FIELD:
 			case	FS_STYLE_STATUS:
-				_handle->display[i].idx=pos;
-				pos++;
+
 				break;
 			case	FS_STYLE_COLUMN:
-				_handle->display[i].idx=j;
+				_handle->display[i]->idx=j;
 				_handle->cloumn_id[j]=i;
 				j++;
 				break;
 			case	FS_STYLE_LINE:
-				_handle->display[i].idx=pos;
+				_handle->display[i]->idx=pos;
 				pos+=_handle->column_cnt;
 				break;
 			default:
@@ -396,7 +399,7 @@ void FS_start(screen_stat_handle_t handle)
 		}		
 	}
 	assert(j==_handle->column_cnt);
-	_handle->stat_array=(struct stat_unit_t*)calloc(sizeof(struct stat_unit_t),stat_unit_cnt);
+	_handle->stat_matrix=(struct stat_unit_t*)calloc(sizeof(struct stat_unit_t),stat_matrix_size);
 	_handle->running=1;
 	if(strlen(_handle->appoint_output_file)>0)//otherwise use stdout;
 	{
@@ -440,12 +443,14 @@ void FS_stop(screen_stat_handle_t* handle)
 	_handle->create_thread=0;
 	for(i=0;i<_handle->display_cnt;i++)
 	{
-		free(_handle->display[i].name);
-		_handle->display[i].name=NULL;
+		free(_handle->display[i]->name);
+		_handle->display[i]->name=NULL;
+		free(_handle->display[i]);
+		_handle->display[i]=NULL;
 	}
 	free(_handle->display);
-	free(_handle->stat_array);
-	_handle->stat_array=NULL;
+	free(_handle->stat_matrix);
+	_handle->stat_matrix=NULL;
 	free(_handle);
 	if(strlen(_handle->appoint_output_file)>0)
 	{
@@ -464,7 +469,7 @@ int FS_register(screen_stat_handle_t handle,enum field_dsp_style_t style,enum fi
 	{
 		return -1;
 	}
-	if(_handle->running==1)
+	if(_handle->running==1&&(style==FS_STYLE_LINE||style==FS_STYLE_COLUMN))
 	{
 		return -1;
 	}
@@ -483,20 +488,20 @@ int FS_register(screen_stat_handle_t handle,enum field_dsp_style_t style,enum fi
 		default:
 			return -1;
 	}
+	pthread_mutex_lock(&(_handle->reg_lock));
 	id=_handle->display_cnt;
 	_handle->display_cnt++;
-	if(_handle->display_cnt==_handle->display_size)
-	{
-		_handle->display_size+=INIT_STAT_FIELD_NUM;
-		_handle->display=(struct display_manifest_t *)realloc(_handle->display,sizeof(struct display_manifest_t )*_handle->display_size);
-	}
-	choosen=&(_handle->display[id]);
+	assert(_handle->display_cnt<_handle->display_size);
+	_handle->display[id]=(struct display_manifest_t*)calloc(sizeof(struct display_manifest_t),1);
+
+	choosen=_handle->display[id];
 	choosen->calc_type=calc_type;
 	choosen->style=style;
 	choosen->is_ratio=0;
 	choosen->output_scaling=1;
 	choosen->name=(char*)calloc(sizeof(char),strlen(name)+1);
 	memcpy(choosen->name,name,strlen(name));
+	pthread_mutex_unlock(&(_handle->reg_lock));
 	return id;
 }
 int FS_register_ratio(screen_stat_handle_t handle,int numerator_id,int denominator_id,int scaling,enum field_dsp_style_t style,enum field_calc_algo calc_type,const char* name)
@@ -504,7 +509,7 @@ int FS_register_ratio(screen_stat_handle_t handle,int numerator_id,int denominat
 	struct FS_space_t* _handle=(struct FS_space_t*)handle;
 	struct display_manifest_t * choosen=NULL;
 	int id=0;
-	if(_handle->running==1)
+	if(_handle->running==1&&(style==FS_STYLE_LINE||style==FS_STYLE_COLUMN))
 	{
 		return -1;
 	}
@@ -516,11 +521,11 @@ int FS_register_ratio(screen_stat_handle_t handle,int numerator_id,int denominat
 	{
 		return -1;
 	}
-	if(_handle->display[denominator_id].is_ratio==1||_handle->display[numerator_id].is_ratio==1)
+	if(_handle->display[denominator_id]->is_ratio==1||_handle->display[numerator_id]->is_ratio==1)
 	{
 		return -1;
 	}
-	if(_handle->display[denominator_id].style==FS_STYLE_LINE||_handle->display[numerator_id].style==FS_STYLE_LINE)
+	if(_handle->display[denominator_id]->style==FS_STYLE_LINE||_handle->display[numerator_id]->style==FS_STYLE_LINE)
 	{
 		return -1;
 	}
@@ -549,12 +554,10 @@ int FS_register_ratio(screen_stat_handle_t handle,int numerator_id,int denominat
 	}
 	id=_handle->display_cnt;
 	_handle->display_cnt++;
-	if(_handle->display_cnt==_handle->display_size)
-	{
-		_handle->display_size+=INIT_STAT_FIELD_NUM;
-		_handle->display=(struct display_manifest_t *)realloc(_handle->display,sizeof(struct display_manifest_t )*_handle->display_size);
-	}
-	choosen=&(_handle->display[id]);
+	assert(_handle->display_cnt<_handle->display_size);
+
+	_handle->display[id]=(struct display_manifest_t*)calloc(sizeof(struct display_manifest_t),1);
+	choosen=_handle->display[id];
 	choosen->calc_type=calc_type;
 	choosen->style=style;
 	choosen->is_ratio=1;
@@ -574,20 +577,20 @@ int FS_operate(screen_stat_handle_t handle,int id,int column_id,enum field_op op
 	{
 		return -1;
 	}
-	if(_handle->display[id].style==FS_STYLE_LINE)
+	if(_handle->display[id]->style==FS_STYLE_LINE)
 	{
-		if(column_id>=_handle->display_cnt||column_id>=_handle->display_cnt||_handle->display[column_id].style!=FS_STYLE_COLUMN)
+		if(column_id>=_handle->display_cnt||column_id>=_handle->display_cnt||_handle->display[column_id]->style!=FS_STYLE_COLUMN)
 		{
 			return -1;
 		}
-		i=_handle->display[id].idx;
-		j=_handle->display[column_id].idx;
-		target=&(_handle->stat_array[i+j]);
+		i=_handle->display[id]->idx;
+		j=_handle->display[column_id]->idx;
+		target=&(_handle->stat_matrix[i+j]);
 	}
 	else
 	{
-		i=_handle->display[id].idx;
-		target=&(_handle->stat_array[i]);
+		i=_handle->display[id]->idx;
+		target=&(_handle->display[id]->stat_unit);
 	}
 	switch(op)
 	{
@@ -607,16 +610,16 @@ static long long get_stat_unit_val(struct FS_space_t* _handle,int id,int column_
 {
 	display_manifest_t* p=NULL;
 	stat_unit_t* target=NULL;
-	p=&(_handle->display[id]);
+	p=_handle->display[id];
 	long long value=0;
 	switch(p->style)
 	{
 		case	FS_STYLE_FIELD:
 		case	FS_STYLE_STATUS:
-			target=&(_handle->stat_array[p->idx]);
+			target=&(p->stat_unit);
 			break;
 		case	FS_STYLE_LINE:
-			target=&(_handle->stat_array[p->idx+_handle->display[column_id].idx]);
+			target=&(_handle->stat_matrix[p->idx+_handle->display[column_id]->idx]);
 			break;
 		case	FS_STYLE_COLUMN:
 		default:
@@ -647,9 +650,9 @@ static double get_stat_ratio(struct FS_space_t* _handle,int numerator_id,int den
 	long long value_n=0,value_d=0;
 	double ratio=0.0;
 
-	if(_handle->display[numerator_id].style==FS_STYLE_COLUMN)
+	if(_handle->display[numerator_id]->style==FS_STYLE_COLUMN)
 	{
-		assert(_handle->display[denominator_id].style==FS_STYLE_COLUMN);
+		assert(_handle->display[denominator_id]->style==FS_STYLE_COLUMN);
 		value_n=get_stat_unit_val(_handle,line_id,numerator_id,calc_type,1);
 		value_d=get_stat_unit_val(_handle,line_id,denominator_id,calc_type,1);
 	}
@@ -685,7 +688,7 @@ void StatsD_output(struct FS_space_t* _handle)
 	
 	for(i=0;i<_handle->display_cnt;i++)
 	{
-		p=&(_handle->display[i]);
+		p=_handle->display[i];
 		if(p->is_invisible==1||p->is_ratio==1)
 		{
 			continue;
@@ -699,7 +702,7 @@ void StatsD_output(struct FS_space_t* _handle)
 	}
 	for(i=0;i<_handle->display_cnt;i++)
 	{
-		p=&(_handle->display[i]);
+		p=_handle->display[i];
 		if(p->style!=FS_STYLE_LINE)
 		{
 			continue;
@@ -710,7 +713,7 @@ void StatsD_output(struct FS_space_t* _handle)
 		}
 		for(j=0;j<_handle->column_cnt;j++)
 		{
-			p_column=&(_handle->display[_handle->cloumn_id[j]]);
+			p_column=_handle->display[_handle->cloumn_id[j]];
 			if(p_column->is_invisible==1||p_column->is_ratio==1)
 			{
 				continue;
@@ -732,7 +735,7 @@ static int output_style_status(struct FS_space_t* _handle,long long interval_ms,
 
 	for(i=0;i<_handle->display_cnt;i++)
 	{
-		p=&(_handle->display[i]);
+		p=_handle->display[i];
 		if(p->style!=FS_STYLE_STATUS)
 		{
 			continue;
@@ -785,7 +788,7 @@ static int output_style_field(struct FS_space_t* _handle,long long interval_ms,c
 	
 	for(i=0;i<_handle->display_cnt;i++)
 	{
-		p=&(_handle->display[i]);
+		p=_handle->display[i];
 		if(p->style!=FS_STYLE_FIELD)
 		{
 			continue;
@@ -804,13 +807,13 @@ static int output_style_field(struct FS_space_t* _handle,long long interval_ms,c
 		pos+=snprintf(pos,size-(pos-print_buf),"\t");
 		for(j=0;j<FIELD_PER_LINE&&i+j<field_cnt;j++)
 		{
-			p=&(_handle->display[field_id[i+j]]);
+			p=_handle->display[field_id[i+j]];
 			pos+=snprintf(pos,size-(pos-print_buf),"%10s\t",p->name);
 		}
 		pos+=snprintf(pos,size-(pos-print_buf),"\nsum\t");
 		for(j=0;j<FIELD_PER_LINE&&i+j<field_cnt;j++)
 		{
-			p=&(_handle->display[field_id[i+j]]);
+			p=_handle->display[field_id[i+j]];
 			if(p->is_ratio==1)
 			{
 				ratio=get_stat_ratio(_handle,p->numerator_id,p->denominator_id,p->output_scaling, 0,FS_CALC_CURRENT);
@@ -862,7 +865,7 @@ static int output_style_table(struct FS_space_t* _handle,long long interval_ms,c
 		{
 			pos+=snprintf(pos,size-(pos-print_buf),"\t\t");
 		}
-		p_column=&(_handle->display[_handle->cloumn_id[i]]);
+		p_column=_handle->display[_handle->cloumn_id[i]];
 		if(p_column->is_invisible==1)
 		{
 			continue;
@@ -872,7 +875,7 @@ static int output_style_table(struct FS_space_t* _handle,long long interval_ms,c
 	pos+=snprintf(pos,sizeof(print_buf)-(pos-print_buf),"\n");
 	for(i=0;i<_handle->display_cnt;i++)
 	{
-		p_line=&(_handle->display[i]);
+		p_line=_handle->display[i];
 		if(p_line->style!=FS_STYLE_LINE)
 		{
 			continue;
@@ -880,7 +883,7 @@ static int output_style_table(struct FS_space_t* _handle,long long interval_ms,c
 		pos+=snprintf(pos,size-(pos-print_buf),"%-20s\t",p_line->name);
 		for(j=0;j<_handle->column_cnt;j++)
 		{
-			p_column=&(_handle->display[_handle->cloumn_id[j]]);
+			p_column=_handle->display[_handle->cloumn_id[j]];
 			if(p_column->is_invisible==1)
 			{
 				//for flush last_output_value
@@ -961,9 +964,11 @@ void FS_passive_output(screen_stat_handle_t handle)
 	pos--;//jump '\n' generate by ctime()
 	pos+=snprintf(pos,sizeof(print_buf)-(pos-print_buf),"%s\n",draw_boundary);
 
+	pthread_mutex_lock(&(_handle->reg_lock));
 	pos+=output_style_status(_handle, interval_ms,pos, sizeof(print_buf)-(pos-print_buf));
 	pos+=output_style_field(_handle, interval_ms,pos, sizeof(print_buf)-(pos-print_buf));
 	pos+=output_style_table(_handle, interval_ms,pos, sizeof(print_buf)-(pos-print_buf));
+	pthread_mutex_unlock(&(_handle->reg_lock));
 
 	if(_handle->fp==NULL)
 	{
@@ -978,8 +983,10 @@ void FS_passive_output(screen_stat_handle_t handle)
 	fflush(_handle->fp);
 	memcpy(&(_handle->last_display_time),&now,sizeof(now));
 	if(_handle->statsd_switch==1)
-	{
+	{		
+		pthread_mutex_lock(&(_handle->reg_lock));
 		StatsD_output(_handle);
+		pthread_mutex_unlock(&(_handle->reg_lock));
 	}
 }
 void *fs2_thread_screen_print(void *arg)
