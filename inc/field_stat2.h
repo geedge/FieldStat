@@ -40,6 +40,7 @@ enum FS_option
 	APP_NAME,			//VALUE is a const char*, MUST end with '\0', SIZE= strlen(string+'\0')+1. DEFAULT is "?".
 	STATS_SERVER_IP, 	//VALUE is a const char*, MUST end with '\0', SIZE= strlen(string+'\0')+1. No DEFAULT.
 	STATS_SERVER_PORT, 	//VALUE is a unsigned short or a signed int, host order, SIZE= sizeof(unsigned short) or sizeof(int). No DEFAULT.
+	MAX_STAT_FIELD_NUM		//VALUE is an interger, SIZE=sizeof(int), DEFAULT:1024.
 };
 
 //Always success.

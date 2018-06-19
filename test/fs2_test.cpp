@@ -29,6 +29,9 @@ int main(int argc,char* argv[])
 	FS_set_para(handle, CREATE_THREAD, &value, sizeof(value));
 	value=2;
 	FS_set_para(handle, STAT_CYCLE, &value, sizeof(value));
+	value=4096;
+	FS_set_para(handle, MAX_STAT_FIELD_NUM, &value, sizeof(value));
+	
 	int status_ids[TEST_STATUS_NUM], field_ids[TEST_FIELD_NUM], line_ids[TEST_LINE_NUM], column_ids[TEST_COLUMN_NUM];
 	int runtime_status_ids[TEST_RUNTIME_REG_NUM];
 	for(i=0;i<TEST_STATUS_NUM;i++)

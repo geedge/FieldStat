@@ -17,7 +17,7 @@
 #include <assert.h>
 #include <sys/time.h>
 
-#define	INIT_STAT_FIELD_NUM	2048
+#define	INIT_STAT_FIELD_NUM	1024
 #define	MAX_STAT_COLUMN_NUM	32
 #define MAX_PATH_LEN	256
 #define	UDP_PAYLOAD_SIZE	1460
@@ -363,6 +363,13 @@ int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* va
 			}
 			_handle->server_port=*((unsigned short *)value);
 			break;
+		case MAX_STAT_FIELD_NUM:
+			if((size_t)size!=sizeof(int))
+			{
+				return -1;
+			}
+			_handle->display_size=*((int*)value);
+			_handle->display=(struct display_manifest_t **)realloc(_handle->display,sizeof(struct display_manifest_t *)*_handle->display_size);
 		default:
 			return -1;
 	}
@@ -501,6 +508,7 @@ int FS_register(screen_stat_handle_t handle,enum field_dsp_style_t style,enum fi
 	choosen->output_scaling=1;
 	choosen->name=(char*)calloc(sizeof(char),strlen(name)+1);
 	memcpy(choosen->name,name,strlen(name));
+	memset(&(choosen->stat_unit),0,sizeof(choosen->stat_unit));
 	pthread_mutex_unlock(&(_handle->reg_lock));
 	return id;
 }
