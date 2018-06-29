@@ -9,6 +9,7 @@ all:
 clean:
 		cd src/ && $(MAKE) clean
 		cd test && $(MAKE) clean
+		rm lib/*
 opt:
 		$(MAKE) all
 

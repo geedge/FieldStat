@@ -1,3 +1,6 @@
+MAJOR_VER=1
+MINOR_VER=0
+RELEASE_DATE=20180629
 CC		= g++
 CFLAGS		= -Wall
 CFLAGS		+= -g -fPIC
@@ -5,7 +8,7 @@ H_DIR		= -I../inc
 SOURCES		= MESA_field_stat.c
 OBJS		= $(SOURCES:.c=.o)
 TARGET_LIB	= libMESA_field_stat2.a
-TARGET_SO	= libMESA_field_stat2.so
+TARGET_SO	= libMESA_field_stat2.so.$(MAJOR_VER).$(MINOR_VER).$(RELEASE_DATE)
 
 .PHONY: all clean deps
 .c.o:

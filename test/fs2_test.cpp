@@ -10,13 +10,14 @@
 #define TEST_LINE_NUM	7
 #define TEST_COLUMN_NUM	8
 #define	TEST_RUNTIME_REG_NUM	32
+#define	TEST_RUNTIME_REG_LINE_NUM 6
 int main(int argc,char* argv[])
 {
 	screen_stat_handle_t handle=NULL;
 	const char* stat_path="./fs2_test.status";
 	const char* app_name="fs2_test";
 	char buff[128];
-	int value=0,i=0,j=0,runtime_reg_num=0,ret=0;
+	int value=0,i=0,j=0,runtime_reg_num=0,runtime_reg_line_num=0,ret=0;
 	handle=FS_create_handle();
 	
 	FS_set_para(handle, APP_NAME, app_name, strlen(app_name)+1);
@@ -32,7 +33,7 @@ int main(int argc,char* argv[])
 	value=4096;
 	FS_set_para(handle, MAX_STAT_FIELD_NUM, &value, sizeof(value));
 	
-	int status_ids[TEST_STATUS_NUM], field_ids[TEST_FIELD_NUM], line_ids[TEST_LINE_NUM], column_ids[TEST_COLUMN_NUM];
+	int status_ids[TEST_STATUS_NUM], field_ids[TEST_FIELD_NUM], line_ids[TEST_LINE_NUM+TEST_RUNTIME_REG_LINE_NUM], column_ids[TEST_COLUMN_NUM];
 	int runtime_status_ids[TEST_RUNTIME_REG_NUM];
 	for(i=0;i<TEST_STATUS_NUM;i++)
 	{
@@ -75,7 +76,7 @@ int main(int argc,char* argv[])
 		{
 			FS_operate(handle, field_ids[i], 0, FS_OP_ADD, i*100);
 		}
-		for(i=0;i<TEST_LINE_NUM;i++)
+		for(i=0;i<TEST_LINE_NUM+runtime_reg_line_num;i++)
 		{
 			for(j=0;j<TEST_COLUMN_NUM;j++)
 			{
@@ -93,8 +94,16 @@ int main(int argc,char* argv[])
 			assert(ret>=0);
 			runtime_status_ids[runtime_reg_num]=ret;
 			runtime_reg_num++;
-			ret=FS_register(handle,FS_STYLE_LINE, FS_CALC_SPEED, buff);
+			ret=FS_register(handle,FS_STYLE_COLUMN, FS_CALC_SPEED, buff);
 			assert(ret==-1);//always failed
+		}
+		if(runtime_reg_line_num<TEST_RUNTIME_REG_LINE_NUM)
+		{
+			snprintf(buff,sizeof(buff),"line_rt_%02d",runtime_reg_line_num);
+			ret=FS_register(handle,FS_STYLE_LINE, FS_CALC_SPEED, buff);
+			assert(ret>=0);
+			line_ids[TEST_LINE_NUM+runtime_reg_line_num]=ret;
+			runtime_reg_line_num++;
 		}
 		usleep(1000);
 	}
