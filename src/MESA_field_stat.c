@@ -24,7 +24,7 @@
 
 #define	STATUS_PER_LINE	6
 #define	FIELD_PER_LINE		8
-int FIELD_STAT_VERSION_1_0_20180629=0;
+int FIELD_STAT_VERSION_1_0_20180712=0;
 
 #if(__GNUC__ * 100 + __GNUC_MINOR__ * 10 + __GNUC_PATCHLEVEL__ >= 410)
 #define atomic_inc(x) __sync_add_and_fetch((x),1)
@@ -449,15 +449,15 @@ void FS_stop(screen_stat_handle_t* handle)
 	_handle->create_thread=0;
 	for(i=0;i<_handle->display_cnt;i++)
 	{
-		free(_handle->display[i]->name);
-		_handle->display[i]->name=NULL;
-		free(_handle->display[i]);
-		_handle->display[i]=NULL;
 		if(_handle->display[i]->style==FS_STYLE_LINE)
 		{
 			free(_handle->display[i]->stat_array);
 			_handle->display[i]->stat_array=NULL;
 		}
+		free(_handle->display[i]->name);
+		_handle->display[i]->name=NULL;
+		free(_handle->display[i]);
+		_handle->display[i]=NULL;
 	}
 	free(_handle->display);
 	free(_handle);
