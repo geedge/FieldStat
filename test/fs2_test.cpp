@@ -36,6 +36,9 @@ int main(int argc,char* argv[])
 	value=4096;
 	FS_set_para(handle, MAX_STAT_FIELD_NUM, &value, sizeof(value));
 	
+	const char* histogram_format="10,100,200,500,1000";
+	FS_set_para(handle, HISTOGRAM_GLOBAL_BINS, histogram_format, strlen(histogram_format)+1);
+	
 	int status_ids[TEST_STATUS_NUM], field_ids[TEST_FIELD_NUM], line_ids[TEST_LINE_NUM+TEST_RUNTIME_REG_LINE_NUM], column_ids[TEST_COLUMN_NUM];
 	int histogram_ids[TEST_HISTOGRAM_NUM];
 	int runtime_status_ids[TEST_RUNTIME_REG_NUM];
@@ -85,8 +88,6 @@ int main(int argc,char* argv[])
 				FS_STYLE_COLUMN,
 				FS_CALC_SPEED,
 				buff);
-	const char* histogram_format="10,100,200,500,1000";
-	FS_set_para(handle, HISTOGRAM_GENERAL_BINS, histogram_format, strlen(histogram_format)+1);
 	
 	FS_start(handle);
 	while (1)

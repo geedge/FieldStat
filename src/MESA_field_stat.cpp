@@ -1,4 +1,5 @@
 #include "field_stat2.h"
+
 #include <sys/socket.h>//socket
 #include <sys/types.h>//socket
 #include <netinet/in.h>
@@ -26,8 +27,11 @@
 #define	FIELD_PER_LINE				8
 
 #define	HISTOGRAM_DEFAULT_BINS		"10,100,1000,10000"
+
+#define	HISOTGRAM_EXTRA_INF			0
 #define	HISTOGRAM_EXTRA_SUM			1
-#define	HISTOGRAM_EXTRA_MAX			2
+#define	HISTOGRAM_EXTRA_MAXVAL		2
+#define	HISTOGRAM_EXTRA_SIZE		3
 
 int FIELD_STAT_VERSION_1_0_20180712=0;
 
@@ -129,6 +133,7 @@ struct FS_space_t
 	struct timespec last_display_time;
 	const char* write_mode;
 };
+
 static int send_udp(int sd, unsigned int dest_ip, unsigned short dest_port, const char * data, int len)
 {
 	int to_send_len=len;
@@ -215,7 +220,7 @@ int current_day(char* day_buff,int size)
 	struct tm *local_time;
 
 	t = time(NULL);
-	local_time=localtime(&t); /*取得当地时间*/
+	local_time=localtime(&t); 
 
 	snprintf(day_buff, size,"%04d-%02d-%02d", 	(local_time->tm_year + 1900), (local_time->tm_mon + 1), local_time->tm_mday);
 
@@ -423,7 +428,7 @@ int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* va
 			_handle->display_size=*((int*)value);
 			_handle->display=(struct display_manifest_t **)realloc(_handle->display,sizeof(struct display_manifest_t *)*_handle->display_size);
 			break;
-		case HISTOGRAM_GENERAL_BINS:
+		case HISTOGRAM_GLOBAL_BINS:
 			_handle->histogram_default_bin_num=parse_histogram_bin_format((const char*)value, &_handle->historgram_default_bins);
 			if(_handle->histogram_default_bin_num<0)
 			{
@@ -452,6 +457,7 @@ void FS_start(screen_stat_handle_t handle)
 		{
 			case	FS_STYLE_FIELD:
 			case	FS_STYLE_STATUS:
+			case	FS_STYLE_HISTOGRAM:
 				break;
 			case	FS_STYLE_COLUMN:
 				_handle->cloumn_id[j]=i;
@@ -461,14 +467,6 @@ void FS_start(screen_stat_handle_t handle)
 			case	FS_STYLE_LINE:
 				p->stat_array=(struct stat_unit_t*)realloc(p->stat_array,sizeof(struct stat_unit_t)*_handle->column_cnt);
 				memset(p->stat_array,0,sizeof(struct stat_unit_t)*_handle->column_cnt);
-				break;
-			case	FS_STYLE_HISTOGRAM:
-				if(p->histogram_use_default_bins==1)
-				{
-					p->histogram_bin_num=_handle->histogram_default_bin_num;
-					_handle->histogram_default_cnt++;
-				}
-				p->stat_array=(struct stat_unit_t*)calloc(sizeof(struct stat_unit_t),p->histogram_bin_num+3);//for +inf and sum
 				break;
 			default:
 				assert(0);
@@ -605,6 +603,9 @@ int FS_register(screen_stat_handle_t handle,enum field_dsp_style_t style,enum fi
 	else if(choosen->style==FS_STYLE_HISTOGRAM)
 	{
 		choosen->histogram_use_default_bins=1;
+		choosen->histogram_bin_num=_handle->histogram_default_bin_num;
+		choosen->stat_array=(struct stat_unit_t*)calloc(sizeof(struct stat_unit_t),choosen->histogram_bin_num+HISTOGRAM_EXTRA_SIZE);//for +inf and sum
+		_handle->histogram_default_cnt++;
 	}
 	else
 	{
@@ -681,6 +682,7 @@ int FS_histogram_set_bins(screen_stat_handle_t handle, int id, const char* bins)
 {
 	struct FS_space_t* _handle=(struct FS_space_t*)handle;
 	struct display_manifest_t* p=NULL;
+	int ret=0;
 	if(id>=_handle->display_cnt)
 	{
 		return -1;
@@ -690,16 +692,22 @@ int FS_histogram_set_bins(screen_stat_handle_t handle, int id, const char* bins)
 	{
 		return -1;
 	}
+	pthread_mutex_lock(&(_handle->reg_lock));
 	p->histogram_bin_num=parse_histogram_bin_format(bins, &p->histogram_bins);
-	if(p->histogram_bin_num<0)
-	{
-		return -1;
+	if(p->histogram_bin_num>0)
+	{	
+		p->histogram_use_default_bins=0;
+		free(p->stat_array);
+		p->stat_array=(struct stat_unit_t*)calloc(sizeof(struct stat_unit_t),p->histogram_bin_num+HISTOGRAM_EXTRA_SIZE);
+		_handle->histogram_default_cnt--;
+		ret=0;
 	}
 	else
 	{
-		p->histogram_use_default_bins=0;
-		return 0;
+		ret=-1;
 	}
+	pthread_mutex_unlock(&(_handle->reg_lock));
+	return ret;
 }
 static int find_histogram_bin(long long* bins, int bin_num, long long val)
 {
@@ -745,7 +753,7 @@ int FS_operate(screen_stat_handle_t handle,int id,int column_id,enum field_op op
 			}
 			target=&(p->stat_array[i]);
 			bin_sum=&(p->stat_array[p->histogram_bin_num+HISTOGRAM_EXTRA_SUM]);
-			max=&(p->stat_array[p->histogram_bin_num+HISTOGRAM_EXTRA_MAX]);
+			max=&(p->stat_array[p->histogram_bin_num+HISTOGRAM_EXTRA_MAXVAL]);
 			atomic_add(&(target->current_value),1);
 			atomic_add(&(bin_sum->current_value),value);
 			if(value>atomic_read(&(max->current_value)))
@@ -1129,7 +1137,7 @@ static int print_histogram_unit(display_manifest_t* p, char*print_buf, unsigned 
 		events+=value[i];
 	}
 	sum=get_stat_unit_val(p, p->histogram_bin_num+HISTOGRAM_EXTRA_SUM, p->calc_type, 0);
-	max=get_stat_unit_val(p, p->histogram_bin_num+HISTOGRAM_EXTRA_MAX, FS_CALC_CURRENT, 0);
+	max=get_stat_unit_val(p, p->histogram_bin_num+HISTOGRAM_EXTRA_MAXVAL, FS_CALC_CURRENT, 0);
 	avg=(double)sum/events;
 	for(i=0;i<p->histogram_bin_num+1;i++)
 	{	
