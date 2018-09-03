@@ -773,7 +773,10 @@ int FS_operate(screen_stat_handle_t handle,int id,int column_id,enum field_op op
 			break;
 		case	FS_OP_SET:
 			atomic_set(&(target->current_value),value);
-			break;	
+			break;
+		case	FS_OP_SUB:
+			atomic_sub(&(target->current_value),value);
+			break;
 		default:
 			return -1;
 			break;

@@ -22,7 +22,8 @@ enum field_calc_algo
 enum field_op
 {
 	FS_OP_ADD=1,
-	FS_OP_SET
+	FS_OP_SET,
+	FS_OP_SUB
 };
 
 
