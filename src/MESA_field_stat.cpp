@@ -17,13 +17,18 @@
 #include <assert.h>
 #include <sys/time.h>
 
-#define	INIT_STAT_FIELD_NUM	1024
-#define	MAX_STAT_COLUMN_NUM	32
-#define MAX_PATH_LEN	256
-#define	UDP_PAYLOAD_SIZE	1460
+#define	INIT_STAT_FIELD_NUM		1024
+#define	MAX_STAT_COLUMN_NUM		32
+#define MAX_PATH_LEN			256
+#define	UDP_PAYLOAD_SIZE		1460
 
-#define	STATUS_PER_LINE	6
-#define	FIELD_PER_LINE		8
+#define	STATUS_PER_LINE				6
+#define	FIELD_PER_LINE				8
+
+#define	HISTOGRAM_DEFAULT_BINS		"10,100,1000,10000"
+#define	HISTOGRAM_EXTRA_SUM			1
+#define	HISTOGRAM_EXTRA_MAX			2
+
 int FIELD_STAT_VERSION_1_0_20180712=0;
 
 #if(__GNUC__ * 100 + __GNUC_MINOR__ * 10 + __GNUC_PATCHLEVEL__ >= 410)
@@ -68,12 +73,15 @@ struct display_manifest_t
 	int numerator_id;
 	int denominator_id;
 	int output_scaling;	//negative value: zoom in; positive value: zoom out;
+	int histogram_use_default_bins;
+	int histogram_bin_num;
+	long long *histogram_bins;
 	enum field_dsp_style_t style;
 	enum field_calc_algo calc_type;
 	union
 	{
 		struct stat_unit_t stat_unit;//for status and field
-		struct stat_unit_t* stat_array; //for line
+		struct stat_unit_t* stat_array; //for line and histogram
 		int column_seq;	//for column
 	};
 };
@@ -92,6 +100,11 @@ struct FS_space_t
 	int single_cnt;//including line_cnt;
 	int matrix_base;
 	int column_cnt;
+	int field_cnt;
+	int histogram_cnt;
+	int histogram_default_cnt;
+	int histogram_default_bin_num;
+	long long *historgram_default_bins;
 	int cloumn_id[MAX_STAT_COLUMN_NUM];
 	int display_size;
 	int current_date;
@@ -260,6 +273,42 @@ screen_stat_handle_t FS_create_handle(void)
 	handle->display=(struct display_manifest_t **)calloc(sizeof(struct display_manifest_t *),handle->display_size);
 	return handle;
 }
+//histogram bins format example:  "10,100,1000,2000" will return 4 bins which indicate 5 interval.
+static int parse_histogram_bin_format(const char* format, long long **output_bins)
+{
+	char *token=NULL,*sub_token=NULL,*saveptr;
+	size_t i=0;
+	int comma_num=0,ret=0;
+	long long *bins;
+	char* dup_format=(char*)malloc(sizeof(char)*strlen(format));
+	strncpy(dup_format,format,strlen(format));
+	for(i=0;i<strlen(dup_format);i++)
+	{
+		if(dup_format[i]==',')
+		{
+			comma_num++;
+		}
+	}
+	bins=(long long*)calloc(sizeof(long long),comma_num+1);
+	for (token = dup_format,i=0; ; token= NULL, i++)
+	{
+		sub_token= strtok_r(token,",", &saveptr);
+		if (sub_token == NULL)
+			break;
+		ret=sscanf(sub_token,"%lld",bins+i);
+		if(ret!=1)
+		{
+			goto error_out;
+		}
+	}
+	free(dup_format);
+	*output_bins=bins;
+	return i;
+error_out:
+	free(dup_format);
+	free(bins);
+	return -1;
+}
 int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* value,int size)
 {
 	struct FS_space_t* _handle=(struct FS_space_t*)handle;
@@ -373,6 +422,13 @@ int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* va
 			}
 			_handle->display_size=*((int*)value);
 			_handle->display=(struct display_manifest_t **)realloc(_handle->display,sizeof(struct display_manifest_t *)*_handle->display_size);
+			break;
+		case HISTOGRAM_GENERAL_BINS:
+			_handle->histogram_default_bin_num=parse_histogram_bin_format((const char*)value, &_handle->historgram_default_bins);
+			if(_handle->histogram_default_bin_num<0)
+			{
+				return -1;
+			}
 		default:
 			return -1;
 	}
@@ -384,21 +440,35 @@ void FS_start(screen_stat_handle_t handle)
 	pthread_t cfg_mon_t;
 	int i=0,j=0;
 	char date_buff[32]={0};
+	if(_handle->histogram_default_bin_num==0)
+	{
+		_handle->histogram_default_bin_num=parse_histogram_bin_format(HISTOGRAM_DEFAULT_BINS, &_handle->historgram_default_bins);
+	}
+	struct display_manifest_t *p=NULL;
 	for(i=0;i<_handle->display_cnt;i++)
 	{
-		switch(_handle->display[i]->style)
+		p=_handle->display[i];
+		switch(p->style)
 		{
 			case	FS_STYLE_FIELD:
 			case	FS_STYLE_STATUS:
 				break;
 			case	FS_STYLE_COLUMN:
 				_handle->cloumn_id[j]=i;
-				_handle->display[i]->column_seq=j;
+				p->column_seq=j;
 				j++;
 				break;
 			case	FS_STYLE_LINE:
-				_handle->display[i]->stat_array=(struct stat_unit_t*)realloc(_handle->display[i]->stat_array,sizeof(struct stat_unit_t)*_handle->column_cnt);
-				memset(_handle->display[i]->stat_array,0,sizeof(struct stat_unit_t)*_handle->column_cnt);
+				p->stat_array=(struct stat_unit_t*)realloc(p->stat_array,sizeof(struct stat_unit_t)*_handle->column_cnt);
+				memset(p->stat_array,0,sizeof(struct stat_unit_t)*_handle->column_cnt);
+				break;
+			case	FS_STYLE_HISTOGRAM:
+				if(p->histogram_use_default_bins==1)
+				{
+					p->histogram_bin_num=_handle->histogram_default_bin_num;
+					_handle->histogram_default_cnt++;
+				}
+				p->stat_array=(struct stat_unit_t*)calloc(sizeof(struct stat_unit_t),p->histogram_bin_num+3);//for +inf and sum
 				break;
 			default:
 				assert(0);
@@ -447,25 +517,40 @@ void FS_stop(screen_stat_handle_t* handle)
 	int i=0;
 	struct FS_space_t* _handle=*(struct FS_space_t**)handle;
 	_handle->create_thread=0;
+	struct display_manifest_t * p=NULL;
 	for(i=0;i<_handle->display_cnt;i++)
 	{
-		if(_handle->display[i]->style==FS_STYLE_LINE)
+		p=_handle->display[i];
+		switch (p->style)
 		{
-			free(_handle->display[i]->stat_array);
-			_handle->display[i]->stat_array=NULL;
+			case FS_STYLE_LINE:
+			case FS_STYLE_HISTOGRAM:
+				free(p->stat_array);
+				p->stat_array=NULL;
+				break;
+			default:
+				break;
 		}
-		free(_handle->display[i]->name);
-		_handle->display[i]->name=NULL;
-		free(_handle->display[i]);
+		if(p->style==FS_STYLE_HISTOGRAM&&p->histogram_use_default_bins==0)
+		{
+			free(p->histogram_bins);
+			p->histogram_bins=NULL;
+		}
+		free(p->name);
+		p->name=NULL;
+		free(p);
 		_handle->display[i]=NULL;
 	}
-	free(_handle->display);
-	free(_handle);
 	if(strlen(_handle->appoint_output_file)>0)
 	{
 		fclose(_handle->fp);
 		_handle->fp=NULL;
 	}
+	free(_handle->historgram_default_bins);
+	_handle->historgram_default_bins=NULL;
+	free(_handle->display);
+	free(_handle);
+
 	*handle=NULL;
 	return;
 }
@@ -494,6 +579,9 @@ int FS_register(screen_stat_handle_t handle,enum field_dsp_style_t style,enum fi
 		case	FS_STYLE_COLUMN:
 			_handle->column_cnt++;
 			break;
+		case	FS_STYLE_HISTOGRAM:
+			_handle->histogram_cnt++;
+			break;
 		default:
 			return -1;
 	}
@@ -513,6 +601,10 @@ int FS_register(screen_stat_handle_t handle,enum field_dsp_style_t style,enum fi
 	if(choosen->style==FS_STYLE_LINE)
 	{
 		choosen->stat_array=(struct stat_unit_t*)calloc(sizeof(struct stat_unit_t),_handle->column_cnt);
+	}
+	else if(choosen->style==FS_STYLE_HISTOGRAM)
+	{
+		choosen->histogram_use_default_bins=1;
 	}
 	else
 	{
@@ -585,30 +677,86 @@ int FS_register_ratio(screen_stat_handle_t handle,int numerator_id,int denominat
 	memcpy(choosen->name,name,strlen(name));
 	return id;
 }
-int FS_operate(screen_stat_handle_t handle,int id,int column_id,enum field_op op,long long value)
+int FS_histogram_set_bins(screen_stat_handle_t handle, int id, const char* bins)
 {
 	struct FS_space_t* _handle=(struct FS_space_t*)handle;
-	int i=0;
 	struct display_manifest_t* p=NULL;
-	struct stat_unit_t* target=NULL;
 	if(id>=_handle->display_cnt)
 	{
 		return -1;
 	}
 	p=_handle->display[id];
-	if(p->style==FS_STYLE_LINE)
+	if(p->style!=FS_STYLE_HISTOGRAM)
 	{
-		if(column_id>=_handle->display_cnt||column_id>=_handle->display_cnt||_handle->display[column_id]->style!=FS_STYLE_COLUMN)
-		{
-			return -1;
-		}
-		
-		i=_handle->display[column_id]->column_seq;
-		target=&(p->stat_array[i]);
+		return -1;
+	}
+	p->histogram_bin_num=parse_histogram_bin_format(bins, &p->histogram_bins);
+	if(p->histogram_bin_num<0)
+	{
+		return -1;
 	}
 	else
 	{
-		target=&(p->stat_unit);
+		p->histogram_use_default_bins=0;
+		return 0;
+	}
+}
+static int find_histogram_bin(long long* bins, int bin_num, long long val)
+{
+	int i=0;
+	for(i=0;i<bin_num;i++)
+	{
+		if(val<bins[i])
+		{
+			break;
+		}
+	}
+	return i;
+}
+int FS_operate(screen_stat_handle_t handle,int id,int column_id,enum field_op op,long long value)
+{
+	struct FS_space_t* _handle=(struct FS_space_t*)handle;
+	int i=0;
+	struct display_manifest_t* p=NULL;
+	struct stat_unit_t* target=NULL, *bin_sum=NULL,*max=NULL;
+	if(id>=_handle->display_cnt)
+	{
+		return -1;
+	}
+	p=_handle->display[id];
+	switch(p->style)
+	{
+		case	FS_STYLE_LINE:
+			if(column_id>=_handle->display_cnt||column_id>=_handle->display_cnt||_handle->display[column_id]->style!=FS_STYLE_COLUMN)
+			{
+				return -1;
+			}
+			i=_handle->display[column_id]->column_seq;
+			target=&(p->stat_array[i]);
+			break;
+		case	FS_STYLE_HISTOGRAM:
+			if(p->histogram_use_default_bins)
+			{
+				i=find_histogram_bin(_handle->historgram_default_bins, _handle->histogram_default_bin_num, value);
+			}
+			else
+			{
+				i=find_histogram_bin(p->histogram_bins, p->histogram_bin_num, value);
+			}
+			target=&(p->stat_array[i]);
+			bin_sum=&(p->stat_array[p->histogram_bin_num+HISTOGRAM_EXTRA_SUM]);
+			max=&(p->stat_array[p->histogram_bin_num+HISTOGRAM_EXTRA_MAX]);
+			atomic_add(&(target->current_value),1);
+			atomic_add(&(bin_sum->current_value),value);
+			if(value>atomic_read(&(max->current_value)))
+			{
+				atomic_set(&(max->current_value),value);
+			}
+			return 0;
+			break;
+		default:
+			target=&(p->stat_unit);
+			break;
 	}
 	switch(op)
 	{
@@ -624,11 +772,9 @@ int FS_operate(screen_stat_handle_t handle,int id,int column_id,enum field_op op
 	}
 	return 0;
 }
-static long long get_stat_unit_val(struct FS_space_t* _handle,int id,int column_id,enum field_calc_algo calc_type,int is_refer)
+static long long get_stat_unit_val(display_manifest_t* p, int column_seq,enum field_calc_algo calc_type,int is_refer)
 {
-	display_manifest_t* p=NULL;
 	stat_unit_t* target=NULL;
-	p=_handle->display[id];
 	long long value=0;
 	switch(p->style)
 	{
@@ -637,7 +783,10 @@ static long long get_stat_unit_val(struct FS_space_t* _handle,int id,int column_
 			target=&(p->stat_unit);
 			break;
 		case	FS_STYLE_LINE:
-			target=&(p->stat_array[_handle->display[column_id]->column_seq]);	
+			target=&(p->stat_array[column_seq]);	
+			break;
+		case	FS_STYLE_HISTOGRAM:
+			target=&(p->stat_array[column_seq]);
 			break;
 		case	FS_STYLE_COLUMN:
 		default:
@@ -663,21 +812,21 @@ static long long get_stat_unit_val(struct FS_space_t* _handle,int id,int column_
 
 	return value;
 }
-static double get_stat_ratio(struct FS_space_t* _handle,int numerator_id,int denominator_id,int scaling,int line_id,enum field_calc_algo calc_type)
+static double get_stat_ratio(struct display_manifest_t* numerator, struct display_manifest_t* denominator, struct display_manifest_t* line, int scaling,enum field_calc_algo calc_type)
 {
 	long long value_n=0,value_d=0;
 	double ratio=0.0;
-
-	if(_handle->display[numerator_id]->style==FS_STYLE_COLUMN)
+	
+	if(numerator->style==FS_STYLE_COLUMN)
 	{
-		assert(_handle->display[denominator_id]->style==FS_STYLE_COLUMN);
-		value_n=get_stat_unit_val(_handle,line_id,numerator_id,calc_type,1);
-		value_d=get_stat_unit_val(_handle,line_id,denominator_id,calc_type,1);
+		assert(denominator->style==FS_STYLE_COLUMN);
+		value_n=get_stat_unit_val(line, numerator->column_seq,calc_type,1);
+		value_d=get_stat_unit_val(line, denominator->column_seq,calc_type,1);
 	}
 	else
 	{
-		value_n=get_stat_unit_val(_handle,numerator_id,0,calc_type,1);
-		value_d=get_stat_unit_val(_handle,denominator_id,0,calc_type,1);
+		value_n=get_stat_unit_val(numerator,0,calc_type,1);
+		value_d=get_stat_unit_val(denominator,0,calc_type,1);
 	}
 	if(value_d==0)
 	{
@@ -715,7 +864,7 @@ void StatsD_output(struct FS_space_t* _handle)
 		{
 			continue;
 		}
-		value=get_stat_unit_val(_handle,i, 0, FS_CALC_SPEED, 1);
+		value=get_stat_unit_val(p, 0, FS_CALC_SPEED, 1);
 		append_metric(_handle, p->name,value);
 	}
 	for(i=0;i<_handle->display_cnt;i++)
@@ -737,7 +886,7 @@ void StatsD_output(struct FS_space_t* _handle)
 				continue;
 			}
 			snprintf(name_buff,sizeof(name_buff),"%s#%s",p->name,p_column->name);
-			value=get_stat_unit_val(_handle,i, _handle->cloumn_id[j], FS_CALC_SPEED, 1);
+			value=get_stat_unit_val(p, p_column->column_seq, FS_CALC_SPEED, 1);
 			append_metric(_handle,name_buff,value);		
 		}
 	}
@@ -760,17 +909,18 @@ static int output_style_status(struct FS_space_t* _handle,long long interval_ms,
 		}
 		if(p->is_invisible==1)
 		{
-			value=get_stat_unit_val(_handle,i, 0, p->calc_type, 0);
+			value=get_stat_unit_val(p, 0, p->calc_type, 0);
 			continue;
 		}
 		if(p->is_ratio==1)
 		{
-			ratio=get_stat_ratio(_handle,p->numerator_id,p->denominator_id,p->output_scaling, 0,p->calc_type);
+			ratio=get_stat_ratio(_handle->display[p->numerator_id],  _handle->display[p->denominator_id], NULL,
+								p->output_scaling, p->calc_type);
 			pos+=snprintf(pos,size-(pos-print_buf),"%s: %10.2e\t",p->name,ratio);
 		}
 		else
 		{
-			value=get_stat_unit_val(_handle,i, 0, p->calc_type, 0);
+			value=get_stat_unit_val(p, 0, p->calc_type, 0);
 			if(p->calc_type==FS_CALC_SPEED)
 			{
 				value=value*p->output_scaling*1000/interval_ms;
@@ -814,7 +964,7 @@ static int output_style_field(struct FS_space_t* _handle,long long interval_ms,c
 		if(p->is_invisible==1)
 		{
 			//for update last_output
-			get_stat_unit_val( _handle, field_id[i+j], 0,FS_CALC_CURRENT, 0);
+			get_stat_unit_val(p, 0,FS_CALC_CURRENT, 0);
 			continue;
 		}
 		field_id[field_cnt]=i;
@@ -834,31 +984,34 @@ static int output_style_field(struct FS_space_t* _handle,long long interval_ms,c
 			p=_handle->display[field_id[i+j]];
 			if(p->is_ratio==1)
 			{
-				ratio=get_stat_ratio(_handle,p->numerator_id,p->denominator_id,p->output_scaling, 0,FS_CALC_CURRENT);
+				ratio=get_stat_ratio(_handle->display[p->numerator_id], _handle->display[p->denominator_id], NULL,
+									p->output_scaling, FS_CALC_CURRENT);
 				pos+=snprintf(pos,size-(pos-print_buf),"%f\t",ratio);
 			}
 			else
 			{
-				value=get_stat_unit_val( _handle, field_id[i+j], 0,FS_CALC_CURRENT, 0);
+				value=get_stat_unit_val(p, 0,FS_CALC_CURRENT, 1);
 				pos+=snprintf(pos,sizeof(print_buf)-(pos-print_buf),"%10lld\t",value);
 			}
 		}
 		pos+=snprintf(pos,sizeof(print_buf)-(pos-print_buf),"\nspeed/s\t");
 		for(j=0;j<FIELD_PER_LINE&&i+j<field_cnt;j++)
 		{
+			p=_handle->display[field_id[i+j]];
 			if(p->is_ratio==1)
 			{
-				ratio=get_stat_ratio(_handle,p->numerator_id,p->denominator_id,p->output_scaling, 0,FS_CALC_SPEED);
+				ratio=get_stat_ratio(_handle->display[p->numerator_id],_handle->display[p->denominator_id],NULL,
+									p->output_scaling, FS_CALC_SPEED);
 				pos+=snprintf(pos,size-(pos-print_buf),"%10.2e\t",ratio);
 			}
 			else
 			{
-				value=get_stat_unit_val( _handle, field_id[i+j], 0,FS_CALC_SPEED, 1);
+				value=get_stat_unit_val(p,0,FS_CALC_SPEED, 0);
 				pos+=snprintf(pos,size-(pos-print_buf),"%10lld\t",value*1000/interval_ms);
 			}
 		}
 		i+=(j-1);
-		pos+=snprintf(pos,sizeof(print_buf)-(pos-print_buf),"\n");
+		pos+=snprintf(pos,size-(pos-print_buf),"\n");
 	}
 	if(pos-print_buf>0)
 	{
@@ -866,7 +1019,7 @@ static int output_style_field(struct FS_space_t* _handle,long long interval_ms,c
 		{
 			pos--;
 		}
-		pos+=snprintf(pos,sizeof(print_buf)-(pos-print_buf),"\n%s\n",draw_line);
+		pos+=snprintf(pos,size-(pos-print_buf),"\n%s\n",draw_line);
 	}
 	return pos-print_buf;
 }
@@ -905,17 +1058,18 @@ static int output_style_table(struct FS_space_t* _handle,long long interval_ms,c
 			if(p_column->is_invisible==1)
 			{
 				//for flush last_output_value
-				get_stat_unit_val( _handle, i, _handle->cloumn_id[j],p_column->calc_type, 0);
+				get_stat_unit_val(p_line, p_column->column_seq, p_column->calc_type, 0);
 				continue;
 			}
 			if(p_column->is_ratio==1)
 			{
-				ratio=get_stat_ratio(_handle,p_column->numerator_id,p_column->denominator_id,p_column->output_scaling, i,p_column->calc_type);
+				ratio=get_stat_ratio(_handle->display[p_column->numerator_id],  _handle->display[p_column->denominator_id], p_line,
+								p_column->output_scaling, p_column->calc_type);
 				pos+=snprintf(pos,size-(pos-print_buf),"%10.2e\t",ratio);
 			}
 			else
 			{
-				value=get_stat_unit_val(_handle,i, _handle->cloumn_id[j], p_column->calc_type, 0);
+				value=get_stat_unit_val(p_line,p_column->column_seq, p_column->calc_type, 0);
 				if(p_column->calc_type==FS_CALC_SPEED)
 				{
 					speed=(double)value*1000/interval_ms;
@@ -928,7 +1082,7 @@ static int output_style_table(struct FS_space_t* _handle,long long interval_ms,c
 				}
 			}
 		}
-		pos+=snprintf(pos,sizeof(print_buf)-(pos-print_buf),"\n");
+		pos+=snprintf(pos,size-(pos-print_buf),"\n");
 
 	}
 	if(pos-print_buf>0)
@@ -937,10 +1091,104 @@ static int output_style_table(struct FS_space_t* _handle,long long interval_ms,c
 		{
 			pos--;
 		}
-		pos+=snprintf(pos,sizeof(print_buf)-(pos-print_buf),"\n");
+		pos+=snprintf(pos,size-(pos-print_buf),"\n%s\n",draw_line);
 	}
 	return pos-print_buf;
 }
+static int print_histogram_head(long long * bins, int bin_num, char*print_buf, unsigned int size)
+{
+	char* pos=print_buf;
+	const char* extra[4]={"+inf","MAX","AVG","CNT"};
+	char buff[32];
+	int i=0;
+	pos+=snprintf(pos,size-(pos-print_buf),"%-8s\t","histogram");
+	for(i=0;i<bin_num;i++)
+	{
+		snprintf(buff,sizeof(buff),"<%lld",bins[i]);
+		pos+=snprintf(pos,size-(pos-print_buf),"%8s\t",buff);
+	}
+	for(i=0;i<4;i++)
+	{
+		pos+=snprintf(pos,size-(pos-print_buf),"%8s\t",extra[i]);
+	}
+	pos+=snprintf(pos,size-(pos-print_buf),"\n");
+	return pos-print_buf;
+}
+static int print_histogram_unit(display_manifest_t* p, char*print_buf, unsigned int size)
+{
+	char* pos=print_buf;
+	long long value[p->histogram_bin_num+1]={0};
+	long long sum=0,events=0,max=0;
+	double avg=0.0;
+	int i=0;
+	
+	pos+=snprintf(pos,size-(pos-print_buf),"%-10s\t",p->name);
+	for(i=0;i<p->histogram_bin_num+1;i++)
+	{
+		value[i]=get_stat_unit_val(p, i, p->calc_type, 0);
+		events+=value[i];
+	}
+	sum=get_stat_unit_val(p, p->histogram_bin_num+HISTOGRAM_EXTRA_SUM, p->calc_type, 0);
+	max=get_stat_unit_val(p, p->histogram_bin_num+HISTOGRAM_EXTRA_MAX, FS_CALC_CURRENT, 0);
+	avg=(double)sum/events;
+	for(i=0;i<p->histogram_bin_num+1;i++)
+	{	
+		pos+=snprintf(pos,sizeof(print_buf)-(pos-print_buf),"%8.2lf%%\t",((double)value[i]/events)*100);
+	}	
+	pos+=snprintf(pos,sizeof(print_buf)-(pos-print_buf),"%8lld\t",max);
+	pos+=snprintf(pos,sizeof(print_buf)-(pos-print_buf),"%8.2e\t",avg);			
+	pos+=snprintf(pos,sizeof(print_buf)-(pos-print_buf),"%8lld\n",events);
+
+	return pos-print_buf;
+}
+static int output_style_histogram(struct FS_space_t* _handle,long long interval_ms,char*print_buf, unsigned int size)
+{
+	int i=0;
+	char* pos=print_buf;
+	display_manifest_t* p=NULL;
+	if(_handle->histogram_cnt==0)
+	{
+		return 0;
+	}
+	if(_handle->histogram_default_cnt>0)
+	{
+		pos+=print_histogram_head(_handle->historgram_default_bins, _handle->histogram_default_bin_num, pos, size-(pos-print_buf));
+		
+		for(i=0;i<_handle->display_cnt;i++)
+		{
+			p=_handle->display[i];
+			if(p->style!=FS_STYLE_HISTOGRAM||p->histogram_use_default_bins==0)
+			{
+				continue;
+			}
+			pos+=print_histogram_unit(p, pos, size-(pos-print_buf));
+		}
+	}
+	if(_handle->histogram_cnt>_handle->histogram_default_cnt)
+	{
+
+		for(i=0;i<_handle->display_cnt;i++)
+		{
+			p=_handle->display[i];
+			if(p->style!=FS_STYLE_HISTOGRAM||p->histogram_use_default_bins==1)
+			{
+				continue;
+			}
+			pos+=print_histogram_head(p->histogram_bins,p->histogram_bin_num, pos, size-(pos-print_buf));
+			pos+=print_histogram_unit(p, pos, size-(pos-print_buf));
+		}		
+	}
+	if(pos-print_buf>0)
+	{
+		if(*(pos-1)=='\n')
+		{
+			pos--;
+		}
+		pos+=snprintf(pos,size-(pos-print_buf),"\n%s\n",draw_line);
+	}
+	return pos-print_buf;	
+}
+
 void FS_passive_output(screen_stat_handle_t handle)
 {
 	struct FS_space_t* _handle=(struct FS_space_t*)handle;
@@ -986,6 +1234,7 @@ void FS_passive_output(screen_stat_handle_t handle)
 	pos+=output_style_status(_handle, interval_ms,pos, sizeof(print_buf)-(pos-print_buf));
 	pos+=output_style_field(_handle, interval_ms,pos, sizeof(print_buf)-(pos-print_buf));
 	pos+=output_style_table(_handle, interval_ms,pos, sizeof(print_buf)-(pos-print_buf));
+	pos+=output_style_histogram(_handle, interval_ms,pos, sizeof(print_buf)-(pos-print_buf));
 	pthread_mutex_unlock(&(_handle->reg_lock));
 
 	if(_handle->fp==NULL)

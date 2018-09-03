@@ -11,7 +11,8 @@ enum field_dsp_style_t
 	FS_STYLE_FIELD=0,
 	FS_STYLE_COLUMN,
 	FS_STYLE_LINE,
-	FS_STYLE_STATUS
+	FS_STYLE_STATUS,
+	FS_STYLE_HISTOGRAM
 };
 enum field_calc_algo
 {
@@ -40,7 +41,8 @@ enum FS_option
 	APP_NAME,			//VALUE is a const char*, MUST end with '\0', SIZE= strlen(string+'\0')+1. DEFAULT is "?".
 	STATS_SERVER_IP, 	//VALUE is a const char*, MUST end with '\0', SIZE= strlen(string+'\0')+1. No DEFAULT.
 	STATS_SERVER_PORT, 	//VALUE is a unsigned short or a signed int, host order, SIZE= sizeof(unsigned short) or sizeof(int). No DEFAULT.
-	MAX_STAT_FIELD_NUM		//VALUE is an interger, SIZE=sizeof(int), DEFAULT:1024.
+	MAX_STAT_FIELD_NUM,		//VALUE is an interger, SIZE=sizeof(int), DEFAULT:1024.
+	HISTOGRAM_GENERAL_BINS	//VALUE is a const char*, define a histogram bins for general purpose, SIZE = strlen(string+'\0')+1.DEFAULT: "10,100,1000,10000".
 };
 
 //Always success.
@@ -58,6 +60,10 @@ int FS_register(screen_stat_handle_t handle,enum field_dsp_style_t style,enum fi
 //numerator_id and denominator_id must be column/field/status style.
 //scaling: negative value: zoom in; positive value: zoom out;
 int FS_register_ratio(screen_stat_handle_t handle,int numerator_id,int denominator_id,int scaling,enum field_dsp_style_t style,enum field_calc_algo calc_type,const char* name);
+
+//@param bins format is comma spited number, e.g."10,100,1000,10000"
+//return 0 on success, <0 on failed.
+int FS_histogram_set_bins(screen_stat_handle_t handle, int id, const char* bins);
 
 //id: when id's type is FIELD , column_id is ignore.
 int FS_operate(screen_stat_handle_t handle,int id,int column_id,enum field_op op,long long value);

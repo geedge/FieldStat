@@ -1,6 +1,7 @@
 #include "field_stat2.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <assert.h>
 #include <unistd.h>
 #include <string.h>
@@ -9,6 +10,8 @@
 #define TEST_FIELD_NUM	9
 #define TEST_LINE_NUM	7
 #define TEST_COLUMN_NUM	8
+#define TEST_HISTOGRAM_NUM	4
+
 #define	TEST_RUNTIME_REG_NUM	32
 #define	TEST_RUNTIME_REG_LINE_NUM 6
 int main(int argc,char* argv[])
@@ -34,6 +37,7 @@ int main(int argc,char* argv[])
 	FS_set_para(handle, MAX_STAT_FIELD_NUM, &value, sizeof(value));
 	
 	int status_ids[TEST_STATUS_NUM], field_ids[TEST_FIELD_NUM], line_ids[TEST_LINE_NUM+TEST_RUNTIME_REG_LINE_NUM], column_ids[TEST_COLUMN_NUM];
+	int histogram_ids[TEST_HISTOGRAM_NUM];
 	int runtime_status_ids[TEST_RUNTIME_REG_NUM];
 	for(i=0;i<TEST_STATUS_NUM;i++)
 	{
@@ -55,6 +59,22 @@ int main(int argc,char* argv[])
 		snprintf(buff,sizeof(buff),"column_%d",i);
 		column_ids[i]=FS_register(handle, FS_STYLE_COLUMN, FS_CALC_SPEED,buff);
 	}
+	for(i=0;i<TEST_HISTOGRAM_NUM;i++)
+	{
+		snprintf(buff,sizeof(buff),"rpc_%d",i);
+		if(i==1)
+		{
+			histogram_ids[i]=FS_register(handle, FS_STYLE_HISTOGRAM, FS_CALC_SPEED, buff);
+		}
+		else
+		{
+			histogram_ids[i]=FS_register(handle, FS_STYLE_HISTOGRAM, FS_CALC_CURRENT, buff);
+		}
+		if(i==2)
+		{
+			FS_histogram_set_bins(handle, histogram_ids[i], "100,200,300,400,800,1000");
+		}
+	}
 	value=column_ids[2];
 	FS_set_para(handle, ID_INVISBLE, &value, sizeof(value));
 	snprintf(buff,sizeof(buff),"c0/c1");
@@ -65,6 +85,9 @@ int main(int argc,char* argv[])
 				FS_STYLE_COLUMN,
 				FS_CALC_SPEED,
 				buff);
+	const char* histogram_format="10,100,200,500,1000";
+	FS_set_para(handle, HISTOGRAM_GENERAL_BINS, histogram_format, strlen(histogram_format)+1);
+	
 	FS_start(handle);
 	while (1)
 	{
@@ -104,6 +127,14 @@ int main(int argc,char* argv[])
 			assert(ret>=0);
 			line_ids[TEST_LINE_NUM+runtime_reg_line_num]=ret;
 			runtime_reg_line_num++;
+		}
+		long long preset[]={1,20,30,200,400,1000,2000,4000};
+		for(i=0;i<TEST_HISTOGRAM_NUM;i++)
+		{
+			for(j=0;(size_t)j<sizeof(preset)/sizeof(long long);j++)
+			{
+				FS_operate(handle, histogram_ids[i], 0, FS_OP_SET,preset[j]);
+			}
 		}
 		usleep(1000);
 	}
