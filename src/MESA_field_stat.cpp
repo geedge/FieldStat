@@ -285,7 +285,7 @@ static int parse_histogram_bin_format(const char* format, long long **output_bin
 	size_t i=0;
 	int comma_num=0,ret=0;
 	long long *bins;
-	char* dup_format=(char*)malloc(sizeof(char)*strlen(format));
+	char* dup_format=(char*)calloc(sizeof(char),strlen(format)+1);
 	strncpy(dup_format,format,strlen(format));
 	for(i=0;i<strlen(dup_format);i++)
 	{
@@ -1128,7 +1128,7 @@ static int print_histogram_head(long long * bins, int bin_num, char*print_buf, u
 static int print_histogram_unit(display_manifest_t* p, char*print_buf, unsigned int size)
 {
 	char* pos=print_buf;
-	long long value[p->histogram_bin_num+1]={0};
+	long long value[p->histogram_bin_num+1];
 	long long sum=0,events=0,max=0;
 	double avg=0.0;
 	int i=0;
