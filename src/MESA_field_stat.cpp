@@ -33,7 +33,7 @@
 #define	HISTOGRAM_EXTRA_MAXVAL		2
 #define	HISTOGRAM_EXTRA_SIZE		3
 
-int FIELD_STAT_VERSION_1_0_20180712=0;
+int FIELD_STAT_VERSION_1_0_20181005=0;
 
 #if(__GNUC__ * 100 + __GNUC_MINOR__ * 10 + __GNUC_PATCHLEVEL__ >= 410)
 #define atomic_inc(x) __sync_add_and_fetch((x),1)
@@ -1096,7 +1096,7 @@ static int output_style_table(struct FS_space_t* _handle,long long interval_ms,c
 		pos+=snprintf(pos,size-(pos-print_buf),"\n");
 
 	}
-	if(pos-print_buf>0)
+/*	if(pos-print_buf>0)
 	{
 		if(*(pos-1)=='\n')
 		{
@@ -1104,6 +1104,7 @@ static int output_style_table(struct FS_space_t* _handle,long long interval_ms,c
 		}
 		pos+=snprintf(pos,size-(pos-print_buf),"\n%s\n",draw_line);
 	}
+*/
 	return pos-print_buf;
 }
 static int print_histogram_head(long long * bins, int bin_num, char*print_buf, unsigned int size)
