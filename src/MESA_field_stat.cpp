@@ -1041,6 +1041,10 @@ static int output_style_table(struct FS_space_t* _handle,long long interval_ms,c
 	display_manifest_t* p_column=NULL,*p_line=NULL;
 	double ratio=0.0,speed=0.0;
 	long long value=0;
+	if(_handle->column_cnt==0)
+	{
+		return 0;
+	}
 	for(i=0;i<_handle->column_cnt;i++)
 	{
 		if(i==0)
@@ -1096,7 +1100,7 @@ static int output_style_table(struct FS_space_t* _handle,long long interval_ms,c
 		pos+=snprintf(pos,size-(pos-print_buf),"\n");
 
 	}
-/*	if(pos-print_buf>0)
+	if(pos-print_buf>0)
 	{
 		if(*(pos-1)=='\n')
 		{
@@ -1104,7 +1108,6 @@ static int output_style_table(struct FS_space_t* _handle,long long interval_ms,c
 		}
 		pos+=snprintf(pos,size-(pos-print_buf),"\n%s\n",draw_line);
 	}
-*/
 	return pos-print_buf;
 }
 static int print_histogram_head(long long * bins, int bin_num, char*print_buf, unsigned int size)
