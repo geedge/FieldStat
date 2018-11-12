@@ -318,7 +318,7 @@ int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* va
 {
 	struct FS_space_t* _handle=(struct FS_space_t*)handle;
 	int int_val=0,ret=0;
-	if(_handle->running==1)
+	if(_handle->running==1 && type!=ID_INVISBLE)
 	{
 		return -1;
 	}
