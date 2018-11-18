@@ -36,7 +36,7 @@ int main(int argc,char* argv[])
 	value=4096;
 	FS_set_para(handle, MAX_STAT_FIELD_NUM, &value, sizeof(value));
 	
-	const char* histogram_format="10,100,200,500,1000";
+	const char* histogram_format="0.1,0.5,0.8,0.9,0.95,0.99";
 	FS_set_para(handle, HISTOGRAM_GLOBAL_BINS, histogram_format, strlen(histogram_format)+1);
 	
 	int status_ids[TEST_STATUS_NUM], field_ids[TEST_FIELD_NUM], line_ids[TEST_LINE_NUM+TEST_RUNTIME_REG_LINE_NUM], column_ids[TEST_COLUMN_NUM];
@@ -67,15 +67,13 @@ int main(int argc,char* argv[])
 		snprintf(buff,sizeof(buff),"rpc_%d",i);
 		if(i==1)
 		{
-			histogram_ids[i]=FS_register(handle, FS_STYLE_HISTOGRAM, FS_CALC_SPEED, buff);
+			histogram_ids[i]=FS_register_histogram(handle, FS_CALC_SPEED, buff
+													,1,100000,3);
 		}
 		else
 		{
-			histogram_ids[i]=FS_register(handle, FS_STYLE_HISTOGRAM, FS_CALC_CURRENT, buff);
-		}
-		if(i==2)
-		{
-			FS_histogram_set_bins(handle, histogram_ids[i], "100,200,300,400,800,1000");
+			histogram_ids[i]=FS_register_histogram(handle, FS_CALC_CURRENT, buff
+										,1,100000,3);
 		}
 	}
 	value=column_ids[2];
