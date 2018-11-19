@@ -1,12 +1,4 @@
-LIBFieldStat2{
-global: 
-	FS_create_handle;
-	FS_set_para;
-	FS_start;
-	FS_stop;
-	FS_register;
-	FS_register_ratio;
-	FS_operate;
-	FS_passive_output;
-local:	*;
+{
+  global: *FS_*;
+  local: *;
 };

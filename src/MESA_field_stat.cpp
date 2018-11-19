@@ -90,6 +90,10 @@ static int parse_histogram_bin_format(const char* format, double **output_bins)
 		if (sub_token == NULL)
 			break;
 		ret=sscanf(sub_token,"%lf",bins+i);
+		if(bins[i]>1.0)
+		{
+			goto error_out;
+		}
 		bins[i] *= 100;
 		if(ret!=1)
 		{
@@ -112,7 +116,7 @@ struct stat_unit_t
 };
 struct histogram_t
 {
-	struct hdr_histogram* changed;
+	struct hdr_histogram* changing;
 	struct hdr_histogram* accumulated;
 	struct hdr_histogram* previous_changed;
 	int64_t lowest_trackable_value;
@@ -351,7 +355,7 @@ static int startup_udp()
 
 void *fs2_thread_screen_print(void *arg);
 
-screen_stat_handle_t FS_create_handle(void)
+screen_stat_handle_t __attribute__((visibility("default"))) FS_create_handle(void)
 {
 	struct FS_space_t* handle=(struct FS_space_t*)calloc(sizeof(struct FS_space_t),1);
 	handle->screen_print_trigger=1;
@@ -660,6 +664,16 @@ int FS_register_histogram(screen_stat_handle_t handle, enum field_calc_algo calc
 	{
 		return -1;
 	}
+    if (lowest_trackable_value < 1 ||
+            significant_figures < 1 || 5 < significant_figures)
+    {
+        return -1;
+    }
+    else if (lowest_trackable_value * 2 > highest_trackable_value)
+    {
+        return -1;
+    }
+
 	pthread_mutex_lock(&(_handle->reg_lock));
 	id=_handle->display_cnt;
 	_handle->display_cnt++;
@@ -669,7 +683,7 @@ int FS_register_histogram(screen_stat_handle_t handle, enum field_calc_algo calc
 	choosen->histogram.lowest_trackable_value=(int64_t)lowest_trackable_value;
 	choosen->histogram.significant_figures=significant_figures;
 	
-	ret=hdr_init((int64_t)lowest_trackable_value, (int64_t)highest_trackable_value, significant_figures, &(choosen->histogram.changed));
+	ret=hdr_init((int64_t)lowest_trackable_value, (int64_t)highest_trackable_value, significant_figures, &(choosen->histogram.changing));
 	assert(ret==0);	
 	ret=hdr_init((int64_t)lowest_trackable_value, (int64_t)highest_trackable_value, significant_figures, &(choosen->histogram.accumulated));
 	assert(ret==0);
@@ -794,7 +808,7 @@ int FS_operate(screen_stat_handle_t handle,int id,int column_id,enum field_op op
 			target=&(p->line[i]);
 			break;
 		case	FS_STYLE_HISTOGRAM:
-			hdr_record_value(p->histogram.changed, (int64_t) value);
+			hdr_record_value(p->histogram.changing, (int64_t) value);
 			return 0;
 		default:
 			target=&(p->single);
@@ -806,7 +820,7 @@ int FS_operate(screen_stat_handle_t handle,int id,int column_id,enum field_op op
 			atomic_add(&(target->changing), value);
 			break;
 		case	FS_OP_SET:
-			atomic_set(&(target->changing), value);
+			atomic_set(&(target->changing), value-target->accumulated);
 			break;
 		case	FS_OP_SUB:
 			atomic_sub(&(target->changing), value);
@@ -1194,10 +1208,17 @@ static int print_histogram_unit(display_manifest_t* p, double * bins, int bin_nu
 	char int_format[256], double_format[256];
 	snprintf(int_format, sizeof(int_format), "%%%dlld",HISTOGRAM_WIDTH);
 	snprintf(double_format, sizeof(double_format), "%%%d.2lf",HISTOGRAM_WIDTH);
-	hdr_add(h->accumulated, h->changed);
+
+	hdr_init(h->lowest_trackable_value,  h->highest_trackable_value, h->significant_figures, &(h_tmp));
+	if(h->previous_changed!=NULL)	hdr_close(h->previous_changed);
+
+	h->previous_changed=atomic_read(&(h->changing));
+	h_tmp=atomic_set(&(h->changing), h_tmp);// left h_tmp is used to avoid warining [-Wunused-value]
+
+	hdr_add(h->accumulated, h->previous_changed);
 	if(p->calc_type==FS_CALC_SPEED)
 	{
-		h_out=h->changed;
+		h_out=h->previous_changed;
 	}
 	else
 	{
@@ -1210,18 +1231,14 @@ static int print_histogram_unit(display_manifest_t* p, double * bins, int bin_nu
 		value=(long long)hdr_value_at_percentile(h_out, bins[i]);
 		pos+=snprintf(pos,size-(pos-print_buf),int_format, value);
 	}	
-	pos+=snprintf(pos,size-(pos-print_buf),int_format,(long long)hdr_max(h_out));
-	pos+=snprintf(pos,size-(pos-print_buf),int_format,(long long)hdr_min(h_out));
-	pos+=snprintf(pos,size-(pos-print_buf),double_format,hdr_mean(h_out));
-	pos+=snprintf(pos,size-(pos-print_buf),double_format,hdr_stddev(h_out));
+	pos+=snprintf(pos,size-(pos-print_buf),int_format,h_out->total_count==0?0:(long long)hdr_max(h_out));
+	pos+=snprintf(pos,size-(pos-print_buf),int_format,h_out->total_count==0?0:(long long)hdr_min(h_out));
+	pos+=snprintf(pos,size-(pos-print_buf),double_format,h_out->total_count==0?0:hdr_mean(h_out));
+	pos+=snprintf(pos,size-(pos-print_buf),double_format,h_out->total_count==0?0:hdr_stddev(h_out));
 	pos+=snprintf(pos,size-(pos-print_buf),int_format,(long long)h_out->total_count);
 
 	pos+=snprintf(pos,size-(pos-print_buf),"\n");
 
-	hdr_init(h->lowest_trackable_value,  h->highest_trackable_value, h->significant_figures, &(h_tmp));
-	if(h->previous_changed!=NULL)	hdr_close(h->previous_changed);
-	h->previous_changed=h->changed;
-	h->changed=h_tmp;
 	h_tmp=NULL;
 
 	return pos-print_buf;
