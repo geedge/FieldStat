@@ -177,7 +177,6 @@ struct FS_space_t
 	int single_cnt;//including line_cnt;
 	int matrix_base;
 	int column_cnt;
-	int field_cnt;
 	int histogram_cnt;
 	
 	int histogram_bin_num;
@@ -195,7 +194,7 @@ struct FS_space_t
 	unsigned short server_port;
 	int statsd_socket;
 
-	int snd_buf_off;
+	size_t snd_buf_off;
 	char send_buff[UDP_PAYLOAD_SIZE];
 	
 	pthread_mutex_t reg_lock;
@@ -259,7 +258,9 @@ void append_metric_counter(struct FS_space_t* _handle,const char* name, long lon
 	{
 		return;
 	}
-	if(UDP_PAYLOAD_SIZE-(unsigned int)_handle->snd_buf_off<strlen(name)+24)
+	
+	size_t max_output_len=strlen(name)+strlen(name)+20+6;
+	if(UDP_PAYLOAD_SIZE-_handle->snd_buf_off<max_output_len)
 	{
 		flush_metric(_handle);
 	}
@@ -274,6 +275,12 @@ void append_metric_histogram(struct FS_space_t* _handle,const char* name, long l
 	{
 		return;
 	}
+	size_t max_output_len=strlen(name)+strlen(name)+20+6;
+	if(UDP_PAYLOAD_SIZE-_handle->snd_buf_off<max_output_len)
+	{
+		flush_metric(_handle);
+	}
+
 	if(count==1)
 	{
 		_handle->snd_buf_off+=snprintf(_handle->send_buff+_handle->snd_buf_off,UDP_PAYLOAD_SIZE-_handle->snd_buf_off,
@@ -916,17 +923,12 @@ void StatsD_output(struct FS_space_t* _handle)
 	for(i=0;i<_handle->display_cnt;i++)
 	{
 		p=_handle->display[i];
-		if(p->style!=FS_STYLE_LINE)
-		{
-			continue;
-		}
 		if(p->is_invisible==1||p->is_ratio==1)
 		{
 			continue;
 		}
 		switch(p->style)
 		{
-
 			case FS_STYLE_STATUS:
 				if(p->calc_type==FS_CALC_SPEED)
 				{
