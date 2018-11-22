@@ -11,7 +11,8 @@ enum field_dsp_style_t
 	FS_STYLE_FIELD=0,
 	FS_STYLE_COLUMN,
 	FS_STYLE_LINE,
-	FS_STYLE_STATUS
+	FS_STYLE_STATUS,
+	FS_STYLE_HISTOGRAM
 };
 enum field_calc_algo
 {
@@ -21,9 +22,15 @@ enum field_calc_algo
 enum field_op
 {
 	FS_OP_ADD=1,
-	FS_OP_SET
+	FS_OP_SET,
+	FS_OP_SUB
 };
 
+enum stats_output_format
+{
+	FS_OUTPUT_STATD=1,
+	FS_OUTPUT_INFLUX=2
+};
 
 typedef	void* screen_stat_handle_t;
 
@@ -40,7 +47,9 @@ enum FS_option
 	APP_NAME,			//VALUE is a const char*, MUST end with '\0', SIZE= strlen(string+'\0')+1. DEFAULT is "?".
 	STATS_SERVER_IP, 	//VALUE is a const char*, MUST end with '\0', SIZE= strlen(string+'\0')+1. No DEFAULT.
 	STATS_SERVER_PORT, 	//VALUE is a unsigned short or a signed int, host order, SIZE= sizeof(unsigned short) or sizeof(int). No DEFAULT.
-	MAX_STAT_FIELD_NUM		//VALUE is an interger, SIZE=sizeof(int), DEFAULT:1024.
+	STATS_FORMAT,		//VALUE is an interger, SIZE=sizeof(int), DEFAULT:1.
+	MAX_STAT_FIELD_NUM,		//VALUE is an interger, SIZE=sizeof(int), DEFAULT:1024.
+	HISTOGRAM_GLOBAL_BINS	//VALUE is a const char*, define a histogram bins for default field, SIZE = strlen(string+'\0')+1. DEFAULT: "0.5,0.8,0.9,0.95,0.99“.
 };
 
 //Always success.
@@ -59,7 +68,19 @@ int FS_register(screen_stat_handle_t handle,enum field_dsp_style_t style,enum fi
 //scaling: negative value: zoom in; positive value: zoom out;
 int FS_register_ratio(screen_stat_handle_t handle,int numerator_id,int denominator_id,int scaling,enum field_dsp_style_t style,enum field_calc_algo calc_type,const char* name);
 
-//id: when id's type is FIELD , column_id is ignore.
+//@param bins format is comma spited number, e.g."0.1,0.5,0.8,0.9,0.95,0.99"
+//return 0 on success, <0 on failed.
+int FS_histogram_set_bins(screen_stat_handle_t handle, int id, const char* bins);
+
+//@param lowest_trackable_value >1
+//@param highest_trackable_value>lowest_trackable_value * 2 
+//@param 1<significant_figures<4
+int FS_register_histogram(screen_stat_handle_t handle, enum field_calc_algo calc_type, const char* name,
+		long long lowest_trackable_value,
+        long long highest_trackable_value,
+        int significant_figures);
+
+//id: when id's type is FIELD , column_id is ignored.
 int FS_operate(screen_stat_handle_t handle,int id,int column_id,enum field_op op,long long value);
 
 void FS_passive_output(screen_stat_handle_t handle);
