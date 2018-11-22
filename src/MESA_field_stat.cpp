@@ -296,6 +296,23 @@ void append_metric_histogram(struct FS_space_t* _handle,const char* name, long l
 	return;
 }
 
+
+void append_measurement(struct FS_space_t* _handle,const char* measurement, char *field_set)
+{
+	if(field_set==NULL)
+	{
+		return;
+	}
+	if(UDP_PAYLOAD_SIZE-(unsigned int)_handle->snd_buf_off<strlen(measurement)+strlen(field_set)+strlen(_handle->app_name)+12)
+	{
+		flush_metric(_handle);
+	}
+	_handle->snd_buf_off+=snprintf(_handle->send_buff+_handle->snd_buf_off,UDP_PAYLOAD_SIZE-_handle->snd_buf_off,
+								   "%s,app_name=%s %s\n",
+								   measurement, _handle->app_name,field_set);
+	return;
+}
+
 int is_valid_fs_name(const char* name)
 {
 	const char* reserverd="|:\n\r. \t<>[]#!@";
@@ -469,7 +486,7 @@ int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* va
 			{
 				return -1;
 			}
-			_handle->statsd_switch=1;
+			_handle->statsd_switch=FS_OUTPUT_STATD;
 			break;
 		case	STATS_SERVER_PORT:
 			if((size_t)size==sizeof(unsigned short))
@@ -489,6 +506,13 @@ int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* va
 				return -1;
 			}
 			_handle->server_port=*((unsigned short *)value);
+			break;
+		case	STATS_FORMAT:
+			if(size!=4||(int_val!=FS_OUTPUT_STATD&&int_val!=FS_OUTPUT_INFLUX))
+			{
+				return -1;
+			}
+			_handle->statsd_switch=int_val;
 			break;
 		case MAX_STAT_FIELD_NUM:
 			if((size_t)size!=sizeof(int))
@@ -566,11 +590,14 @@ void FS_start(screen_stat_handle_t handle)
 			return;
 		}
 	}
-	if(_handle->statsd_switch==1)
+	if(_handle->statsd_switch > 0)
 	{
 		_handle->statsd_socket=startup_udp();
-		append_metric_counter(_handle, "RESTART", 1);
-		flush_metric(_handle);
+		if(_handle->statsd_switch == FS_OUTPUT_STATD)
+		{
+			append_metric_counter(_handle, "RESTART", 1);
+			flush_metric(_handle);
+		}
 	}
 	clock_gettime(CLOCK_MONOTONIC,&(_handle->last_display_time));
 	if(_handle->create_thread==1)
@@ -911,6 +938,80 @@ static double get_stat_ratio(struct display_manifest_t* numerator, struct displa
 	return ratio;
 }
 
+void influx_output(struct FS_space_t* _handle)
+{
+	display_manifest_t* p=NULL,*p_column=NULL;
+	long long value=0;
+	int i=0,j=0;
+	char field_buff[UDP_PAYLOAD_SIZE];
+	int buff_off = 0, not_zero_column_cnt = 0;
+
+	memset(field_buff, 0, UDP_PAYLOAD_SIZE);
+
+	for(i=0;i<_handle->display_cnt;i++)
+	{
+		p=_handle->display[i];
+		if(p->is_invisible==1||p->is_ratio==1)
+		{
+			continue;
+		}
+		switch(p->style)
+		{
+			case FS_STYLE_STATUS:
+				if(p->calc_type==FS_CALC_SPEED)
+				{
+					value=get_stat_unit_val(p, 0, FS_CALC_CURRENT, 1);
+					if(value != 0)
+					{
+						snprintf(field_buff, UDP_PAYLOAD_SIZE, "%s=%lld", p->name, value);
+						append_measurement(_handle, p->name, field_buff);
+					}
+					break;
+				}
+				//not break
+			case FS_STYLE_FIELD:
+				value=get_stat_unit_val(p, 0, FS_CALC_SPEED, 1);
+				if(value != 0)
+				{
+					snprintf(field_buff, UDP_PAYLOAD_SIZE, "%s=%lld", p->name, value);
+					append_measurement(_handle, p->name, field_buff);
+				}
+				break;
+			case FS_STYLE_LINE:
+				for(j=0;j<_handle->column_cnt;j++)
+				{
+					p_column=_handle->display[_handle->cloumn_id[j]];
+					if(p_column->is_invisible==1||p_column->is_ratio==1)
+					{
+						continue;
+					}
+					value=get_stat_unit_val(p, p_column->column_seq, FS_CALC_SPEED, 1);
+					buff_off+=snprintf(field_buff+buff_off, UDP_PAYLOAD_SIZE-buff_off,"%s=%lld,",p_column->name, value);
+					if(value != 0)
+					{
+						not_zero_column_cnt += 1;
+					}
+					if(buff_off >= UDP_PAYLOAD_SIZE)continue;
+				}
+				if(not_zero_column_cnt > 0)
+				{
+					field_buff[buff_off-1] = '\0';
+					append_measurement(_handle, p->name, field_buff);
+				}
+				buff_off=0;
+				not_zero_column_cnt = 0;
+				break;
+			case FS_STYLE_HISTOGRAM:
+				//
+				break;
+			default:
+				break;
+		}
+
+	}
+	flush_metric(_handle);
+}
+
 void StatsD_output(struct FS_space_t* _handle)
 {
 	display_manifest_t* p=NULL,*p_column=NULL;
@@ -970,6 +1071,7 @@ void StatsD_output(struct FS_space_t* _handle)
 	}
 	flush_metric(_handle);
 }
+
 static int output_style_status(struct FS_space_t* _handle,long long interval_ms,char*print_buf, unsigned int size)
 {
 	int i=0,j=0;
@@ -1337,13 +1439,21 @@ void FS_passive_output(screen_stat_handle_t handle)
 	fwrite(print_buf,pos-print_buf,1,_handle->fp);
 	fflush(_handle->fp);
 	memcpy(&(_handle->last_display_time),&now,sizeof(now));
-	if(_handle->statsd_switch==1)
-	{		
+	if(_handle->statsd_switch > 0)
+	{
 		pthread_mutex_lock(&(_handle->reg_lock));
-		StatsD_output(_handle);
+		if(_handle->statsd_switch == FS_OUTPUT_STATD)
+		{
+			StatsD_output(_handle);
+		}
+		if(_handle->statsd_switch == FS_OUTPUT_INFLUX)
+		{
+			influx_output(_handle);
+		}
 		pthread_mutex_unlock(&(_handle->reg_lock));
 	}
 }
+
 void *fs2_thread_screen_print(void *arg)
 {
 	struct FS_space_t* handle=(struct FS_space_t*)arg;

@@ -35,6 +35,15 @@ int main(int argc,char* argv[])
 	FS_set_para(handle, STAT_CYCLE, &value, sizeof(value));
 	value=4096;
 	FS_set_para(handle, MAX_STAT_FIELD_NUM, &value, sizeof(value));
+
+	FS_set_para(handle, STATS_SERVER_IP, "127.0.0.1", strlen("127.0.0.1"));
+	value=8100;
+	FS_set_para(handle, STATS_SERVER_PORT, &value, sizeof(value));
+
+	//value=FS_OUTPUT_INFLUX;
+	value=FS_OUTPUT_STATD;
+	FS_set_para(handle, STATS_FORMAT, &value, sizeof(value));
+
 	
 	const char* histogram_format="0.1,0.5,0.8,0.9,0.95,0.99";
 	FS_set_para(handle, HISTOGRAM_GLOBAL_BINS, histogram_format, strlen(histogram_format)+1);
