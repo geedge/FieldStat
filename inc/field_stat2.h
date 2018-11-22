@@ -28,7 +28,7 @@ enum field_op
 
 enum stats_output_format
 {
-	FS_OUTPUT_STATD=1,
+	FS_OUTPUT_STATSD=1,
 	FS_OUTPUT_INFLUX=2
 };
 
