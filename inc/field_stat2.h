@@ -29,7 +29,7 @@ enum field_op
 enum stats_output_format
 {
 	FS_OUTPUT_STATSD=1,
-	FS_OUTPUT_INFLUX=2
+	FS_OUTPUT_INFLUX_LINE=2
 };
 
 typedef	void* screen_stat_handle_t;

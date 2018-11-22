@@ -508,7 +508,7 @@ int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* va
 			_handle->server_port=*((unsigned short *)value);
 			break;
 		case	STATS_FORMAT:
-			if(size!=4||(int_val!=FS_OUTPUT_STATSD&&int_val!=FS_OUTPUT_INFLUX))
+			if(size!=4||(int_val!=FS_OUTPUT_STATSD&&int_val!=FS_OUTPUT_INFLUX_LINE))
 			{
 				return -1;
 			}
@@ -1446,7 +1446,7 @@ void FS_passive_output(screen_stat_handle_t handle)
 		{
 			StatsD_output(_handle);
 		}
-		if(_handle->statsd_switch == FS_OUTPUT_INFLUX)
+		if(_handle->statsd_switch == FS_OUTPUT_INFLUX_LINE)
 		{
 			influx_output(_handle);
 		}
