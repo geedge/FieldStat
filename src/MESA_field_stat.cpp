@@ -252,7 +252,7 @@ void flush_metric(struct FS_space_t* _handle)
 	memset(_handle->send_buff,0,sizeof(_handle->send_buff));
 	return;
 }
-void append_metric_counter(struct FS_space_t* _handle,const char* name, long long value)
+void append_statsd_counter(struct FS_space_t* _handle,const char* name, long long value)
 {
 	if(value==0)
 	{
@@ -269,7 +269,7 @@ void append_metric_counter(struct FS_space_t* _handle,const char* name, long lon
 				_handle->app_name,name,value);
 	return;
 }
-void append_metric_histogram(struct FS_space_t* _handle,const char* name, long long value, long long count)
+void append_statsd_histogram(struct FS_space_t* _handle,const char* name, long long value, long long count)
 {
 	if(count==0)
 	{
@@ -297,7 +297,7 @@ void append_metric_histogram(struct FS_space_t* _handle,const char* name, long l
 }
 
 
-void append_measurement(struct FS_space_t* _handle,const char* measurement, char *field_set)
+void appen_influx_line(struct FS_space_t* _handle,const char* measurement, char *field_set)
 {
 	if(field_set==NULL)
 	{
@@ -595,7 +595,7 @@ void FS_start(screen_stat_handle_t handle)
 		_handle->statsd_socket=startup_udp();
 		if(_handle->statsd_switch == FS_OUTPUT_STATD)
 		{
-			append_metric_counter(_handle, "RESTART", 1);
+			append_statsd_counter(_handle, "RESTART", 1);
 			flush_metric(_handle);
 		}
 	}
@@ -964,7 +964,7 @@ void influx_output(struct FS_space_t* _handle)
 					if(value != 0)
 					{
 						snprintf(field_buff, UDP_PAYLOAD_SIZE, "%s=%lld", p->name, value);
-						append_measurement(_handle, p->name, field_buff);
+						appen_influx_line(_handle, p->name, field_buff);
 					}
 					break;
 				}
@@ -974,7 +974,7 @@ void influx_output(struct FS_space_t* _handle)
 				if(value != 0)
 				{
 					snprintf(field_buff, UDP_PAYLOAD_SIZE, "%s=%lld", p->name, value);
-					append_measurement(_handle, p->name, field_buff);
+					appen_influx_line(_handle, p->name, field_buff);
 				}
 				break;
 			case FS_STYLE_LINE:
@@ -996,7 +996,7 @@ void influx_output(struct FS_space_t* _handle)
 				if(not_zero_column_cnt > 0)
 				{
 					field_buff[buff_off-1] = '\0';
-					append_measurement(_handle, p->name, field_buff);
+					appen_influx_line(_handle, p->name, field_buff);
 				}
 				buff_off=0;
 				not_zero_column_cnt = 0;
@@ -1034,13 +1034,13 @@ void StatsD_output(struct FS_space_t* _handle)
 				if(p->calc_type==FS_CALC_SPEED)
 				{
 					value=get_stat_unit_val(p, 0, FS_CALC_CURRENT, 1);
-					append_metric_histogram(_handle, p->name, value, 1);
+					append_statsd_histogram(_handle, p->name, value, 1);
 					break;
 				}
 				//not break;
 			case FS_STYLE_FIELD:
 				value=get_stat_unit_val(p, 0, FS_CALC_SPEED, 1);
-				append_metric_counter(_handle, p->name,value);
+				append_statsd_counter(_handle, p->name,value);
 				break;
 			case FS_STYLE_LINE:
 				for(j=0;j<_handle->column_cnt;j++)
@@ -1052,7 +1052,7 @@ void StatsD_output(struct FS_space_t* _handle)
 					}
 					snprintf(name_buff,sizeof(name_buff),"%s#%s",p->name,p_column->name);
 					value=get_stat_unit_val(p, p_column->column_seq, FS_CALC_SPEED, 1);
-					append_metric_counter(_handle, name_buff, value); 
+					append_statsd_counter(_handle, name_buff, value); 
 				}
 				break;
 			case FS_STYLE_HISTOGRAM:
@@ -1060,7 +1060,7 @@ void StatsD_output(struct FS_space_t* _handle)
 				hdr_iter_recorded_init(&iter, p->histogram.previous_changed);
 			    while (hdr_iter_next(&iter))
 			    {
-					append_metric_histogram(_handle, p->name, (long long)iter.value, (long long)iter.count);
+					append_statsd_histogram(_handle, p->name, (long long)iter.value, (long long)iter.count);
 					index++;
 			    }
 				break;
