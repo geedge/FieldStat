@@ -486,7 +486,7 @@ int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* va
 			{
 				return -1;
 			}
-			_handle->statsd_switch=FS_OUTPUT_STATD;
+			_handle->statsd_switch=FS_OUTPUT_STATSD;
 			break;
 		case	STATS_SERVER_PORT:
 			if((size_t)size==sizeof(unsigned short))
@@ -508,7 +508,7 @@ int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* va
 			_handle->server_port=*((unsigned short *)value);
 			break;
 		case	STATS_FORMAT:
-			if(size!=4||(int_val!=FS_OUTPUT_STATD&&int_val!=FS_OUTPUT_INFLUX))
+			if(size!=4||(int_val!=FS_OUTPUT_STATSD&&int_val!=FS_OUTPUT_INFLUX))
 			{
 				return -1;
 			}
@@ -593,7 +593,7 @@ void FS_start(screen_stat_handle_t handle)
 	if(_handle->statsd_switch > 0)
 	{
 		_handle->statsd_socket=startup_udp();
-		if(_handle->statsd_switch == FS_OUTPUT_STATD)
+		if(_handle->statsd_switch == FS_OUTPUT_STATSD)
 		{
 			append_statsd_counter(_handle, "RESTART", 1);
 			flush_metric(_handle);
@@ -1442,7 +1442,7 @@ void FS_passive_output(screen_stat_handle_t handle)
 	if(_handle->statsd_switch > 0)
 	{
 		pthread_mutex_lock(&(_handle->reg_lock));
-		if(_handle->statsd_switch == FS_OUTPUT_STATD)
+		if(_handle->statsd_switch == FS_OUTPUT_STATSD)
 		{
 			StatsD_output(_handle);
 		}

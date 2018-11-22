@@ -41,7 +41,7 @@ int main(int argc,char* argv[])
 	FS_set_para(handle, STATS_SERVER_PORT, &value, sizeof(value));
 
 	//value=FS_OUTPUT_INFLUX;
-	value=FS_OUTPUT_STATD;
+	value=FS_OUTPUT_STATSD;
 	FS_set_para(handle, STATS_FORMAT, &value, sizeof(value));
 
 	
