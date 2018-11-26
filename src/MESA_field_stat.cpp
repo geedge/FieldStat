@@ -132,9 +132,6 @@ struct display_manifest_t
 	int numerator_id;
 	int denominator_id;
 	int output_scaling;	//negative value: zoom in; positive value: zoom out;
-	int histogram_use_default_bins;
-	int histogram_bin_num;
-	double *histogram_bins;
 	enum field_dsp_style_t style;
 	enum field_calc_algo calc_type;
 	union
@@ -203,6 +200,7 @@ struct FS_space_t
 	char appoint_output_file[MAX_PATH_LEN];
 	char current_output_file[MAX_PATH_LEN];
 	FILE* fp;
+	pthread_t cfg_mon_t;
 	struct timespec last_display_time;
 	const char* write_mode;
 };
@@ -538,7 +536,6 @@ int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* va
 void FS_start(screen_stat_handle_t handle)
 {
 	struct FS_space_t* _handle=(struct FS_space_t*)handle;
-	pthread_t cfg_mon_t;
 	int i=0,j=0;
 	char date_buff[32]={0};
 
@@ -602,15 +599,17 @@ void FS_start(screen_stat_handle_t handle)
 	clock_gettime(CLOCK_MONOTONIC,&(_handle->last_display_time));
 	if(_handle->create_thread==1)
 	{
-		pthread_create(&cfg_mon_t, NULL, fs2_thread_screen_print, (void*)handle);
+		pthread_create(&(_handle->cfg_mon_t), NULL, fs2_thread_screen_print, (void*)handle);
 	}
 	return;
 }
 void FS_stop(screen_stat_handle_t* handle)
 {
 	int i=0;
+	void * ret=NULL;
 	struct FS_space_t* _handle=*(struct FS_space_t**)handle;
-	_handle->create_thread=0;
+	_handle->create_thread=0;	
+	pthread_join(_handle->cfg_mon_t, &ret);
 	struct display_manifest_t * p=NULL;
 	for(i=0;i<_handle->display_cnt;i++)
 	{
@@ -618,17 +617,27 @@ void FS_stop(screen_stat_handle_t* handle)
 		switch (p->style)
 		{
 			case FS_STYLE_LINE:
-			case FS_STYLE_HISTOGRAM:
 				free(p->line);
 				p->line=NULL;
 				break;
+			case FS_STYLE_HISTOGRAM:
+				if(p->histogram.previous_changed!=NULL)
+				{
+					hdr_close(p->histogram.previous_changed);
+					p->histogram.previous_changed=NULL;
+				}
+				if(p->histogram.changing!=NULL)
+				{
+					hdr_close(p->histogram.changing);
+					p->histogram.changing=NULL;
+				}
+				if(p->histogram.accumulated!=NULL)
+				{
+					hdr_close(p->histogram.accumulated);
+					p->histogram.accumulated=NULL;
+				}	
 			default:
 				break;
-		}
-		if(p->style==FS_STYLE_HISTOGRAM&&p->histogram_use_default_bins==0)
-		{
-			free(p->histogram_bins);
-			p->histogram_bins=NULL;
 		}
 		free(p->name);
 		p->name=NULL;
@@ -641,6 +650,13 @@ void FS_stop(screen_stat_handle_t* handle)
 		_handle->fp=NULL;
 	}
 	free(_handle->display);
+	if(_handle->fp!=NULL)
+	{
+		fclose(_handle->fp);
+		_handle->fp=NULL;
+	}
+	free(_handle->histogram_bins);
+	_handle->histogram_bins=NULL;	
 	free(_handle);
 
 	*handle=NULL;
@@ -787,37 +803,6 @@ int FS_register_ratio(screen_stat_handle_t handle,int numerator_id,int denominat
 	pthread_mutex_unlock(&(_handle->reg_lock));
 
 	return id;
-}
-
-int FS_histogram_set_bins(screen_stat_handle_t handle, int id, const char* bins)
-{
-	struct FS_space_t* _handle=(struct FS_space_t*)handle;
-	struct display_manifest_t* p=NULL;
-	int ret=0;
-	if(id>=_handle->display_cnt)
-	{
-		return -1;
-	}
-	p=_handle->display[id];
-	if(p->style!=FS_STYLE_HISTOGRAM)
-	{
-		return -1;
-	}
-	pthread_mutex_lock(&(_handle->reg_lock));
-	p->histogram_bin_num=parse_histogram_bin_format(bins, &p->histogram_bins);
-	if(p->histogram_bin_num>0)
-	{	
-		p->histogram_use_default_bins=0;
-		free(p->line);
-		p->line=(struct stat_unit_t*)calloc(sizeof(struct stat_unit_t),p->histogram_bin_num+HISTOGRAM_EXTRA_SIZE);
-		ret=0;
-	}
-	else
-	{
-		ret=-1;
-	}
-	pthread_mutex_unlock(&(_handle->reg_lock));
-	return ret;
 }
 
 int FS_operate(screen_stat_handle_t handle,int id,int column_id,enum field_op op,long long value)
