@@ -21,6 +21,7 @@ int main(int argc,char* argv[])
 	const char* app_name="fs2_test";
 	char buff[128];
 	int value=0,i=0,j=0,runtime_reg_num=0,runtime_reg_line_num=0,ret=0;
+	int loops=10;
 	handle=FS_create_handle();
 	
 	FS_set_para(handle, APP_NAME, app_name, strlen(app_name)+1);
@@ -97,8 +98,10 @@ int main(int argc,char* argv[])
 				buff);
 	
 	FS_start(handle);
-	while (1)
+	loops=10;
+	while (loops>0)
 	{
+		loops--;
 		for(i=0;i<TEST_STATUS_NUM;i++)
 		{
 			FS_operate(handle, status_ids[i], 0, FS_OP_SET, i*10);
@@ -146,5 +149,6 @@ int main(int argc,char* argv[])
 		}
 		usleep(1000);
 	}
+	FS_stop(&handle);
 }
 
