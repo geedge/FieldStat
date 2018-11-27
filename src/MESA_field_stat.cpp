@@ -608,8 +608,11 @@ void FS_stop(screen_stat_handle_t* handle)
 	int i=0;
 	void * ret=NULL;
 	struct FS_space_t* _handle=*(struct FS_space_t**)handle;
-	_handle->create_thread=0;	
-	pthread_join(_handle->cfg_mon_t, &ret);
+	if(_handle->create_thread==1 && _handle->cfg_mon_t!=0)
+	{		
+		_handle->create_thread=0;	
+		pthread_join(_handle->cfg_mon_t, &ret);
+	}
 	struct display_manifest_t * p=NULL;
 	for(i=0;i<_handle->display_cnt;i++)
 	{
