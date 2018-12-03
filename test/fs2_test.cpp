@@ -98,7 +98,7 @@ int main(int argc,char* argv[])
 				buff);
 	
 	FS_start(handle);
-	loops=10;
+	loops=100;
 	while (loops>0)
 	{
 		loops--;
@@ -147,7 +147,7 @@ int main(int argc,char* argv[])
 				FS_operate(handle, histogram_ids[i], 0, FS_OP_SET,preset[j]);
 			}
 		}
-		usleep(1000);
+		sleep(1);
 	}
 	FS_stop(&handle);
 }

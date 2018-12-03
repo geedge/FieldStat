@@ -36,7 +36,7 @@
 double HISTOGRAM_DEFAULT_BINS[]={50.0, 80.0, 90.0, 95.0, 99.0};
 
 
-int FIELD_STAT_VERSION_2_8_20181118=0;
+int FIELD_STAT_VERSION_2_8_20181203=0;
 
 #if(__GNUC__ * 100 + __GNUC_MINOR__ * 10 + __GNUC_PATCHLEVEL__ >= 410)
 #define atomic_inc(x) __sync_add_and_fetch((x),1)
@@ -1045,12 +1045,15 @@ void StatsD_output(struct FS_space_t* _handle)
 				break;
 			case FS_STYLE_HISTOGRAM:
 				// Raw Histogram
-				hdr_iter_recorded_init(&iter, p->histogram.previous_changed);
-			    while (hdr_iter_next(&iter))
-			    {
-					append_statsd_histogram(_handle, p->name, (long long)iter.value, (long long)iter.count);
-					index++;
-			    }
+				if(p->histogram.previous_changed!=NULL)
+				{
+					hdr_iter_recorded_init(&iter, p->histogram.previous_changed);
+					while (hdr_iter_next(&iter))
+					{
+						append_statsd_histogram(_handle, p->name, (long long)iter.value, (long long)iter.count);
+						index++;
+					}
+				}
 				break;
 			default:
 				break;
@@ -1373,7 +1376,8 @@ void FS_passive_output(screen_stat_handle_t handle)
 	struct timespec now;
 	time_t current=0;
 	char date_buff[32];
-	char print_buf[1024*64]={0};
+	char* print_buf=NULL;
+	size_t print_buf_sz=_handle->display_cnt*1024;
 	char*pos=NULL;
 	int today=0;
 	time(&current);
@@ -1397,29 +1401,31 @@ void FS_passive_output(screen_stat_handle_t handle)
 			_handle->fp=fopen(_handle->current_output_file,_handle->write_mode);
 		}
 	}
+	if(_handle->fp==NULL)
+	{
+		printf("Field Stat: open %s failed.\n",_handle->appoint_output_file);
+		return;
+	}
 	clock_gettime(CLOCK_MONOTONIC,&now);
 	long long interval_ms=(now.tv_sec-_handle->last_display_time.tv_sec)*1000+(now.tv_nsec-_handle->last_display_time.tv_nsec)/1000000;
 	if(interval_ms<1)
 	{
 		return;
 	}
+	print_buf=(char*)calloc(sizeof(char), print_buf_sz);
 	pos=print_buf;
-	pos+=snprintf(pos,sizeof(print_buf)-(pos-print_buf),"%s%s",draw_boundary,ctime(&current));
+	pos+=snprintf(pos, print_buf_sz-(pos-print_buf), "%s%s", draw_boundary, ctime(&current));
 	pos--;//jump '\n' generate by ctime()
-	pos+=snprintf(pos,sizeof(print_buf)-(pos-print_buf),"%s\n",draw_boundary);
+	pos+=snprintf(pos, print_buf_sz-(pos-print_buf),"%s\n",draw_boundary);
 
 	pthread_mutex_lock(&(_handle->reg_lock));
-	pos+=output_style_status(_handle, interval_ms, pos, sizeof(print_buf)-(pos-print_buf));
-	pos+=output_style_field(_handle, interval_ms, pos, sizeof(print_buf)-(pos-print_buf));
-	pos+=output_style_table(_handle, interval_ms, pos, sizeof(print_buf)-(pos-print_buf));
-	pos+=output_style_histogram(_handle, interval_ms, pos, sizeof(print_buf)-(pos-print_buf));
+	pos+=output_style_status(_handle, interval_ms, pos, print_buf_sz-(pos-print_buf));
+	pos+=output_style_field(_handle, interval_ms, pos, print_buf_sz-(pos-print_buf));
+	pos+=output_style_table(_handle, interval_ms, pos, print_buf_sz-(pos-print_buf));
+	pos+=output_style_histogram(_handle, interval_ms, pos, print_buf_sz-(pos-print_buf));
 	pthread_mutex_unlock(&(_handle->reg_lock));
 
-	if(_handle->fp==NULL)
-	{
-		printf("Field Stat: open %s failed.\n",_handle->appoint_output_file);
-		return;
-	}
+
 	if(_handle->print_mode==1)
 	{
 		fseek(_handle->fp,0,SEEK_SET);
@@ -1440,6 +1446,8 @@ void FS_passive_output(screen_stat_handle_t handle)
 		}
 		pthread_mutex_unlock(&(_handle->reg_lock));
 	}
+	free(print_buf);
+	print_buf=NULL;
 }
 
 void *fs2_thread_screen_print(void *arg)
