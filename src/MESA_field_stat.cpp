@@ -499,11 +499,6 @@ int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* va
 			{
 				return -1;
 			}
-			if(size!=sizeof(unsigned short))
-			{
-				return -1;
-			}
-			_handle->server_port=*((unsigned short *)value);
 			break;
 		case	STATS_FORMAT:
 			if(size!=4||(int_val!=FS_OUTPUT_STATSD&&int_val!=FS_OUTPUT_INFLUX_LINE))
