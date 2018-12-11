@@ -1371,6 +1371,8 @@ void FS_passive_output(screen_stat_handle_t handle)
 	struct timespec now;
 	time_t current=0;
 	char date_buff[32];
+	//he reentrant version ctime_r() does the same, but stores the string in a user-supplied buffer which should have room for at least 26 bytes.
+	char ctime_buff[32]={0};
 	char* print_buf=NULL;
 	size_t print_buf_sz=_handle->display_cnt*1024;
 	char*pos=NULL;
@@ -1409,7 +1411,8 @@ void FS_passive_output(screen_stat_handle_t handle)
 	}
 	print_buf=(char*)calloc(sizeof(char), print_buf_sz);
 	pos=print_buf;
-	pos+=snprintf(pos, print_buf_sz-(pos-print_buf), "%s%s", draw_boundary, ctime(&current));
+	ctime_r(&current, ctime_buff);
+	pos+=snprintf(pos, print_buf_sz-(pos-print_buf), "%s%s", draw_boundary, ctime_buff);
 	pos--;//jump '\n' generate by ctime()
 	pos+=snprintf(pos, print_buf_sz-(pos-print_buf),"%s\n",draw_boundary);
 

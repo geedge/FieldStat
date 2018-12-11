@@ -23,3 +23,7 @@ line_3              	  2.76e+04	  5.53e+04	  1.11e+05	  1.38e+05	  1.66e+05	  1.
 line_4              	  2.76e+04	  5.53e+04	  1.11e+05	  1.38e+05	  1.66e+05	  1.94e+05	  2.21e+05	  5.00e-01	
 line_5              	  2.76e+04	  5.53e+04	  1.11e+05	  1.38e+05	  1.66e+05	  1.94e+05	  2.21e+05	  5.00e-01	
 line_6              	  2.76e+04	  5.53e+04	  1.11e+05	  1.38e+05	  1.66e+05	  1.94e+05	  2.21e+05	  5.00e-01
+
+关于fieldstat中显示域的命名，一般不要超过10个字节，不然本地刷新不美观。在缩写时，建议按照以下规则：
+1. field命名，除若干单词首字母组成的缩写外，不要大写。如Kernel Network Interface 可以缩写为KNI，packet缩写为pkt，而不是PKT
+2. htable->htab, read->rd，write->wr，send ->tx，receive->rx。如send packets，可缩写为tx_pkts；send bytes可缩写为tx_bytes
