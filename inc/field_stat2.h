@@ -1,7 +1,7 @@
 #ifndef H_SCREEN_STAT_H_INCLUDE
 #define H_SCREEN_STAT_H_INCLUDE
 #include <stdio.h>
-
+#include <time.h>
 #ifndef __cplusplus
 #error("This file should be compiled with C++ compiler")
 #endif
@@ -67,6 +67,19 @@ int FS_register(screen_stat_handle_t handle,enum field_dsp_style_t style,enum fi
 //numerator_id and denominator_id must be column/field/status style.
 //scaling: negative value: zoom in; positive value: zoom out;
 int FS_register_ratio(screen_stat_handle_t handle,int numerator_id,int denominator_id,int scaling,enum field_dsp_style_t style,enum field_calc_algo calc_type,const char* name);
+
+inline void record_time_start(struct timespec *start)
+{
+	clock_gettime(CLOCK_MONOTONIC, start);
+}
+inline long record_time_elapse_us(struct timespec *start)
+{
+	struct timespec end;
+	long elapsed = 0;
+	clock_gettime(CLOCK_MONOTONIC, &end);
+	elapsed = (end.tv_sec - start->tv_sec)*1000000 + (end.tv_nsec - start->tv_nsec)/1000;
+	return elapsed;
+}
 
 //@param bins format is comma spited number, e.g."0.1,0.5,0.8,0.9,0.95,0.99"
 //return 0 on success, <0 on failed.
