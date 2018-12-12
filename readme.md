@@ -10,12 +10,12 @@ Field Stat是一个运行状态输出与统计库。
 
 ### 域（Field ）
 
-​	`FS_STYLE_FIELD` 同时输出累计值(sum)和瞬时值(speed/s，1秒内的变化值)
+​	`FS_STYLE_FIELD` 同时输出累计值(sum)和瞬时值(speed/s，1秒内的变化值)。
 
 ```
-	  field_00	  field_01
-sum	         0	    184300
-speed/s	     0	     92150
+        field_00  field_01
+sum         0	    184300
+speed/s     0	     92150
 ```
 
 ​	函数接口 
@@ -26,7 +26,7 @@ field_ids[i]=FS_register(handle, FS_STYLE_FIELD, FS_CALC_CURRENT, "field_01");
 
 ### 状态（Status）
 
-​	`FS_STYLE_STATUS` 输出累计值或瞬时值
+​	`FS_STYLE_STATUS` 输出累计值或瞬时值。
 
 ```c
 status_00:  100  status_01: 10
@@ -43,7 +43,7 @@ status_ids[i]=FS_register(handle, FS_STYLE_STATUS, FS_CALC_CURRENT, "status_01")
  `FS_STYLE_LINE`和`FS_STYLE_COLUMN `输出累计值或瞬时值。
 
 ```
-___________________________________________________________________________________
+___________________________________________________________________________________________________
 	     column_0	  column_1	  column_3	  column_4	  column_5	      c0/c1
 line_0       2.76e+04	  5.53e+04	  1.11e+05	  1.38e+05	  1.66e+05	   5.00e-01	
 line_1       2.76e+04	  5.53e+04	  1.11e+05	  1.38e+05	  1.66e+05	   5.00e-01	
@@ -68,11 +68,11 @@ column_ids[i]=FS_register(handle, FS_STYLE_COLUMN, FS_CALC_SPEED,"column_0");
 ​	`FS_STYLE_HISTOGRAM` 输出事件的数值分布，如延迟，文件长度等。
 
 ```
-histogram	 50%   80%   95%   MAX   MIN    AVG   STDDEV   CNT
-ssl_up(ms)	   0     0     0     0     0    0.00    0.00     0
-peek_sni(ms)   0     0     0     0     0    0.00    0.00     0
-ssl_down(ms)   0     0     0     0     0    0.00    0.00     0
-ask_kyr(ms)	   0     0     0     0     0    0.00    0.00     0
+histogram       50%   80%   95%   MAX   MIN    AVG   STDDEV   CNT
+ssl_up(ms)      0     0     0     0     0    0.00    0.00     0
+peek_sni(ms)    0     0     0     0     0    0.00    0.00     0
+ssl_down(ms)    0     0     0     0     0    0.00    0.00     0
+ask_kyr(ms)     0     0     0     0     0    0.00    0.00     0
 ```
 
 ​	默认输出 50%，80.00%，90%，95%和99%的比例， 可以通过 `FS_set_para` 函数的`HISTOGRAM_GLOBAL_BINS`选项修改。
@@ -92,12 +92,12 @@ ask_kyr(ms)	   0     0     0     0     0    0.00    0.00     0
   函数接口 
 
 ```
-fs_metric_sql_exec=FS_register_histogram(g_info.fs_handle,	//Field Stat句柄
-										FS_CALC_CURRENT,	//输出累计值或瞬时值
-                                        "sql_exec(us)",		//统计项名称，字符串
-                                        1,					//可追踪的最小值
-                                        1000000,			//可追踪的最大值
-                                        2);					//精度，即小数点后几位，范围1~4
+fs_metric_sql_exec=FS_register_histogram(g_info.fs_handle,  //Field Stat句柄
+                                        FS_CALC_CURRENT,    //输出累计值或瞬时值
+                                        "sql_exec(us)",     //统计项名称，字符串
+                                        1,                  //可追踪的最小值
+                                        1000000,            //可追踪的最大值
+                                        2);                 //精度，即小数点后几位，范围1~4
 ```
 
 
