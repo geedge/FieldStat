@@ -4,7 +4,9 @@ Field Stat是一个运行状态输出与统计库。
 
 ## 本地显示风格(style)
 
-​	输出到屏幕或文件，可选择输出瞬时值 `FS_CALC_SPEED`或累计值`FS_CALC_CURRENT`。
+​	本地显示会输出到屏幕或文件，可选择输出瞬时值 `FS_CALC_SPEED`或累计值`FS_CALC_CURRENT`。
+
+​	允许在`FS_start`启动后注册非Column的统计域。
 
 ### 域（Field ）
 
@@ -42,7 +44,7 @@ status_ids[i]=FS_register(handle, FS_STYLE_STATUS, FS_CALC_CURRENT, "status_01")
 
 ```
 ___________________________________________________________________________________
-			 column_0	  column_1	  column_3	  column_4	  column_5	      c0/c1
+	  	  	 column_0	  column_1	  column_3	  column_4	  column_5	      c0/c1
 line_0       2.76e+04	  5.53e+04	  1.11e+05	  1.38e+05	  1.66e+05	   5.00e-01	
 line_1       2.76e+04	  5.53e+04	  1.11e+05	  1.38e+05	  1.66e+05	   5.00e-01	
 line_2       2.76e+04	  5.53e+04	  1.11e+05	  1.38e+05	  1.66e+05	   5.00e-01	
@@ -122,27 +124,21 @@ line，app_name=APPNAME column1=value,column2=value
 
 `percentiles = [50, 60, 80, 90, 95, 99]`
 
-## 使用建议
+## 统计
 
-### 命名建议
+### 记录统计值
 
-​	在命名时，遵循按照以下规则：
+​	通过`FS_operate`函数操作统计域，函数内部使用原子变量，无锁且线程安全。
 
-1. 带上单位，如bytes或kb，微秒us或毫秒ms等。
-2. 除若干单词首字母组成的缩写外，不要大写。如Kernel Network Interface 可以缩写为KNI，packet缩写为pkt，而不是PKT
-3.  一般不要超过10个字节，不然本地刷新不美观。
-   - htable->htab, read->rd，write->wr，send ->tx，receive->rx
-   - send packets，可缩写为tx_pkts，send bytes可缩写为tx_bytes
-
-### 显示字段数量
-
-​	Status和Field每行固定展示8个统计值。Column和Histogram取决于注册数量，建议Column一般不超过8个，Histogram的bins不超过5个。
-
-​	通过`FS_set_para`函数的 `ID_INVISBLE`不显示的字段，可以节约屏幕空间；通过 `FS_register_ratio`计算两个统计字段的比值。
-
-### 本地结果查看
-
-​	在shell执行`watch -d cat 日志文件`，观察实时的输出结果。
+```
+//handle: FieldStat句柄
+//id: FS_register_**返回的ID
+//column_id: 列ID，非column类型填0
+//filed_op: FS_OP_ADD: + value
+//			FS_OP_SUB: - value
+//			FS_OP_SET: = value
+int FS_operate(screen_stat_handle_t handle,int id,int column_id,enum field_op op,long long value);
+```
 
 ### 记录事件耗时
 
@@ -155,5 +151,33 @@ struct timespec start;
 record_time_start(&start);
 //do something
 long eplapses=record_time_elapse_us(&start);
+FS_operate(fs_handle, histogram_id, 0, FS_OP_SET, eplapsed);
 ```
+
+
+
+## 使用建议
+
+### 命名建议
+
+​	在命名时，遵循按照以下规则：
+
+1. 带上单位，如bytes或kb，微秒us或毫秒ms等。
+2. 除若干单词首字母组成的缩写外，不要大写。如Kernel Network Interface 可以缩写为KNI，packet缩写为pkt，而不是PKT
+3.  一般不要超过10个字节，不然本地刷新不美观。
+   - htable->htab, read->rd，write->wr，send ->tx，receive->rx
+
+   - send packets，可缩写为tx_pkts，send bytes可缩写为tx_bytes
+
+     禁止注册名称包含 `|:\n\r. \t<>[]#!@`的统计域。
+
+### 显示字段数量
+
+​	Status和Field每行固定展示8个统计值。Column和Histogram取决于注册数量，建议Column一般不超过8个，Histogram的bins不超过5个。
+
+​	通过`FS_set_para`函数的 `ID_INVISBLE`不显示的字段，可以节约屏幕空间；通过 `FS_register_ratio`计算两个统计字段的比值。
+
+### 本地结果查看
+
+​	在shell执行`watch -d cat 日志文件`，观察实时的输出结果。
 
