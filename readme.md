@@ -44,7 +44,7 @@ status_ids[i]=FS_register(handle, FS_STYLE_STATUS, FS_CALC_CURRENT, "status_01")
 
 ```
 ___________________________________________________________________________________
-	  	  	 column_0	  column_1	  column_3	  column_4	  column_5	      c0/c1
+	     column_0	  column_1	  column_3	  column_4	  column_5	      c0/c1
 line_0       2.76e+04	  5.53e+04	  1.11e+05	  1.38e+05	  1.66e+05	   5.00e-01	
 line_1       2.76e+04	  5.53e+04	  1.11e+05	  1.38e+05	  1.66e+05	   5.00e-01	
 line_2       2.76e+04	  5.53e+04	  1.11e+05	  1.38e+05	  1.66e+05	   5.00e-01	
