@@ -1014,7 +1014,7 @@ void StatsD_output(struct FS_space_t* _handle)
 		switch(p->style)
 		{
 			case FS_STYLE_STATUS:
-				if(p->calc_type==FS_CALC_SPEED)
+				if(p->calc_type==FS_CALC_CURRENT)
 				{
 					value=get_stat_unit_val(p, 0, FS_CALC_CURRENT, 1);
 					append_statsd_histogram(_handle, p->name, value, 1);

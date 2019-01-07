@@ -26,13 +26,21 @@ field_ids[i]=FS_register(handle, FS_STYLE_FIELD, FS_CALC_CURRENT, "field_01");
 
 ### 状态（Status）
 
-​	`FS_STYLE_STATUS` 输出累计值或瞬时值。
+​	`FS_STYLE_STATUS` ，可以输出当前值（FS_CALC_CURRENT）或速度值（FS_CALC_SPEED）。
 
 ```c
 status_00:  100  status_01: 10
 ```
 
-​	函数接口 
+​	 输出前值（FS_CALC_CURRENT）时，StatsD输出会采用Histogram类型，以便telegraf对其进行聚合。例如下面的grafana查询语句：
+
+`SELECT sum("sum_sum")  / 5 FROM "[tango_cache]SESSION_REDIS" WHERE $timeFilter GROUP BY time(10s) fill(linear)`
+
+​	该语句在聚合多个节点上SESSION_REDIS的总数，group by 的时间为10s，因为FieldStat的输出间隔为2s（通过`STAT_CYCLE`参数），所以sum("sum_sum") 的值要再除以5。
+
+​	注意：在使用多个FieldStat实例时，`STAT_CYCLE`必须设定为相同的值。
+
+函数接口 
 
 ```
 status_ids[i]=FS_register(handle, FS_STYLE_STATUS, FS_CALC_CURRENT, "status_01");
@@ -40,7 +48,7 @@ status_ids[i]=FS_register(handle, FS_STYLE_STATUS, FS_CALC_CURRENT, "status_01")
 
 ### 表格 （Line&Column）
 
- `FS_STYLE_LINE`和`FS_STYLE_COLUMN `输出累计值或瞬时值。
+ `FS_STYLE_LINE`和`FS_STYLE_COLUMN `输出当前值或速度值。
 
 ```
 ___________________________________________________________________________________________________
@@ -123,6 +131,8 @@ line，app_name=APPNAME column1=value,column2=value
 ​	服务端搭建流程参见[《【StatsD监控】基于Telegraf+InfluxDB+grafana展示（非Docker方案）》](https://blog.csdn.net/littlefang/article/details/78473161)。聚合Histogram建议修改telegraf.conf的以下配置项：
 
 `percentiles = [50, 60, 80, 90, 95, 99]`
+
+
 
 ## 统计
 
