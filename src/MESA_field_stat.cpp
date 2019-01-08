@@ -1017,13 +1017,13 @@ void StatsD_output(struct FS_space_t* _handle)
 				if(p->calc_type==FS_CALC_CURRENT)
 				{
 					value=get_stat_unit_val(p, 0, FS_CALC_CURRENT, 1);
-					append_statsd_histogram(_handle, p->name, value, 1);
+					append_statsd_counter(_handle, p->name, value);
 					break;
 				}
 				//not break;
 			case FS_STYLE_FIELD:
 				value=get_stat_unit_val(p, 0, FS_CALC_SPEED, 1);
-				append_statsd_counter(_handle, p->name,value);
+				append_statsd_counter(_handle, p->name, value);
 				break;
 			case FS_STYLE_LINE:
 				for(j=0;j<_handle->column_cnt;j++)

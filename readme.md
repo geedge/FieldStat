@@ -34,9 +34,9 @@ status_00:  100  status_01: 10
 
 ​	 输出前值（FS_CALC_CURRENT）时，StatsD输出会采用Histogram类型，以便telegraf对其进行聚合。例如下面的grafana查询语句：
 
-`SELECT sum("sum_sum")  / 5 FROM "[tango_cache]SESSION_REDIS" WHERE $timeFilter GROUP BY time(10s) fill(linear)`
+`SELECT sum("value_sum")  / 5 FROM "[tango_cache]SESSION_REDIS" WHERE $timeFilter GROUP BY time(10s) fill(linear)`
 
-​	该语句在聚合多个节点上SESSION_REDIS的总数，group by 的时间为10s，因为FieldStat的输出间隔为2s（通过`STAT_CYCLE`参数），所以sum("sum_sum") 的值要再除以5。
+​	该语句在聚合多个节点上SESSION_REDIS的总数，group by 的时间为10s，因为FieldStat的输出间隔为2秒（初始化时由`STAT_CYCLE`参数设置，默认2s），所以sum("value_sum") 的值要再除以5。
 
 ​	注意：在使用多个FieldStat实例时，`STAT_CYCLE`必须设定为相同的值。
 
