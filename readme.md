@@ -130,7 +130,13 @@ line，app_name=APPNAME column1=value,column2=value
 
 ​	服务端搭建流程参见[《【StatsD监控】基于Telegraf+InfluxDB+grafana展示（非Docker方案）》](https://blog.csdn.net/littlefang/article/details/78473161)。聚合Histogram建议修改telegraf.conf的以下配置项：
 
-`percentiles = [50, 60, 80, 90, 95, 99]`
+```
+[[inputs.statsd]]
+        protocol = "udp4"
+        service_address = ":8125"
+        percentiles = [20,30,40,50,60,70,80,90,95,99]
+        percentile_limit = 100000000
+```
 
 
 
