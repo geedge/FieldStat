@@ -96,6 +96,8 @@ int main(int argc,char* argv[])
 				FS_STYLE_COLUMN,
 				FS_CALC_SPEED,
 				buff);
+	value=line_ids[1];
+	FS_set_para(handle, NOT_SEND_METRIC_TO_SERVER, &value, sizeof(value));
 	
 	FS_start(handle);
 	loops=100;

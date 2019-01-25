@@ -49,7 +49,8 @@ enum FS_option
 	STATS_SERVER_PORT, 	//VALUE is a unsigned short or a signed int, host order, SIZE= sizeof(unsigned short) or sizeof(int). No DEFAULT.
 	STATS_FORMAT,		//VALUE is enum stats_output_format, STATSD or INFLUX_LINE, SIZE=sizeof(int), DEFAULT:STATSD.
 	MAX_STAT_FIELD_NUM,		//VALUE is an interger, SIZE=sizeof(int), DEFAULT:1024.
-	HISTOGRAM_GLOBAL_BINS	//VALUE is a const char*, define a histogram bins for default field, SIZE = strlen(string+'\0')+1. DEFAULT: "0.5,0.8,0.9,0.95,0.99“.
+	HISTOGRAM_GLOBAL_BINS,	//VALUE is a const char*, define a histogram bins for default field, SIZE = strlen(string+'\0')+1. DEFAULT: "0.5,0.8,0.9,0.95,0.99“.
+	NOT_SEND_METRIC_TO_SERVER		//value is field_id/status_id/column_id, not output this string, SIZE=4,DEFAULT: Send.
 };
 
 //Always success.

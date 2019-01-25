@@ -36,7 +36,7 @@
 double HISTOGRAM_DEFAULT_BINS[]={50.0, 80.0, 90.0, 95.0, 99.0};
 
 
-int FIELD_STAT_VERSION_2_8_20181203=0;
+int FIELD_STAT_VERSION_2_8_20190125=0;
 
 #if(__GNUC__ * 100 + __GNUC_MINOR__ * 10 + __GNUC_PATCHLEVEL__ >= 410)
 #define atomic_inc(x) __sync_add_and_fetch((x),1)
@@ -129,6 +129,7 @@ struct display_manifest_t
 	char* name;
 	int is_invisible;
 	int is_ratio;
+	int not_send_to_server;
 	int numerator_id;
 	int denominator_id;
 	int output_scaling;	//negative value: zoom in; positive value: zoom out;
@@ -459,6 +460,13 @@ int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* va
 				return -1;
 			}
 			_handle->display[int_val]->is_invisible=1;
+			break;
+		case	NOT_SEND_METRIC_TO_SERVER:
+			if(int_val<0||int_val>=_handle->display_cnt)
+			{
+				return -1;
+			}
+			_handle->display[int_val]->not_send_to_server=1;
 			break;
 		case	FLUSH_BY_DATE:
 			if(int_val==1)
@@ -934,7 +942,7 @@ void influx_output(struct FS_space_t* _handle)
 	for(i=0;i<_handle->display_cnt;i++)
 	{
 		p=_handle->display[i];
-		if(p->is_invisible==1||p->is_ratio==1)
+		if(p->not_send_to_server==1||p->is_ratio==1)
 		{
 			continue;
 		}
@@ -964,7 +972,7 @@ void influx_output(struct FS_space_t* _handle)
 				for(j=0;j<_handle->column_cnt;j++)
 				{
 					p_column=_handle->display[_handle->cloumn_id[j]];
-					if(p_column->is_invisible==1||p_column->is_ratio==1)
+					if(p_column->not_send_to_server==1||p_column->is_ratio==1)
 					{
 						continue;
 					}
@@ -1007,7 +1015,7 @@ void StatsD_output(struct FS_space_t* _handle)
 	for(i=0;i<_handle->display_cnt;i++)
 	{
 		p=_handle->display[i];
-		if(p->is_invisible==1||p->is_ratio==1)
+		if(p->not_send_to_server==1||p->is_ratio==1)
 		{
 			continue;
 		}
@@ -1029,7 +1037,7 @@ void StatsD_output(struct FS_space_t* _handle)
 				for(j=0;j<_handle->column_cnt;j++)
 				{
 					p_column=_handle->display[_handle->cloumn_id[j]];
-					if(p_column->is_invisible==1||p_column->is_ratio==1)
+					if(p_column->not_send_to_server==1||p_column->is_ratio==1)
 					{
 						continue;
 					}
