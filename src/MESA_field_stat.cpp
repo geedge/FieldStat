@@ -18,6 +18,8 @@
 #include <assert.h>
 #include <sys/time.h>
 
+
+
 #define	INIT_STAT_FIELD_NUM		1024
 #define	MAX_STAT_COLUMN_NUM		32
 #define MAX_PATH_LEN			256
@@ -57,6 +59,30 @@ typedef long atomic_t;
 #define atomic_read(x) 	(*(x))
 #define atomic_set(x,y)	((*(x))=(y))
 #endif 
+
+//Automatically generate the version number
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
+#define GIT_VERSION_CATTER(v) __attribute__((__used__)) const char * GIT_VERSION_##v = NULL
+#define GIT_VERSION_EXPEND(v) GIT_VERSION_CATTER(v)
+
+/* VERSION TAG */
+#ifdef GIT_VERSION
+GIT_VERSION_EXPEND(GIT_VERSION);
+#else
+static __attribute__((__used__)) const char * GIT_VERSION_UNKNOWN = NULL;
+#endif
+#undef GIT_VERSION_CATTER
+#undef GIT_VERSION_EXPEND
+
+#ifdef __cplusplus
+}
+#endif
+//endof Automatically generate the version number
+
 const char* draw_line="________________________________________________________________________________________________________________________________________________";
 const char* draw_boundary="============================================================";
 
