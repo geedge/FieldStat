@@ -2,5 +2,11 @@ SI/
 *.log
 *.o
 *.so
-bin/avrule/
-bin/avlog/
+*.si4project/
+*.a
+*.d
+build/
+.vscode
+.idea
+core.*
+version.txt
