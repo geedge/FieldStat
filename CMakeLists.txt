@@ -5,7 +5,7 @@ set(lib_name MESA_field_stat2)
 project (${lib_name})
 
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
-include(Version)
+#include(Version)
 
 set(CMAKE_MACOSX_RPATH 0)
 
@@ -40,13 +40,13 @@ file(GLOB SRC
 add_library(${lib_name}_shared SHARED ${SRC})
 set_target_properties(${lib_name}_shared PROPERTIES LINK_FLAGS
     "-Wl,--version-script=${PROJECT_SOURCE_DIR}/src/version.map")
-set_target_properties(${lib_name}_shared PROPERTIES OUTPUT_NAME ${lib_name})
+set_target_properties(${lib_name}_shared PROPERTIES OUTPUT_NAME ${lib_name} LIBRARY_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX}/lib)
 
 # static Library Output
 add_library(${lib_name}_static STATIC ${SRC})
 set_target_properties(${lib_name}_static PROPERTIES OUTPUT_NAME ${lib_name})
 
-install(TARGETS ${lib_name}_shared ${lib_name}_static DESTINATION ${CMAKE_SOURCE_DIR}/lib)
+install(TARGETS ${lib_name}_shared ${lib_name}_static DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
 
 
 file(GLOB DEMO
