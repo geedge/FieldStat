@@ -5,7 +5,7 @@ set(lib_name MESA_field_stat2)
 project (${lib_name})
 
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
-#include(Version)
+include(Version)
 
 set(CMAKE_MACOSX_RPATH 0)
 
