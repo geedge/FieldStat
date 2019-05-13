@@ -40,7 +40,7 @@ file(GLOB SRC
 add_library(${lib_name}_shared SHARED ${SRC})
 set_target_properties(${lib_name}_shared PROPERTIES LINK_FLAGS
     "-Wl,--version-script=${PROJECT_SOURCE_DIR}/src/version.map")
-set_target_properties(${lib_name}_shared PROPERTIES OUTPUT_NAME ${lib_name})
+set_target_properties(${lib_name}_shared PROPERTIES OUTPUT_NAME ${lib_name} "${CMAKE_INSTALL_PREFIX}/lib")
 
 # static Library Output
 add_library(${lib_name}_static STATIC ${SRC})
