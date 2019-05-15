@@ -46,6 +46,8 @@ add_library(${lib_name}_static STATIC ${SRC})
 set_target_properties(${lib_name}_static PROPERTIES OUTPUT_NAME ${lib_name})
 
 install(TARGETS ${lib_name}_shared ${lib_name}_static DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
+install(FILES inc/filed_stat2.h   DESTINATION   ${CMAKE_INSTALL_PREFIX}/include/MESA COMPONENT devel)
+
 
 
 file(GLOB DEMO
