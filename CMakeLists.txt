@@ -39,7 +39,7 @@ file(GLOB SRC
 add_library(${lib_name}_shared SHARED ${SRC})
 set_target_properties(${lib_name}_shared PROPERTIES LINK_FLAGS
     "-Wl,--version-script=${PROJECT_SOURCE_DIR}/src/version.map")
-set_target_properties(${lib_name}_shared PROPERTIES OUTPUT_NAME ${lib_name} LIBRARY_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX}/lib)
+set_target_properties(${lib_name}_shared PROPERTIES OUTPUT_NAME ${lib_name})
 
 # static Library Output
 add_library(${lib_name}_static STATIC ${SRC})
@@ -48,7 +48,7 @@ set_target_properties(${lib_name}_static PROPERTIES OUTPUT_NAME ${lib_name})
 install(TARGETS ${lib_name}_shared ${lib_name}_static DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
 install(FILES inc/field_stat2.h   DESTINATION   ${CMAKE_INSTALL_PREFIX}/include/MESA COMPONENT devel)
 
-
+include(Package)
 
 file(GLOB DEMO
     "test/*.c"
