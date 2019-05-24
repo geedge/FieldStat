@@ -39,7 +39,11 @@ file(GLOB SRC
 add_library(${lib_name}_shared SHARED ${SRC})
 set_target_properties(${lib_name}_shared PROPERTIES LINK_FLAGS
     "-Wl,--version-script=${PROJECT_SOURCE_DIR}/src/version.map")
-set_target_properties(${lib_name}_shared PROPERTIES OUTPUT_NAME ${lib_name})
+if(DEFINED MESA_SHARED_INSTALL_DIR)
+	set_target_properties(${lib_name}_shared PROPERTIES OUTPUT_NAME ${lib_name} LIBRARY_OUTPUT_DIRECTORY ${MESA_SHARED_INSTALL_DIR})
+else()
+	set_target_properties(${lib_name}_shared PROPERTIES OUTPUT_NAME ${lib_name})
+endif()
 
 # static Library Output
 add_library(${lib_name}_static STATIC ${SRC})
