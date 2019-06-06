@@ -1,0 +1,39 @@
+image: "git.mesalab.cn:7443/mesa_framework/framework-build-env:master"
+stages:
+- build
+#- test
+#- package
+- release
+
+variables:
+  TOKEN: "LWsss-XPxWuP-Esv-dF7"
+  ARTIFACTS_JOB: "build"
+  
+build:
+  stage: build
+  script:
+    - mkdir -p build
+    - cd build
+    - cmake .. -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DCMAKE_PREFIX_PATH=$BUILD_PREFIX
+    - make
+    - make package
+  tags:
+    - share
+  variables:
+    BUILD_TYPE: "Debug"
+    BUILD_PREFIX: "/opt/MESA/"
+  only:
+    - tags
+  artifacts:
+    name: "$CI_JOB_NAME-$CI_COMMIT_REF_NAME-debug"
+    paths:
+      -  ./build/*.rpm
+
+release:
+  stage: release
+  tags:
+    - share
+  only:
+    - tags    
+  script:
+     - /bin/bash -x ./autorelease.sh $CI_API_V4_URL $CI_PROJECT_URL $CI_PROJECT_ID $TOKEN $CI_COMMIT_TAG $ARTIFACTS_JOB $CI_PROJECT_NAME
