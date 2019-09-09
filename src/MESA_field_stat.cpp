@@ -1,5 +1,7 @@
 #include "field_stat2.h"
 #include "hdr_histogram.h"
+#include "cJSON.h"
+
 #include <sys/socket.h>//socket
 #include <sys/types.h>//socket
 #include <netinet/in.h>
@@ -199,7 +201,7 @@ struct FS_space_t
 	int line_cnt;
 	int display_cnt;
 	int single_cnt;//including line_cnt;
-	int matrix_base;
+	int metris_format;
 	int column_cnt;
 	int histogram_cnt;
 	
@@ -557,6 +559,13 @@ int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* va
 			}
 			_handle->histogram_bin_num=parse_histogram_bin_format((const char*)value, &_handle->histogram_bins);
 			assert(_handle->histogram_bin_num>0);
+        case	METRIS_FORMAT:
+            if(size!=4||(int_val!=FS_METRIS_OUTPUT_DEFAULT&&int_val!=FS_METRIS_OUTPUT_JSON))
+            {
+                return -1;
+            }
+            _handle->metris_format=int_val;
+            break;
 		default:
 			return -1;
 	}
@@ -1399,6 +1408,131 @@ static int output_style_histogram(struct FS_space_t* _handle, long long interval
 	return pos-print_buf;	
 }
 
+cJSON *fs2_metrics_to_json(FS_space_t* _handle, long long timestamp)
+{
+    if(_handle == NULL)
+    {
+        return NULL;
+    }
+    display_manifest_t* p=NULL, *p_column=NULL;;
+    long long value=0;
+    cJSON *root_obj = cJSON_CreateObject();
+    cJSON_AddNumberToObject(root_obj, "unix timestamp", timestamp);
+    cJSON_AddNumberToObject(root_obj, "output interval", _handle->stat_cycle);
+    cJSON *metrics_array_obj = cJSON_CreateArray();
+    cJSON *tmp_obj = NULL;
+    char tmp_output_name[64];
+    const char* extra[]={"MAX", "MIN", "AVG", "STDDEV", "CNT"};
+    long long tmp_histogram_values[sizeof(extra)/sizeof(char*)];
+    for(int i=0;i<_handle->display_cnt;i++)
+    {
+        p=_handle->display[i];
+        if(p->not_send_to_server==1||p->is_ratio==1)
+        {
+            continue;
+        }
+        switch(p->style)
+        {
+            case FS_STYLE_STATUS:
+                if(p->calc_type==FS_CALC_SPEED)
+                {
+                    //value=get_stat_unit_val(p, 0, FS_CALC_CURRENT, 1);
+                    tmp_obj = cJSON_CreateObject();
+                    cJSON_AddStringToObject(tmp_obj, "name", p->name);
+                    cJSON_AddStringToObject(tmp_obj, "type", "single");
+                    cJSON_AddNumberToObject(tmp_obj, "acc", p->single.accumulated);
+                    cJSON_AddNumberToObject(tmp_obj, "diff", p->single.changing);
+                    cJSON_AddItemToArray(metrics_array_obj, tmp_obj);
+                    //cJSON_Delete(tmp_obj);
+                    break;
+                }
+                //not break
+            case FS_STYLE_FIELD:
+                //value=get_stat_unit_val(p, 0, FS_CALC_SPEED, 1);
+                tmp_obj = cJSON_CreateObject();
+                cJSON_AddStringToObject(tmp_obj, "name", p->name);
+                cJSON_AddStringToObject(tmp_obj, "type", "single");
+                cJSON_AddNumberToObject(tmp_obj, "acc", p->single.accumulated);
+                cJSON_AddNumberToObject(tmp_obj, "diff", p->single.changing);
+                cJSON_AddItemToArray(metrics_array_obj, tmp_obj);
+                //cJSON_Delete(tmp_obj);
+                break;
+            case FS_STYLE_LINE:
+                for(int j=0;j<_handle->column_cnt;j++)
+                {
+                    p_column=_handle->display[_handle->cloumn_id[j]];
+                    if(p_column->not_send_to_server==1||p_column->is_ratio==1)
+                    {
+                        continue;
+                    }
+                    //value=get_stat_unit_val(p, p_column->column_seq, FS_CALC_SPEED, 1);
+                    tmp_obj = cJSON_CreateObject();
+                    snprintf(tmp_output_name, sizeof(tmp_output_name), "%s.%s", p->name, p_column->name);
+                    cJSON_AddStringToObject(tmp_obj, "name", tmp_output_name);
+                    //cJSON_AddStringToObject(tmp_obj, "type", "line");
+                    cJSON_AddNumberToObject(tmp_obj, "acc", p_column->single.accumulated);
+                    cJSON_AddNumberToObject(tmp_obj, "diff", p_column->single.changing);
+                    cJSON_AddItemToArray(metrics_array_obj, tmp_obj);
+                    //cJSON_Delete(tmp_obj);
+                }
+                break;
+            case FS_STYLE_HISTOGRAM:
+                {
+                    struct histogram_t* h=&(p->histogram);
+                    struct hdr_histogram* h_out=NULL, *h_tmp=NULL;
+                    hdr_init(h->lowest_trackable_value,  h->highest_trackable_value, h->significant_figures, &(h_tmp));
+                    if(h->previous_changed!=NULL)	hdr_close(h->previous_changed);
+
+                    h->previous_changed=atomic_read(&(h->changing));
+                    h_tmp=atomic_set(&(h->changing), h_tmp);// left h_tmp is used to avoid warining [-Wunused-value]
+
+                    hdr_add(h->accumulated, h->previous_changed);
+                    if(p->calc_type==FS_CALC_SPEED)
+                    {
+                        h_out=h->previous_changed;
+                    }
+                    else
+                    {
+                        h_out=h->accumulated;
+                    }
+
+                    for(int j=0;j<_handle->histogram_bin_num;j++)
+                    {
+                        value=(long long)hdr_value_at_percentile(h_out, _handle->histogram_bins[j]);
+                        tmp_obj = cJSON_CreateObject();
+                        snprintf(tmp_output_name, sizeof(tmp_output_name), "%s.p%.2f", p->name,
+                                _handle->histogram_bins[j]);
+                        cJSON_AddStringToObject(tmp_obj, "name", tmp_output_name);
+                        cJSON_AddNumberToObject(tmp_obj, "acc", value);
+                        cJSON_AddNumberToObject(tmp_obj, "diff", value);
+                        cJSON_AddItemToArray(metrics_array_obj, tmp_obj);
+                    }
+                    tmp_histogram_values[0] = h_out->total_count==0?0:(long long)hdr_max(h_out);
+                    tmp_histogram_values[1] = h_out->total_count==0?0:(long long)hdr_min(h_out);
+                    tmp_histogram_values[2] = h_out->total_count==0?0:hdr_mean(h_out);
+                    tmp_histogram_values[3] = h_out->total_count==0?0:hdr_stddev(h_out);
+                    tmp_histogram_values[4] = (long long)h_out->total_count;
+                    for(unsigned int j = 0; j < sizeof(extra)/sizeof(char*); j++)
+                    {
+                        tmp_obj = cJSON_CreateObject();
+                        snprintf(tmp_output_name, sizeof(tmp_output_name), "%s.%s", p->name, extra[j]);
+                        cJSON_AddStringToObject(tmp_obj, "name", tmp_output_name);
+                        cJSON_AddNumberToObject(tmp_obj, "acc", tmp_histogram_values[j]);
+                        cJSON_AddNumberToObject(tmp_obj, "diff", tmp_histogram_values[j]);
+                        cJSON_AddItemToArray(metrics_array_obj, tmp_obj);
+                    }
+                }
+                break;
+            default:
+                break;
+        }
+
+    }
+    cJSON_AddItemToObject(root_obj, "metrics", metrics_array_obj);
+    //cJSON_Delete(metrics_array_obj);
+    return root_obj;
+}
+
 void FS_passive_output(screen_stat_handle_t handle)
 {
 	struct FS_space_t* _handle=(struct FS_space_t*)handle;
@@ -1443,20 +1577,34 @@ void FS_passive_output(screen_stat_handle_t handle)
 	{
 		return;
 	}
-	print_buf=(char*)calloc(sizeof(char), print_buf_sz);
-	pos=print_buf;
-	ctime_r(&current, ctime_buff);
-	pos+=snprintf(pos, print_buf_sz-(pos-print_buf), "%s%s", draw_boundary, ctime_buff);
-	pos--;//jump '\n' generate by ctime()
-	pos+=snprintf(pos, print_buf_sz-(pos-print_buf),"%s\n",draw_boundary);
+	if(_handle->metris_format == FS_METRIS_OUTPUT_DEFAULT)
+    {
+        print_buf=(char*)calloc(sizeof(char), print_buf_sz);
+        pos=print_buf;
+        ctime_r(&current, ctime_buff);
+        pos+=snprintf(pos, print_buf_sz-(pos-print_buf), "%s%s", draw_boundary, ctime_buff);
+        pos--;//jump '\n' generate by ctime()
+        pos+=snprintf(pos, print_buf_sz-(pos-print_buf),"%s\n",draw_boundary);
 
-	pthread_mutex_lock(&(_handle->reg_lock));
-	pos+=output_style_status(_handle, interval_ms, pos, print_buf_sz-(pos-print_buf));
-	pos+=output_style_field(_handle, interval_ms, pos, print_buf_sz-(pos-print_buf));
-	pos+=output_style_table(_handle, interval_ms, pos, print_buf_sz-(pos-print_buf));
-	pos+=output_style_histogram(_handle, interval_ms, pos, print_buf_sz-(pos-print_buf));
-	pthread_mutex_unlock(&(_handle->reg_lock));
-
+        pthread_mutex_lock(&(_handle->reg_lock));
+        pos+=output_style_status(_handle, interval_ms, pos, print_buf_sz-(pos-print_buf));
+        pos+=output_style_field(_handle, interval_ms, pos, print_buf_sz-(pos-print_buf));
+        pos+=output_style_table(_handle, interval_ms, pos, print_buf_sz-(pos-print_buf));
+        pos+=output_style_histogram(_handle, interval_ms, pos, print_buf_sz-(pos-print_buf));
+        pthread_mutex_unlock(&(_handle->reg_lock));
+    }
+    if(_handle->metris_format == FS_METRIS_OUTPUT_JSON)
+    {
+        pthread_mutex_lock(&(_handle->reg_lock));
+        cJSON *output_obj = fs2_metrics_to_json(_handle, now.tv_sec);
+        pthread_mutex_unlock(&(_handle->reg_lock));
+        if(output_obj != NULL)
+        {
+            print_buf = cJSON_PrintUnformatted(output_obj);
+            cJSON_Delete(output_obj);
+            pos = print_buf+strlen(print_buf)+1;
+        }
+    }
 
 	if(_handle->print_mode==1)
 	{

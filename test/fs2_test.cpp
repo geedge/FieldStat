@@ -32,7 +32,8 @@ int main(int argc,char* argv[])
 	FS_set_para(handle, PRINT_MODE, &value, sizeof(value));
 	value=1;
 	FS_set_para(handle, CREATE_THREAD, &value, sizeof(value));
-	value=2;
+    FS_set_para(handle, METRIS_FORMAT, &value, sizeof(value));
+    value=2;
 	FS_set_para(handle, STAT_CYCLE, &value, sizeof(value));
 	value=4096;
 	FS_set_para(handle, MAX_STAT_FIELD_NUM, &value, sizeof(value));
