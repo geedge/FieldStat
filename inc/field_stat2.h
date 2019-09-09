@@ -32,6 +32,12 @@ enum stats_output_format
 	FS_OUTPUT_INFLUX_LINE=2
 };
 
+enum metris_output_format
+{
+    FS_METRIS_OUTPUT_DEFAULT=0,
+    FS_METRIS_OUTPUT_JSON=1
+};
+
 typedef	void* screen_stat_handle_t;
 
 enum FS_option
@@ -43,14 +49,15 @@ enum FS_option
 	CREATE_THREAD,		//VALUE is an interger,1: Create a print thread,0:not create,output by call passive_output function,
 						//and the STAT_CYCLE is meaningless.SIZE=4,DEFAULT:0.
 	ID_INVISBLE,		//value is field_id/status_id/column_id, not output this string, SIZE=4,DEFAULT: shutdown NO one.
-	FLUSH_BY_DATE,		//value is 1(ture) or 0(false),SIZE=4,DEFAULT: Do not flush by date.
+	FLUSH_BY_DATE,		//value is 1(true) or 0(false),SIZE=4,DEFAULT: Do not flush by date.
 	APP_NAME,			//VALUE is a const char*, MUST end with '\0', SIZE= strlen(string+'\0')+1. DEFAULT is "?".
 	STATS_SERVER_IP, 	//VALUE is a const char*, MUST end with '\0', SIZE= strlen(string+'\0')+1. No DEFAULT.
 	STATS_SERVER_PORT, 	//VALUE is a unsigned short or a signed int, host order, SIZE= sizeof(unsigned short) or sizeof(int). No DEFAULT.
 	STATS_FORMAT,		//VALUE is enum stats_output_format, STATSD or INFLUX_LINE, SIZE=sizeof(int), DEFAULT:STATSD.
 	MAX_STAT_FIELD_NUM,		//VALUE is an interger, SIZE=sizeof(int), DEFAULT:1024.
 	HISTOGRAM_GLOBAL_BINS,	//VALUE is a const char*, define a histogram bins for default field, SIZE = strlen(string+'\0')+1. DEFAULT: "0.5,0.8,0.9,0.95,0.99“.
-	NOT_SEND_METRIC_TO_SERVER		//value is field_id/status_id/column_id, not output this string, SIZE=4,DEFAULT: Send.
+	NOT_SEND_METRIC_TO_SERVER,		//value is field_id/status_id/column_id, not output this string, SIZE=4,DEFAULT:Send.
+	METRIS_FORMAT //VALUE is enum metris_output_format, DEFAULT or JSON, SIZE=sizeof(int).
 };
 
 //Always success.
