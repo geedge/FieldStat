@@ -6,7 +6,6 @@ stages:
 - release
 
 variables:
-  TOKEN: "LWsss-XPxWuP-Esv-dF7"
   ARTIFACTS_JOB: "build"
   
 build:
@@ -24,10 +23,12 @@ build:
     BUILD_PREFIX: "/opt/MESA/"
   only:
     - tags
+    - pushes
   artifacts:
     name: "$CI_JOB_NAME-$CI_COMMIT_REF_NAME-debug"
     paths:
       -  ./build/*.rpm
+    expire_in: "1 years"
 
 release:
   stage: release
@@ -36,4 +37,4 @@ release:
   only:
     - tags    
   script:
-     - /bin/bash -x ./autorelease.sh $CI_API_V4_URL $CI_PROJECT_URL $CI_PROJECT_ID $TOKEN $CI_COMMIT_TAG $ARTIFACTS_JOB $CI_PROJECT_NAME
+     - /bin/bash -x ./autorelease.sh $CI_API_V4_URL $CI_PROJECT_URL $CI_PROJECT_ID $CI_TOKEN $CI_COMMIT_TAG $ARTIFACTS_JOB $CI_PROJECT_NAME
