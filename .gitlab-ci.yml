@@ -1,40 +1,103 @@
-image: "git.mesalab.cn:7443/mesa_framework/framework-build-env:master"
+image: "git.mesalab.cn:7443/mesa_platform/build-env:master"
+variables:
+  GIT_STRATEGY: "clone"
+  BUILD_PADDING_PREFIX: /tmp/padding_for_CPACK_RPM_BUILD_SOURCE_DIRS_PREFIX_PREFIX_PREFIX_PREFIX_PREFIX_PREFIX/
+  INSTALL_PREFIX: "/opt/MESA/lib/"
+
 stages:
 - build
-#- test
-#- package
-- release
 
-variables:
-  ARTIFACTS_JOB: "build"
-  
-build:
-  stage: build
+.build_by_travis:
+  before_script:
+  - mkdir -p $BUILD_PADDING_PREFIX/$CI_PROJECT_NAMESPACE/
+  - ln -s $CI_PROJECT_DIR $BUILD_PADDING_PREFIX/$CI_PROJECT_PATH
+  - cd $BUILD_PADDING_PREFIX/$CI_PROJECT_PATH
+  - chmod +x ./ci/travis.sh
   script:
-    - mkdir -p build
-    - cd build
-    - cmake .. -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DCMAKE_PREFIX_PATH=$BUILD_PREFIX
-    - make
-    - make package
+  - yum makecache
+  - ./ci/travis.sh
+  - cd build
   tags:
-    - share
+  - share
+
+branch_build_debug:
+  stage: build
+  extends: .build_by_travis
   variables:
-    BUILD_TYPE: "Debug"
-    BUILD_PREFIX: "/opt/MESA/"
+    BUILD_TYPE: Debug
+  except:
+    - /^develop.*$/i
+    - /^master.*$/i
+    - tags
+
+branch_build_release:
+  stage: build
+  variables:
+    BUILD_TYPE: RelWithDebInfo
+  extends: .build_by_travis
+  except:
+    - /^develop.*$/i
+    - /^master.*$/i
+    - tags
+
+develop_build_debug:
+  stage: build
+  extends: .build_by_travis
+  variables:
+    BUILD_TYPE: Debug
+    PACKAGE: 1
+  artifacts:
+    name: "MESA_field_stat2-$CI_COMMIT_REF_NAME-debug"
+    paths:
+      - build/*.rpm
+  only:
+    - /^develop.*$/i
+    - /^master.*$/i
+
+develop_build_release:
+  stage: build
+  extends: .build_by_travis
+  variables:
+    BUILD_TYPE: RelWithDebInfo
+    PACKAGE: 1
+  artifacts:
+    name: "MESA_field_stat2-$CI_COMMIT_REF_NAME-release"
+    paths:
+      - build/*.rpm
+  only:
+    - /^develop.*$/i
+    - /^master.*$/i
+
+
+release_build_release:
+  stage: build
+  variables:
+    BUILD_TYPE: RelWithDebInfo
+    PACKAGE: 1
+    UPLOAD: 1
+    PULP3_REPO_NAME: framework-stable-x86_64.el7
+    PULP3_DIST_NAME: framework-stable-x86_64.el7
+  extends: .build_by_travis
+  artifacts:
+    name: "MESA_field_stat2-$CI_COMMIT_REF_NAME-release"
+    paths:
+      - build/*.rpm
   only:
     - tags
-    - pushes
-  artifacts:
-    name: "$CI_JOB_NAME-$CI_COMMIT_REF_NAME-debug"
-    paths:
-      -  ./build/*.rpm
-    expire_in: "1 years"
 
-release:
-  stage: release
-  tags:
-    - share
+release_build_release_devel:
+  stage: build
+  variables:
+    BUILD_TYPE: RelWithDebInfo
+    ENABLE_DEVEL_SWITCH: "ON"
+    PACKAGE: 1
+    UPLOAD: 1
+    PULP3_REPO_NAME: framework-stable-x86_64.el7
+    PULP3_DIST_NAME: framework-stable-x86_64.el7
+  extends: .build_by_travis
+  artifacts:
+    name: "MESA_field_stat2-$CI_COMMIT_REF_NAME-release"
+    paths:
+      - build/*.rpm
   only:
-    - tags    
-  script:
-     - /bin/bash -x ./autorelease.sh $CI_API_V4_URL $CI_PROJECT_URL $CI_PROJECT_ID $CI_TOKEN $CI_COMMIT_TAG $ARTIFACTS_JOB $CI_PROJECT_NAME
+    - tags
