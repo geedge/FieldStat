@@ -11,3 +11,6 @@ build/
 core.*
 version.txt
 cmake-build-debug
+GPATH
+GRTAGS
+GTAGS

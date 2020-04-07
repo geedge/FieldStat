@@ -984,7 +984,7 @@ void influx_output(struct FS_space_t* _handle)
 		switch(p->style)
 		{
 			case FS_STYLE_STATUS:
-				if(p->calc_type==FS_CALC_SPEED)
+				if (p->calc_type == FS_CALC_CURRENT)
 				{
 					value=get_stat_unit_val(p, 0, FS_CALC_CURRENT, 1);
 					if(value != 0)
@@ -1011,7 +1011,14 @@ void influx_output(struct FS_space_t* _handle)
 					{
 						continue;
 					}
-					value=get_stat_unit_val(p, p_column->column_seq, FS_CALC_SPEED, 1);
+					if(p_column->calc_type==FS_CALC_SPEED)
+					{
+						value = get_stat_unit_val(p, p_column->column_seq, FS_CALC_SPEED, 1);
+					}
+					if(p_column->calc_type==FS_CALC_CURRENT)
+					{
+						value = get_stat_unit_val(p, p_column->column_seq, FS_CALC_CURRENT, 1);
+					}
 					buff_off+=snprintf(field_buff+buff_off, UDP_PAYLOAD_SIZE-buff_off,"%s=%lld,",p_column->name, value);
 					if(value != 0)
 					{
