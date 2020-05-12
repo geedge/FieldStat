@@ -292,8 +292,8 @@ void append_statsd_counter(struct FS_space_t* _handle,const char* name, long lon
 		flush_metric(_handle);
 	}
 	_handle->snd_buf_off+=snprintf(_handle->send_buff+_handle->snd_buf_off,UDP_PAYLOAD_SIZE-_handle->snd_buf_off,
-				"[%s]%s:%lld|c\n",
-				_handle->app_name,name,value);
+				"%s,app_name=%s:%lld|c\n",
+				 name,_handle->app_name,value);
 	return;
 }
 void append_statsd_histogram(struct FS_space_t* _handle,const char* name, long long value, long long count)
@@ -311,14 +311,14 @@ void append_statsd_histogram(struct FS_space_t* _handle,const char* name, long l
 	if(count==1)
 	{
 		_handle->snd_buf_off+=snprintf(_handle->send_buff+_handle->snd_buf_off,UDP_PAYLOAD_SIZE-_handle->snd_buf_off,
-					"[%s]%s:%lld|h\n",
-					_handle->app_name,name,value);
+					"%s,app_name=%s:%lld|h\n",
+					name,_handle->app_name,value);
 	}
 	else
 	{
 		_handle->snd_buf_off+=snprintf(_handle->send_buff+_handle->snd_buf_off,UDP_PAYLOAD_SIZE-_handle->snd_buf_off,
-					"[%s]%s:%lld|h|@%f\n",
-					_handle->app_name,name,value, (double)1/count);
+					"%s,app_name=%s:%lld|h|@%f\n",
+					name,_handle->app_name,value, (double)1/count);
 	}
 	return;
 }
