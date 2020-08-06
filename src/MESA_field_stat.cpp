@@ -40,7 +40,7 @@
 double HISTOGRAM_DEFAULT_BINS[]={50.0, 80.0, 90.0, 95.0, 99.0};
 
 
-int FIELD_STAT_VERSION_2_8_20190125=0;
+int FIELD_STAT_VERSION_2_8_20200805_fix_outOfBound=0;
 
 #if(__GNUC__ * 100 + __GNUC_MINOR__ * 10 + __GNUC_PATCHLEVEL__ >= 410)
 #define atomic_inc(x) __sync_add_and_fetch((x),1)
@@ -286,7 +286,7 @@ void append_statsd_counter(struct FS_space_t* _handle,const char* name, long lon
 		return;
 	}
 	
-	size_t max_output_len=strlen(name)+strlen(name)+20+6;
+	size_t max_output_len=strlen(name)+strlen(name)+20+14+strlen(_handle->app_name); //14: ,app_name=:|c\n;
 	if(UDP_PAYLOAD_SIZE-_handle->snd_buf_off<max_output_len)
 	{
 		flush_metric(_handle);
@@ -294,6 +294,7 @@ void append_statsd_counter(struct FS_space_t* _handle,const char* name, long lon
 	_handle->snd_buf_off+=snprintf(_handle->send_buff+_handle->snd_buf_off,UDP_PAYLOAD_SIZE-_handle->snd_buf_off,
 				"%s,app_name=%s:%lld|c\n",
 				 name,_handle->app_name,value);
+	assert(_handle->snd_buf_off<=UDP_PAYLOAD_SIZE && _handle->snd_buf_off>=0);
 	return;
 }
 void append_statsd_histogram(struct FS_space_t* _handle,const char* name, long long value, long long count)
@@ -302,7 +303,7 @@ void append_statsd_histogram(struct FS_space_t* _handle,const char* name, long l
 	{
 		return;
 	}
-	size_t max_output_len=strlen(name)+strlen(name)+20+6;
+	size_t max_output_len=strlen(name)+strlen(name)+20+3+16+strlen(_handle->app_name); //20: %lld; 3: .%f; 16: ,app_name=:|h|@\n;
 	if(UDP_PAYLOAD_SIZE-_handle->snd_buf_off<max_output_len)
 	{
 		flush_metric(_handle);
@@ -320,6 +321,7 @@ void append_statsd_histogram(struct FS_space_t* _handle,const char* name, long l
 					"%s,app_name=%s:%lld|h|@%f\n",
 					name,_handle->app_name,value, (double)1/count);
 	}
+	assert(_handle->snd_buf_off<=UDP_PAYLOAD_SIZE && _handle->snd_buf_off>=0);
 	return;
 }
 
