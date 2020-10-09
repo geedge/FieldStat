@@ -46,6 +46,12 @@ develop_build_debug:
   variables:
     BUILD_TYPE: Debug
     PACKAGE: 1
+    UPLOAD_RPM: 1
+    ASAN_OPTION: ADDRESS
+    TESTING_VERSION_BUILD: 1
+    INSTALL_DEPENDENCY_LIBRARY:  libasan
+    PULP3_REPO_NAME: framework-testing-x86_64.el7
+    PULP3_DIST_NAME: framework-testing-x86_64.el7
   artifacts:
     name: "MESA_field_stat2-$CI_COMMIT_REF_NAME-debug"
     paths:
@@ -60,6 +66,12 @@ develop_build_release:
   variables:
     BUILD_TYPE: RelWithDebInfo
     PACKAGE: 1
+    UPLOAD_RPM: 1
+    ASAN_OPTION: ADDRESS
+    TESTING_VERSION_BUILD: 1
+    INSTALL_DEPENDENCY_LIBRARY:  libasan
+    PULP3_REPO_NAME: framework-testing-x86_64.el7
+    PULP3_DIST_NAME: framework-testing-x86_64.el7
   artifacts:
     name: "MESA_field_stat2-$CI_COMMIT_REF_NAME-release"
     paths:
@@ -68,13 +80,30 @@ develop_build_release:
     - /^develop.*$/i
     - /^master.*$/i
 
+release_build_debug:
+  stage: build
+  variables:
+    BUILD_TYPE: Debug
+    PACKAGE: 1
+    UPLOAD_RPM: 1
+    PULP3_REPO_NAME: framework-stable-x86_64.el7
+    PULP3_DIST_NAME: framework-stable-x86_64.el7
+  extends: .build_by_travis
+  artifacts:
+    name: "MESA_field_stat2-$CI_COMMIT_REF_NAME-release"
+    paths:
+      - build/*.rpm
+  only:
+    - tags
 
 release_build_release:
   stage: build
   variables:
     BUILD_TYPE: RelWithDebInfo
     PACKAGE: 1
-    UPLOAD: 1
+    UPLOAD_RPM: 1
+    UPLOAD_SYMBOL_FILES: 1
+    SYMBOL_TARGET: libMESA_field_stat2
     PULP3_REPO_NAME: framework-stable-x86_64.el7
     PULP3_DIST_NAME: framework-stable-x86_64.el7
   extends: .build_by_travis

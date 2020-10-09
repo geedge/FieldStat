@@ -33,7 +33,10 @@ env | sort
 : "${COMPILER_IS_GNUCXX:=OFF}"
 
 # Install dependency from YUM
-#yum install -y mrzcpd framework numactl-devel zlib-devel librdkafka-devel systemd-devel
+if [ -n "${INSTALL_DEPENDENCY_LIBRARY}" ]; then
+      yum install -y $INSTALL_DEPENDENCY_LIBRARY
+fi
+
 mkdir build || true
 cd build
 
@@ -41,6 +44,8 @@ cmake3 -DCMAKE_CXX_FLAGS=$CXX_FLAGS \
       -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
       -DCMAKE_INSTALL_PREFIX=$INSTALL_PREFIX \
       -DENABLE_DEVEL=$ENABLE_DEVEL_SWITCH \
+      -DASAN_OPTION=$ASAN_OPTION \
+      -DVERSION_DAILY_BUILD=$TESTING_VERSION_BUILD \
       ..
 
 make
@@ -49,13 +54,15 @@ if [ -n "${PACKAGE}" ]; then
 	make package
 fi
 
-if [ -n "${UPLOAD}" ]; then	
+
+if [ -n "${UPLOAD_RPM}" ]; then	
 	cp ~/rpm_upload_tools.py ./
 	python3 rpm_upload_tools.py ${PULP3_REPO_NAME} ${PULP3_DIST_NAME} *.rpm
 fi
 
-#if [ -n "${UPLOAD_SYMBOL_FILES}" ]; then
-#  rpm -i tfe*debuginfo*.rpm
-#  cp /usr/lib/debug/opt/tsg/tfe/bin/tfe.debug /tmp/tfe.debuginfo.${CI_COMMIT_SHORT_SHA}
-#  sentry-cli upload-dif -t elf /tmp/tfe.debuginfo.${CI_COMMIT_SHORT_SHA}
-#fi
+if [ -n "${UPLOAD_SYMBOL_FILES}" ]; then
+	rpm -i $SYMBOL_TARGET*debuginfo*.rpm
+	_symbol_file=`find /usr/lib/debug/ -name "$SYMBOL_TARGET*.so*.debug"`
+	cp $_symbol_file ${_symbol_file}info.${CI_COMMIT_SHORT_SHA}
+	sentry-cli upload-dif -t elf ${_symbol_file}info.${CI_COMMIT_SHORT_SHA}
+fi
