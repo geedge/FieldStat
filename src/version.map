@@ -1,4 +1,5 @@
 {
-  global: *FS_*;
+  global: 	*FS_*;
+	GIT_VERSION*;
   local: *;
 };
