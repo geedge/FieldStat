@@ -438,10 +438,7 @@ int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* va
 	{
 		return -1;
 	}
-	if(type!=OUTPUT_DEVICE)
-	{
-		int_val=*(const int*)value;
-	}
+
 	switch(type)
 	{
 		case	OUTPUT_DEVICE:
@@ -449,7 +446,8 @@ int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* va
 			memcpy(_handle->appoint_output_file,value,size);
 			break;
 		case	PRINT_MODE:
-			if(size!=4||(int_val!=1&&int_val!=2))
+			int_val = *(const int *)value;
+			if (size != 4 || (int_val != 1 && int_val != 2))
 			{
 				return -1;
 			}
@@ -464,6 +462,7 @@ int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* va
 			}
 			break;
 		case	STAT_CYCLE:
+			int_val = *(const int *)value;
 			if(size!=4||(int_val==0))
 			{
 				return -1;
@@ -471,6 +470,7 @@ int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* va
 			_handle->stat_cycle=int_val;
 			break;
 		case	PRINT_TRIGGER:
+			int_val = *(const int *)value;
 			if(size!=4||(int_val!=0&&int_val!=1))
 			{
 				return -1;
@@ -478,6 +478,7 @@ int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* va
 			_handle->screen_print_trigger=int_val;
 			break;
 		case 	CREATE_THREAD:
+			int_val = *(const int *)value;
 			if(size!=4||(int_val!=0&&int_val!=1))
 			{
 				return -1;
@@ -485,6 +486,7 @@ int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* va
 			_handle->create_thread=int_val;
 			break;
 		case	ID_INVISBLE:
+			int_val = *(const int *)value;
 			if(int_val<0||int_val>=_handle->display_cnt)
 			{
 				return -1;
@@ -492,6 +494,7 @@ int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* va
 			_handle->display[int_val]->is_invisible=1;
 			break;
 		case	NOT_SEND_METRIC_TO_SERVER:
+			int_val = *(const int *)value;
 			if(int_val<0||int_val>=_handle->display_cnt)
 			{
 				return -1;
@@ -499,6 +502,7 @@ int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* va
 			_handle->display[int_val]->not_send_to_server=1;
 			break;
 		case	FLUSH_BY_DATE:
+			int_val = *(const int *)value;
 			if(int_val==1)
 			{
 				_handle->flush_by_date=1;
@@ -539,6 +543,7 @@ int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* va
 			}
 			break;
 		case	STATS_FORMAT:
+			int_val = *(const int *)value;
 			if(size!=4||(int_val!=FS_OUTPUT_STATSD&&int_val!=FS_OUTPUT_INFLUX_LINE))
 			{
 				return -1;
@@ -562,6 +567,7 @@ int FS_set_para(screen_stat_handle_t handle, enum FS_option  type,const void* va
 			_handle->histogram_bin_num=parse_histogram_bin_format((const char*)value, &_handle->histogram_bins);
 			assert(_handle->histogram_bin_num>0);
         case	METRIS_FORMAT:
+			int_val = *(const int *)value;
             if(size!=4||(int_val!=FS_METRIS_OUTPUT_DEFAULT&&int_val!=FS_METRIS_OUTPUT_JSON))
             {
                 return -1;
@@ -752,7 +758,7 @@ int FS_register_histogram(screen_stat_handle_t handle, enum field_calc_algo calc
 {
 	struct FS_space_t* _handle=(struct FS_space_t*)handle;
 	struct display_manifest_t * choosen=NULL;
-	int id=0, ret=0;
+	int id=0;
 	if(!is_valid_fs_name(name))
 	{
 		return -1;
@@ -776,7 +782,7 @@ int FS_register_histogram(screen_stat_handle_t handle, enum field_calc_algo calc
 	choosen->histogram.lowest_trackable_value=(int64_t)lowest_trackable_value;
 	choosen->histogram.significant_figures=significant_figures;
 	
-	ret=hdr_init((int64_t)lowest_trackable_value, (int64_t)highest_trackable_value, significant_figures, &(choosen->histogram.changing));
+	int ret=hdr_init((int64_t)lowest_trackable_value, (int64_t)highest_trackable_value, significant_figures, &(choosen->histogram.changing));
 	assert(ret==0);	
 	ret=hdr_init((int64_t)lowest_trackable_value, (int64_t)highest_trackable_value, significant_figures, &(choosen->histogram.accumulated));
 	assert(ret==0);
