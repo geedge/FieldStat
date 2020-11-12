@@ -540,7 +540,7 @@ void FS_start(screen_stat_handle_t handle)
 
 	if(_handle->output_prometheus==1)
 	{
-		PROM_register((screen_stat_handle_t)_handle);
+		FS_library_promethues_register(handle);
 	}
 	
 	return;

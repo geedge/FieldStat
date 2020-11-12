@@ -107,19 +107,9 @@ int FS_operate(screen_stat_handle_t handle,int id,int column_id,enum field_op op
 
 void FS_passive_output(screen_stat_handle_t handle);
 
-
-typedef	void* PROM_handle_t;
-
-enum PROM_option
-{
-	PROM_OPT_LISTEN_PORT,		//default: 9273; len=sizeof(unsigned short)
-	PROM_OPT_OUT_PATH,			//default: /metrics; len=strlen()
-	PROM_OPT_OUT_BY_APPNAME		//0: use PROM_OPT_OUT_PATH, 1: use fs2 app_name; default: 0; len=sizeof(int)
-};
-
-PROM_handle_t PROM_create_handle(void);
-int PROM_set_opt(PROM_handle_t handle, enum PROM_option  type,const void* value,int size);
-int PROM_init_handle(PROM_handle_t handle);
+int FS_library_init(void);
+int FS_library_set_prometheus_port(unsigned short port);
+int FS_library_set_prometheus_url_path(const char *url_path);
 
 #endif
 

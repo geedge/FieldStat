@@ -122,6 +122,6 @@ struct FS_space_t
 	const char* write_mode;
 };
 
-int PROM_register(screen_stat_handle_t handle);
+int FS_library_promethues_register(screen_stat_handle_t handle);
 long long get_stat_unit_val(display_manifest_t* p, int column_seq,enum field_calc_algo calc_type,int is_refer);
 #endif

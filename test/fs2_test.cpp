@@ -22,15 +22,12 @@ int main(int argc,char* argv[])
 	char buff[128];
 	int value=0,i=0,j=0,runtime_reg_num=0,runtime_reg_line_num=0,ret=0;
 	int loops=10;
-
-	PROM_handle_t prom_handle=PROM_create_handle();
 	
 	unsigned short port=9001;
-	PROM_set_opt(prom_handle, PROM_OPT_LISTEN_PORT, (void *)&port, sizeof(port));
-	char *path=(char *)"/prometheus";
-	PROM_set_opt(prom_handle,PROM_OPT_OUT_PATH, (void *)path, strlen(path));
-
-	PROM_init_handle(prom_handle);
+	FS_library_set_prometheus_port(port);
+	char *url_path=(char *)"/prometheus";
+	FS_library_set_prometheus_url_path(url_path);
+	FS_library_init();
 	
 	handle=FS_create_handle();
 	
