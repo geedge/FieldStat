@@ -89,7 +89,7 @@ static int histgram_output_summary(display_manifest_t* p, char *app_name, double
 
 static void FS_library_promethues_output(struct mg_connection *c, int ev, void *message, void* user_data)
 {
-	int i=0,j=0;
+	int i=0,j=0,k=0;
 	int payload_len=0;
 	int used_len=0;
 	long long value=0;
@@ -136,9 +136,9 @@ static void FS_library_promethues_output(struct mg_connection *c, int ev, void *
 		}
 
 		pthread_mutex_lock(&(fs2_handle->reg_lock));
-		for(i=0;i<fs2_handle->display_cnt;i++)
+		for(k=0;k<fs2_handle->display_cnt;k++)
 		{
-			p=fs2_handle->display[i];
+			p=fs2_handle->display[k];
 			if(p->not_send_to_server==1||p->is_ratio==1)
 			{
 				continue;
@@ -191,9 +191,9 @@ static void FS_library_promethues_output(struct mg_connection *c, int ev, void *
 					}
 					break;
 				case FS_STYLE_HISTOGRAM:
-					for(i=0;i<fs2_handle->display_cnt;i++)
+					for(j=0;j<fs2_handle->display_cnt;j++)
 					{
-						p=fs2_handle->display[i];
+						p=fs2_handle->display[j];
 						if(p->style!=FS_STYLE_HISTOGRAM)
 						{
 							continue;
