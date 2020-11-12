@@ -57,7 +57,8 @@ enum FS_option
 	MAX_STAT_FIELD_NUM,		//VALUE is an interger, SIZE=sizeof(int), DEFAULT:1024.
 	HISTOGRAM_GLOBAL_BINS,	//VALUE is a const char*, define a histogram bins for default field, SIZE = strlen(string+'\0')+1. DEFAULT: "0.5,0.8,0.9,0.95,0.99“.
 	NOT_SEND_METRIC_TO_SERVER,		//value is field_id/status_id/column_id, not output this string, SIZE=4,DEFAULT:Send.
-	METRIS_FORMAT //VALUE is enum metris_output_format, DEFAULT or JSON, SIZE=sizeof(int).
+	METRIS_FORMAT, //VALUE is enum metris_output_format, DEFAULT or JSON, SIZE=sizeof(int).
+	OUTPUT_PROMETHEUS	//VALUE is an interger,1:output prometheus ,0: not output. SIZE=4,DEFALUT: 0.
 };
 
 //Always success.
@@ -105,6 +106,14 @@ int FS_register_histogram(screen_stat_handle_t handle, enum field_calc_algo calc
 int FS_operate(screen_stat_handle_t handle,int id,int column_id,enum field_op op,long long value);
 
 void FS_passive_output(screen_stat_handle_t handle);
+
+//@param default port is 9273
+//return 1 on success, 0 on failed.
+int FS_library_set_prometheus_port(unsigned short port);
+//@param default url_path is "/metrics"
+//return 1 on success, 0 on failed.
+int FS_library_set_prometheus_url_path(const char *url_path);
+int FS_library_init(void);
 
 #endif
 
