@@ -1,5 +1,4 @@
 #include "field_stat2.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -14,6 +13,7 @@
 
 #define	TEST_RUNTIME_REG_NUM	32
 #define	TEST_RUNTIME_REG_LINE_NUM 6
+
 int main(int argc,char* argv[])
 {
 	screen_stat_handle_t handle=NULL;
@@ -22,6 +22,13 @@ int main(int argc,char* argv[])
 	char buff[128];
 	int value=0,i=0,j=0,runtime_reg_num=0,runtime_reg_line_num=0,ret=0;
 	int loops=10;
+	
+	unsigned short port=9001;
+	FS_library_set_prometheus_port(port);
+	char *url_path=(char *)"/prometheus";
+	FS_library_set_prometheus_url_path(url_path);
+	FS_library_init();
+	
 	handle=FS_create_handle();
 	
 	FS_set_para(handle, APP_NAME, app_name, strlen(app_name)+1);
@@ -32,7 +39,8 @@ int main(int argc,char* argv[])
 	FS_set_para(handle, PRINT_MODE, &value, sizeof(value));
 	value=1;
 	FS_set_para(handle, CREATE_THREAD, &value, sizeof(value));
-    FS_set_para(handle, METRIS_FORMAT, &value, sizeof(value));
+	value=0;
+	FS_set_para(handle, METRIS_FORMAT, &value, sizeof(value));
     value=2;
 	FS_set_para(handle, STAT_CYCLE, &value, sizeof(value));
 	value=4096;
@@ -45,8 +53,10 @@ int main(int argc,char* argv[])
 	//value=FS_OUTPUT_INFLUX_LINE;
 	value=FS_OUTPUT_STATSD;
 	FS_set_para(handle, STATS_FORMAT, &value, sizeof(value));
-
 	
+	value=1;
+	FS_set_para(handle, OUTPUT_PROMETHEUS, &value, sizeof(value));
+
 	const char* histogram_format="0.1,0.5,0.8,0.9,0.95,0.99";
 	FS_set_para(handle, HISTOGRAM_GLOBAL_BINS, histogram_format, strlen(histogram_format)+1);
 	
@@ -142,7 +152,7 @@ int main(int argc,char* argv[])
 			line_ids[TEST_LINE_NUM+runtime_reg_line_num]=ret;
 			runtime_reg_line_num++;
 		}
-		long long preset[]={1,20,30,200,400,1000,2000,4000};
+		long long preset[]={1,10,20,30,40,200,300,400,600,1000,2000,4000,5000,8000,100000};
 		for(i=0;i<TEST_HISTOGRAM_NUM;i++)
 		{
 			for(j=0;(size_t)j<sizeof(preset)/sizeof(long long);j++)
