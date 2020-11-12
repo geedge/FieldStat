@@ -57,7 +57,8 @@ enum FS_option
 	MAX_STAT_FIELD_NUM,		//VALUE is an interger, SIZE=sizeof(int), DEFAULT:1024.
 	HISTOGRAM_GLOBAL_BINS,	//VALUE is a const char*, define a histogram bins for default field, SIZE = strlen(string+'\0')+1. DEFAULT: "0.5,0.8,0.9,0.95,0.99“.
 	NOT_SEND_METRIC_TO_SERVER,		//value is field_id/status_id/column_id, not output this string, SIZE=4,DEFAULT:Send.
-	METRIS_FORMAT //VALUE is enum metris_output_format, DEFAULT or JSON, SIZE=sizeof(int).
+	METRIS_FORMAT, //VALUE is enum metris_output_format, DEFAULT or JSON, SIZE=sizeof(int).
+	OUTPUT_PROMETHEUS	//VALUE is an interger,1:output prometheus ,0: not output. SIZE=4,DEFALUT: 0.
 };
 
 //Always success.
@@ -105,6 +106,20 @@ int FS_register_histogram(screen_stat_handle_t handle, enum field_calc_algo calc
 int FS_operate(screen_stat_handle_t handle,int id,int column_id,enum field_op op,long long value);
 
 void FS_passive_output(screen_stat_handle_t handle);
+
+
+typedef	void* PROM_handle_t;
+
+enum PROM_option
+{
+	PROM_OPT_LISTEN_PORT,		//default: 9273; len=sizeof(unsigned short)
+	PROM_OPT_OUT_PATH,			//default: /metrics; len=strlen()
+	PROM_OPT_OUT_BY_APPNAME		//0: use PROM_OPT_OUT_PATH, 1: use fs2 app_name; default: 0; len=sizeof(int)
+};
+
+PROM_handle_t PROM_create_handle(void);
+int PROM_set_opt(PROM_handle_t handle, enum PROM_option  type,const void* value,int size);
+int PROM_init_handle(PROM_handle_t handle);
 
 #endif
 

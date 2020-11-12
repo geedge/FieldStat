@@ -30,6 +30,7 @@ endif()
 # end of for ASAN
 
 include_directories(${PROJECT_SOURCE_DIR}/inc/)
+include_directories(${PROJECT_SOURCE_DIR}/src/)
 
 file(GLOB SRC
     "src/*.c"
