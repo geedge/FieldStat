@@ -538,10 +538,7 @@ void FS_start(screen_stat_handle_t handle)
 		pthread_create(&(_handle->cfg_mon_t), NULL, fs2_thread_screen_print, (void*)handle);
 	}
 
-	if(_handle->output_prometheus==1)
-	{
-		FS_library_promethues_register(handle);
-	}
+	FS_library_promethues_register(handle);
 	
 	return;
 }
