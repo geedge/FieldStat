@@ -107,9 +107,13 @@ int FS_operate(screen_stat_handle_t handle,int id,int column_id,enum field_op op
 
 void FS_passive_output(screen_stat_handle_t handle);
 
-int FS_library_init(void);
+//@param default port is 9273
+//return 1 on success, 0 on failed.
 int FS_library_set_prometheus_port(unsigned short port);
+//@param default url_path is "/metrics"
+//return 1 on success, 0 on failed.
 int FS_library_set_prometheus_url_path(const char *url_path);
+int FS_library_init(void);
 
 #endif
 
