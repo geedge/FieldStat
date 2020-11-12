@@ -8,41 +8,32 @@
 
 #define	STEP_SIZE	1024
 #define	MAX_URL_PATH_LEN	128
-#define	MAX_FS2_HANDLE_NUM	64
+#define	FS2_HANDLE_STEP_NUM	16
 
 struct FS_library_runtime
 {
- 	int fs2_handle_cnt;
+	int fs2_handle_cnt;
+ 	int using_fs2_handle_cnt;
 	unsigned short port;
-	unsigned short init_flag;
+	char *url_path;
 	struct mg_mgr mgr;
 	struct mg_connection *nc;	
 	pthread_mutex_t library_lock;
-	char url_path[MAX_URL_PATH_LEN];
-	struct FS_space_t *fs2_handle[MAX_FS2_HANDLE_NUM];
+	struct FS_space_t **fs2_handle;
 };
 
-struct FS_library_runtime *g_FS2_LIBRARY_handle;
-
-static struct FS_library_runtime *create_runtime_handle(void)
-{
-	struct FS_library_runtime *_handle=(struct FS_library_runtime *)calloc(1, sizeof(struct FS_library_runtime));
-	_handle->port=9273;
-	memcpy(_handle->url_path, "/metrics", strlen("/metrics"));
-	pthread_mutex_init(&_handle->library_lock, NULL);
-
-	return _handle;
-}
+struct FS_library_runtime g_FS2_LIBRARY_handle={
+					0, 0, 9273, (char *)"/metrics", {}, NULL, PTHREAD_MUTEX_INITIALIZER, NULL};
 
 static int check_http_request(struct FS_library_runtime *_handle, char *uri, int uri_len)
 {
 	int i=0;
 	if(uri_len==(int)strlen(_handle->url_path) && !(memcmp(uri, _handle->url_path, strlen(_handle->url_path))))
 	{		
-		return _handle->fs2_handle_cnt;
+		return _handle->using_fs2_handle_cnt;
 	}
 	
-	for(i=0; i<_handle->fs2_handle_cnt; i++)
+	for(i=0; i<_handle->using_fs2_handle_cnt; i++)
 	{
 		if(uri_len-1==(int)strlen(_handle->fs2_handle[i]->app_name) 
 			&& !(memcmp(uri+1, _handle->fs2_handle[i]->app_name, strlen(_handle->fs2_handle[i]->app_name))))
@@ -105,6 +96,7 @@ static void FS_library_promethues_output(struct mg_connection *c, int ev, void *
 	char* payload=NULL;
 	long long sum=0;
 	int output_cnt=0;
+	int check_flag=0;
 	struct hdr_iter iter;
 	struct FS_space_t *fs2_handle=NULL;
 	struct display_manifest_t *p=NULL,*p_column=NULL;
@@ -122,21 +114,23 @@ static void FS_library_promethues_output(struct mg_connection *c, int ev, void *
 		return ;
 	}
 
-	if(fs2_handle_idx==_handle->fs2_handle_cnt)
+	if(fs2_handle_idx==_handle->using_fs2_handle_cnt)
 	{
 		i=0;
-		output_cnt=_handle->fs2_handle_cnt;
+		check_flag=1;
+		output_cnt=_handle->using_fs2_handle_cnt;
 	}
 	else
 	{
+		check_flag=0;
 		i=fs2_handle_idx;
-		output_cnt=fs2_handle_idx;
+		output_cnt=fs2_handle_idx+1;
 	}
 	
-	for(; i<=output_cnt; i++)
+	for(; i<output_cnt; i++)
 	{
 		fs2_handle=_handle->fs2_handle[i];
-		if(fs2_handle->running==0)
+		if(fs2_handle->running==0 || (check_flag==1 && fs2_handle->output_prometheus!=1))
 		{
 			continue;
 		}
@@ -294,18 +288,24 @@ void *FS_library_promethues_listen(void *arg)
 } 
 
 int FS_library_promethues_register(screen_stat_handle_t handle)
-{	
+{
+	struct FS_library_runtime *_handle=&g_FS2_LIBRARY_handle;
 	if(handle!=NULL)
-	{	
-		if(g_FS2_LIBRARY_handle->fs2_handle_cnt<MAX_FS2_HANDLE_NUM)
+	{
+		if(_handle->fs2_handle==NULL 
+			|| _handle->using_fs2_handle_cnt >= _handle->fs2_handle_cnt)
 		{
-			pthread_mutex_lock(&g_FS2_LIBRARY_handle->library_lock);
-			int i=g_FS2_LIBRARY_handle->fs2_handle_cnt;
-			g_FS2_LIBRARY_handle->fs2_handle[i]=(struct FS_space_t *)handle;
-			g_FS2_LIBRARY_handle->fs2_handle_cnt++;
-			pthread_mutex_unlock(&g_FS2_LIBRARY_handle->library_lock);
-			return 1;
+			_handle->fs2_handle_cnt+=FS2_HANDLE_STEP_NUM;
+			_handle->fs2_handle=(struct FS_space_t **)realloc(_handle->fs2_handle, sizeof(struct FS_space_t *)*(_handle->fs2_handle_cnt));
 		}
+	
+		pthread_mutex_lock(&_handle->library_lock);
+		int i=_handle->using_fs2_handle_cnt;
+		_handle->fs2_handle[i]=(struct FS_space_t *)handle;
+		_handle->using_fs2_handle_cnt++;
+		pthread_mutex_unlock(&_handle->library_lock);
+
+		return 1;
 	}
 
 	return 0;
@@ -314,36 +314,23 @@ int FS_library_promethues_register(screen_stat_handle_t handle)
 
 int FS_library_set_prometheus_port(unsigned short port)
 {
-	if(g_FS2_LIBRARY_handle==NULL)
-	{
-		g_FS2_LIBRARY_handle=create_runtime_handle();
-	}
-	
-	g_FS2_LIBRARY_handle->port=port;
+	g_FS2_LIBRARY_handle.port=port;
 	
 	return 1;
 }
 int FS_library_set_prometheus_url_path(const char *url_path)
 {
-	if(g_FS2_LIBRARY_handle==NULL)
-	{
-		g_FS2_LIBRARY_handle=create_runtime_handle();
-	}
+	g_FS2_LIBRARY_handle.url_path=(char *)calloc(1, strlen(url_path)+1);
+	memcpy(g_FS2_LIBRARY_handle.url_path, url_path, strlen(url_path));
 
-	if(MAX_URL_PATH_LEN>strlen(url_path)+1)
-	{
-		memcpy(g_FS2_LIBRARY_handle->url_path, url_path, strlen(url_path));
-		return 1;
-	}
-	
-	return 0;
+	return 1;
 }
 
 int FS_library_init(void)
 {
 	pthread_t tid=0;
-	
-	pthread_create(&tid, NULL, FS_library_promethues_listen, g_FS2_LIBRARY_handle);
+
+	pthread_create(&tid, NULL, FS_library_promethues_listen, (void *)&g_FS2_LIBRARY_handle);
 
 	return 0;
 
