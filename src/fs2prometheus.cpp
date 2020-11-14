@@ -25,6 +25,30 @@ struct FS_library_runtime
 struct FS_library_runtime g_FS2_LIBRARY_handle={
 					0, 0, 9273, (char *)"/metrics", {}, NULL, PTHREAD_MUTEX_INITIALIZER, NULL};
 
+static char* str_unescape(char* s, char *d, int d_len)
+{
+	int i=0;
+	int len=strlen(s);
+	for(i=0; i<len && i<d_len; i++)
+	{
+		if(s[i]=='(' || s[i]==')' || s[i]=='{' || s[i]=='}')
+		{
+			d[i]='_';
+		}
+		else
+		{
+			d[i]=s[i];
+		}
+	}
+
+	if(d[i-1]=='_')
+	{
+		d[i-1]='\0';
+	}
+	
+	return 0;
+}
+
 static int check_http_request(struct FS_library_runtime *_handle, char *uri, int uri_len)
 {
 	int i=0;
@@ -49,6 +73,7 @@ static int histgram_output_summary(display_manifest_t* p, char *app_name, double
 {
 	long long value=0;
 	int i=0,used_len=0;
+	char line_name[128]={0};
 	struct histogram_t* h=&(p->histogram);
 	struct hdr_histogram* h_out=NULL, *h_tmp=NULL;
 
@@ -60,23 +85,25 @@ static int histgram_output_summary(display_manifest_t* p, char *app_name, double
 
 	for(i=0;i<bin_num;i++)
 	{
-		value=(long long)hdr_value_at_percentile(h_out, bins[i]);		
+		value=(long long)hdr_value_at_percentile(h_out, bins[i]);
+		str_unescape(p->name, line_name, sizeof(line_name));
 		used_len+=snprintf(payload+used_len,
 							payload_len-used_len,
 							"%s_%s{app_name=\"%s\",quantile=\"%f\"} %llu\n",
 							app_name,
-							p->name,
+							line_name,
 							app_name,
 							bins[i]/100,
 							value
 					);		
 	}
-	
+
+	str_unescape(p->name, line_name, sizeof(line_name));
 	used_len+=snprintf(payload+used_len,
 							payload_len-used_len,
 							"%s_%s_count{app_name=\"%s\"} %llu\n",
 							app_name,
-							p->name,
+							line_name,
 							app_name,
 							(long long)(h_out->total_count)
 					);
@@ -97,6 +124,9 @@ static void FS_library_promethues_output(struct mg_connection *c, int ev, void *
 	long long sum=0;
 	int output_cnt=0;
 	int check_flag=0;
+	char line_name[128]={0};
+	char column_name[128]={0};
+	char app_name[128]={0};
 	struct hdr_iter iter;
 	struct FS_space_t *fs2_handle=NULL;
 	struct display_manifest_t *p=NULL,*p_column=NULL;
@@ -111,6 +141,28 @@ static void FS_library_promethues_output(struct mg_connection *c, int ev, void *
 	int fs2_handle_idx=check_http_request(_handle, (char *)hm->uri.p, hm->uri.len);
 	if(fs2_handle_idx==-1)
 	{
+		payload_len=_handle->using_fs2_handle_cnt * 128;
+		payload=(char *)calloc(1, payload_len);
+
+		used_len=strlen("url_path:\n\t");
+		memcpy(payload, "url_path:\n\t", used_len);
+
+		memcpy(payload+used_len, _handle->url_path, strlen(_handle->url_path));
+		used_len+=strlen(_handle->url_path);
+		
+		for(i=0; i<_handle->using_fs2_handle_cnt; i++)
+		{
+			used_len+=snprintf(payload+used_len, payload_len-used_len, "\n\t/%s",_handle->fs2_handle[i]->app_name);
+		}
+
+		payload[used_len++]='\n';
+		payload[used_len]='\0';
+		
+		mg_send_head(c, 404, strlen(payload), "Content-Type: text/plain; charset=utf-8");
+		mg_printf(c, "%s", payload);
+	
+		free(payload);
+		payload=NULL;
 		return ;
 	}
 
@@ -154,13 +206,15 @@ static void FS_library_promethues_output(struct mg_connection *c, int ev, void *
 			{
 				case FS_STYLE_STATUS:
 				case FS_STYLE_FIELD:
+					str_unescape(p->name, line_name, sizeof(line_name));
+					str_unescape(fs2_handle->app_name, app_name, sizeof(app_name));
 					value=get_stat_unit_val(p, 0, FS_CALC_CURRENT, 1);
 					used_len+=snprintf(payload+used_len, 
 										payload_len-used_len, 
 										"%s_%s{app_name=\"%s\"} %llu\n",
-										fs2_handle->app_name,
-										p->name,
-										fs2_handle->app_name,
+										app_name,
+										line_name,
+										app_name,
 										value
 									);
 					break;
@@ -172,14 +226,17 @@ static void FS_library_promethues_output(struct mg_connection *c, int ev, void *
 						{
 							continue;
 						}
+						str_unescape(p->name, line_name, sizeof(line_name));
+						str_unescape(p->name, column_name, sizeof(column_name));
+						str_unescape(fs2_handle->app_name, app_name, sizeof(app_name));
 						value=get_stat_unit_val(p, p_column->column_seq, FS_CALC_CURRENT, 1);						
 						used_len+=snprintf(payload+used_len, 
 											payload_len-used_len, 
 											"%s_%s{app_name=\"%s\",line_name=\"%s\"} %llu\n",
-											fs2_handle->app_name,
-											p_column->name,
-											fs2_handle->app_name,
-											p->name, 
+											app_name,
+											column_name,
+											app_name,
+											line_name, 
 											value
 										);
 
@@ -204,9 +261,11 @@ static void FS_library_promethues_output(struct mg_connection *c, int ev, void *
 								payload_len+=STEP_SIZE;
 								payload=(char *)realloc(payload, payload_len);
 						}
+						
+						str_unescape(fs2_handle->app_name, app_name, sizeof(app_name));
 
 						used_len+=histgram_output_summary(p, 
-															fs2_handle->app_name, 
+															app_name, 
 															fs2_handle->histogram_bins,
 															fs2_handle->histogram_bin_num,
 															payload+used_len,
@@ -221,12 +280,14 @@ static void FS_library_promethues_output(struct mg_connection *c, int ev, void *
 								sum+=(long long)iter.value;
 							}
 
+							str_unescape(p->name, line_name, sizeof(line_name));
+							str_unescape(fs2_handle->app_name, app_name, sizeof(app_name));
 							used_len+=snprintf(payload+used_len,
 													payload_len-used_len,
 													"%s_%s_sum{app_name=\"%s\"} %llu\n",
-													fs2_handle->app_name,
-													p->name,
-													fs2_handle->app_name,
+													app_name,
+													line_name,
+													app_name,
 													sum
 											);
 
