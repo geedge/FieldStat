@@ -43,8 +43,10 @@ static char* str_unescape(char* s, char *d, int d_len)
 
 	if(d[i-1]=='_')
 	{
-		d[i-1]='\0';
+		i-=1;
 	}
+
+	d[i]='\0';
 	
 	return 0;
 }
@@ -227,7 +229,7 @@ static void FS_library_promethues_output(struct mg_connection *c, int ev, void *
 							continue;
 						}
 						str_unescape(p->name, line_name, sizeof(line_name));
-						str_unescape(p->name, column_name, sizeof(column_name));
+						str_unescape(p_column->name, column_name, sizeof(column_name));
 						str_unescape(fs2_handle->app_name, app_name, sizeof(app_name));
 						value=get_stat_unit_val(p, p_column->column_seq, FS_CALC_CURRENT, 1);						
 						used_len+=snprintf(payload+used_len, 
