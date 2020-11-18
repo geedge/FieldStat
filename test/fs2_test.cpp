@@ -65,7 +65,7 @@ int main(int argc,char* argv[])
 	int runtime_status_ids[TEST_RUNTIME_REG_NUM];
 	for(i=0;i<TEST_STATUS_NUM;i++)
 	{
-		snprintf(buff,sizeof(buff),"(status_%02d)",i);
+		snprintf(buff,sizeof(buff),"(status_%02d)/\\-,;%%$*",i);
 		status_ids[i]=FS_register(handle, FS_STYLE_STATUS, FS_CALC_CURRENT,buff);
 	}
 	for(i=0;i<TEST_FIELD_NUM;i++)

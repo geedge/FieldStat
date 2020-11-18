@@ -27,26 +27,33 @@ struct FS_library_runtime g_FS2_LIBRARY_handle={
 
 static char* str_unescape(char* s, char *d, int d_len)
 {
-	int i=0;
+	int i=0,j=0;
 	int len=strlen(s);
-	for(i=0; i<len && i<d_len; i++)
+	for(i=0; i<len && j<d_len; i++)
 	{
-		if(s[i]=='(' || s[i]==')' || s[i]=='{' || s[i]=='}')
+		if(s[i]=='(' || s[i]==')'  || s[i]=='{' || s[i]=='}' || 
+		   s[i]=='/' || s[i]=='\\' || s[i]=='%' || s[i]=='*' || 
+		   s[i]=='$' || s[i]=='-'  || s[i]==',' || s[i]==';')
 		{
-			d[i]='_';
+			if(i==0)
+			{
+				continue;
+			}
+
+			d[j++]='_';
 		}
 		else
 		{
-			d[i]=s[i];
+			d[j++]=s[i];
 		}
 	}
 
-	if(d[i-1]=='_')
+	if(d[j-1]=='_')
 	{
-		i-=1;
+		j-=1;
 	}
 
-	d[i]='\0';
+	d[j]='\0';
 	
 	return 0;
 }
