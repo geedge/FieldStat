@@ -101,7 +101,7 @@ struct FS_space_t
 	int current_date;
 	int flush_by_date;
 	char str_ip[32];
-	char app_name[16];
+	char app_name[32];
 
 	int statsd_switch;
 	unsigned int server_ip;
