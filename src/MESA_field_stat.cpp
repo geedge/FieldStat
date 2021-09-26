@@ -152,12 +152,16 @@ static int send_udp(int sd, unsigned int dest_ip, unsigned short dest_port, cons
 }
 void flush_metric(struct FS_space_t* _handle)
 {
-	if(_handle->snd_buf_off==0 || _handle->server_port==0)
+	if(_handle->snd_buf_off==0)
 	{
 		return;
 	}
-	send_udp(_handle->statsd_socket, _handle->server_ip,(unsigned short) _handle->server_port,
-				_handle->send_buff, _handle->snd_buf_off);
+	
+	if(_handle->server_port>0)
+	{
+		send_udp(_handle->statsd_socket, _handle->server_ip,(unsigned short) _handle->server_port, _handle->send_buff, _handle->snd_buf_off);
+	}
+	
 	_handle->snd_buf_off=0;
 	memset(_handle->send_buff,0,sizeof(_handle->send_buff));
 	return;
