@@ -10,7 +10,7 @@ build/
 .idea
 core.*
 version.txt
-cmake-build-debug
+cmake-build-*/
 GPATH
 GRTAGS
 GTAGS

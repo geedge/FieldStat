@@ -603,6 +603,13 @@ void FS_stop(screen_stat_handle_t* handle)
 	}
 	free(_handle->histogram_bins);
 	_handle->histogram_bins=NULL;	
+
+	if(_handle->statsd_switch > 0)
+	{
+		close(_handle->statsd_socket);	
+	}	
+
+
 	free(_handle);
 
 	*handle=NULL;

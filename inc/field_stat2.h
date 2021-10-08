@@ -114,6 +114,7 @@ int FS_library_set_prometheus_port(unsigned short port);
 //return 1 on success, 0 on failed.
 int FS_library_set_prometheus_url_path(const char *url_path);
 int FS_library_init(void);
+void FS_library_destroy(void);
 
 #endif
 

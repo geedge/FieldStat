@@ -12,8 +12,10 @@
 
 struct FS_library_runtime
 {
+	pthread_t tid;
 	int fs2_handle_cnt;
  	int using_fs2_handle_cnt;
+	unsigned short create_thread;
 	unsigned short port;
 	char *url_path;
 	struct mg_mgr mgr;
@@ -23,7 +25,7 @@ struct FS_library_runtime
 };
 
 struct FS_library_runtime g_FS2_LIBRARY_handle={
-					0, 0, 9273, (char *)"/metrics", {}, NULL, PTHREAD_MUTEX_INITIALIZER, NULL};
+					0, 0, 0, 0, 9273, NULL, {}, NULL, PTHREAD_MUTEX_INITIALIZER, NULL};
 
 static char* str_unescape(char* s, char *d, int d_len)
 {
@@ -346,9 +348,9 @@ void *FS_library_promethues_listen(void *arg)
 		// Set up HTTP server parameters
 		mg_set_protocol_http_websocket(_handle->nc);
 
-		for (;;)
+		while(g_FS2_LIBRARY_handle.create_thread > 0)
 		{
-	    	mg_mgr_poll(&_handle->mgr, 1000);
+	    		mg_mgr_poll(&_handle->mgr, 1000);
 	  	}
 
 		mg_mgr_free(&_handle->mgr);
@@ -390,6 +392,11 @@ int FS_library_set_prometheus_port(unsigned short port)
 }
 int FS_library_set_prometheus_url_path(const char *url_path)
 {
+	if(g_FS2_LIBRARY_handle.url_path != NULL)
+	{
+		free(g_FS2_LIBRARY_handle.url_path);
+		g_FS2_LIBRARY_handle.url_path = NULL;
+	}
 	g_FS2_LIBRARY_handle.url_path=(char *)calloc(1, strlen(url_path)+1);
 	memcpy(g_FS2_LIBRARY_handle.url_path, url_path, strlen(url_path));
 
@@ -398,12 +405,36 @@ int FS_library_set_prometheus_url_path(const char *url_path)
 
 int FS_library_init(void)
 {
-	pthread_t tid=0;
-
-	pthread_create(&tid, NULL, FS_library_promethues_listen, (void *)&g_FS2_LIBRARY_handle);
+	if(g_FS2_LIBRARY_handle.url_path == NULL)
+	{
+		g_FS2_LIBRARY_handle.url_path = (char *)calloc(strlen((char *)"/metrics")+1, 1);
+		memcpy(g_FS2_LIBRARY_handle.url_path, (char *)"/metrics", strlen((char *)"/metrics"));
+	}
+	g_FS2_LIBRARY_handle.create_thread = 1;
+	pthread_create(&g_FS2_LIBRARY_handle.tid, NULL, FS_library_promethues_listen, (void *)&g_FS2_LIBRARY_handle);
 
 	return 0;
 
 }
 
+void FS_library_destroy(void)
+{
+	void* ret ;
+	if(g_FS2_LIBRARY_handle.create_thread == 1)
+	{
+		g_FS2_LIBRARY_handle.create_thread = 0;
+		pthread_join(g_FS2_LIBRARY_handle.tid, &ret);
+	}
+	if(g_FS2_LIBRARY_handle.url_path != NULL)
+	{
+		free(g_FS2_LIBRARY_handle.url_path);
+		g_FS2_LIBRARY_handle.url_path = NULL;
+	}
+	if(g_FS2_LIBRARY_handle.fs2_handle)
+	{
+		free(g_FS2_LIBRARY_handle.fs2_handle);
+	}
+	return ;
+
+}
 
