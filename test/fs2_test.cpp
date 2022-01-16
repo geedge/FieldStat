@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <pthread.h>
 
 #define TEST_STATUS_NUM 4
 #define TEST_FIELD_NUM 9
@@ -14,14 +15,87 @@
 #define TEST_RUNTIME_REG_NUM 32
 #define TEST_RUNTIME_REG_LINE_NUM 6
 
+int status_ids[TEST_STATUS_NUM], field_ids[TEST_FIELD_NUM], line_ids[TEST_LINE_NUM + TEST_RUNTIME_REG_LINE_NUM], column_ids[TEST_COLUMN_NUM];
+int histogram_ids[TEST_HISTOGRAM_NUM];
+int runtime_status_ids[TEST_RUNTIME_REG_NUM];
+int runtime_reg_num = 0, runtime_reg_line_num = 0;
+
+struct thread_para
+{
+	int loops;
+	screen_stat_handle_t handle;
+	int thread_id;
+};
+static void* worker_thread(void* arg)
+{
+	
+	struct thread_para* para=(struct thread_para*)arg;
+	int loops = para->loops, i=0, j=0;
+	screen_stat_handle_t handle=para->handle;
+	char buff[128];
+	int ret=0;
+	while (loops > 0)
+	{
+		loops--;
+		for (i = 0; i < TEST_STATUS_NUM; i++)
+		{
+			FS_operate(handle, status_ids[i], 0, FS_OP_SET, i * 10);
+		}
+		for (i = 0; i < TEST_FIELD_NUM; i++)
+		{
+			FS_operate(handle, field_ids[i], 0, FS_OP_ADD, i * 100);
+		}
+		for (i = 0; i < TEST_LINE_NUM + runtime_reg_line_num; i++)
+		{
+			for (j = 0; j < TEST_COLUMN_NUM; j++)
+			{
+				FS_operate(handle, line_ids[i], column_ids[j], FS_OP_ADD, (j + 1) * 30);
+			}
+		}
+		for (i = 0; i < runtime_reg_num; i++)
+		{
+			FS_operate(handle, runtime_status_ids[i], 0, FS_OP_ADD, i * 1000);
+		}
+		if (runtime_reg_num < TEST_RUNTIME_REG_NUM)
+		{
+			snprintf(buff, sizeof(buff), "rt_reg_%02d", runtime_reg_num);
+			ret = FS_register(handle, FS_STYLE_STATUS, FS_CALC_SPEED, buff);
+			assert(ret >= 0);
+			runtime_status_ids[runtime_reg_num] = ret;
+			runtime_reg_num++;
+			ret = FS_register(handle, FS_STYLE_COLUMN, FS_CALC_SPEED, buff);
+			assert(ret == -1); //always failed
+		}
+		if (runtime_reg_line_num < TEST_RUNTIME_REG_LINE_NUM)
+		{
+			snprintf(buff, sizeof(buff), "line_rt_%02d", runtime_reg_line_num);
+			ret = FS_register(handle, FS_STYLE_LINE, FS_CALC_SPEED, buff);
+			assert(ret >= 0);
+			line_ids[TEST_LINE_NUM + runtime_reg_line_num] = ret;
+			runtime_reg_line_num++;
+		}
+		long long preset[] = {1, 10, 20, 30, 40, 200, 300, 400, 600, 1000, 2000, 4000, 5000, 8000, 100000};
+		for (i = 0; i < TEST_HISTOGRAM_NUM; i++)
+		{
+			for (j = 0; (size_t)j < sizeof(preset) / sizeof(long long); j++)
+			{
+				FS_operate(handle, histogram_ids[i], 0, FS_OP_SET, preset[j]);
+			}
+		}
+		sleep(1);
+	}
+	return NULL;
+}
+
 int main(int argc, char *argv[])
 {
 	screen_stat_handle_t handle = NULL;
 	const char *stat_path = "./fs2_test.status";
 	const char *app_name = "fs2_test";
 	char buff[128];
-	int value = 0, i = 0, j = 0, runtime_reg_num = 0, runtime_reg_line_num = 0, ret = 0;
-	int loops = 10;
+	int value = 0, i = 0;
+
+	srand(171);
 
 	unsigned short port = 9001;
 	FS_library_set_prometheus_port(port);
@@ -63,9 +137,7 @@ int main(int argc, char *argv[])
 		const char *histogram_format = "0.1,0.5,0.8,0.9,0.95,0.99";
 		FS_set_para(handle, HISTOGRAM_GLOBAL_BINS, histogram_format, strlen(histogram_format) + 1);
 
-		int status_ids[TEST_STATUS_NUM], field_ids[TEST_FIELD_NUM], line_ids[TEST_LINE_NUM + TEST_RUNTIME_REG_LINE_NUM], column_ids[TEST_COLUMN_NUM];
-		int histogram_ids[TEST_HISTOGRAM_NUM];
-		int runtime_status_ids[TEST_RUNTIME_REG_NUM];
+
 		for (i = 0; i < TEST_STATUS_NUM; i++)
 		{
 			snprintf(buff, sizeof(buff), "(status_%02d)/\\-,;%%$*", i);
@@ -112,57 +184,22 @@ int main(int argc, char *argv[])
 		FS_set_para(handle, NOT_SEND_METRIC_TO_SERVER, &value, sizeof(value));
 
 		FS_start(handle);
-		loops = 10;
-		while (loops > 0)
+		int thread_num=16;
+		pthread_t threads[thread_num];
+		struct thread_para para;
+		para.loops=10;
+		para.handle=handle;
+		for(i=0; i<thread_num; i++)
 		{
-			loops--;
-			for (i = 0; i < TEST_STATUS_NUM; i++)
-			{
-				FS_operate(handle, status_ids[i], 0, FS_OP_SET, i * 10);
-			}
-			for (i = 0; i < TEST_FIELD_NUM; i++)
-			{
-				FS_operate(handle, field_ids[i], 0, FS_OP_ADD, i * 100);
-			}
-			for (i = 0; i < TEST_LINE_NUM + runtime_reg_line_num; i++)
-			{
-				for (j = 0; j < TEST_COLUMN_NUM; j++)
-				{
-					FS_operate(handle, line_ids[i], column_ids[j], FS_OP_ADD, (j + 1) * 30);
-				}
-			}
-			for (i = 0; i < runtime_reg_num; i++)
-			{
-				FS_operate(handle, runtime_status_ids[i], 0, FS_OP_ADD, i * 1000);
-			}
-			if (runtime_reg_num < TEST_RUNTIME_REG_NUM)
-			{
-				snprintf(buff, sizeof(buff), "rt_reg_%02d", runtime_reg_num);
-				ret = FS_register(handle, FS_STYLE_STATUS, FS_CALC_SPEED, buff);
-				assert(ret >= 0);
-				runtime_status_ids[runtime_reg_num] = ret;
-				runtime_reg_num++;
-				ret = FS_register(handle, FS_STYLE_COLUMN, FS_CALC_SPEED, buff);
-				assert(ret == -1); //always failed
-			}
-			if (runtime_reg_line_num < TEST_RUNTIME_REG_LINE_NUM)
-			{
-				snprintf(buff, sizeof(buff), "line_rt_%02d", runtime_reg_line_num);
-				ret = FS_register(handle, FS_STYLE_LINE, FS_CALC_SPEED, buff);
-				assert(ret >= 0);
-				line_ids[TEST_LINE_NUM + runtime_reg_line_num] = ret;
-				runtime_reg_line_num++;
-			}
-			long long preset[] = {1, 10, 20, 30, 40, 200, 300, 400, 600, 1000, 2000, 4000, 5000, 8000, 100000};
-			for (i = 0; i < TEST_HISTOGRAM_NUM; i++)
-			{
-				for (j = 0; (size_t)j < sizeof(preset) / sizeof(long long); j++)
-				{
-					FS_operate(handle, histogram_ids[i], 0, FS_OP_SET, preset[j]);
-				}
-			}
-			sleep(1);
+			pthread_create(&(threads[i]), NULL, worker_thread, &para);
 		}
+		void *temp;
+		for(i=0; i<thread_num; i++)
+		{
+			pthread_join(threads[i], (void**)&temp);
+		}
+
+
 		FS_stop(&handle);
 		printf("fs2 stoped cnt = %d, will sleep 1s\n", repeat_cnt);
 		sleep(1);

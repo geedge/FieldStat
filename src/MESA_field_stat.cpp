@@ -1,5 +1,6 @@
 #include "field_stat2.h"
 #include "field_stat_internal.h"
+#include "threadsafe_counter.h"
 #include "hdr_histogram.h"
 #include "cJSON.h"
 
@@ -789,13 +790,13 @@ int FS_operate(screen_stat_handle_t handle,int id,int column_id,enum field_op op
 	switch(op)
 	{
 		case	FS_OP_ADD:
-			atomic_add(&(target->changing), value);
+			threadsafe_counter_add(&(target->changing), value);
 			break;
 		case	FS_OP_SET:
-			atomic_set(&(target->changing), value-target->accumulated);
+			threadsafe_counter_set(&(target->changing), value-target->accumulated);
 			break;
 		case	FS_OP_SUB:
-			atomic_sub(&(target->changing), value);
+			threadsafe_counter_sub(&(target->changing), value);
 			break;
 		default:
 			assert(0);
@@ -821,12 +822,12 @@ long long get_stat_unit_val(display_manifest_t* p, int column_seq,enum field_cal
 		default:
 			break;
 	}
-	value= atomic_read(&(target->changing));
+	value= threadsafe_counter_read(&(target->changing));
 	if(is_refer==0)
 	{
 		target->previous_changed=value;
 		target->accumulated+=value;
-		atomic_set(&(target->changing), 0);
+		threadsafe_counter_set(&(target->changing), 0);
 	}
 	switch(calc_type)
 	{
@@ -1322,7 +1323,7 @@ static int output_style_histogram(struct FS_space_t* _handle, long long interval
 		{
 			pos--;
 		}
-		pos+=snprintf(pos,size-(pos-print_buf),"\n%s\n",draw_line);
+		pos+=snprintf(pos,size-(pos-print_buf),"\n%s\n", draw_line);
 	}
 	return pos-print_buf;	
 }
@@ -1360,7 +1361,8 @@ cJSON *fs2_metrics_to_json(FS_space_t* _handle, long long timestamp)
                     cJSON_AddStringToObject(tmp_obj, "name", p->name);
                     cJSON_AddStringToObject(tmp_obj, "type", "single");
                     cJSON_AddNumberToObject(tmp_obj, "acc", p->single.accumulated);
-                    cJSON_AddNumberToObject(tmp_obj, "diff", p->single.changing);
+					value=threadsafe_counter_read(&p->single.changing);
+                    cJSON_AddNumberToObject(tmp_obj, "diff", value);
                     cJSON_AddItemToArray(metrics_array_obj, tmp_obj);
                     //cJSON_Delete(tmp_obj);
                     break;
@@ -1371,8 +1373,9 @@ cJSON *fs2_metrics_to_json(FS_space_t* _handle, long long timestamp)
                 tmp_obj = cJSON_CreateObject();
                 cJSON_AddStringToObject(tmp_obj, "name", p->name);
                 cJSON_AddStringToObject(tmp_obj, "type", "single");
-                cJSON_AddNumberToObject(tmp_obj, "acc", p->single.accumulated);
-                cJSON_AddNumberToObject(tmp_obj, "diff", p->single.changing);
+                cJSON_AddNumberToObject(tmp_obj, "acc", p->single.accumulated);	
+				value=threadsafe_counter_read(&p->single.changing);
+                cJSON_AddNumberToObject(tmp_obj, "diff", value);
                 cJSON_AddItemToArray(metrics_array_obj, tmp_obj);
                 //cJSON_Delete(tmp_obj);
                 break;
@@ -1390,7 +1393,8 @@ cJSON *fs2_metrics_to_json(FS_space_t* _handle, long long timestamp)
                     cJSON_AddStringToObject(tmp_obj, "name", tmp_output_name);
                     //cJSON_AddStringToObject(tmp_obj, "type", "line");
                     cJSON_AddNumberToObject(tmp_obj, "acc", p_column->single.accumulated);
-                    cJSON_AddNumberToObject(tmp_obj, "diff", p_column->single.changing);
+					value=threadsafe_counter_read(&p->single.changing);					
+                    cJSON_AddNumberToObject(tmp_obj, "diff", value);
                     cJSON_AddItemToArray(metrics_array_obj, tmp_obj);
                     //cJSON_Delete(tmp_obj);
                 }
