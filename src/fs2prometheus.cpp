@@ -433,7 +433,12 @@ void FS_library_destroy(void)
 	if(g_FS2_LIBRARY_handle.fs2_handle)
 	{
 		free(g_FS2_LIBRARY_handle.fs2_handle);
+		g_FS2_LIBRARY_handle.fs2_handle=NULL;
 	}
+
+	g_FS2_LIBRARY_handle.using_fs2_handle_cnt=0;
+	g_FS2_LIBRARY_handle.fs2_handle_cnt=0;
+		
 	return ;
 
 }
