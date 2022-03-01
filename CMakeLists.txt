@@ -53,8 +53,8 @@ endif()
 add_library(${lib_name}_static STATIC ${SRC})
 set_target_properties(${lib_name}_static PROPERTIES OUTPUT_NAME ${lib_name})
 
-install(TARGETS ${lib_name}_shared LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib COMPONENT LIBRARY)
-install(TARGETS ${lib_name}_static LIBRARY ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib COMPONENT LIBRARY)
+install(TARGETS ${lib_name}_shared LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib COMPONENT LIBRARIES)
+install(TARGETS ${lib_name}_static LIBRARY ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib COMPONENT LIBRARIES)
 install(FILES inc/field_stat2.h   DESTINATION   ${CMAKE_INSTALL_PREFIX}/include/MESA COMPONENT HEADER)
 
 include(Package)
