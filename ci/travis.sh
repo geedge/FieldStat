@@ -37,7 +37,7 @@ if [ -n "${INSTALL_DEPENDENCY_LIBRARY}" ]; then
       yum install -y $INSTALL_DEPENDENCY_LIBRARY
 fi
 
-if [ $ASAN_OPTION ];then
+if [ $ASAN_OPTION ] && [ -f "/opt/rh/devtoolset-7/enable" ] ;then
 	source /opt/rh/devtoolset-7/enable
 fi
 
