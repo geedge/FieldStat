@@ -9,7 +9,10 @@ include(Version)
 
 set(CMAKE_MACOSX_RPATH 0)
 set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} -Wall)
-set (CMAKE_INSTALL_PREFIX "/opt/MESA" CACHE PATH "default install path" FORCE)
+
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+	set(CMAKE_INSTALL_PREFIX "/opt/MESA" CACHE PATH "default install path" FORCE)
+endif()
 
 #for ASAN
 set(ASAN_OPTION "OFF" CACHE STRING " set asan type chosen by the user, using OFF as default")
