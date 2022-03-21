@@ -259,54 +259,50 @@ static void FS_library_promethues_output(struct mg_connection *c, int ev, void *
 					}
 					break;
 				case FS_STYLE_HISTOGRAM:
-					for(j=0;j<fs2_handle->display_cnt;j++)
+					if(p->style!=FS_STYLE_HISTOGRAM)
 					{
-						p=fs2_handle->display[j];
-						if(p->style!=FS_STYLE_HISTOGRAM)
+						continue;
+					}
+
+					if(payload_len-used_len<=STEP_SIZE)
+					{
+						payload_len+=STEP_SIZE;
+						payload=(char *)realloc(payload, payload_len);
+					}
+
+					str_unescape(fs2_handle->app_name, app_name, sizeof(app_name));
+
+					used_len+=histgram_output_summary(p, 
+							app_name, 
+							fs2_handle->histogram_bins,
+							fs2_handle->histogram_bin_num,
+							payload+used_len,
+							payload_len-used_len
+							);
+
+					if(p->histogram.previous_changed!=NULL)
+					{
+						hdr_iter_recorded_init(&iter, p->histogram.accumulated);
+						while (hdr_iter_next(&iter))
 						{
-							continue;
+							sum+=(long long)iter.value;
 						}
 
-						if(payload_len-used_len<=STEP_SIZE)
-						{
-								payload_len+=STEP_SIZE;
-								payload=(char *)realloc(payload, payload_len);
-						}
-						
+						str_unescape(p->name, line_name, sizeof(line_name));
 						str_unescape(fs2_handle->app_name, app_name, sizeof(app_name));
+						used_len+=snprintf(payload+used_len,
+								payload_len-used_len,
+								"%s_%s_sum{app_name=\"%s\"} %llu\n",
+								app_name,
+								line_name,
+								app_name,
+								sum
+								);
 
-						used_len+=histgram_output_summary(p, 
-															app_name, 
-															fs2_handle->histogram_bins,
-															fs2_handle->histogram_bin_num,
-															payload+used_len,
-															payload_len-used_len
-														);
-						
-						if(p->histogram.previous_changed!=NULL)
+						if(payload_len-used_len<=100)
 						{
-							hdr_iter_recorded_init(&iter, p->histogram.accumulated);
-							while (hdr_iter_next(&iter))
-							{
-								sum+=(long long)iter.value;
-							}
-
-							str_unescape(p->name, line_name, sizeof(line_name));
-							str_unescape(fs2_handle->app_name, app_name, sizeof(app_name));
-							used_len+=snprintf(payload+used_len,
-													payload_len-used_len,
-													"%s_%s_sum{app_name=\"%s\"} %llu\n",
-													app_name,
-													line_name,
-													app_name,
-													sum
-											);
-
-							if(payload_len-used_len<=100)
-							{
-								payload_len+=STEP_SIZE;
-								payload=(char *)realloc(payload, payload_len);
-							}
+							payload_len+=STEP_SIZE;
+							payload=(char *)realloc(payload, payload_len);
 						}
 					}
 					break;
