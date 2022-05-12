@@ -7,6 +7,7 @@
 #include "field_stat_internal.h"
 
 #define	STEP_SIZE	1024
+#define	LEFT_MIN_BUFF_LEN	256
 #define	MAX_URL_PATH_LEN	128
 #define	FS2_HANDLE_STEP_NUM	16
 
@@ -207,7 +208,7 @@ static void FS_library_promethues_output(struct mg_connection *c, int ev, void *
 				continue;
 			}
 
-			if(payload_len-used_len<=100)
+			if(payload_len-used_len<=LEFT_MIN_BUFF_LEN)
 			{
 				payload_len+=STEP_SIZE;
 				payload=(char *)realloc(payload, payload_len);
@@ -251,7 +252,7 @@ static void FS_library_promethues_output(struct mg_connection *c, int ev, void *
 											value
 										);
 
-						if(payload_len-used_len<=100)
+						if(payload_len-used_len<=LEFT_MIN_BUFF_LEN)
 						{
 							payload_len+=STEP_SIZE;
 							payload=(char *)realloc(payload, payload_len);
@@ -299,7 +300,7 @@ static void FS_library_promethues_output(struct mg_connection *c, int ev, void *
 								sum
 								);
 
-						if(payload_len-used_len<=100)
+						if(payload_len-used_len<=LEFT_MIN_BUFF_LEN)
 						{
 							payload_len+=STEP_SIZE;
 							payload=(char *)realloc(payload, payload_len);
