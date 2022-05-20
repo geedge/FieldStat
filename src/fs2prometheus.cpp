@@ -1,8 +1,9 @@
-#include <stdio.h>
-#include <string.h>
+//#include <stdio.h>
+//#include <string.h>
 #include <pthread.h>
 
-#include "mongoose.h"
+#define HTTPSERVER_IMPL
+#include "httpserver.h"
 #include "field_stat2.h"
 #include "field_stat_internal.h"
 
@@ -19,14 +20,13 @@ struct FS_library_runtime
 	unsigned short create_thread;
 	unsigned short port;
 	char *url_path;
-	struct mg_mgr mgr;
-	struct mg_connection *nc;	
+	struct http_server_s *server_handle;
 	pthread_mutex_t library_lock;
 	struct FS_space_t **fs2_handle;
 };
 
 struct FS_library_runtime g_FS2_LIBRARY_handle={
-					0, 0, 0, 0, 9273, NULL, {}, NULL, PTHREAD_MUTEX_INITIALIZER, NULL};
+					0, 0, 0, 0, 9273, NULL, NULL, PTHREAD_MUTEX_INITIALIZER, NULL};
 
 static char* str_unescape(char* s, char *d, int d_len)
 {
@@ -126,7 +126,7 @@ static int histgram_output_summary(display_manifest_t* p, char *app_name, double
 	return used_len;
 }
 
-static void FS_library_promethues_output(struct mg_connection *c, int ev, void *message, void* user_data)
+static void FS_library_promethues_output(struct http_request_s* request)
 {
 	int i=0,j=0,k=0;
 	int payload_len=0;
@@ -142,15 +142,11 @@ static void FS_library_promethues_output(struct mg_connection *c, int ev, void *
 	struct hdr_iter iter;
 	struct FS_space_t *fs2_handle=NULL;
 	struct display_manifest_t *p=NULL,*p_column=NULL;
-	struct FS_library_runtime *_handle=(struct FS_library_runtime *)user_data;
-	
-	if (ev != MG_EV_HTTP_REQUEST)
-	{
-		return;
-	}
-	struct http_message *hm = (struct http_message *)message;
+	struct FS_library_runtime *_handle=(struct FS_library_runtime *)(&g_FS2_LIBRARY_handle);
 
-	int fs2_handle_idx=check_http_request(_handle, (char *)hm->uri.p, hm->uri.len);
+	struct http_response_s* response=NULL;
+	struct http_string_s uri=http_request_target(request);
+	int fs2_handle_idx=check_http_request(_handle, (char *)uri.buf, uri.len);
 	if(fs2_handle_idx==-1)
 	{
 		payload_len=_handle->using_fs2_handle_cnt * 128;
@@ -169,10 +165,13 @@ static void FS_library_promethues_output(struct mg_connection *c, int ev, void *
 
 		payload[used_len++]='\n';
 		payload[used_len]='\0';
+
+		response = http_response_init();
+		http_response_status(response, 404);
+		http_response_header(response, "Content-Type", "text/plain; charset=utf-8");
+		http_response_body(response, payload, strlen(payload));
+		http_respond(request, response);
 		
-		mg_send_head(c, 404, strlen(payload), "Content-Type: text/plain; charset=utf-8");
-		mg_printf(c, "%s", payload);
-	
 		free(payload);
 		payload=NULL;
 		return ;
@@ -315,9 +314,12 @@ static void FS_library_promethues_output(struct mg_connection *c, int ev, void *
 	}
 
 	if(payload!=NULL)
-	{
-		mg_send_head(c, 200, strlen(payload), "Content-Type: text/plain; charset=utf-8");
-		mg_printf(c, "%s", payload);
+	{	
+		response = http_response_init();
+		http_response_status(response, 200);
+		http_response_header(response, "Content-Type", "text/plain; charset=utf-8");
+		http_response_body(response, payload, strlen(payload));
+		http_respond(request, response);
 	
 		free(payload);
 		payload=NULL;
@@ -328,29 +330,12 @@ static void FS_library_promethues_output(struct mg_connection *c, int ev, void *
 
 void *FS_library_promethues_listen(void *arg)
 {
-	char s_http_port[16]={0};
 	struct FS_library_runtime *_handle=(struct FS_library_runtime *)arg;
 
 	if(_handle!=NULL)
 	{
-		mg_mgr_init(&(_handle->mgr), NULL);
-
-		snprintf(s_http_port, sizeof(s_http_port), "%hu", _handle->port);	
-		_handle->nc = mg_bind(&(_handle->mgr), s_http_port, FS_library_promethues_output, _handle);
-		if (_handle->nc == NULL)
-		{
-			printf("%s, Mongoose failed to create listener on port %s\n", (char *)"Prometheus", s_http_port);
-			return NULL;
-		}
-		// Set up HTTP server parameters
-		mg_set_protocol_http_websocket(_handle->nc);
-
-		while(g_FS2_LIBRARY_handle.create_thread > 0)
-		{
-	    		mg_mgr_poll(&_handle->mgr, 1000);
-	  	}
-
-		mg_mgr_free(&_handle->mgr);
+		_handle->server_handle=http_server_init(_handle->port, FS_library_promethues_output);
+		http_server_listen(_handle->server_handle);
 	}
 	
 	return NULL;
