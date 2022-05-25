@@ -102,9 +102,11 @@ int main(int argc, char *argv[])
 	char *url_path = (char *)"/prometheus";
 	FS_library_set_prometheus_url_path(url_path);
 	FS_library_init();
-
-	for (int repeat_cnt = 0; repeat_cnt < 10; repeat_cnt++)
+	struct timespec start;
+	long time_use;
+	for (int repeat_cnt = 0; repeat_cnt < 2; repeat_cnt++)
 	{
+		record_time_start(&start);
 
 		handle = FS_create_handle();
 
@@ -201,9 +203,11 @@ int main(int argc, char *argv[])
 
 
 		FS_stop(&handle);
-		printf("fs2 stoped cnt = %d, will sleep 1s\n", repeat_cnt);
+		time_use = record_time_elapse_us(&start);
+		printf("fs2 stoped cnt = %d, cost %ld us, will sleep 1s\n", repeat_cnt, time_use);
 		sleep(1);
 	}
+	printf("Start FS library destoryed ...\n");
 	FS_library_destroy();
 	printf("FS library destoryed, will sleep 30s\n");
 	sleep(30);
