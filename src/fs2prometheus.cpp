@@ -335,6 +335,7 @@ void *FS_library_promethues_listen(void *arg)
 	if(_handle!=NULL)
 	{
 		_handle->server_handle=http_server_init(_handle->port, FS_library_promethues_output);
+		//pthread_testcancel();
 		http_server_listen(_handle->server_handle);
 	}
 	
@@ -405,6 +406,7 @@ void FS_library_destroy(void)
 	if(g_FS2_LIBRARY_handle.create_thread == 1)
 	{
 		g_FS2_LIBRARY_handle.create_thread = 0;
+		pthread_cancel(g_FS2_LIBRARY_handle.tid);
 		pthread_join(g_FS2_LIBRARY_handle.tid, &ret);
 	}
 	if(g_FS2_LIBRARY_handle.url_path != NULL)
