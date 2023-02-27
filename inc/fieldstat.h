@@ -13,7 +13,8 @@
 #define LEN_APP_NAME   32
 #define LEN_FORMAT_MAX 32
 #define LEN_PATH_MAX   256
-
+#define	NUM_MAX_TABLE	64
+#define TABLE_COLUMN_SIZE 32
 
 struct fieldstat_global_prometheus
 {
@@ -46,6 +47,13 @@ struct fieldstat_instance
 	int metric_cnt;
 	int metric_size;
 	struct metric_t **metric;
+	struct{
+		struct metric_t **column;
+		size_t column_size;
+	} table_metrics[NUM_MAX_TABLE];
+
+	int table_num;
+	int line_seq;
 
 	int prometheus_output_enable;
 
@@ -69,6 +77,12 @@ enum field_type
 	FIELD_TYPE_SUMMARY
 };
 
+struct metric_id_list
+{
+	int num;
+	int id[TABLE_COLUMN_SIZE];
+};
+
 /*
  * @param listen_port 
  * @param url if NULL use "/metrics" default
@@ -88,6 +102,7 @@ int fieldstat_set_app_name(struct fieldstat_instance *instance, const char *app_
  * @param field_name the name of the field
  * @type counter, gauge summary and histogram
  * @n_tag size of tag_key[] and tag_value[]
+ * 
  * return field_id to be used in fieldstat_value_xxx(),
  * 	 -1 if an error occured.
  * example field_name=packets, tag=[{"policy_id", "101"},{"profile_id", "a"}]
@@ -95,8 +110,10 @@ int fieldstat_set_app_name(struct fieldstat_instance *instance, const char *app_
  * counter or histogram
  * */
 int fieldstat_register(struct fieldstat_instance *instance, enum field_type type, const char *field_name, const char *tag_key[], const char *tag_value[], size_t n_tag);
-//int fieldstat_register_table(struct fieldstat_instance *instance, enum file_type table_type[], consul char *field_list[], size_t n_field);
-//int fieldstat_register_table_metrics(struct fieldstat_instance * instance, const char *tag_key[], const char *tag_value[]);
+int fieldstat_register_table(struct fieldstat_instance *instance, enum field_type table_type[], const char *field_list[], size_t n_field);
+//int fieldstat_register_table_metrics(struct fieldstat_instance * instance, const char *field_name, const char *tag_key[], const char *tag_value[]);
+struct metric_id_list fieldstat_register_table_metrics(struct fieldstat_instance * instance, int table_id, const char *field_name, const char *tag_key[], const char *tag_value[],size_t n_tag);
+
 
 int fieldstat_value_incrby(struct fieldstat_instance *instance, int field_id, long long increment);
 int fieldstat_value_set(struct fieldstat_instance *instance, int field_id, long long increment);
@@ -106,3 +123,4 @@ void fieldstat_instance_start(struct fieldstat_instance *instance);
 void fieldstat_passive_output(struct fieldstat_instance *instance);
 
 #endif
+

@@ -20,11 +20,16 @@
 int main(int argc, char *argv[])
 {
 	int ret = 0;
+	int i = 0;
 	struct fieldstat_instance * test_instance = NULL;
 	const char *tag_key[] = {"A","B","C"};
-	const char *tag_value[] = {"a1","b1","c1"};
+	const char *tag_value[] = {"a1","b1","c1","b1","f1"};
+	enum field_type table_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+	const char *field_list[] = {"column_0", "colunm_1", "column_2"};
+	const char *field_list_0[] = {"c0", "c1", "c2"};
+	struct metric_id_list id_list; 
 
-       	test_instance = fieldstat_instance_create();
+	test_instance = fieldstat_instance_create();
 	ret = fieldstat_set_app_name(test_instance, "test");
 	if(ret == -1)
 	{
@@ -73,14 +78,60 @@ int main(int argc, char *argv[])
 		printf("Failed to register metric!\n");
 	}
 
-
-        ret = fieldstat_register(test_instance, FIELD_TYPE_COUNTER, "metric_1", tag_key, tag_value, sizeof(tag_key)/sizeof(tag_key[0]));
-        if(ret == -1)
-        {
-                printf("Failed to register metric!\n");
-        }
+	ret = fieldstat_register(test_instance, FIELD_TYPE_COUNTER, "metric_1", tag_key, tag_value, sizeof(tag_key)/sizeof(tag_key[0]));
+	if(ret == -1)
+	{
+		printf("Failed to register metric!\n");
+	}
 	
 	ret = fieldstat_register(test_instance, FIELD_TYPE_GAUGE, "gauge_0",tag_key, tag_value, sizeof(tag_key)/sizeof(tag_key[0]));
+	if(ret == -1)
+	{
+		printf("Failed to register metric gauge_0\n");
+	}
+
+	ret = fieldstat_register(test_instance, FIELD_TYPE_GAUGE, "gauge_0_tag", NULL, NULL, 0);
+	if(ret == -1)
+	{
+		printf("Failed to register metric gauge_0_tag\n");
+	}
+/*
+	enum field_type table_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+	const char *field_list[] = {"column_0", "colunm_1", "column_2"};
+*/
+	int table_id = -1;
+	table_id = fieldstat_register_table(test_instance, table_type, field_list, sizeof(field_list)/sizeof(field_list[0]));
+	if(table_id == -1)
+	{
+		printf("Failed to register metric table\n");
+	}
+
+	id_list = fieldstat_register_table_metrics(test_instance, table_id, "line_0", tag_key, tag_value, sizeof(tag_key)/sizeof(tag_key[0]));
+	for(i = 0; i < id_list.num; i++)
+	{
+		printf("%d\n", id_list.id[i]);
+	}
+
+	id_list = fieldstat_register_table_metrics(test_instance, table_id, "line_2", tag_key, tag_value, sizeof(tag_key)/sizeof(tag_key[0]));
+	for(i = 0; i < id_list.num; i++)
+	{
+		printf("%d\n", id_list.id[i]);
+	}
+
+	table_id = fieldstat_register_table(test_instance, table_type, field_list_0, sizeof(field_list_0)/sizeof(field_list_0[0]));
+	printf("%d\n",table_id);
+	if(table_id == -1)
+	{
+		printf("Failed to register metric table list_0\n");
+	}
+
+	id_list = fieldstat_register_table_metrics(test_instance, table_id, "line_0", tag_key, tag_value, sizeof(tag_key)/sizeof(tag_key[0]));
+	printf("id_list.num:%d\n",id_list.num);
+	for(i = 0; i < id_list.num; i++)
+	{
+		printf("%d\n", id_list.id[i]);
+	}
+
 
 	fieldstat_instance_start(test_instance);
 	sleep(1);

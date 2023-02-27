@@ -328,7 +328,7 @@ static int print_buf_tag_append_position(metric_t *metric, char *print_buf_tags,
 	char *print_buf_tags_append_position = print_buf_tags;
 
 	print_buf_tags_append_position += snprintf(print_buf_tags_append_position, size - (print_buf_tags_append_position - print_buf_tags),"{");
-	for(; i < metric->n_tag; i++)
+	for(; i < (int)metric->n_tag; i++)
 	{
 		if(i == 0)
 		{
@@ -360,6 +360,10 @@ static int output_file_format_default_type_gauge(struct fieldstat_instance *inst
 	{
 		metric = instance->metric[i];
 		if(metric->field_type != FIELD_TYPE_GAUGE)
+		{
+			continue;
+		}
+		if(metric->belong_to_table == 1)
 		{
 			continue;
 		}
@@ -421,6 +425,10 @@ static int output_file_format_default_type_counter(struct fieldstat_instance *in
 		{
 			continue;
 		}
+		if(metric->belong_to_table == 1)
+		{
+			continue;
+		}
 		if(metric->is_invisible == 1)
 		{
 			get_metric_unit_val(metric,FS_CALC_CURRENT,0);
@@ -474,6 +482,84 @@ static int output_file_format_default_type_counter(struct fieldstat_instance *in
 }
 
 
+static int output_file_format_default_table(struct fieldstat_instance *instance,long long interval_ms,char*print_buf, unsigned int size)
+{
+	int i = 0, j = 0, k = 0;
+	metric_t *metric = NULL;
+	long long value = 0;
+	//double ratio = 0.0;
+	struct metric_t **table_column = NULL;
+	size_t table_column_size = 0;
+
+	char* print_buf_append_position = print_buf;
+
+	int index_table[NUM_MAX_TABLE][1024];
+	int table_metric_number[NUM_MAX_TABLE];
+	memset(table_metric_number,0, sizeof(table_metric_number));
+	char *line_name = NULL;
+	int table_id = 0;
+	int per_table_counter = 0;
+	int metric_id = 0;
+	char print_buf_tags[1024] = {0};
+
+	for(i = 0; i < instance->metric_cnt; i++)
+	{
+		metric = instance->metric[i];
+		if(metric->belong_to_table != 1)
+		{
+			continue;
+		}
+		table_id = metric->table_id;
+		per_table_counter = table_metric_number[table_id]++;
+		index_table[table_id][per_table_counter] = i;
+	}
+
+	for(i = 0; i < instance->table_num; i++)
+	{
+		if(table_metric_number[i] == 0)
+		{
+			continue;
+		}
+
+		table_column = instance->table_metrics[i].column;
+		table_column_size = instance->table_metrics[i].column_size;
+
+		print_buf_append_position += snprintf(print_buf_append_position, size - (print_buf - print_buf),"\t\t\t");
+		for(k = 0; k < (int)table_column_size; k++)
+		{
+			print_buf_append_position += snprintf(print_buf_append_position ,size - (print_buf_append_position - print_buf), "\t%10s", table_column[k]->field_name);			
+		}
+		for(j = 0; j < table_metric_number[i]; j++)
+		{
+			metric_id = index_table[i][j];
+			metric = instance->metric[metric_id];
+			if(line_name == NULL || strcmp(line_name, metric->field_name))
+			{
+				print_buf_tag_append_position(metric, print_buf_tags, sizeof(print_buf_tags));
+				print_buf_append_position += snprintf(print_buf_append_position, size - (print_buf_append_position - print_buf), "\n%s %-20s\t", metric->field_name,print_buf_tags);
+
+				line_name = metric->field_name;	
+			}
+			value = get_metric_unit_val(metric, FS_CALC_CURRENT, 0);
+			print_buf_append_position += snprintf(print_buf_append_position, size - (print_buf_append_position - print_buf), "%10lld\t", value);
+		}
+		print_buf_append_position += snprintf(print_buf_append_position,size - (print_buf_append_position - print_buf), "\n");
+		line_name = NULL;
+
+		if(print_buf_append_position - print_buf > 0)
+		{
+			if(*(print_buf_append_position - 1) == '\n')
+			{
+				print_buf_append_position--;
+			}
+			print_buf_append_position += snprintf(print_buf_append_position, size - (print_buf_append_position - print_buf), "\n%s\n", draw_line);
+		}
+	}
+
+	return print_buf_append_position - print_buf;
+}
+
+
 int fieldstat_output_file(struct fieldstat_instance *instance,long long interval_ms)
 {
 	size_t print_buf_sz = instance->metric_cnt*1024;
@@ -506,6 +592,7 @@ int fieldstat_output_file(struct fieldstat_instance *instance,long long interval
 		//pthread_mutex_lock(&(_handle->reg_lock)); //TODO
 		print_buf_append_position += output_file_format_default_type_gauge(instance, interval_ms, print_buf_append_position, print_buf_sz - (print_buf_append_position - print_buf));
 		print_buf_append_position += output_file_format_default_type_counter(instance, interval_ms, print_buf_append_position, print_buf_sz - (print_buf_append_position - print_buf));
+		print_buf_append_position += output_file_format_default_table(instance, interval_ms, print_buf_append_position, print_buf_sz - (print_buf_append_position - print_buf));
 		//TODO  output table,output histogram,output summary 
 		//pthread_mutex_unlock(&(_handle->reg_lock));//TODO
 	}
@@ -591,6 +678,119 @@ struct fieldstat_instance * fieldstat_instance_create(void)
 	instance->output_interval_s = 2;		//default 2s
 	instance->background_thread_disable = 0;
 	instance->metric_size = NUM_INIT_METRICS;
-	instance->metric =(struct metric_t **)calloc(sizeof(struct metric *), instance->metric_size);
+	instance->metric = (struct metric_t **)calloc(sizeof(struct metric *), instance->metric_size);
+	//instance->table_num = NUM_INIT_TABLES;
+	//instance->metric_table = (struct metric_t **)calloc(sizeof(struct metric *), instance->table_num); 
 	return instance;
+}
+
+
+ int fieldstat_register_table(struct fieldstat_instance *instance, enum field_type table_type[], const char *field_list[], size_t n_field)
+ {
+	int table_id = 0;
+	int i = 0;
+	metric_t **table_column = NULL;
+
+	if(n_field <= 0)
+	{
+		return -1;
+	}
+	if(instance->table_num > NUM_MAX_TABLE)
+	{
+		return -1;
+	}
+	if(n_field > TABLE_COLUMN_SIZE)
+	{
+		return -1;
+	}
+
+	table_id = instance->table_num++;
+	//instance->metric_table[table_id];
+	table_column = instance->table_metrics[table_id].column = (struct metric_t **)calloc(sizeof(struct metric *), n_field);
+	instance->table_metrics[table_id].column_size = n_field;
+	for(; i < (int)n_field; i ++)
+	{
+		table_column[i] = metric_new(table_type[i],field_list[i],NULL,NULL,0);
+	}
+	return table_id;
+ }
+
+
+struct metric_id_list fieldstat_register_table_metrics(struct fieldstat_instance * instance, int table_id, const char *field_name, const char *tag_key[], const char *tag_value[],size_t n_tag)
+
+//int fieldstat_register(struct fieldstat_instance *instance, enum field_type type, const char *field_name, const char *tag_key[], const char *tag_value[], size_t n_tag)
+{
+	
+	int metric_id = 0;
+	int i = 0;
+	struct metric_t * metric_choosen = NULL;
+	metric_t **table_column = instance->table_metrics[table_id].column;
+	int table_column_size = instance->table_metrics[table_id].column_size;
+	struct metric_id_list metric_id_list;
+	memset(&(metric_id_list),0,sizeof(struct metric_id_list));
+
+	if(table_id < 0 || table_id >= NUM_MAX_TABLE)
+	{
+		return metric_id_list;
+	}
+
+	if(!is_valid_field_name(field_name))
+	{
+		return metric_id_list;
+	}
+	if(n_tag > N_TAG_MAX)
+	{
+		return metric_id_list;
+	}
+
+	if(table_column_size < 1)
+	{
+		return metric_id_list;
+	}
+
+	//TODO not block
+	table_column = instance->table_metrics[table_id].column;
+
+	for(; i < table_column_size; i ++)
+	{	
+		metric_id = instance->metric_cnt++;
+		assert(instance->metric_cnt < instance->metric_size);
+		metric_choosen = instance->metric[metric_id] = metric_new(table_column[i]->field_type,field_name,tag_key,tag_value,n_tag);
+
+		metric_choosen->table_id = table_id;
+		metric_choosen->belong_to_table = 1;
+		metric_choosen->table_column_id = i;
+		metric_choosen->line_seq ++;
+		metric_choosen->table_column_name = strdup(table_column[i]->field_name); 
+
+		switch(metric_choosen->field_type)
+		{
+			case FIELD_TYPE_COUNTER:
+				instance->counter_cnt++;
+				memset(&(metric_choosen->counter), 0, sizeof(metric_choosen->counter));
+				break;
+			case FIELD_TYPE_GAUGE:
+				instance->gauge_cnt++;
+				memset(&(metric_choosen->gauge), 0, sizeof(metric_choosen->gauge));
+				break;
+			case FILED_TYPE_HISTOGRAM:
+				//instance->histogram_cnt++;
+				// TODO  what?
+				break;
+			case FIELD_TYPE_SUMMARY:
+				//instance->summary_cnt++;
+				//TODO what ?
+				break;
+			default:
+				assert(0);
+				break;
+		}
+		if(table_column_size < TABLE_COLUMN_SIZE)
+		{
+			metric_id_list.id[metric_id_list.num ++] = metric_id;
+		}
+
+	}
+
+	return metric_id_list;
 }
