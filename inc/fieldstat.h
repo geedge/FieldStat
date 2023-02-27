@@ -15,6 +15,7 @@
 #define LEN_PATH_MAX   256
 #define	NUM_MAX_TABLE	64
 #define TABLE_COLUMN_SIZE 32
+#define	UDP_PAYLOAD_SIZE 1460
 
 struct fieldstat_global_prometheus
 {
@@ -65,6 +66,9 @@ struct fieldstat_instance
 	struct timespec last_output_time;
 
 	pthread_t cfg_mon_t;
+	char line_protocol_send_buff[UDP_PAYLOAD_SIZE];
+	size_t line_protocol_send_buff_offset;
+	int line_protocol_socket;
 
 	FILE* fp;
 };
