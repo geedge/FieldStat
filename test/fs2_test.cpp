@@ -1,4 +1,4 @@
-#include "../inc/field_stat2.h"
+#include "../inc/fieldstat.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,201 +15,76 @@
 #define TEST_RUNTIME_REG_NUM 32
 #define TEST_RUNTIME_REG_LINE_NUM 6
 
-int status_ids[TEST_STATUS_NUM], field_ids[TEST_FIELD_NUM], line_ids[TEST_LINE_NUM + TEST_RUNTIME_REG_LINE_NUM], column_ids[TEST_COLUMN_NUM];
-int histogram_ids[TEST_HISTOGRAM_NUM];
-int runtime_status_ids[TEST_RUNTIME_REG_NUM];
-int runtime_reg_num = 0, runtime_reg_line_num = 0;
 
-struct thread_para
-{
-	int loops;
-	screen_stat_handle_t handle;
-	int thread_id;
-};
-static void* worker_thread(void* arg)
-{
-	
-	struct thread_para* para=(struct thread_para*)arg;
-	int loops = para->loops, i=0, j=0;
-	screen_stat_handle_t handle=para->handle;
-	char buff[128];
-	int ret=0;
-	while (loops > 0)
-	{
-		loops--;
-		for (i = 0; i < TEST_STATUS_NUM; i++)
-		{
-			FS_operate(handle, status_ids[i], 0, FS_OP_SET, i * 10);
-		}
-		for (i = 0; i < TEST_FIELD_NUM; i++)
-		{
-			FS_operate(handle, field_ids[i], 0, FS_OP_ADD, i * 100);
-		}
-		for (i = 0; i < TEST_LINE_NUM + runtime_reg_line_num; i++)
-		{
-			for (j = 0; j < TEST_COLUMN_NUM; j++)
-			{
-				FS_operate(handle, line_ids[i], column_ids[j], FS_OP_ADD, (j + 1) * 30);
-			}
-		}
-		for (i = 0; i < runtime_reg_num; i++)
-		{
-			FS_operate(handle, runtime_status_ids[i], 0, FS_OP_ADD, i * 1000);
-		}
-		if (runtime_reg_num < TEST_RUNTIME_REG_NUM)
-		{
-			snprintf(buff, sizeof(buff), "rt_reg_%02d", runtime_reg_num);
-			ret = FS_register(handle, FS_STYLE_STATUS, FS_CALC_SPEED, buff);
-			assert(ret >= 0);
-			runtime_status_ids[runtime_reg_num] = ret;
-			runtime_reg_num++;
-			ret = FS_register(handle, FS_STYLE_COLUMN, FS_CALC_SPEED, buff);
-			assert(ret == -1); //always failed
-		}
-		if (runtime_reg_line_num < TEST_RUNTIME_REG_LINE_NUM)
-		{
-			snprintf(buff, sizeof(buff), "line_rt_%02d", runtime_reg_line_num);
-			ret = FS_register(handle, FS_STYLE_LINE, FS_CALC_SPEED, buff);
-			assert(ret >= 0);
-			line_ids[TEST_LINE_NUM + runtime_reg_line_num] = ret;
-			runtime_reg_line_num++;
-		}
-		long long preset[] = {1, 10, 20, 30, 40, 200, 300, 400, 600, 1000, 2000, 4000, 5000, 8000, 100000};
-		for (i = 0; i < TEST_HISTOGRAM_NUM; i++)
-		{
-			for (j = 0; (size_t)j < sizeof(preset) / sizeof(long long); j++)
-			{
-				FS_operate(handle, histogram_ids[i], 0, FS_OP_SET, preset[j]);
-			}
-		}
-		sleep(1);
-	}
-	return NULL;
-}
 
 int main(int argc, char *argv[])
 {
-	screen_stat_handle_t handle = NULL;
-	const char *stat_path = "./fs2_test.status";
-	const char *app_name = "fs2_test";
-	char buff[128];
-	int value = 0, i = 0;
+	int ret = 0;
+	struct fieldstat_instance * test_instance = NULL;
+	const char *tag_key[] = {"A","B","C"};
+	const char *tag_value[] = {"a1","b1","c1"};
 
-	srand(171);
-
-	unsigned short port = 9001;
-	FS_library_set_prometheus_port(port);
-	char *url_path = (char *)"/prometheus";
-	FS_library_set_prometheus_url_path(url_path);
-	FS_library_init();
-	struct timespec start;
-	long time_use;
-	for (int repeat_cnt = 0; repeat_cnt < 2; repeat_cnt++)
+       	test_instance = fieldstat_instance_create();
+	ret = fieldstat_set_app_name(test_instance, "test");
+	if(ret == -1)
 	{
-		record_time_start(&start);
-
-		handle = FS_create_handle();
-
-		FS_set_para(handle, APP_NAME, app_name, strlen(app_name) + 1);
-		value = 0;
-		FS_set_para(handle, FLUSH_BY_DATE, &value, sizeof(value));
-		FS_set_para(handle, OUTPUT_DEVICE, stat_path, strlen(stat_path) + 1);
-		value = 1;
-		FS_set_para(handle, PRINT_MODE, &value, sizeof(value));
-		value = 1;
-		FS_set_para(handle, CREATE_THREAD, &value, sizeof(value));
-		value = 0;
-		FS_set_para(handle, METRIS_FORMAT, &value, sizeof(value));
-		value = 2;
-		FS_set_para(handle, STAT_CYCLE, &value, sizeof(value));
-		value = 4096;
-		FS_set_para(handle, MAX_STAT_FIELD_NUM, &value, sizeof(value));
-
-		FS_set_para(handle, STATS_SERVER_IP, "127.0.0.1", strlen("127.0.0.1"));
-		value = 8100;
-		FS_set_para(handle, STATS_SERVER_PORT, &value, sizeof(value));
-
-		//value=FS_OUTPUT_INFLUX_LINE;
-		value = FS_OUTPUT_STATSD;
-		FS_set_para(handle, STATS_FORMAT, &value, sizeof(value));
-
-		value = 1;
-		FS_set_para(handle, OUTPUT_PROMETHEUS, &value, sizeof(value));
-
-		const char *histogram_format = "0.1,0.5,0.8,0.9,0.95,0.99";
-		FS_set_para(handle, HISTOGRAM_GLOBAL_BINS, histogram_format, strlen(histogram_format) + 1);
-
-
-		for (i = 0; i < TEST_STATUS_NUM; i++)
-		{
-			snprintf(buff, sizeof(buff), "(status_%02d)/\\-,;%%$*", i);
-			status_ids[i] = FS_register(handle, FS_STYLE_STATUS, FS_CALC_CURRENT, buff);
-		}
-		for (i = 0; i < TEST_FIELD_NUM; i++)
-		{
-			snprintf(buff, sizeof(buff), "(field_%02d)", i);
-			field_ids[i] = FS_register(handle, FS_STYLE_FIELD, FS_CALC_CURRENT, buff);
-		}
-		for (i = 0; i < TEST_LINE_NUM; i++)
-		{
-			snprintf(buff, sizeof(buff), "line_%d", i);
-			line_ids[i] = FS_register(handle, FS_STYLE_LINE, FS_CALC_CURRENT, buff);
-		}
-		for (i = 0; i < TEST_COLUMN_NUM; i++)
-		{
-			snprintf(buff, sizeof(buff), "column_%d", i);
-			column_ids[i] = FS_register(handle, FS_STYLE_COLUMN, FS_CALC_SPEED, buff);
-		}
-		for (i = 0; i < TEST_HISTOGRAM_NUM; i++)
-		{
-			snprintf(buff, sizeof(buff), "{rpc_%d}", i);
-			if (i == 1)
-			{
-				histogram_ids[i] = FS_register_histogram(handle, FS_CALC_SPEED, buff, 1, 100000, 3);
-			}
-			else
-			{
-				histogram_ids[i] = FS_register_histogram(handle, FS_CALC_CURRENT, buff, 1, 100000, 3);
-			}
-		}
-		value = column_ids[2];
-		FS_set_para(handle, ID_INVISBLE, &value, sizeof(value));
-		snprintf(buff, sizeof(buff), "c0/c1");
-		FS_register_ratio(handle,
-				  column_ids[0],
-				  column_ids[1],
-				  1,
-				  FS_STYLE_COLUMN,
-				  FS_CALC_SPEED,
-				  buff);
-		value = line_ids[1];
-		FS_set_para(handle, NOT_SEND_METRIC_TO_SERVER, &value, sizeof(value));
-
-		FS_start(handle);
-		int thread_num=16;
-		pthread_t threads[thread_num];
-		struct thread_para para;
-		para.loops=10;
-		para.handle=handle;
-		for(i=0; i<thread_num; i++)
-		{
-			pthread_create(&(threads[i]), NULL, worker_thread, &para);
-		}
-		void *temp;
-		for(i=0; i<thread_num; i++)
-		{
-			pthread_join(threads[i], (void**)&temp);
-		}
-
-
-		FS_stop(&handle);
-		time_use = record_time_elapse_us(&start);
-		printf("fs2 stoped cnt = %d, cost %ld us, will sleep 1s\n", repeat_cnt, time_use);
-		sleep(1);
+		printf("set fieldstat app_name failed!\n");
 	}
-	printf("Start FS library destoryed ...\n");
-	FS_library_destroy();
-	printf("FS library destoryed, will sleep 30s\n");
-	sleep(30);
+
+	ret = fieldstat_set_local_output(test_instance, "./test.fs", "default");
+	if(ret == -1)
+	{
+		printf("set fieldstat local_outpud failed!\n");
+	}
+
+	ret = fieldstat_set_output_interval(test_instance, 5);
+	if(ret == -1)
+	{
+		printf("Set output_interval failed!\n");
+	}
+
+	ret = fieldstat_backgroud_thead_disable(test_instance);
+	if(ret == -1)
+	{
+		printf("Set backgroud thread disable failed!\n");
+	}
+
+	ret = fieldstat_set_line_protocol_server(test_instance, "127.0.0.1", 8001);
+	if(ret == -1)
+	{
+		printf("Failed to set line_protocol server\n");
+	}
+
+	ret = fieldstat_set_statsd_server(test_instance, "192.168.100.1", 8002);
+	if(ret == -1)
+	{
+		printf("Failed to set statsd_server!\n");
+	}
+
+	ret = fieldstat_prometheus_output_enable(test_instance);
+	if(ret == -1)
+	{
+		printf("Failed to set prometheus_output_enable!\n");
+	}
+
+	ret = fieldstat_register(test_instance, FIELD_TYPE_COUNTER, "metric_0", tag_key, tag_value, sizeof(tag_key)/sizeof(tag_key[0]));
+	if(ret == -1)
+	{
+		printf("Failed to register metric!\n");
+	}
+
+
+        ret = fieldstat_register(test_instance, FIELD_TYPE_COUNTER, "metric_1", tag_key, tag_value, sizeof(tag_key)/sizeof(tag_key[0]));
+        if(ret == -1)
+        {
+                printf("Failed to register metric!\n");
+        }
+	
+	ret = fieldstat_register(test_instance, FIELD_TYPE_GAUGE, "gauge_0",tag_key, tag_value, sizeof(tag_key)/sizeof(tag_key[0]));
+
+	fieldstat_instance_start(test_instance);
+	sleep(1);
+	fieldstat_passive_output(test_instance);
+	printf("Testing for fieldstat\n");
 	return 0;
 }
