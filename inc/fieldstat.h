@@ -52,6 +52,8 @@ struct fieldstat_instance
 		struct metric_t **column;
 		size_t column_size;
 	} table_metrics[NUM_MAX_TABLE];
+	int index_table[NUM_MAX_TABLE][1024];
+	int per_table_metric_number[NUM_MAX_TABLE];
 
 	int table_num;
 	int line_seq;

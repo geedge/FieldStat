@@ -117,9 +117,8 @@ int main(int argc, char *argv[])
 	{
 		printf("%d\n", id_list.id[i]);
 	}
-
+	
 	table_id = fieldstat_register_table(test_instance, table_type, field_list_0, sizeof(field_list_0)/sizeof(field_list_0[0]));
-	printf("%d\n",table_id);
 	if(table_id == -1)
 	{
 		printf("Failed to register metric table list_0\n");
@@ -131,7 +130,6 @@ int main(int argc, char *argv[])
 	{
 		printf("%d\n", id_list.id[i]);
 	}
-
 
 	fieldstat_instance_start(test_instance);
 	sleep(1);

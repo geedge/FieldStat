@@ -417,54 +417,91 @@ void append_line_protocol_line(struct fieldstat_instance *instance, const char* 
 	return;
 }
 
-
-
-int line_protocol_output(struct fieldstat_instance *instance)
+/*
+static int output_file_format_default_table(struct fieldstat_instance *instance)
 {
+	int i = 0, j = 0, k = 0;
 	metric_t *metric = NULL;
-	long long value=0;
-	int i=0,j=0;
+	long long value = 0;
+	//double ratio = 0.0;
+	struct metric_t **table_column = NULL;
+	size_t table_column_size = 0;
+
+	char* print_buf_append_position = print_buf;
+
+	int index_table[NUM_MAX_TABLE][1024];
+	int table_metric_number[NUM_MAX_TABLE];
+	memset(table_metric_number,0, sizeof(table_metric_number));
+	char *line_name = NULL;
+	int table_id = 0;
+	int per_table_counter = 0;
+	int metric_id = 0;
+
 	char field_set_buff[UDP_PAYLOAD_SIZE];
 	char tag_set_buff[UDP_PAYLOAD_SIZE];
-	char *line_name = NULL;
 
 	memset(field_set_buff, 0, sizeof(field_set_buff));
 	memset(tag_set_buff,  0, sizeof(tag_set_buff));
-	char *tag_set_buff_append = tag_set_buff;
+	char *tag_set_buff_append   = tag_set_buff;
+	char *field_set_buff_append = field_set_buff;
+	char *measurement = NULL;
 
 	for(i = 0; i < instance->metric_cnt; i++)
 	{
 		metric = instance->metric[i];
-		if(metric->is_ratio == 1)
-		{
-			continue;
-		}
-
 		if(metric->belong_to_table != 1)
 		{
 			continue;
 		}
-		value = get_metric_unit_val(metric, FS_CALC_CURRENT, 1);
-		if()
-		if(value != 0)
-		{
-			snprintf(field_set_buff, UDP_PAYLOAD_SIZE, "%s=%lld", metric->field_name, value);
-			tag_set_buff_append += snprintf(tag_set_buff_append, sizeof(tag_set_buff) - (tag_set_buff_append - tag_set_buff), ",app_name=%s", instance->app_name);
-			for(j = 0; j < (int)metric->n_tag; j++)
-			{
-				tag_set_buff_append += snprintf(tag_set_buff_append, sizeof(tag_set_buff) - (tag_set_buff_append - tag_set_buff), ",%s=%s", metric->tag_key[i],metric->tag_value[i]);
-			}
-			append_line_protocol_line(instance, metric->field_name, tag_set_buff, field_set_buff);
-			tag_set_buff_append = tag_set_buff;
-			
-		}
+		table_id = metric->table_id;
+		per_table_counter = table_metric_number[table_id]++;
+		index_table[table_id][per_table_counter] = i;
 	}
-	flush_line_protocol_metric(instance);
-	return 0;
+
+	for(i = 0; i < instance->table_num; i++)
+	{
+		if(table_metric_number[i] == 0)
+		{
+			continue;
+		}
+
+		table_column = instance->table_metrics[i].column;
+		table_column_size = instance->table_metrics[i].column_size;
+
+		for(j = 0; j < table_metric_number[i]; j++)
+		{
+			metric_id = index_table[i][j];
+			metric = instance->metric[metric_id];
+			if(line_name == NULL || strcmp(line_name, metric->field_name))
+			{
+				if(line_name != NULL)
+				{
+					append_line_protocol_line(instance, measurement, tag_set_buff, field_set_buff);
+				}
+				line_name = metric->field_name;
+				tag_set_buff_append += snprintf(tag_set_buff, sizeof(tag_set_buff) - (tag_set_buff_append - tag_set_buff), ",app_name=", instance->app_name);
+				for(j = 0; j < (int)metric->n_tag; j++)
+				{
+					tag_set_buff_append += snprintf(tag_set_buff_append, sizeof(tag_set_buff) - (tag_set_buff_append - tag_set_buff), ",%s=%s", metric->tag_key[i],metric->tag_value[i]);
+				}
+			}
+			if(metric->field_type == FIELD_TYPE_COUNTER)
+			{
+				value = get_metric_unit_val(metric, FS_CALC_SPEED, 1);
+			}
+			if(metric->field_type == FIELD_TYPE_GAUGE)
+			{
+				value = get_metric_unit_val(metric, FS_CALC_CURRENT, 1);
+			}
+			field_set_buff_append += snprintf(field_set_buff_append, sizeof(field_set_buff) - (field_set_buff_append - tag_set_buff), "%s=%lld,", metric->table_column_name, value);
+		}
+		
+		line_name = NULL;
+	}
+
+	return print_buf_append_position - print_buf;
 }
-
-
-
+*/
 
 int line_protocol_output(struct fieldstat_instance *instance)
 {
@@ -706,34 +743,13 @@ static int output_file_format_default_table(struct fieldstat_instance *instance,
 
 	char* print_buf_append_position = print_buf;
 
-	int index_table[NUM_MAX_TABLE][1024];
 	int table_metric_number[NUM_MAX_TABLE];
 	memset(table_metric_number,0, sizeof(table_metric_number));
-	char *line_name = NULL;
-	int table_id = 0;
-	int per_table_counter = 0;
 	int metric_id = 0;
 	char print_buf_tags[1024] = {0};
 
-	for(i = 0; i < instance->metric_cnt; i++)
-	{
-		metric = instance->metric[i];
-		if(metric->belong_to_table != 1)
-		{
-			continue;
-		}
-		table_id = metric->table_id;
-		per_table_counter = table_metric_number[table_id]++;
-		index_table[table_id][per_table_counter] = i;
-	}
-
 	for(i = 0; i < instance->table_num; i++)
 	{
-		if(table_metric_number[i] == 0)
-		{
-			continue;
-		}
-
 		table_column = instance->table_metrics[i].column;
 		table_column_size = instance->table_metrics[i].column_size;
 
@@ -742,22 +758,20 @@ static int output_file_format_default_table(struct fieldstat_instance *instance,
 		{
 			print_buf_append_position += snprintf(print_buf_append_position ,size - (print_buf_append_position - print_buf), "\t%10s", table_column[k]->field_name);			
 		}
-		for(j = 0; j < table_metric_number[i]; j++)
+
+		for(j = 0; j < instance->per_table_metric_number[i]; j++)
 		{
-			metric_id = index_table[i][j];
+			metric_id = instance->index_table[i][j];
 			metric = instance->metric[metric_id];
-			if(line_name == NULL || strcmp(line_name, metric->field_name))
+			if( (j + 1) % table_column_size == 1)
 			{
 				print_buf_tag_append_position(metric, print_buf_tags, sizeof(print_buf_tags));
 				print_buf_append_position += snprintf(print_buf_append_position, size - (print_buf_append_position - print_buf), "\n%s %-20s\t", metric->field_name,print_buf_tags);
-
-				line_name = metric->field_name;	
 			}
 			value = get_metric_unit_val(metric, FS_CALC_CURRENT, 0);
 			print_buf_append_position += snprintf(print_buf_append_position, size - (print_buf_append_position - print_buf), "%10lld\t", value);
 		}
 		print_buf_append_position += snprintf(print_buf_append_position,size - (print_buf_append_position - print_buf), "\n");
-		line_name = NULL;
 
 		if(print_buf_append_position - print_buf > 0)
 		{
@@ -768,7 +782,6 @@ static int output_file_format_default_table(struct fieldstat_instance *instance,
 			print_buf_append_position += snprintf(print_buf_append_position, size - (print_buf_append_position - print_buf), "\n%s\n", draw_line);
 		}
 	}
-
 	return print_buf_append_position - print_buf;
 }
 
@@ -940,6 +953,7 @@ struct metric_id_list fieldstat_register_table_metrics(struct fieldstat_instance
 	
 	int metric_id = 0;
 	int i = 0;
+	int per_table_metrics_num = 0;
 	struct metric_t * metric_choosen = NULL;
 	metric_t **table_column = instance->table_metrics[table_id].column;
 	int table_column_size = instance->table_metrics[table_id].column_size;
@@ -968,11 +982,14 @@ struct metric_id_list fieldstat_register_table_metrics(struct fieldstat_instance
 	//TODO not block
 	table_column = instance->table_metrics[table_id].column;
 
-	for(; i < table_column_size; i ++)
+	for( i = 0; i < table_column_size; i ++)
 	{	
 		metric_id = instance->metric_cnt++;
 		assert(instance->metric_cnt < instance->metric_size);
 		metric_choosen = instance->metric[metric_id] = metric_new(table_column[i]->field_type,field_name,tag_key,tag_value,n_tag);
+
+		per_table_metrics_num = instance->per_table_metric_number[table_id]++;
+		instance->index_table[table_id][per_table_metrics_num] = metric_id;
 
 		metric_choosen->table_id = table_id;
 		metric_choosen->belong_to_table = 1;
@@ -1005,6 +1022,7 @@ struct metric_id_list fieldstat_register_table_metrics(struct fieldstat_instance
 		if(table_column_size < TABLE_COLUMN_SIZE)
 		{
 			metric_id_list.id[metric_id_list.num ++] = metric_id;
+			printf("list_num:%d, metric_id:%d, name:%s\n",metric_id_list.num, metric_id, metric_choosen->field_name);
 		}
 
 	}
