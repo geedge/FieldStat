@@ -418,6 +418,54 @@ void append_line_protocol_line(struct fieldstat_instance *instance, const char* 
 }
 
 
+
+int line_protocol_output(struct fieldstat_instance *instance)
+{
+	metric_t *metric = NULL;
+	long long value=0;
+	int i=0,j=0;
+	char field_set_buff[UDP_PAYLOAD_SIZE];
+	char tag_set_buff[UDP_PAYLOAD_SIZE];
+	char *line_name = NULL;
+
+	memset(field_set_buff, 0, sizeof(field_set_buff));
+	memset(tag_set_buff,  0, sizeof(tag_set_buff));
+	char *tag_set_buff_append = tag_set_buff;
+
+	for(i = 0; i < instance->metric_cnt; i++)
+	{
+		metric = instance->metric[i];
+		if(metric->is_ratio == 1)
+		{
+			continue;
+		}
+
+		if(metric->belong_to_table != 1)
+		{
+			continue;
+		}
+		value = get_metric_unit_val(metric, FS_CALC_CURRENT, 1);
+		if()
+		if(value != 0)
+		{
+			snprintf(field_set_buff, UDP_PAYLOAD_SIZE, "%s=%lld", metric->field_name, value);
+			tag_set_buff_append += snprintf(tag_set_buff_append, sizeof(tag_set_buff) - (tag_set_buff_append - tag_set_buff), ",app_name=%s", instance->app_name);
+			for(j = 0; j < (int)metric->n_tag; j++)
+			{
+				tag_set_buff_append += snprintf(tag_set_buff_append, sizeof(tag_set_buff) - (tag_set_buff_append - tag_set_buff), ",%s=%s", metric->tag_key[i],metric->tag_value[i]);
+			}
+			append_line_protocol_line(instance, metric->field_name, tag_set_buff, field_set_buff);
+			tag_set_buff_append = tag_set_buff;
+			
+		}
+	}
+	flush_line_protocol_metric(instance);
+	return 0;
+}
+
+
+
+
 int line_protocol_output(struct fieldstat_instance *instance)
 {
 	metric_t *metric = NULL;
