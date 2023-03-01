@@ -409,7 +409,7 @@ void append_line_protocol_line(struct fieldstat_instance *instance, const char* 
 	{
 		flush_line_protocol_metric(instance);
 	}
-	//printf("Line_protocol metric: %s%s %s\n",measurement,tag_set,field_set);
+	printf("Line_protocol metric: %s%s %s\n",measurement,tag_set,field_set);
 	instance->line_protocol_send_buff_offset += snprintf(instance->line_protocol_send_buff + instance->line_protocol_send_buff_offset,
 														sizeof(instance->line_protocol_send_buff) - instance->line_protocol_send_buff_offset,
 														"%s%s %s\n",
@@ -503,11 +503,90 @@ static int output_file_format_default_table(struct fieldstat_instance *instance)
 }
 */
 
+static int output_line_protocol_tag_set_buf(metric_t *metric, char *tag_set_buff, unsigned int size)
+{
+	int i = 0;
+	char *tag_set_buff_append = tag_set_buff;
+	for(i = 0; i < (int)metric->n_tag; i++)
+	{
+		tag_set_buff_append += snprintf(tag_set_buff_append, size - (tag_set_buff_append - tag_set_buff), ",%s=%s", metric->tag_key[i],metric->tag_value[i]);
+	}
+	return tag_set_buff_append - tag_set_buff;
+}
+
+
+
+static void output_line_protocol_table(struct fieldstat_instance *instance)
+{
+	int i = 0, j = 0;
+	metric_t *metric = NULL;
+	long long value = 0;
+	//double ratio = 0.0;
+	size_t table_column_size = 0;
+
+	int table_metric_number[NUM_MAX_TABLE];
+	memset(table_metric_number,0, sizeof(table_metric_number));
+	int metric_id = 0;
+	char field_set_buff[UDP_PAYLOAD_SIZE];
+	char tag_set_buff[UDP_PAYLOAD_SIZE];
+
+	memset(field_set_buff, 0, sizeof(field_set_buff));
+	memset(tag_set_buff,  0, sizeof(tag_set_buff));
+	char *tag_set_buff_append = tag_set_buff;
+	char *field_set_buff_append = field_set_buff;
+
+
+	for(i = 0; i < instance->table_num; i++)
+	{
+		table_column_size = instance->table_metrics[i].column_size;
+
+		for(j = 0; j < instance->per_table_metric_number[i]; j++)
+		{
+			metric_id = instance->index_table[i][j];
+			metric = instance->metric[metric_id];
+
+			switch(metric->field_type)
+			{
+				case FIELD_TYPE_GAUGE:
+					value = get_metric_unit_val(metric, FS_CALC_CURRENT, 1);
+					break;
+				case FIELD_TYPE_COUNTER:
+					value = get_metric_unit_val(metric, FS_CALC_SPEED, 1);
+					break;
+				default:
+					break;
+			}
+
+			field_set_buff_append += snprintf(field_set_buff_append, sizeof(field_set_buff) - (field_set_buff - field_set_buff), "%s=%lld,", metric->table_column_name, value);
+
+			if((j + 1) % table_column_size == 0)  //per line edge
+			{
+				tag_set_buff_append += snprintf(tag_set_buff_append, sizeof(tag_set_buff) - (tag_set_buff_append - tag_set_buff), ",app_name=%s", instance->app_name);
+				output_line_protocol_tag_set_buf(metric, tag_set_buff_append, sizeof(tag_set_buff) - (tag_set_buff_append - tag_set_buff));
+				/*
+				for(k = 0; k < (int)metric->n_tag; k++)
+				{
+					tag_set_buff_append += snprintf(tag_set_buff_append, sizeof(tag_set_buff) - (tag_set_buff_append - tag_set_buff), ",%s=%s", metric->tag_key[i],metric->tag_value[i]);
+				}
+				*/
+
+				if(field_set_buff_append - field_set_buff > 0)
+				{
+					field_set_buff[field_set_buff_append - field_set_buff - 1] = '\0';
+				}
+				append_line_protocol_line(instance, metric->field_name, tag_set_buff, field_set_buff);
+				tag_set_buff_append = tag_set_buff;
+				field_set_buff_append = field_set_buff;
+			}
+		}
+	}
+}
+
 int line_protocol_output(struct fieldstat_instance *instance)
 {
 	metric_t *metric = NULL;
 	long long value=0;
-	int i=0,j=0;
+	int i=0;
 	char field_set_buff[UDP_PAYLOAD_SIZE];
 	char tag_set_buff[UDP_PAYLOAD_SIZE];
 
@@ -536,13 +615,16 @@ int line_protocol_output(struct fieldstat_instance *instance)
 				{
 					snprintf(field_set_buff, UDP_PAYLOAD_SIZE, "%s=%lld", metric->field_name, value);
 					tag_set_buff_append += snprintf(tag_set_buff_append, sizeof(tag_set_buff) - (tag_set_buff_append - tag_set_buff), ",app_name=%s", instance->app_name);
+					/*
 					for(j = 0; j < (int)metric->n_tag; j++)
 					{
 						tag_set_buff_append += snprintf(tag_set_buff_append, sizeof(tag_set_buff) - (tag_set_buff_append - tag_set_buff), ",%s=%s", metric->tag_key[i],metric->tag_value[i]);
 					}
+					*/
+					output_line_protocol_tag_set_buf(metric, tag_set_buff_append, sizeof(tag_set_buff) - (tag_set_buff_append - tag_set_buff));
 					append_line_protocol_line(instance, metric->field_name, tag_set_buff, field_set_buff);
 					tag_set_buff_append = tag_set_buff;
-					
+
 				}
 				break;
 			case FIELD_TYPE_COUNTER:
@@ -551,10 +633,13 @@ int line_protocol_output(struct fieldstat_instance *instance)
 				{
 					snprintf(field_set_buff, UDP_PAYLOAD_SIZE, "%s=%lld", metric->field_name, value);
 					tag_set_buff_append += snprintf(tag_set_buff_append, sizeof(tag_set_buff) - (tag_set_buff_append - tag_set_buff), ",app_name=%s", instance->app_name);
+					/*
 					for(j = 0; j < (int)metric->n_tag; j++)
 					{
 						tag_set_buff_append += snprintf(tag_set_buff_append, sizeof(tag_set_buff) - (tag_set_buff_append - tag_set_buff), ",%s=%s", metric->tag_key[i],metric->tag_value[i]);
 					}
+					*/
+					output_line_protocol_tag_set_buf(metric, tag_set_buff_append, sizeof(tag_set_buff) - (tag_set_buff_append - tag_set_buff));
 					append_line_protocol_line(instance, metric->field_name, tag_set_buff, field_set_buff);
 					tag_set_buff_append = tag_set_buff;
 				}
@@ -564,13 +649,12 @@ int line_protocol_output(struct fieldstat_instance *instance)
 
 		}
 	}
+
+	output_line_protocol_table(instance);
 	flush_line_protocol_metric(instance);
+
 	return 0;
 }
-
-
-
-
 
 static int print_buf_tag_append_position(metric_t *metric, char *print_buf_tags, unsigned int size)
 {
