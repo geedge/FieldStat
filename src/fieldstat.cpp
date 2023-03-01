@@ -49,6 +49,73 @@ static __attribute__((__used__)) const char * GIT_VERSION_UNKNOWN = NULL;
 #endif
 //endof Automatically generate the version number
 
+#define URL_MAX_LEN   2048
+#define LEN_IP_MAX     32  //?????? 32 from document 
+#define LEN_APP_NAME   32
+#define LEN_FORMAT_MAX 32
+#define LEN_PATH_MAX   256
+#define	NUM_MAX_TABLE	64
+#define TABLE_COLUMN_SIZE 32
+#define	UDP_PAYLOAD_SIZE 1460
+
+struct fieldstat_instance
+{
+	//char *statsd_server_ip;
+	char statsd_server_str_ip[LEN_IP_MAX];
+	unsigned int statsd_server_ip;
+	unsigned short statsd_server_port;
+	int statsd_output_enable;
+
+	char line_protocol_server_str_ip[LEN_IP_MAX];
+	unsigned int line_protocol_server_ip;
+	unsigned short line_protocol_server_port;
+	int line_protocol_output_enable;
+
+	char local_output_filename[LEN_PATH_MAX];
+	char local_output_format[LEN_FORMAT_MAX];
+	int local_output_enable;
+
+	int background_thread_disable;                 //default:1
+	int output_interval_s;                         //default:2
+	char app_name[LEN_APP_NAME];
+	int running;
+
+	int metric_cnt;
+	int metric_size;
+	struct metric_t **metric;
+	struct{
+		struct metric_t **column;
+		size_t column_size;
+	} table_metrics[NUM_MAX_TABLE];
+	int index_table[NUM_MAX_TABLE][1024];
+	int per_table_metric_number[NUM_MAX_TABLE];
+
+	int table_num;
+	int line_seq;
+
+	int prometheus_output_enable;
+
+	int counter_cnt;
+	int gauge_cnt;
+	int histogram_cnt;
+	int summary_cnt;
+
+	struct timespec last_output_time;
+
+	pthread_t cfg_mon_t;
+	char line_protocol_send_buff[UDP_PAYLOAD_SIZE];
+	size_t line_protocol_send_buff_offset;
+	int line_protocol_socket;
+
+	FILE* fp;
+};
+
+struct fieldstat_global_prometheus
+{
+	unsigned short port;
+	char *url_path;
+};
+
 const char* draw_line="________________________________________________________________________________________________________________________________________________";
 const char* draw_boundary="============================================================";
 
@@ -1103,10 +1170,9 @@ struct metric_id_list fieldstat_register_table_metrics(struct fieldstat_instance
 				assert(0);
 				break;
 		}
-		if(table_column_size < TABLE_COLUMN_SIZE)
+		if(table_column_size < (int)sizeof(metric_id_list.id))
 		{
-			metric_id_list.id[metric_id_list.num ++] = metric_id;
-			printf("list_num:%d, metric_id:%d, name:%s\n",metric_id_list.num, metric_id, metric_choosen->field_name);
+			metric_id_list.id[metric_id_list.count ++] = metric_id;
 		}
 
 	}

@@ -40,8 +40,8 @@ int main(int argc, char *argv[])
 	const char *tag_key4[] = {"A4","B4","C4"};
 	const char *tag_value4[] = {"a4","b4","c4"};
 
-	const char *tag_key5[] = {"A5","B5","C5"};
-	const char *tag_value5[] = {"a5","b5","c5"};
+	//const char *tag_key5[] = {"A5","B5","C5"};
+	//const char *tag_value5[] = {"a5","b5","c5"};
 
 	enum field_type table_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
 	const char *field_list[] = {"column_0", "colunm_1", "column_2"};
@@ -126,13 +126,13 @@ int main(int argc, char *argv[])
 	}
 
 	id_list = fieldstat_register_table_metrics(test_instance, table_id, "line_0", tag_key2, tag_value2, sizeof(tag_key2)/sizeof(tag_key2[0]));
-	for(i = 0; i < id_list.num; i++)
+	for(i = 0; i < id_list.count; i++)
 	{
 		printf("%d\n", id_list.id[i]);
 	}
 
 	id_list = fieldstat_register_table_metrics(test_instance, table_id, "line_2", tag_key3, tag_value3, sizeof(tag_key3)/sizeof(tag_key3[0]));
-	for(i = 0; i < id_list.num; i++)
+	for(i = 0; i < id_list.count; i++)
 	{
 		printf("%d\n", id_list.id[i]);
 	}
@@ -144,8 +144,8 @@ int main(int argc, char *argv[])
 	}
 
 	id_list = fieldstat_register_table_metrics(test_instance, table_id, "line_0", tag_key4, tag_value4, sizeof(tag_key4)/sizeof(tag_key4[0]));
-	printf("id_list.num:%d\n",id_list.num);
-	for(i = 0; i < id_list.num; i++)
+	printf("id_list.num:%d\n",id_list.count);
+	for(i = 0; i < id_list.count; i++)
 	{
 		printf("%d\n", id_list.id[i]);
 	}
