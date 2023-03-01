@@ -27,7 +27,7 @@ struct metric_id_list
  * @param url if NULL use "/metrics" default
  * */
 struct fieldstat_instance * fieldstat_instance_create(void);
-int fieldstat_global_enable_prometheus_endpoint(unsigned short listen_port, const char *url);  //TODO
+int fieldstat_global_enable_prometheus_endpoint(unsigned short listen_port, const char *url);
 int fieldstat_prometheus_output_enable(struct fieldstat_instance *instance);
 int fieldstat_set_statsd_server(struct fieldstat_instance *instance, const char *ip, unsigned short port);
 int fieldstat_set_line_protocol_server(struct fieldstat_instance *instance, const char *ip, unsigned short port);

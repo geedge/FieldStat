@@ -48,6 +48,8 @@ int main(int argc, char *argv[])
 	const char *field_list_0[] = {"c0", "c1", "c2"};
 	struct metric_id_list id_list; 
 
+	fieldstat_global_enable_prometheus_endpoint(9010, "/metrics");
+
 	test_instance = fieldstat_instance_create();
 	ret = fieldstat_set_app_name(test_instance, "test");
 	if(ret == -1)
@@ -154,5 +156,6 @@ int main(int argc, char *argv[])
 	sleep(1);
 	fieldstat_passive_output(test_instance);
 	printf("Testing for fieldstat\n");
+	sleep(10000);
 	return 0;
 }

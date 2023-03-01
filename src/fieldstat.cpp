@@ -3,6 +3,8 @@
 #include "threadsafe_counter.h"
 #include "hdr_histogram.h"
 #include "cJSON.h"
+#define HTTPSERVER_IMPL
+#include "httpserver.h"
 
 #include <sys/socket.h>//socket
 #include <sys/types.h>//socket
@@ -49,14 +51,18 @@ static __attribute__((__used__)) const char * GIT_VERSION_UNKNOWN = NULL;
 #endif
 //endof Automatically generate the version number
 
-#define URL_MAX_LEN   2048
-#define LEN_IP_MAX     32  //?????? 32 from document 
-#define LEN_APP_NAME   32
-#define LEN_FORMAT_MAX 32
-#define LEN_PATH_MAX   256
-#define	NUM_MAX_TABLE	64
-#define TABLE_COLUMN_SIZE 32
-#define	UDP_PAYLOAD_SIZE 1460
+#define URL_MAX_LEN			2048
+#define LEN_IP_MAX			32  //?????? 32 from document 
+#define LEN_APP_NAME		32
+#define LEN_FORMAT_MAX		32
+#define LEN_PATH_MAX		256
+#define	NUM_MAX_TABLE		64
+#define TABLE_COLUMN_SIZE	32
+#define	UDP_PAYLOAD_SIZE	1460
+#define	LEFT_MIN_BUFF_LEN	256
+#define	REALLOC_SCALE_SIZE	1024
+
+
 
 struct fieldstat_instance
 {
@@ -114,6 +120,24 @@ struct fieldstat_global_prometheus
 {
 	unsigned short port;
 	char *url_path;
+	pthread_t tid;
+	int running;
+	struct http_server_s *server_handle;
+	int output_instance_cnt;
+	struct fieldstat_instance **output_instance;
+	int output_instance_size;
+};
+
+struct fieldstat_global_prometheus g_fieldstat_global_prometheus = 
+{
+	9273,
+	NULL,
+	0,
+	0,
+	NULL,
+	0,
+	NULL,
+	REALLOC_SCALE_SIZE,
 };
 
 const char* draw_line="________________________________________________________________________________________________________________________________________________";
@@ -142,7 +166,38 @@ int is_valid_field_name(const char* name)
 	return 1;
 }
 
+static char* str_unescape(char* s, char *d, int d_len)
+{
+	int i=0,j=0;
+	int len=strlen(s);
+	for(i=0; i<len && j<d_len; i++)
+	{
+		if(s[i]=='(' || s[i]==')'  || s[i]=='{' || s[i]=='}' || 
+		   s[i]=='/' || s[i]=='\\' || s[i]=='%' || s[i]=='*' || 
+		   s[i]=='$' || s[i]=='-'  || s[i]==',' || s[i]==';')
+		{
+			if(i==0)
+			{
+				continue;
+			}
 
+			d[j++]='_';
+		}
+		else
+		{
+			d[j++]=s[i];
+		}
+	}
+
+	if(d[j-1]=='_')
+	{
+		j-=1;
+	}
+
+	d[j]='\0';
+	
+	return 0;
+}
 
 struct metric_t* metric_new(enum field_type type, const char *field_name, const char *tag_key[], const char *tag_value[], size_t n_tag)
 {
@@ -282,15 +337,6 @@ int fieldstat_backgroud_thead_disable(struct fieldstat_instance *instance)
 	return 0;
 }
 
-int fieldstat_prometheus_output_enable(struct fieldstat_instance *instance)
-{
-	if(instance->running == 1)
-	{
-		return -1;
-	}
-	instance->prometheus_output_enable = 1;
-	return 0;
-}
 
 int fieldstat_set_local_output(struct fieldstat_instance *instance, const char *filename, const char *format)
 {
@@ -1179,3 +1225,283 @@ struct metric_id_list fieldstat_register_table_metrics(struct fieldstat_instance
 
 	return metric_id_list;
 }
+
+
+/*
+* ret = -1, output not match fieldstat instance
+* ret >=0 && ret < instance_cnt  output sepecify fieldstat instance 
+* ret = instance_cnt output all fieldstat instance
+*/
+static int prometheus_get_output_instance_id(struct fieldstat_global_prometheus *global_prometheus_output, char *uri, int uri_len)
+{
+	int i = 0;
+
+	if(uri_len == (int)strlen(global_prometheus_output->url_path) && 
+	         0 == memcmp(uri, global_prometheus_output->url_path, strlen(global_prometheus_output->url_path)))
+	{		
+		return global_prometheus_output->output_instance_cnt;
+	}
+	
+	for( i = 0; i < global_prometheus_output->output_instance_cnt; i++)
+	{
+		if(uri_len - 1 == (int)strlen(global_prometheus_output->output_instance[i]->app_name) && 
+					 0 == memcmp( uri + 1, global_prometheus_output->output_instance[i]->app_name, strlen(global_prometheus_output->output_instance[i]->app_name)))
+		{
+			return i;
+		}
+	}
+	return -1;
+}
+
+static void prometheus_output_uri_list(struct fieldstat_global_prometheus *prometheus_output,struct http_request_s* request)
+{
+	int i = 0;
+	int payload_len = 0;
+	char *payload = NULL;
+	char *payload_append_position = NULL;
+	struct fieldstat_instance  **output_instance = NULL;
+	struct http_response_s* response = NULL;
+
+	output_instance = prometheus_output->output_instance;
+	
+
+	payload_len = prometheus_output->output_instance_cnt * 128;
+	payload_append_position = payload = (char *)calloc(1,payload_len);
+	
+	payload_append_position += snprintf(payload_append_position, payload_len - (payload_append_position - payload),"url_path:\n\t%s\n", prometheus_output->url_path);
+
+	for(i = 0; i < prometheus_output->output_instance_cnt; i++)
+	{
+		payload_append_position += snprintf(payload_append_position, payload_len - (payload_append_position - payload),"\t/%s\n", output_instance[i]->app_name);
+	}
+
+	response = http_response_init();
+	http_response_status(response, 404);
+	http_response_header(response, "Content-Type", "text/plain; charset=utf-8");
+	http_response_body(response, payload, strlen(payload));
+	http_respond(request, response);
+	
+	free(payload);
+	payload=NULL;
+	return;
+}
+
+static int prometheus_output_get_metric_tags(struct metric_t *metric, char *tags_buff, unsigned int size, char *instance_app_name)
+{
+	int i = 0;
+	char unescape[256] = {0};
+	char *tags_buff_append_position = tags_buff;
+	
+	tags_buff_append_position += snprintf(tags_buff_append_position, size - (tags_buff_append_position - tags_buff), "app_name=\"%s\"", instance_app_name);
+
+	if(metric->belong_to_table == 1)
+	{
+		tags_buff_append_position += snprintf(tags_buff_append_position, size - (tags_buff_append_position - tags_buff), ",line_name=\"%s\"", metric->field_name);
+	}
+
+	for(i = 0; i < (int)metric->n_tag; i++)
+	{
+		memset(unescape, 0, sizeof(unescape));
+		str_unescape(metric->tag_key[i], unescape, sizeof(unescape));
+		tags_buff_append_position += snprintf(tags_buff_append_position, size - (tags_buff_append_position - tags_buff), ",%s=\"%s\"", unescape, metric->tag_value[i]);
+	}
+	return tags_buff_append_position - tags_buff;
+}
+
+
+static int prometheus_output_get_metric_name(struct metric_t *metric, char *name_buff, unsigned int size, char *instance_app_name)
+{
+	char unescape[256] = {0};
+	char *name_buff_append_position = name_buff;
+	
+	if(metric->belong_to_table == 1)
+	{
+		str_unescape(metric->table_column_name, unescape, sizeof(unescape));
+	}
+	else
+	{
+		str_unescape(metric->field_name, unescape, sizeof(unescape));
+	}
+	name_buff_append_position += snprintf(name_buff_append_position, size - (name_buff_append_position - name_buff), "%s_%s", instance_app_name, unescape);
+
+	return name_buff_append_position - name_buff;
+}
+
+
+static int prometheus_get_instance_metric_playload(struct fieldstat_instance *instance, char **payload, int *payload_size, int offset)
+{
+	int i = 0;
+	struct metric_t *metric = NULL;
+	long long value = 0;
+	char metric_name[256] = {0};  //match the regex [a-zA-Z_:][a-zA-Z0-9_:]*
+	char app_name[256] = {0};
+	char metric_tags[1024] = {0};   //label name match the regex [a-zA-Z_:][a-zA-Z0-9_:]* 
+	int append_offset = offset;
+
+	if(instance == NULL || instance->running != 1)
+	{
+		return -1;
+	}
+	if(payload == NULL)
+	{
+		return -1;
+	}
+
+
+	str_unescape(instance->app_name, app_name, sizeof(app_name));
+
+	for(i = 0; i < instance->metric_cnt; i++)
+	{
+		metric = instance->metric[i];
+
+		if(metric->is_ratio == 1)
+		{
+			continue;
+		}
+		if(metric->is_invisible == 1)
+		{
+			continue;
+		}
+
+		//relloc
+		//type = [counter, gauge]
+		if( *payload_size - append_offset <= LEFT_MIN_BUFF_LEN)
+		{
+			*payload_size += REALLOC_SCALE_SIZE;
+			*payload = (char *)realloc(*payload, *payload_size);
+		}
+
+		switch(metric->field_type)
+		{
+			case FIELD_TYPE_COUNTER:
+			case FIELD_TYPE_GAUGE:
+				value = get_metric_unit_val(metric, FS_CALC_CURRENT, 1);
+				prometheus_output_get_metric_name(metric, metric_name, sizeof(metric_name), app_name);
+				prometheus_output_get_metric_tags(metric, metric_tags, sizeof(metric_tags), app_name);
+
+				append_offset += snprintf(*payload + append_offset, *payload_size - append_offset,
+													"%s{%s} %llu\n", metric_name, metric_tags, value);
+				break;
+			case FIELD_TYPE_SUMMARY:
+			case FILED_TYPE_HISTOGRAM:
+			default:
+				break;
+		}
+	}
+	return append_offset;
+
+}
+
+static void prometheus_output_instance_metric(struct fieldstat_global_prometheus *prometheus_output, struct http_request_s* request, int output_instance_id)
+{
+	int i = 0;
+	int payload_size = 0;
+	int payload_offset = 0;
+	char *payload = NULL;
+	struct fieldstat_instance *instance = NULL;
+	struct http_response_s* response = NULL;
+
+	if(output_instance_id == prometheus_output->output_instance_cnt)
+	{
+		for(i = 0; i < prometheus_output->output_instance_cnt; i++)
+		{
+			instance = prometheus_output->output_instance[i];
+			payload_offset = prometheus_get_instance_metric_playload(instance, &payload, &payload_size, payload_offset);				
+		}
+	}
+	else
+	{
+		instance = prometheus_output->output_instance[output_instance_id];
+		payload_offset = prometheus_get_instance_metric_playload(instance, &payload, &payload_size, payload_offset);	
+	}
+
+	if(payload != NULL)
+	{	
+		response = http_response_init();
+		http_response_status(response, 200);
+		http_response_header(response, "Content-Type", "text/plain; charset=utf-8");
+		http_response_body(response, payload, strlen(payload));
+		http_respond(request, response);
+	
+		free(payload);
+		payload=NULL;
+	}
+
+}
+
+
+static void fieldstat_global_prometheus_output(struct http_request_s* request)
+{
+	struct http_string_s uri;
+	struct fieldstat_global_prometheus *prometheus_output = NULL;
+	int prometheus_output_instance_id = -1;	
+
+	prometheus_output = &g_fieldstat_global_prometheus;
+	uri = http_request_target(request);
+	prometheus_output_instance_id = prometheus_get_output_instance_id(prometheus_output, (char *)uri.buf, uri.len);
+
+	if(prometheus_output_instance_id == -1)
+	{
+		prometheus_output_uri_list(prometheus_output, request);
+		return;
+	}
+	else
+	{
+		prometheus_output_instance_metric(prometheus_output, request, prometheus_output_instance_id);
+	}
+	return;
+}
+
+
+void *fieldstat_global_promethues_listen(void *arg)
+{
+	struct fieldstat_global_prometheus *global_prometheus = (struct fieldstat_global_prometheus *)arg;
+
+	if(global_prometheus != NULL)
+	{
+		global_prometheus->server_handle = http_server_init(global_prometheus->port , fieldstat_global_prometheus_output);
+		http_server_listen(global_prometheus->server_handle);
+	}
+
+	return NULL;
+} 
+
+
+int fieldstat_global_enable_prometheus_endpoint(unsigned short listen_port, const char *url)
+{
+	if(url == NULL)
+	{
+		g_fieldstat_global_prometheus.url_path = (char *)calloc(strlen((char *)"/metrics")+1, 1);
+		memcpy(g_fieldstat_global_prometheus.url_path, (char *)"/metrics", strlen((char *)"/metrics"));
+	}
+
+	g_fieldstat_global_prometheus.port = listen_port;
+	g_fieldstat_global_prometheus.url_path = strdup(url);
+	g_fieldstat_global_prometheus.running = 1;
+	g_fieldstat_global_prometheus.output_instance = (struct fieldstat_instance **)calloc( sizeof(struct fieldstat_instance *), g_fieldstat_global_prometheus.output_instance_size);
+
+	pthread_create(&g_fieldstat_global_prometheus.tid, NULL, fieldstat_global_promethues_listen, (void *)&g_fieldstat_global_prometheus);
+	return 0;
+}
+
+
+int fieldstat_prometheus_output_enable(struct fieldstat_instance *instance)
+{
+	int i = 0;
+
+	if(g_fieldstat_global_prometheus.running != 1)
+	{
+		return -1;
+	}
+
+	if(g_fieldstat_global_prometheus.output_instance_cnt >= g_fieldstat_global_prometheus.output_instance_size)
+	{
+		g_fieldstat_global_prometheus.output_instance_size += REALLOC_SCALE_SIZE;
+		g_fieldstat_global_prometheus.output_instance = (struct fieldstat_instance **)realloc(g_fieldstat_global_prometheus.output_instance, g_fieldstat_global_prometheus.output_instance_size);
+	}
+
+	i = g_fieldstat_global_prometheus.output_instance_cnt++;
+	g_fieldstat_global_prometheus.output_instance[i] = instance;
+	return 0;
+}
+
