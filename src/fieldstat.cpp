@@ -61,8 +61,7 @@ static __attribute__((__used__)) const char * GIT_VERSION_UNKNOWN = NULL;
 #define	UDP_PAYLOAD_SIZE	1460
 #define	LEFT_MIN_BUFF_LEN	256
 #define	REALLOC_SCALE_SIZE	1024
-
-
+#define MAX_STR_LEN32		32
 
 struct fieldstat_instance
 {
@@ -116,19 +115,19 @@ struct fieldstat_instance
 	FILE* fp;
 };
 
-struct fieldstat_global_prometheus
+struct prometheus_endpoint_instance
 {
 	unsigned short port;
 	char *url_path;
 	pthread_t tid;
 	int running;
 	struct http_server_s *server_handle;
-	int output_instance_cnt;
-	struct fieldstat_instance **output_instance;
-	int output_instance_size;
+	int fs_instance_cnt;
+	struct fieldstat_instance **fs_instance; //TO refactor
+	int fs_instance_size;                    // number
 };
 
-struct fieldstat_global_prometheus g_fieldstat_global_prometheus = 
+struct prometheus_endpoint_instance g_prometheus_endpoint_instance = 
 {
 	9273,
 	NULL,
@@ -1232,20 +1231,20 @@ struct metric_id_list fieldstat_register_table_metrics(struct fieldstat_instance
 * ret >=0 && ret < instance_cnt  output sepecify fieldstat instance 
 * ret = instance_cnt output all fieldstat instance
 */
-static int prometheus_get_output_instance_id(struct fieldstat_global_prometheus *global_prometheus_output, char *uri, int uri_len)
+static int prometheus_get_fs_instance_id(struct prometheus_endpoint_instance *global_prometheus_output, char *uri, int uri_len)
 {
 	int i = 0;
 
 	if(uri_len == (int)strlen(global_prometheus_output->url_path) && 
 	         0 == memcmp(uri, global_prometheus_output->url_path, strlen(global_prometheus_output->url_path)))
 	{		
-		return global_prometheus_output->output_instance_cnt;
+		return global_prometheus_output->fs_instance_cnt;
 	}
 	
-	for( i = 0; i < global_prometheus_output->output_instance_cnt; i++)
+	for( i = 0; i < global_prometheus_output->fs_instance_cnt; i++)
 	{
-		if(uri_len - 1 == (int)strlen(global_prometheus_output->output_instance[i]->app_name) && 
-					 0 == memcmp( uri + 1, global_prometheus_output->output_instance[i]->app_name, strlen(global_prometheus_output->output_instance[i]->app_name)))
+		if(uri_len - 1 == (int)strlen(global_prometheus_output->fs_instance[i]->app_name) && 
+					 0 == memcmp( uri + 1, global_prometheus_output->fs_instance[i]->app_name, strlen(global_prometheus_output->fs_instance[i]->app_name)))
 		{
 			return i;
 		}
@@ -1253,26 +1252,26 @@ static int prometheus_get_output_instance_id(struct fieldstat_global_prometheus 
 	return -1;
 }
 
-static void prometheus_output_uri_list(struct fieldstat_global_prometheus *prometheus_output,struct http_request_s* request)
+static void prometheus_output_uri_list(struct prometheus_endpoint_instance *prometheus_output,struct http_request_s* request)
 {
 	int i = 0;
 	int payload_len = 0;
 	char *payload = NULL;
 	char *payload_append_position = NULL;
-	struct fieldstat_instance  **output_instance = NULL;
+	struct fieldstat_instance **fs_instance = NULL;
 	struct http_response_s* response = NULL;
 
-	output_instance = prometheus_output->output_instance;
+	fs_instance = prometheus_output->fs_instance;
 	
 
-	payload_len = prometheus_output->output_instance_cnt * 128;
+	payload_len = prometheus_output->fs_instance_cnt * 128; //TODO using marco, len?
 	payload_append_position = payload = (char *)calloc(1,payload_len);
 	
 	payload_append_position += snprintf(payload_append_position, payload_len - (payload_append_position - payload),"url_path:\n\t%s\n", prometheus_output->url_path);
 
-	for(i = 0; i < prometheus_output->output_instance_cnt; i++)
+	for(i = 0; i < prometheus_output->fs_instance_cnt; i++)
 	{
-		payload_append_position += snprintf(payload_append_position, payload_len - (payload_append_position - payload),"\t/%s\n", output_instance[i]->app_name);
+		payload_append_position += snprintf(payload_append_position, payload_len - (payload_append_position - payload),"\t/%s\n", fs_instance[i]->app_name);
 	}
 
 	response = http_response_init();
@@ -1333,8 +1332,8 @@ static int prometheus_get_instance_metric_playload(struct fieldstat_instance *in
 	int i = 0;
 	struct metric_t *metric = NULL;
 	long long value = 0;
-	char metric_name[256] = {0};  //match the regex [a-zA-Z_:][a-zA-Z0-9_:]*
-	char app_name[256] = {0};
+	char metric_name[256] = {0};  //need to macro  match the regex [a-zA-Z_:][a-zA-Z0-9_:]*
+	char app_name[256] = {0};       //using macro
 	char metric_tags[1024] = {0};   //label name match the regex [a-zA-Z_:][a-zA-Z0-9_:]* 
 	int append_offset = offset;
 
@@ -1376,12 +1375,11 @@ static int prometheus_get_instance_metric_playload(struct fieldstat_instance *in
 			case FIELD_TYPE_COUNTER:
 			case FIELD_TYPE_GAUGE:
 				value = get_metric_unit_val(metric, FS_CALC_CURRENT, 1);
-				prometheus_output_get_metric_name(metric, metric_name, sizeof(metric_name), app_name);
-				prometheus_output_get_metric_tags(metric, metric_tags, sizeof(metric_tags), app_name);
+				prometheus_output_get_metric_name(metric, metric_name, sizeof(metric_name), app_name);    //TODO refactor
+				prometheus_output_get_metric_tags(metric, metric_tags, sizeof(metric_tags), app_name);    //TODO refactor
 
 				append_offset += snprintf(*payload + append_offset, *payload_size - append_offset,
 													"%s{%s} %llu\n", metric_name, metric_tags, value);
-				break;
 			case FIELD_TYPE_SUMMARY:
 			case FILED_TYPE_HISTOGRAM:
 			default:
@@ -1392,7 +1390,7 @@ static int prometheus_get_instance_metric_playload(struct fieldstat_instance *in
 
 }
 
-static void prometheus_output_instance_metric(struct fieldstat_global_prometheus *prometheus_output, struct http_request_s* request, int output_instance_id)
+static void prometheus_output_instance_metric(struct prometheus_endpoint_instance *prometheus_output, struct http_request_s* request, int fs_instance_id)
 {
 	int i = 0;
 	int payload_size = 0;
@@ -1401,17 +1399,17 @@ static void prometheus_output_instance_metric(struct fieldstat_global_prometheus
 	struct fieldstat_instance *instance = NULL;
 	struct http_response_s* response = NULL;
 
-	if(output_instance_id == prometheus_output->output_instance_cnt)
+	if(fs_instance_id == prometheus_output->fs_instance_cnt)
 	{
-		for(i = 0; i < prometheus_output->output_instance_cnt; i++)
+		for(i = 0; i < prometheus_output->fs_instance_cnt; i++)
 		{
-			instance = prometheus_output->output_instance[i];
+			instance = prometheus_output->fs_instance[i];
 			payload_offset = prometheus_get_instance_metric_playload(instance, &payload, &payload_size, payload_offset);				
 		}
 	}
 	else
 	{
-		instance = prometheus_output->output_instance[output_instance_id];
+		instance = prometheus_output->fs_instance[fs_instance_id];
 		payload_offset = prometheus_get_instance_metric_playload(instance, &payload, &payload_size, payload_offset);	
 	}
 
@@ -1430,36 +1428,36 @@ static void prometheus_output_instance_metric(struct fieldstat_global_prometheus
 }
 
 
-static void fieldstat_global_prometheus_output(struct http_request_s* request)
+static void prometheus_endpoint_instance_output(struct http_request_s* request)
 {
 	struct http_string_s uri;
-	struct fieldstat_global_prometheus *prometheus_output = NULL;
-	int prometheus_output_instance_id = -1;	
+	struct prometheus_endpoint_instance *prometheus_instance = NULL;
+	int fs_instance_idx = -1;	
 
-	prometheus_output = &g_fieldstat_global_prometheus;
+	prometheus_instance = &g_prometheus_endpoint_instance;
 	uri = http_request_target(request);
-	prometheus_output_instance_id = prometheus_get_output_instance_id(prometheus_output, (char *)uri.buf, uri.len);
+	fs_instance_idx = prometheus_get_fs_instance_id(prometheus_instance, (char *)uri.buf, uri.len);
 
-	if(prometheus_output_instance_id == -1)
+	if(fs_instance_idx == -1)
 	{
-		prometheus_output_uri_list(prometheus_output, request);
+		prometheus_output_uri_list(prometheus_instance, request);
 		return;
 	}
 	else
 	{
-		prometheus_output_instance_metric(prometheus_output, request, prometheus_output_instance_id);
+		prometheus_output_instance_metric(prometheus_instance, request, fs_instance_idx);
 	}
 	return;
 }
 
 
-void *fieldstat_global_promethues_listen(void *arg)
+void *prometheus_endpoin_listen(void *arg)
 {
-	struct fieldstat_global_prometheus *global_prometheus = (struct fieldstat_global_prometheus *)arg;
+	struct prometheus_endpoint_instance *global_prometheus = (struct prometheus_endpoint_instance *)arg;
 
 	if(global_prometheus != NULL)
 	{
-		global_prometheus->server_handle = http_server_init(global_prometheus->port , fieldstat_global_prometheus_output);
+		global_prometheus->server_handle = http_server_init(global_prometheus->port , prometheus_endpoint_instance_output);
 		http_server_listen(global_prometheus->server_handle);
 	}
 
@@ -1471,37 +1469,38 @@ int fieldstat_global_enable_prometheus_endpoint(unsigned short listen_port, cons
 {
 	if(url == NULL)
 	{
-		g_fieldstat_global_prometheus.url_path = (char *)calloc(strlen((char *)"/metrics")+1, 1);
-		memcpy(g_fieldstat_global_prometheus.url_path, (char *)"/metrics", strlen((char *)"/metrics"));
+		g_prometheus_endpoint_instance.url_path = (char *)calloc(strlen((char *)"/metrics")+1, 1);
+		memcpy(g_prometheus_endpoint_instance.url_path, (char *)"/metrics", strlen((char *)"/metrics"));
 	}
 
-	g_fieldstat_global_prometheus.port = listen_port;
-	g_fieldstat_global_prometheus.url_path = strdup(url);
-	g_fieldstat_global_prometheus.running = 1;
-	g_fieldstat_global_prometheus.output_instance = (struct fieldstat_instance **)calloc( sizeof(struct fieldstat_instance *), g_fieldstat_global_prometheus.output_instance_size);
+	g_prometheus_endpoint_instance.port = listen_port;
+	g_prometheus_endpoint_instance.url_path = strdup(url);
+	g_prometheus_endpoint_instance.running = 1;
+	g_prometheus_endpoint_instance.fs_instance = (struct fieldstat_instance **)calloc( sizeof(struct fieldstat_instance *), g_prometheus_endpoint_instance.fs_instance_size);
 
-	pthread_create(&g_fieldstat_global_prometheus.tid, NULL, fieldstat_global_promethues_listen, (void *)&g_fieldstat_global_prometheus);
+	pthread_create(&g_prometheus_endpoint_instance.tid, NULL, prometheus_endpoin_listen, (void *)&g_prometheus_endpoint_instance);
 	return 0;
 }
 
 
-int fieldstat_prometheus_output_enable(struct fieldstat_instance *instance)
+int fieldstat_set_prometheus_output(struct fieldstat_instance *instance) //TODO 
 {
 	int i = 0;
 
-	if(g_fieldstat_global_prometheus.running != 1)
+	if(g_prometheus_endpoint_instance.running != 1)
 	{
 		return -1;
 	}
 
-	if(g_fieldstat_global_prometheus.output_instance_cnt >= g_fieldstat_global_prometheus.output_instance_size)
+	if(g_prometheus_endpoint_instance.fs_instance_cnt >= g_prometheus_endpoint_instance.fs_instance_size)
 	{
-		g_fieldstat_global_prometheus.output_instance_size += REALLOC_SCALE_SIZE;
-		g_fieldstat_global_prometheus.output_instance = (struct fieldstat_instance **)realloc(g_fieldstat_global_prometheus.output_instance, g_fieldstat_global_prometheus.output_instance_size);
+		g_prometheus_endpoint_instance.fs_instance_size += REALLOC_SCALE_SIZE;
+		g_prometheus_endpoint_instance.fs_instance = (struct fieldstat_instance **)realloc(g_prometheus_endpoint_instance.fs_instance, g_prometheus_endpoint_instance.fs_instance_size);
 	}
 
-	i = g_fieldstat_global_prometheus.output_instance_cnt++;
-	g_fieldstat_global_prometheus.output_instance[i] = instance;
+	i = g_prometheus_endpoint_instance.fs_instance_cnt++;
+	g_prometheus_endpoint_instance.fs_instance[i] = instance;
 	return 0;
 }
+
 

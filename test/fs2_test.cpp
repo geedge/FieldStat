@@ -87,7 +87,7 @@ int main(int argc, char *argv[])
 		printf("Failed to set statsd_server!\n");
 	}
 
-	ret = fieldstat_prometheus_output_enable(test_instance);
+	ret = fieldstat_set_prometheus_output(test_instance);
 	if(ret == -1)
 	{
 		printf("Failed to set prometheus_output_enable!\n");
@@ -159,3 +159,4 @@ int main(int argc, char *argv[])
 	sleep(10000);
 	return 0;
 }
+

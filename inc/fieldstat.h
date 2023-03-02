@@ -14,12 +14,11 @@ enum field_type
 	FIELD_TYPE_SUMMARY
 };
 
-struct fieldstat_global_prometheus;
 struct fieldstat_instance;
 struct metric_id_list
 {
 	int count;
-	int id[64];
+	int id[64];  // define marco
 };
 
 /*
@@ -28,13 +27,13 @@ struct metric_id_list
  * */
 struct fieldstat_instance * fieldstat_instance_create(void);
 int fieldstat_global_enable_prometheus_endpoint(unsigned short listen_port, const char *url);
-int fieldstat_prometheus_output_enable(struct fieldstat_instance *instance);
+int fieldstat_set_prometheus_output(struct fieldstat_instance *instance);
 int fieldstat_set_statsd_server(struct fieldstat_instance *instance, const char *ip, unsigned short port);
 int fieldstat_set_line_protocol_server(struct fieldstat_instance *instance, const char *ip, unsigned short port);
 int fieldstat_set_local_output(struct fieldstat_instance *instance, const char *filename, const char *format);//format could be "json" or "default"
 int fieldstat_backgroud_thead_disable(struct fieldstat_instance *instance);
 int fieldstat_set_output_interval(struct fieldstat_instance *instance, int seconds);//default is 2 seconds
-int fieldstat_set_app_name(struct fieldstat_instance *instance, const char *app_name);
+int fieldstat_set_app_name(struct fieldstat_instance *instance, const char *app_name); //app_name must set delete
 
 
 /*
