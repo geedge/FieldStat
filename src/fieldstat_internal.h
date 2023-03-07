@@ -23,7 +23,9 @@
 
 
 #define N_TAG_MAX				32
-#define	NUM_INIT_METRICS		1024
+#define	NUM_INIT_METRICS		1024*16
+#define	BLOCK_LIST_SIZE			1024*16
+
 
 enum field_calc_algo
 {
