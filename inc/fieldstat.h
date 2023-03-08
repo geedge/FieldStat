@@ -54,11 +54,26 @@ struct metric_id_list fieldstat_register_table_metrics(struct fieldstat_instance
 
 
 int fieldstat_value_incrby(struct fieldstat_instance *instance, int field_id, long long increment);
-int fieldstat_value_set(struct fieldstat_instance *instance, int field_id, long long increment);
+int fieldstat_value_set(struct fieldstat_instance *instance, int field_id, long long retain);
 int fieldstat_value_decrby(struct fieldstat_instance *instance, int field_id, long long decrment);
 
 void fieldstat_instance_start(struct fieldstat_instance *instance);
 void fieldstat_passive_output(struct fieldstat_instance *instance);
+
+/**
+ * @param instance fieldstat instance
+ * @param type field type
+ * @param field_name  field name
+ * @param tag_key     the array of tag key
+ * @param tag_value   the array of tag value
+ * @param n_tag       the number of tags
+ * @param quantiles   the quantiles of summary output
+ * @return metric id: -1 is failed,  > 0 is success
+ * the output.
+ */
+int fieldstat_register_histogram(struct fieldstat_instance *instance, enum field_type type, const char *field_name, const char *tag_key[], const char *tag_value[], size_t n_tag, 
+		const char * bins,const long long lowest_trackable_value,long long highest_trackable_value,int significant_figures);
+
 #ifdef __cplusplus
 }
 #endif

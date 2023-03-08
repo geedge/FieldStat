@@ -22,6 +22,7 @@ int main(int argc, char *argv[])
 {
 	int ret = 0;
 	int i = 0;
+	char buff[128];
 	struct fieldstat_instance * test_instance = NULL;
 	const char *tag_key[] = {"A","B","C"};
 	const char *tag_value[] = {"a","b","c"};
@@ -100,23 +101,27 @@ int main(int argc, char *argv[])
 		printf("Failed to register metric!\n");
 	}
 
+	fieldstat_value_set(test_instance, ret, 1);
+
 	ret = fieldstat_register(test_instance, FIELD_TYPE_COUNTER, "metric_1", tag_key0, tag_value0, sizeof(tag_key0)/sizeof(tag_key0[0]));
 	if(ret == -1)
 	{
 		printf("Failed to register metric!\n");
 	}
-	
+	fieldstat_value_set(test_instance, ret, 2);
 	ret = fieldstat_register(test_instance, FIELD_TYPE_GAUGE, "gauge_0",tag_key1, tag_value1, sizeof(tag_key1)/sizeof(tag_key1[0]));
 	if(ret == -1)
 	{
 		printf("Failed to register metric gauge_0\n");
 	}
-
+	fieldstat_value_set(test_instance, ret, 9999);
 	ret = fieldstat_register(test_instance, FIELD_TYPE_GAUGE, "gauge_0_tag", NULL, NULL, 0);
 	if(ret == -1)
 	{
 		printf("Failed to register metric gauge_0_tag\n");
 	}
+	//fieldstat_value_set(test_instance, ret, 1111);
+	fieldstat_value_decrby(test_instance, ret, 22);
 /*
 	enum field_type table_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
 	const char *field_list[] = {"column_0", "colunm_1", "column_2"};
@@ -131,12 +136,14 @@ int main(int argc, char *argv[])
 	id_list = fieldstat_register_table_metrics(test_instance, table_id, "line_0", tag_key2, tag_value2, sizeof(tag_key2)/sizeof(tag_key2[0]));
 	for(i = 0; i < id_list.count; i++)
 	{
+		fieldstat_value_set(test_instance, id_list.id[i], 100 + i);
 		printf("%d\n", id_list.id[i]);
 	}
 
 	id_list = fieldstat_register_table_metrics(test_instance, table_id, "line_2", tag_key3, tag_value3, sizeof(tag_key3)/sizeof(tag_key3[0]));
 	for(i = 0; i < id_list.count; i++)
 	{
+		fieldstat_value_set(test_instance,id_list.id[i], 1000 + i);
 		printf("%d\n", id_list.id[i]);
 	}
 	
@@ -150,10 +157,48 @@ int main(int argc, char *argv[])
 	printf("id_list.num:%d\n",id_list.count);
 	for(i = 0; i < id_list.count; i++)
 	{
+		fieldstat_value_set(test_instance,id_list.id[i], 2000 + i);
 		printf("%d\n", id_list.id[i]);
 	}
 
+
+	for (i = 0; i < TEST_HISTOGRAM_NUM; i++)
+	{
+		snprintf(buff, sizeof(buff), "{rpc_%d}", i);
+		if (i < 2)
+		{
+			fieldstat_register_histogram(test_instance, FIELD_TYPE_SUMMARY, buff, NULL, NULL, 0, 
+			"0.1,0.5,0.8,0.9,0.95,0.99",1,10000,3);
+			//histogram_ids[i] = FS_register_histogram(handle, FS_CALC_SPEED, buff, 1, 100000, 3);
+		}
+		else
+		{
+			fieldstat_register_histogram(test_instance, FILED_TYPE_HISTOGRAM, buff, NULL, NULL, 0, 
+			"1.0,2.0,3.0,4.0,5.0,6.0",1,10000,3);
+		}
+	}
+
+	int abcd = fieldstat_register_histogram(test_instance, FILED_TYPE_HISTOGRAM, "re_hi", NULL, NULL, 0, 
+	"10,20,30,40,50",1,10000,3);
+	abcd = fieldstat_register_histogram(test_instance, FILED_TYPE_HISTOGRAM, "re_hi000", NULL, NULL, 0, 
+	"10,20,30,40,60",1,10000,3);
 	fieldstat_instance_start(test_instance);
+
+	for(i = 0; i < id_list.count; i++)
+	{
+		fieldstat_value_set(test_instance,id_list.id[i], 5000 + i);
+		printf("%d\n", id_list.id[i]);
+	}
+
+	//long long preset[] = {1, 4, 10, 50, 20, 30, 40, 200, 300, 400, 600, 1000, 2000, 4000, 5000};
+	long long preset[] = {1,2,3,4,5,6,3000,3500,3600,3700,3800,4000,4000};
+	for (i = 0; (size_t)i < sizeof(preset) / sizeof(long long); i++)
+	{
+		fieldstat_value_set(test_instance,abcd, preset[i]);
+		//FS_operate(handle, histogram_ids[i], 0, FS_OP_SET, preset[j]);
+	}
+
+
 	sleep(1);
 	fieldstat_passive_output(test_instance);
 	printf("Testing for fieldstat\n");

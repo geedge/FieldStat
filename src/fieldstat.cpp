@@ -24,7 +24,6 @@
 #include <assert.h>
 #include <sys/time.h>
 
-double HISTOGRAM_DEFAULT_BINS[]={50.0, 80.0, 90.0, 95.0, 99.0};
 
 int FIELD_STAT_VERSION_2_8_20200805_fix_outOfBound=0;
 
@@ -59,10 +58,23 @@ static __attribute__((__used__)) const char * GIT_VERSION_UNKNOWN = NULL;
 #define	NUM_MAX_TABLE		64
 #define TABLE_COLUMN_SIZE	32
 #define	UDP_PAYLOAD_SIZE	1460
-#define	LEFT_MIN_BUFF_LEN	256
-#define	REALLOC_SCALE_SIZE	1024
-#define MAX_STR_LEN32		32
+#define	LEFT_MIN_BUFF_LEN	1024
+#define	REALLOC_SCALE_SIZE	2048
+#define STR_LEN_32			32
+#define STR_LEN_64			64
+#define STR_LEN_256			256
+#define STR_LEN_1024		1024
 #define NUM_MAX_METRIC_IN_TABLE 1024
+#define HISTOGRAM_WIDTH	10
+
+
+enum field_op
+{
+	FS_OP_ADD=1,
+	FS_OP_SET,
+	FS_OP_SUB
+};
+
 
 struct fieldstat_instance
 {
@@ -953,6 +965,194 @@ static int output_file_format_default_table(struct fieldstat_instance *instance,
 	return print_buf_append_position - print_buf;
 }
 
+static int output_file_print_hdr_head(struct metric_t *metric, char *print_buf, size_t size)
+{
+	char * pos = print_buf;
+	char bin_format[STR_LEN_256], str_format[STR_LEN_256];
+	const char* extra[]={"MAX", "MIN", "AVG", "STDDEV", "CNT"};
+	char buff[STR_LEN_32];
+	int i=0;
+	double * bins = metric->histogram.bins;
+	int bins_num  = metric->histogram.bins_num;
+	if(metric->field_type == FIELD_TYPE_SUMMARY)
+	{
+		snprintf(bin_format, sizeof(bin_format), "%%%d.2lf%%%%", HISTOGRAM_WIDTH-1);
+	}
+	if(metric->field_type == FILED_TYPE_HISTOGRAM)
+	{
+		snprintf(bin_format, sizeof(bin_format), "le=%%0.0f");
+	}
+	snprintf(str_format, sizeof(str_format), "%%%ds", HISTOGRAM_WIDTH);
+	if(metric->field_type == FIELD_TYPE_SUMMARY)
+	{
+		pos+=snprintf(pos,size-(pos-print_buf),"%-8s\t","summary");
+	}
+	if(metric->field_type == FILED_TYPE_HISTOGRAM)
+	{
+		pos+=snprintf(pos,size-(pos-print_buf),"%-8s\t","histogram");
+	}
+	for(i = 0;i < bins_num; i++)
+	{
+		if(metric->field_type == FIELD_TYPE_SUMMARY)
+		{
+			snprintf(buff,sizeof(buff),bin_format,bins[i]*100);
+		}
+		if(metric->field_type == FILED_TYPE_HISTOGRAM)
+		{
+			snprintf(buff,sizeof(buff),bin_format,bins[i]);
+		}
+		pos+=snprintf(pos,size-(pos-print_buf),str_format, buff);
+	}
+	for(i=0;(unsigned int)i<sizeof(extra)/sizeof(extra[0]);i++)
+	{
+		pos+=snprintf(pos,size-(pos-print_buf),str_format, extra[i]);
+	}
+	pos+=snprintf(pos,size-(pos-print_buf),"\n");
+	return pos-print_buf;
+}
+
+
+long long hdr_count_le_value(const struct hdr_histogram* h, long long value)
+{
+	struct hdr_iter iter;
+	long long count = 0;
+	hdr_iter_recorded_init(&iter, h);
+	while (hdr_iter_next(&iter))
+	{
+		if((long long)iter.value <= value)
+			count ++;
+	}
+	return count;
+}
+static int output_file_print_hdr_unit(struct metric_t *metric, char*print_buf, size_t size)
+{
+	double * bins = metric->histogram.bins;
+	int bins_num  = metric->histogram.bins_num;
+	char* pos=print_buf;
+	long long value=0;
+	int i=0;
+	struct histogram_t* h=&(metric->histogram);
+	struct hdr_histogram* h_out=NULL, *h_tmp=NULL;
+	char int_format[STR_LEN_256], double_format[STR_LEN_256];
+	snprintf(int_format, sizeof(int_format), "%%%dlld",HISTOGRAM_WIDTH);
+	snprintf(double_format, sizeof(double_format), "%%%d.2lf",HISTOGRAM_WIDTH);
+
+	hdr_init(h->lowest_trackable_value,  h->highest_trackable_value, h->significant_figures, &(h_tmp));
+	if(h->previous_changed!=NULL)	hdr_close(h->previous_changed);
+
+	h->previous_changed=atomic_read(&(h->changing));
+	h_tmp=atomic_set(&(h->changing), h_tmp);// left h_tmp is used to avoid warining [-Wunused-value]
+
+	hdr_add(h->accumulated, h->previous_changed);
+	h_out=h->accumulated; //TODO
+/*
+	if(metric->calc_type==FS_CALC_SPEED)
+	{
+		h_out=h->previous_changed;
+	}
+	else
+	{
+		h_out=h->accumulated;
+	}
+*/
+	pos+=snprintf(pos,size-(pos-print_buf),"%-10s\t", metric->field_name);
+
+	for(i=0;i<bins_num;i++)
+	{
+		if(metric->field_type == FIELD_TYPE_SUMMARY)
+		{
+			value=(long long)hdr_value_at_percentile(h_out, bins[i]*100);
+		}
+		if(metric->field_type == FILED_TYPE_HISTOGRAM)
+		{
+			value= hdr_count_le_value(h_out, (long long)bins[i]);
+		}
+		pos+=snprintf(pos,size-(pos-print_buf),int_format, value);
+	}
+	pos+=snprintf(pos,size-(pos-print_buf),int_format,h_out->total_count==0?0:(long long)hdr_max(h_out));
+	pos+=snprintf(pos,size-(pos-print_buf),int_format,h_out->total_count==0?0:(long long)hdr_min(h_out));
+	pos+=snprintf(pos,size-(pos-print_buf),double_format,h_out->total_count==0?0:hdr_mean(h_out));
+	pos+=snprintf(pos,size-(pos-print_buf),double_format,h_out->total_count==0?0:hdr_stddev(h_out));
+	pos+=snprintf(pos,size-(pos-print_buf),int_format,(long long)h_out->total_count);
+
+	pos+=snprintf(pos,size-(pos-print_buf),"\n");
+
+	h_tmp=NULL;
+
+	return pos-print_buf;
+}
+
+static int output_file_format_default_type_histogram(struct fieldstat_instance *instance, enum field_type type, long long interval_ms, char*print_buf, size_t size)
+{
+	int i = 0, j = 0, metric_num = 0;
+	char *pos = print_buf;
+	//display_manifest_t* p=NULL;
+	struct metric_t *metric = NULL;
+	struct metric_t  *metric_array[INIT_STAT_FIELD_NUM] = {NULL};
+	int metric_is_print[INIT_STAT_FIELD_NUM] = {0};
+
+	if(type == FILED_TYPE_HISTOGRAM)
+	{
+		if(instance->histogram_cnt == 0)
+		{
+			return 0;
+		}
+	}
+
+	if(type == FIELD_TYPE_SUMMARY)
+	{
+		if(instance->summary_cnt == 0)
+		{
+			return 0;
+		}
+	}
+
+	for(i = 0; i < instance->metric_cnt; i ++)
+	{
+		metric = get_metric(instance, i);
+		if(metric->field_type != type)
+		{
+			continue;
+		}
+		metric_array[metric_num++] = metric;	
+
+	}
+	for(i = 0; i < metric_num; i++)
+	{
+		if(metric_is_print[i] == 1)
+		{
+			continue;
+		}
+		pos += output_file_print_hdr_head(metric_array[i], pos, size-(pos-print_buf));
+		for(j = i; j < metric_num; j ++)
+		{
+			if(metric_array[j] == NULL)
+			{
+				continue;
+			}
+			if(metric_array[i]->histogram.bins_num != metric_array[j]->histogram.bins_num)
+			{
+				continue;
+			}
+			if(memcmp(metric_array[i]->histogram.bins, metric_array[j]->histogram.bins, metric_array[i]->histogram.bins_num))
+			{
+				continue;
+			}
+			pos += output_file_print_hdr_unit(metric_array[j], pos, size-(pos-print_buf));
+			metric_is_print[j] = 1;
+		}
+		if(pos-print_buf>0)
+		{
+			if(*(pos-1)=='\n')
+			{
+				pos--;
+			}
+			pos+=snprintf(pos,size-(pos-print_buf),"\n%s\n", draw_line);
+		}
+	}
+	return pos-print_buf;	
+}
+
 
 int fieldstat_output_file(struct fieldstat_instance *instance,long long interval_ms)
 {
@@ -960,7 +1160,7 @@ int fieldstat_output_file(struct fieldstat_instance *instance,long long interval
 	char *print_buf = NULL;
 	char *print_buf_append_position = NULL;
 	time_t current = 0;
-	char ctime_buff[32]={0};
+	char ctime_buff[STR_LEN_32]={0};
 
 	if(instance->fp == NULL)
 	{
@@ -987,6 +1187,8 @@ int fieldstat_output_file(struct fieldstat_instance *instance,long long interval
 		print_buf_append_position += output_file_format_default_type_gauge(instance, interval_ms, print_buf_append_position, print_buf_sz - (print_buf_append_position - print_buf));
 		print_buf_append_position += output_file_format_default_type_counter(instance, interval_ms, print_buf_append_position, print_buf_sz - (print_buf_append_position - print_buf));
 		print_buf_append_position += output_file_format_default_table(instance, interval_ms, print_buf_append_position, print_buf_sz - (print_buf_append_position - print_buf));
+		print_buf_append_position += output_file_format_default_type_histogram(instance, FIELD_TYPE_SUMMARY, interval_ms, print_buf_append_position, print_buf_sz - (print_buf_append_position - print_buf));
+		print_buf_append_position += output_file_format_default_type_histogram(instance, FILED_TYPE_HISTOGRAM,  interval_ms, print_buf_append_position, print_buf_sz - (print_buf_append_position - print_buf));
 		//TODO  output table,output histogram,output summary 
 		//pthread_mutex_unlock(&(_handle->reg_lock));//TODO
 	}
@@ -1116,10 +1318,7 @@ struct fieldstat_instance * fieldstat_instance_create(void)
 
 
 struct metric_id_list fieldstat_register_table_metrics(struct fieldstat_instance * instance, int table_id, const char *field_name, const char *tag_key[], const char *tag_value[],size_t n_tag)
-
-//int fieldstat_register(struct fieldstat_instance *instance, enum field_type type, const char *field_name, const char *tag_key[], const char *tag_value[], size_t n_tag)
 {
-	
 	int metric_id = 0;
 	int i = 0;
 	int per_table_line_num = 0;
@@ -1263,7 +1462,7 @@ static void prometheus_output_uri_list(struct prometheus_endpoint_instance *prom
 static int prometheus_output_get_metric_tags(struct metric_t *metric, char *tags_buff, unsigned int size, char *instance_app_name)
 {
 	int i = 0;
-	char unescape[256] = {0};
+	char unescape[STR_LEN_256] = {0};
 	char *tags_buff_append_position = tags_buff;
 	
 	tags_buff_append_position += snprintf(tags_buff_append_position, size - (tags_buff_append_position - tags_buff), "app_name=\"%s\"", instance_app_name);
@@ -1302,14 +1501,86 @@ static int prometheus_output_get_metric_name(struct metric_t *metric, char *name
 }
 
 
+static int prometheus_output_histogram_and_summary(struct metric_t *metric, char *payload, int payload_len, char *instance_app_name, char *metric_name, char *metric_tags)
+{
+	long long value=0;
+	long long sum = 0;
+	int i=0,used_len=0;
+
+	struct hdr_iter iter;
+	char output_format[STR_LEN_64] = {0};
+
+	//struct histogram_t* h=&(p->histogram);
+	struct histogram_t *h = &(metric->histogram);
+	struct hdr_histogram* h_out=NULL, *h_tmp=NULL;
+	int bin_num = metric->histogram.bins_num;
+	double *bins = metric->histogram.bins;
+
+	if(metric->field_type == FILED_TYPE_HISTOGRAM)
+	{
+		snprintf(output_format, sizeof(output_format), "%%s_bucket{%%s,le=\"%%0.2f\"} %%llu\n");
+	}
+
+	if(metric->field_type == FIELD_TYPE_SUMMARY)
+	{
+		snprintf(output_format, sizeof(output_format), "%%s{%%s,quantile=\"%%0.2f\"} %%llu\n");
+	}
+
+	hdr_init(h->lowest_trackable_value,  h->highest_trackable_value, h->significant_figures, &(h_tmp));
+
+	hdr_add(h_tmp, h->accumulated);
+	hdr_add(h_tmp, h->changing);
+	h_out=h_tmp;
+
+	for(i=0;i<bin_num;i++)
+	{
+		value= hdr_count_le_value(h_out, (long long)bins[i]);
+		used_len+=snprintf(payload+used_len,
+							payload_len-used_len,
+							output_format,
+							metric_name,
+							metric_tags,
+							bins[i],
+							value
+					);
+	}
+	used_len+=snprintf(payload+used_len,
+							payload_len-used_len,
+							"%s_count{%s} %llu\n",
+							metric_name,
+							metric_tags,
+							(long long)h_out->total_count
+					);
+
+	hdr_iter_recorded_init(&iter, h_out);
+	while (hdr_iter_next(&iter))
+	{
+		sum+=(long long)iter.value;
+	}
+	used_len+=snprintf(payload+used_len,
+			payload_len-used_len,
+			"%s_sum{%s} %llu\n",
+			metric_name,
+			metric_tags,
+			sum
+			);
+
+	hdr_close(h_tmp);
+	h_tmp=NULL;
+
+	return used_len;
+}
+
+
+
 static int prometheus_get_instance_metric_playload(struct fieldstat_instance *instance, char **payload, int *payload_size, int offset)
 {
 	int i = 0;
 	struct metric_t *metric = NULL;
 	long long value = 0;
-	char metric_name[256] = {0};  //need to macro  match the regex [a-zA-Z_:][a-zA-Z0-9_:]*
-	char app_name[256] = {0};       //using macro
-	char metric_tags[1024] = {0};   //label name match the regex [a-zA-Z_:][a-zA-Z0-9_:]* 
+	char metric_name[STR_LEN_256] = {0};  //need to macro  match the regex [a-zA-Z_:][a-zA-Z0-9_:]*
+	char app_name[STR_LEN_256] = {0};       //using macro
+	char metric_tags[STR_LEN_1024] = {0};   //label name match the regex [a-zA-Z_:][a-zA-Z0-9_:]* 
 	int append_offset = offset;
 
 	if(instance == NULL || instance->running != 1)
@@ -1346,18 +1617,21 @@ static int prometheus_get_instance_metric_playload(struct fieldstat_instance *in
 			*payload = (char *)realloc(*payload, *payload_size);
 		}
 
+		prometheus_output_get_metric_name(metric, metric_name, sizeof(metric_name), app_name);    //TODO refactor
+		prometheus_output_get_metric_tags(metric, metric_tags, sizeof(metric_tags), app_name);    //TODO refactor
+
 		switch(metric->field_type)
 		{
 			case FIELD_TYPE_COUNTER:
 			case FIELD_TYPE_GAUGE:
 				value = get_metric_unit_val(metric, FS_CALC_CURRENT, 1);
-				prometheus_output_get_metric_name(metric, metric_name, sizeof(metric_name), app_name);    //TODO refactor
-				prometheus_output_get_metric_tags(metric, metric_tags, sizeof(metric_tags), app_name);    //TODO refactor
-
 				append_offset += snprintf(*payload + append_offset, *payload_size - append_offset,
 													"%s{%s} %llu\n", metric_name, metric_tags, value);
+				break;
 			case FIELD_TYPE_SUMMARY:
 			case FILED_TYPE_HISTOGRAM:
+				append_offset += prometheus_output_histogram_and_summary(metric,*payload + append_offset, *payload_size - append_offset, app_name, metric_name, metric_tags);
+				break;
 			default:
 				break;
 		}
@@ -1480,3 +1754,168 @@ int fieldstat_set_prometheus_output(struct fieldstat_instance *instance) //TODO
 }
 
 
+
+static int fieldstat_value_operate(struct fieldstat_instance *instance, int field_id, enum field_op op, long long value)
+{
+	struct metric_t * metric = NULL;
+	struct stat_unit_t *target = NULL;
+
+	if(field_id >= instance->metric_cnt)
+	{
+		return -1;
+	}
+
+	metric = get_metric(instance, field_id);
+
+	switch(metric->field_type)
+	{
+		case FIELD_TYPE_COUNTER:
+			target = &(metric->counter);
+			break;
+		case FIELD_TYPE_GAUGE:
+			target = &(metric->gauge);
+			break;
+		case FIELD_TYPE_SUMMARY:
+		case FILED_TYPE_HISTOGRAM: 
+			hdr_record_value(metric->histogram.changing, (int64_t) value);
+			return 0;
+		default:
+			break;
+	}
+
+	switch(op)
+	{
+		case	FS_OP_ADD:
+			threadsafe_counter_add(&(target->changing), value);
+			break;
+		case	FS_OP_SET:
+			threadsafe_counter_set(&(target->changing), value-target->accumulated);
+			break;
+		case	FS_OP_SUB:
+			threadsafe_counter_sub(&(target->changing), value);
+			break;
+		default:
+			assert(0);
+			break;
+	}
+
+	return 0;
+}
+
+
+int fieldstat_value_incrby(struct fieldstat_instance *instance, int field_id, long long increment)
+{
+	int ret = 0;
+	ret = fieldstat_value_operate(instance, field_id, FS_OP_ADD, increment);
+	return ret;
+}
+
+int fieldstat_value_set(struct fieldstat_instance *instance, int field_id, long long retain)
+{
+	int ret = 0;
+	ret = fieldstat_value_operate(instance, field_id, FS_OP_SET, retain);
+	return ret;
+}
+
+int fieldstat_value_decrby(struct fieldstat_instance *instance, int field_id, long long decrment)
+{
+	int ret = 0;
+	ret = fieldstat_value_operate(instance, field_id, FS_OP_SUB, decrment);
+	return ret;
+}
+
+static int parse_histogram_bin_format(const char* format, double **output_bins, enum field_type type)
+{
+	char *token=NULL,*sub_token=NULL,*saveptr;
+	size_t i=0;
+	int comma_num=0,ret=0;
+	double *bins;
+	char* dup_format=__str_dup(format);
+	for(i=0;i<strlen(dup_format);i++)
+	{
+		if(dup_format[i]==',')
+		{
+			comma_num++;
+		}
+	}
+	bins=(double*)calloc(sizeof(double),comma_num+1);
+	for (token = dup_format,i=0; ; token= NULL, i++)
+	{
+		sub_token= strtok_r(token,",", &saveptr);
+		if (sub_token == NULL)
+			break;
+		ret=sscanf(sub_token,"%lf",bins+i);
+		if(type == FIELD_TYPE_SUMMARY)
+		{
+			if(bins[i]>1.0)
+			{
+				goto error_out;
+			}
+		}
+		if(ret!=1)
+		{
+			goto error_out;
+		}
+	}
+	free(dup_format);
+	*output_bins=bins;
+	return i;
+error_out:
+	free(dup_format);
+	free(bins);
+	return -1;
+}
+
+
+int fieldstat_register_histogram(struct fieldstat_instance *instance, enum field_type type, const char *field_name, const char *tag_key[], const char *tag_value[], size_t n_tag, 
+		const char * bins,const long long lowest_trackable_value,long long highest_trackable_value,int significant_figures)
+{
+	struct metric_t *metric_choosen = NULL;
+	int metric_id = -1;
+	int ret;
+
+	if(!is_valid_field_name(field_name))
+	{
+		return -1;
+	}
+	if(n_tag > N_TAG_MAX)
+	{
+		return -1;
+	}
+
+	if (lowest_trackable_value < 1 || significant_figures < 1 || 5 < significant_figures)
+	{
+		return -1;
+	}
+
+	if (lowest_trackable_value * 2 > highest_trackable_value)
+	{
+		return -1;
+	}
+
+	metric_id = atomic_inc(&instance->metric_cnt) - 1;
+	metric_choosen = create_metric(instance, metric_id, type, field_name, tag_key, tag_value, n_tag);
+
+	metric_choosen->histogram.highest_trackable_value = (int64_t)highest_trackable_value;
+	metric_choosen->histogram.lowest_trackable_value  = (int64_t)lowest_trackable_value;
+	metric_choosen->histogram.significant_figures     = significant_figures;
+	metric_choosen->histogram.bins_num = parse_histogram_bin_format((const char*)bins, &(metric_choosen->histogram.bins), type);
+
+	ret = hdr_init((int64_t)lowest_trackable_value, (int64_t)highest_trackable_value, significant_figures, &(metric_choosen->histogram.changing));
+	assert(ret==0);	
+	ret = hdr_init((int64_t)lowest_trackable_value, (int64_t)highest_trackable_value, significant_figures, &(metric_choosen->histogram.accumulated));
+	assert(ret==0);
+
+	switch(type)
+	{
+		case FIELD_TYPE_SUMMARY:
+			atomic_inc(&instance->summary_cnt);
+			break;
+		case FILED_TYPE_HISTOGRAM:
+			atomic_inc(&instance->histogram_cnt);
+			break;
+		default:
+			break;
+	}
+	return metric_id;
+}

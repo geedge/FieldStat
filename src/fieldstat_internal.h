@@ -47,7 +47,8 @@ struct histogram_t
 	int64_t lowest_trackable_value;
 	int64_t highest_trackable_value;
 	int significant_figures;
-
+	int bins_num;
+	double *bins;
 };
 
 
