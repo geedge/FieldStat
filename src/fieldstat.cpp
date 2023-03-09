@@ -50,101 +50,6 @@ static __attribute__((__used__)) const char * GIT_VERSION_UNKNOWN = NULL;
 #endif
 //endof Automatically generate the version number
 
-#define URL_MAX_LEN			2048
-#define LEN_IP_MAX			32  //?????? 32 from document 
-#define LEN_APP_NAME		32
-#define LEN_FORMAT_MAX		32
-#define LEN_PATH_MAX		256
-#define	NUM_MAX_TABLE		64
-#define TABLE_COLUMN_SIZE	32
-#define	UDP_PAYLOAD_SIZE	1460
-#define	LEFT_MIN_BUFF_LEN	1024
-#define	REALLOC_SCALE_SIZE	2048
-#define STR_LEN_32			32
-#define STR_LEN_64			64
-#define STR_LEN_256			256
-#define STR_LEN_1024		1024
-#define NUM_MAX_METRIC_IN_TABLE 1024
-#define HISTOGRAM_WIDTH	10
-#define INSTANCE_NAME_LEN	32
-
-
-enum field_op
-{
-	FS_OP_ADD=1,
-	FS_OP_SET,
-	FS_OP_SUB
-};
-
-
-struct fieldstat_instance
-{
-	char name[LEN_APP_NAME];
-	//char *statsd_server_ip;
-	char statsd_server_str_ip[LEN_IP_MAX];
-	unsigned int statsd_server_ip;
-	unsigned short statsd_server_port;
-	int statsd_output_enable;
-
-	char line_protocol_server_str_ip[LEN_IP_MAX];
-	unsigned int line_protocol_server_ip;
-	unsigned short line_protocol_server_port;
-	int line_protocol_output_enable;
-
-	char local_output_filename[LEN_PATH_MAX];
-	char local_output_format[LEN_FORMAT_MAX];
-	int local_output_enable;
-
-	int background_thread_disable;                 //default:1
-	int output_interval_s;                         //default:2
-	int running;
-
-	struct metric_t **metric_block_list[BLOCK_LIST_SIZE];
-
-	int metric_cnt;
-	int metric_size;
-	//struct metric_t **metric;
-	struct{
-		struct metric_t **column;
-		size_t column_size;
-	} table_metrics[NUM_MAX_TABLE];
-	int *index_table[NUM_MAX_TABLE][TABLE_COLUMN_SIZE];
-	int per_table_line_number[NUM_MAX_TABLE];
-
-	int table_num;
-	int line_seq;
-
-	int prometheus_output_enable;
-
-	int counter_cnt;
-	int gauge_cnt;
-	int histogram_cnt;
-	int summary_cnt;
-
-	struct timespec last_output_time;
-
-	pthread_t cfg_mon_t;
-	char line_protocol_send_buff[UDP_PAYLOAD_SIZE];
-	size_t line_protocol_send_buff_offset;
-	int line_protocol_socket;
-	pthread_mutex_t output_lock;
-
-
-	FILE* fp;
-};
-
-struct prometheus_endpoint_instance
-{
-	unsigned short port;
-	char *url_path;
-	pthread_t tid;
-	int running;
-	struct http_server_s *server_handle;
-	int fs_instance_cnt;
-	struct fieldstat_instance **fs_instance; //TO refactor
-	int fs_instance_size;                    // number
-};
-
 struct prometheus_endpoint_instance g_prometheus_endpoint_instance = 
 {
 	9273,
@@ -256,33 +161,6 @@ struct metric_t* metric_new(enum field_type type, const char *field_name, const 
 	return metric;
 }
 
-struct metric_t * create_metric(struct fieldstat_instance *instance, int metric_id,enum field_type type, const char *field_name, const char *tag_key[], const char *tag_value[], size_t n_tag)
-{
-	int block_index = 0;
-	int block_in_index = 0;
-	struct metric_t ** metrics_array = NULL;
-	struct metric_t * metric = NULL;
-
-	if(instance == NULL)
-	{
-		return NULL;
-	}
-	block_index = metric_id / NUM_INIT_METRICS;
-	block_in_index = metric_id % NUM_INIT_METRICS;
-	if(block_in_index == 0 && instance->metric_block_list[block_index] == NULL)
-	{
-		instance->metric_block_list[block_index] = (struct metric_t **)calloc(sizeof(struct metric *), NUM_INIT_METRICS);	
-	}
-	else
-	{
-		while (instance->metric_block_list[block_index] == NULL);
-	}
-	metrics_array = (struct metric_t **)instance->metric_block_list[block_index];
-	//assert(instance->metric_cnt < instance->metric_size);
-	metric = metrics_array[block_in_index] = metric_new(type,field_name,tag_key,tag_value,n_tag);
-	return metric;
-}
-
 void metric_free(struct metric_t* metric)
 {
 	int i = 0;
@@ -305,10 +183,37 @@ void metric_free(struct metric_t* metric)
 	return;
 }
 
+static struct metric_t ** read_metric_slot(struct fieldstat_instance *instance, int metric_id)
+{
+	int block_index = 0;
+	int in_block_index = 0;
+	struct metric_t ** metrics_block = NULL;
+
+	if(instance == NULL)
+	{
+		return NULL;
+	}
+	block_index = metric_id / NUM_INIT_METRICS;
+	in_block_index = metric_id % NUM_INIT_METRICS;
+	if(in_block_index == 0)
+	{
+		assert(instance->metric_block_list[block_index] != NULL);
+		instance->metric_block_list[block_index] = (struct metric_t **)calloc(sizeof(struct metric *), NUM_INIT_METRICS);	
+	}
+	else
+	{
+		while (instance->metric_block_list[block_index] == NULL);
+	}
+	metrics_block = (struct metric_t **)instance->metric_block_list[block_index];
+
+	return (struct metric_t **)&(metrics_block[in_block_index]);
+}
+
 static int startup_udp()
 {
 	int sd_udp=-1;
 	int flags;
+	int opt=1;
  	if(-1==(sd_udp = socket(AF_INET, SOCK_DGRAM, 0)))
 	{
 		printf("FS2: socket error: %d %s, restart socket.", errno, strerror(errno));
@@ -321,8 +226,8 @@ static int startup_udp()
 		printf("FS2: socket error: %d %s, restart socket.", errno, strerror(errno));
 		sd_udp=-1;
 	}
-	int opt=1;
-	if (setsockopt (sd_udp, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, sizeof(opt) ) < 0) {
+	if (setsockopt (sd_udp, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, sizeof(opt) ) < 0) 
+	{
 		printf("FS2:setsockopt error: %d %s, restart socket.", errno, strerror(errno));
 		close (sd_udp);
 		sd_udp=-1;
@@ -376,7 +281,7 @@ int fieldstat_set_output_interval(struct fieldstat_instance *instance, int secon
 	return 0;
 }
 
-int fieldstat_backgroud_thead_disable(struct fieldstat_instance *instance)
+int fieldstat_background_thead_disable(struct fieldstat_instance *instance)
 {
 	if(instance->running == 1)
 	{
@@ -408,7 +313,6 @@ int fieldstat_set_local_output(struct fieldstat_instance *instance, const char *
 	{
 		return -1;
 	}
-	instance->line_protocol_socket = startup_udp();
 	strncpy(instance->local_output_filename, (char *)filename, len_filename);
 	strncpy(instance->local_output_format, (char *)format, len_format);
 	instance->local_output_enable  = 1;
@@ -418,22 +322,16 @@ int fieldstat_set_local_output(struct fieldstat_instance *instance, const char *
 
 int fieldstat_set_line_protocol_server(struct fieldstat_instance *instance, const char *ip, unsigned short port)
 {
-	int len_ip = strlen(ip);
-
 	if(instance->running == 1)
 	{
 		return -1;
 	}
-	if(len_ip <= 0 || len_ip >= LEN_IP_MAX)
-	{
-		return -1;
-	}
+
 	if(1 != inet_pton(AF_INET, ip, (void *)&(instance->line_protocol_server_ip)))
 	{
 		return -1;
 	}
-
-	strncpy(instance->line_protocol_server_str_ip,(char *)ip,len_ip);
+	instance->line_protocol_socket = startup_udp();
 	instance->line_protocol_server_port   = port;
 	instance->line_protocol_output_enable = 1;
 
@@ -442,12 +340,7 @@ int fieldstat_set_line_protocol_server(struct fieldstat_instance *instance, cons
 
 int fieldstat_set_statsd_server(struct fieldstat_instance *instance, const char *ip, unsigned short port)
 {
-	int len_ip = strlen(ip);
 	if(instance->running == 1)
-	{
-		return -1;
-	}
-	if(len_ip <= 0 || len_ip >= LEN_IP_MAX)
 	{
 		return -1;
 	}
@@ -457,7 +350,6 @@ int fieldstat_set_statsd_server(struct fieldstat_instance *instance, const char 
 		return -1;
 	}
 
-	strncpy(instance->statsd_server_str_ip,(char *)ip,len_ip);
 	instance->statsd_server_port   = port;
 	instance->statsd_output_enable = 1;
 	return 0;
@@ -466,7 +358,8 @@ int fieldstat_set_statsd_server(struct fieldstat_instance *instance, const char 
 int fieldstat_register(struct fieldstat_instance *instance, enum field_type type, const char *field_name, const char *tag_key[], const char *tag_value[], size_t n_tag)
 {
 	int metric_id = 0;
-	struct metric_t * metric_choosen = NULL;
+	struct metric_t * metric = NULL;
+	struct metric_t **metric_slot = NULL;
 	if(!is_valid_field_name(field_name))
 	{
 		return -1;
@@ -475,29 +368,19 @@ int fieldstat_register(struct fieldstat_instance *instance, enum field_type type
 	{
 		return -1;
 	}
-	//TODO not block
-	metric_id = atomic_inc(&instance->metric_cnt) - 1;	
-	metric_choosen = create_metric(instance, metric_id, type,field_name,tag_key,tag_value,n_tag);
-	//assert(instance->metric_cnt < instance->metric_size);
-	//metric_choosen = instance->metric[metric_id] = metric_new(type,field_name,tag_key,tag_value,n_tag);
-	//metric_choosen = metrics_array[block_in_index] = metric_new(type,field_name,tag_key,tag_value,n_tag);
+
+	metric_id = atomic_inc(&instance->metric_cnt) - 1;
+	metric_slot = read_metric_slot(instance, metric_id);
+	metric = metric_new(type,field_name,tag_key,tag_value,n_tag);
+	*metric_slot = metric;
+
 	switch(type)
 	{
 		case FIELD_TYPE_COUNTER:
-			instance->counter_cnt++;
-			memset(&(metric_choosen->counter), 0, sizeof(metric_choosen->counter));
+			memset(&(metric->counter), 0, sizeof(metric->counter));
 			break;
 		case FIELD_TYPE_GAUGE:
-			instance->gauge_cnt++;
-			memset(&(metric_choosen->gauge), 0, sizeof(metric_choosen->gauge));
-			break;
-		case FILED_TYPE_HISTOGRAM:
-			//instance->histogram_cnt++;
-			// TODO  what?
-			break;
-		case FIELD_TYPE_SUMMARY:
-			//instance->summary_cnt++;
-			//TODO what ?
+			memset(&(metric->gauge), 0, sizeof(metric->gauge));
 			break;
 		default:
 			assert(0);
@@ -505,8 +388,6 @@ int fieldstat_register(struct fieldstat_instance *instance, enum field_type type
 	return metric_id;
 }
 
-
-//long long get_metric_unit_val(display_manifest_t* p, int column_seq,enum field_calc_algo calc_type,int is_refer)
 long long get_metric_unit_val(struct metric_t *metric,enum field_calc_algo calc_type,int is_refer)
 {
 	stat_unit_t* target = NULL;
@@ -519,8 +400,6 @@ long long get_metric_unit_val(struct metric_t *metric,enum field_calc_algo calc_
 		case FIELD_TYPE_GAUGE:
 			target = &(metric->gauge);
 			break;
-		case FILED_TYPE_HISTOGRAM:
-		case FIELD_TYPE_SUMMARY:
 		default:
 			break;
 	}
@@ -542,6 +421,7 @@ long long get_metric_unit_val(struct metric_t *metric,enum field_calc_algo calc_
 			break;
 		default:
 			assert(0);
+			break;
 	}
 	return value;
 }
@@ -577,7 +457,8 @@ void append_line_protocol_line(struct fieldstat_instance *instance, const char* 
 	instance->line_protocol_send_buff_offset += snprintf(instance->line_protocol_send_buff + instance->line_protocol_send_buff_offset,
 														sizeof(instance->line_protocol_send_buff) - instance->line_protocol_send_buff_offset,
 														"%s%s %s\n",
-														measurement, tag_set, field_set);
+														measurement, tag_set, field_set
+													);
 	return;
 }
 
@@ -587,7 +468,12 @@ static int output_line_protocol_tag_set_buf(metric_t *metric, char *tag_set_buff
 	char *tag_set_buff_append = tag_set_buff;
 	for(i = 0; i < (int)metric->n_tag; i++)
 	{
-		tag_set_buff_append += snprintf(tag_set_buff_append, size - (tag_set_buff_append - tag_set_buff), ",%s=%s", metric->tag_key[i],metric->tag_value[i]);
+		tag_set_buff_append += snprintf(tag_set_buff_append, 
+										size - (tag_set_buff_append - tag_set_buff), 
+										",%s=%s", 
+										metric->tag_key[i],
+										metric->tag_value[i]
+									);
 	}
 	return tag_set_buff_append - tag_set_buff;
 }
@@ -636,10 +522,19 @@ static void output_line_protocol_table(struct fieldstat_instance *instance)
 						break;
 				}
 
-				field_set_buff_append += snprintf(field_set_buff_append, sizeof(field_set_buff) - (field_set_buff - field_set_buff), "%s=%lld,", metric->table_column_name, value);
+				field_set_buff_append += snprintf(field_set_buff_append, 
+													sizeof(field_set_buff) - (field_set_buff - field_set_buff), 
+													"%s=%lld,", 
+													metric->table_column_name, 
+													value
+												);
 			}
 
-			tag_set_buff_append += snprintf(tag_set_buff_append, sizeof(tag_set_buff) - (tag_set_buff_append - tag_set_buff), ",app_name=%s", instance->name);
+			tag_set_buff_append += snprintf(tag_set_buff_append, 
+												sizeof(tag_set_buff) - (tag_set_buff_append - tag_set_buff), 
+												",app_name=%s", 
+												instance->name
+											);
 			output_line_protocol_tag_set_buf(metric, tag_set_buff_append, sizeof(tag_set_buff) - (tag_set_buff_append - tag_set_buff));
 
 			if(field_set_buff_append - field_set_buff > 0)
@@ -685,13 +580,11 @@ int line_protocol_output(struct fieldstat_instance *instance)
 				if(value != 0)
 				{
 					snprintf(field_set_buff, UDP_PAYLOAD_SIZE, "%s=%lld", metric->field_name, value);
-					tag_set_buff_append += snprintf(tag_set_buff_append, sizeof(tag_set_buff) - (tag_set_buff_append - tag_set_buff), ",app_name=%s", instance->name);
-					/*
-					for(j = 0; j < (int)metric->n_tag; j++)
-					{
-						tag_set_buff_append += snprintf(tag_set_buff_append, sizeof(tag_set_buff) - (tag_set_buff_append - tag_set_buff), ",%s=%s", metric->tag_key[i],metric->tag_value[i]);
-					}
-					*/
+					tag_set_buff_append += snprintf(tag_set_buff_append, 
+														sizeof(tag_set_buff) - (tag_set_buff_append - tag_set_buff), 
+														",app_name=%s", 
+														instance->name
+													);
 					output_line_protocol_tag_set_buf(metric, tag_set_buff_append, sizeof(tag_set_buff) - (tag_set_buff_append - tag_set_buff));
 					append_line_protocol_line(instance, metric->field_name, tag_set_buff, field_set_buff);
 					tag_set_buff_append = tag_set_buff;
@@ -703,13 +596,11 @@ int line_protocol_output(struct fieldstat_instance *instance)
 				if(value != 0)
 				{
 					snprintf(field_set_buff, UDP_PAYLOAD_SIZE, "%s=%lld", metric->field_name, value);
-					tag_set_buff_append += snprintf(tag_set_buff_append, sizeof(tag_set_buff) - (tag_set_buff_append - tag_set_buff), ",app_name=%s", instance->name);
-					/*
-					for(j = 0; j < (int)metric->n_tag; j++)
-					{
-						tag_set_buff_append += snprintf(tag_set_buff_append, sizeof(tag_set_buff) - (tag_set_buff_append - tag_set_buff), ",%s=%s", metric->tag_key[i],metric->tag_value[i]);
-					}
-					*/
+					tag_set_buff_append += snprintf(tag_set_buff_append, 
+														sizeof(tag_set_buff) - (tag_set_buff_append - tag_set_buff), 
+														",app_name=%s", 
+														instance->name
+													);
 					output_line_protocol_tag_set_buf(metric, tag_set_buff_append, sizeof(tag_set_buff) - (tag_set_buff_append - tag_set_buff));
 					append_line_protocol_line(instance, metric->field_name, tag_set_buff, field_set_buff);
 					tag_set_buff_append = tag_set_buff;
@@ -732,19 +623,34 @@ static int print_buf_tag_append_position(metric_t *metric, char *print_buf_tags,
 	int i = 0;
 	char *print_buf_tags_append_position = print_buf_tags;
 
-	print_buf_tags_append_position += snprintf(print_buf_tags_append_position, size - (print_buf_tags_append_position - print_buf_tags),"{");
-	for(; i < (int)metric->n_tag; i++)
+	if(metric->n_tag <= 0)
 	{
-		if(i == 0)
-		{
-			print_buf_tags_append_position += snprintf(print_buf_tags_append_position, size - (print_buf_tags_append_position - print_buf_tags),"%s=\"%s\"", metric->tag_key[i],metric->tag_value[i]);
-		}
-		else
-		{
-			print_buf_tags_append_position += snprintf(print_buf_tags_append_position, size - (print_buf_tags_append_position - print_buf_tags),",%s=\"%s\"", metric->tag_key[i],metric->tag_value[i]);
-		}
+		return 0;
 	}
-	print_buf_tags_append_position += snprintf(print_buf_tags_append_position, size - (print_buf_tags_append_position - print_buf_tags),"}");
+
+	print_buf_tags_append_position += snprintf(print_buf_tags_append_position, 
+												size - (print_buf_tags_append_position - print_buf_tags),
+												"{"
+											);
+	for(i = 0; i < (int)metric->n_tag; i++)
+	{
+		print_buf_tags_append_position += snprintf(print_buf_tags_append_position,
+													size - (print_buf_tags_append_position - print_buf_tags),
+													",%s=\"%s\"", 
+													metric->tag_key[i],
+													metric->tag_value[i]
+												);
+	}
+
+	if(print_buf_tags_append_position - print_buf_tags > 0)
+	{
+		print_buf_tags_append_position--;
+	}
+
+	print_buf_tags_append_position += snprintf(print_buf_tags_append_position, 
+												size - (print_buf_tags_append_position - print_buf_tags),
+												"}"
+											);
 
 	return print_buf_tags_append_position - print_buf_tags;
 }
@@ -790,7 +696,13 @@ static int output_file_format_default_type_gauge(struct fieldstat_instance *inst
 		//value=value * metric->output_scaling * 1000 / interval_ms;
 		memset(print_buf_tags,0, sizeof(print_buf_tags));
 		print_buf_tag_append_position(metric, print_buf_tags, sizeof(print_buf_tags));
-		print_buf_append_position += snprintf(print_buf_append_position, size - (print_buf_append_position - print_buf), "%s %s: %-10lld\t", metric->field_name, print_buf_tags, value);
+		print_buf_append_position += snprintf(print_buf_append_position, 
+												size - (print_buf_append_position - print_buf), 
+												"%s %s: %-10lld\t", 
+												metric->field_name, 
+												print_buf_tags, 
+												value
+											);
 		j++;
 		if(j == STATUS_PER_LINE)
 		{
@@ -855,7 +767,12 @@ static int output_file_format_default_type_counter(struct fieldstat_instance *in
 			metric = get_metric(instance, metric_id[i+j]);
 			memset(print_buf_tags,0, sizeof(print_buf_tags));
 			print_buf_tag_append_position(metric, print_buf_tags, sizeof(print_buf_tags));
-			print_buf_append_position += snprintf(print_buf_append_position, size - (print_buf_append_position - print_buf), "%10s %s\t", metric->field_name, print_buf_tags);
+			print_buf_append_position += snprintf(print_buf_append_position, 
+													size - (print_buf_append_position - print_buf), 
+													"%10s %s\t", 
+													metric->field_name, 
+													print_buf_tags
+												);
 		}
 		print_buf_append_position += snprintf(print_buf_append_position, size - (print_buf_append_position-print_buf), "\nsum\t");
 
@@ -864,19 +781,33 @@ static int output_file_format_default_type_counter(struct fieldstat_instance *in
 			//metric = instance->metric[metric_id[i+j]];
 			metric = get_metric(instance, metric_id[i+j]);
 			value  = get_metric_unit_val(metric,FS_CALC_CURRENT, 1);
-			print_buf_append_position += snprintf(print_buf_append_position, sizeof(print_buf) - (print_buf_append_position - print_buf), "%10lld\t", value);
+			print_buf_append_position += snprintf(print_buf_append_position, 
+													sizeof(print_buf) - (print_buf_append_position - print_buf), 
+													"%10lld\t", 
+													value
+												);
 		}
-		print_buf_append_position += snprintf(print_buf_append_position, sizeof(print_buf) - (print_buf_append_position - print_buf), "\nspeed/s\t");
+		print_buf_append_position += snprintf(print_buf_append_position, 
+												sizeof(print_buf) - (print_buf_append_position - print_buf), 
+												"\nspeed/s\t"
+											);
 
 		for(j=0;j<FIELD_PER_LINE&&i+j<metric_cnt;j++)
 		{
 			//metric = instance->metric[metric_id[i+j]];
 			metric = get_metric(instance, metric_id[i+j]);
 			value  = get_metric_unit_val(metric,FS_CALC_SPEED, 0);
-			print_buf_append_position += snprintf(print_buf_append_position, size - (print_buf_append_position - print_buf), "%10lld\t", value*1000/interval_ms);
+			print_buf_append_position += snprintf(print_buf_append_position, 
+													size - (print_buf_append_position - print_buf), 
+													"%10lld\t", 
+													value*1000/interval_ms
+												);
 		}
 		i += (j-1);
-		print_buf_append_position += snprintf(print_buf_append_position, size - (print_buf_append_position - print_buf), "\n");
+		print_buf_append_position += snprintf(print_buf_append_position, 
+												size - (print_buf_append_position - print_buf), 
+												"\n"
+											);
 	}
 
 	if(print_buf_append_position - print_buf > 0)
@@ -885,7 +816,11 @@ static int output_file_format_default_type_counter(struct fieldstat_instance *in
 		{
 			print_buf_append_position--;
 		}
-		print_buf_append_position += snprintf(print_buf_append_position, size - (print_buf_append_position - print_buf),"\n%s\n", draw_line);
+		print_buf_append_position += snprintf(print_buf_append_position, 
+												size - (print_buf_append_position - print_buf),
+												"\n%s\n", 
+												draw_line
+											);
 	}
 
 	return print_buf_append_position - print_buf;
@@ -917,7 +852,11 @@ static int output_file_format_default_table(struct fieldstat_instance *instance,
 		print_buf_append_position += snprintf(print_buf_append_position, size - (print_buf - print_buf),"\t\t\t");
 		for(k = 0; k < (int)table_column_size; k++)
 		{
-			print_buf_append_position += snprintf(print_buf_append_position ,size - (print_buf_append_position - print_buf), "\t%10s", table_column[k]->field_name);			
+			print_buf_append_position += snprintf(print_buf_append_position,
+													size - (print_buf_append_position - print_buf), 
+													"\t%10s", 
+													table_column[k]->field_name
+												);			
 		}
 
 		for(j = 0; j < instance->per_table_line_number[i]; j++)
@@ -931,13 +870,25 @@ static int output_file_format_default_table(struct fieldstat_instance *instance,
 				if(k == 0)
 				{
 					print_buf_tag_append_position(metric, print_buf_tags, sizeof(print_buf_tags));
-					print_buf_append_position += snprintf(print_buf_append_position, size - (print_buf_append_position - print_buf), "\n%s %-20s\t", metric->field_name,print_buf_tags);
+					print_buf_append_position += snprintf(print_buf_append_position,
+															size - (print_buf_append_position - print_buf), 
+															"\n%s %-20s\t", 
+															metric->field_name,
+															print_buf_tags
+														);
 				}
 				value = get_metric_unit_val(metric, FS_CALC_CURRENT, 0);
-				print_buf_append_position += snprintf(print_buf_append_position, size - (print_buf_append_position - print_buf), "%10lld\t", value);
+				print_buf_append_position += snprintf(print_buf_append_position, 
+															size - (print_buf_append_position - print_buf), 
+															"%10lld\t", 
+															value
+														);
 			}
 		}
-		print_buf_append_position += snprintf(print_buf_append_position,size - (print_buf_append_position - print_buf), "\n");
+		print_buf_append_position += snprintf(print_buf_append_position, 
+												size - (print_buf_append_position - print_buf), 
+												"\n"
+											);
 
 		if(print_buf_append_position - print_buf > 0)
 		{
@@ -945,7 +896,11 @@ static int output_file_format_default_table(struct fieldstat_instance *instance,
 			{
 				print_buf_append_position--;
 			}
-			print_buf_append_position += snprintf(print_buf_append_position, size - (print_buf_append_position - print_buf), "\n%s\n", draw_line);
+			print_buf_append_position += snprintf(print_buf_append_position, 
+													size - (print_buf_append_position - print_buf), 
+													"\n%s\n", 
+													draw_line
+												);
 		}
 	}
 	return print_buf_append_position - print_buf;
@@ -1313,7 +1268,8 @@ struct metric_id_list fieldstat_register_table_metrics(struct fieldstat_instance
 	int metric_id = 0;
 	int i = 0;
 	int per_table_line_num = 0;
-	struct metric_t * metric_choosen = NULL;
+	struct metric_t * metric = NULL;
+	struct metric_t **metric_slot = NULL;
 	int *table_line = NULL;
 	metric_t **table_column = instance->table_metrics[table_id].column;
 	int table_column_size = instance->table_metrics[table_id].column_size;
@@ -1348,33 +1304,25 @@ struct metric_id_list fieldstat_register_table_metrics(struct fieldstat_instance
 	for( i = 0; i < table_column_size; i ++)
 	{	
 		metric_id = atomic_inc(&instance->metric_cnt) - 1;
-		metric_choosen = create_metric(instance,metric_id, table_column[i]->field_type,field_name,tag_key,tag_value,n_tag);
+		metric_slot = read_metric_slot(instance, metric_id);
+		metric = metric_new(table_column[i]->field_type,field_name,tag_key,tag_value,n_tag);
+		*metric_slot = metric;
 
 		table_line[i] = metric_id;
 
-		metric_choosen->table_id = table_id;
-		metric_choosen->belong_to_table = 1;
-		metric_choosen->table_column_id = i;
-		metric_choosen->line_seq ++;
-		metric_choosen->table_column_name = strdup(table_column[i]->field_name); 
+		metric->table_id = table_id;
+		metric->belong_to_table = 1;
+		metric->table_column_id = i;
+		metric->line_seq ++;
+		metric->table_column_name = strdup(table_column[i]->field_name); 
 
-		switch(metric_choosen->field_type)
+		switch(metric->field_type)
 		{
 			case FIELD_TYPE_COUNTER:
-				instance->counter_cnt++;
-				memset(&(metric_choosen->counter), 0, sizeof(metric_choosen->counter));
+				memset(&(metric->counter), 0, sizeof(metric->counter));
 				break;
 			case FIELD_TYPE_GAUGE:
-				instance->gauge_cnt++;
-				memset(&(metric_choosen->gauge), 0, sizeof(metric_choosen->gauge));
-				break;
-			case FILED_TYPE_HISTOGRAM:
-				//instance->histogram_cnt++;
-				// TODO  what?
-				break;
-			case FIELD_TYPE_SUMMARY:
-				//instance->summary_cnt++;
-				//TODO what ?
+				memset(&(metric->gauge), 0, sizeof(metric->gauge));
 				break;
 			default:
 				assert(0);
@@ -1408,17 +1356,22 @@ struct metric_id_list fieldstat_register_table_metrics(struct fieldstat_instance
 static int prometheus_get_fs_instance_id(struct prometheus_endpoint_instance *global_prometheus_output, char *uri, int uri_len)
 {
 	int i = 0;
+	char instance_name_url[INSTANCE_NAME_LEN + 1] = {0};
+	int  instance_name_url_len = 0;
 
-	if(uri_len == (int)strlen(global_prometheus_output->url_path) && 
-			 0 == memcmp(uri, global_prometheus_output->url_path, strlen(global_prometheus_output->url_path)))
+	if(uri_len == (int)strlen(global_prometheus_output->url_path) 
+		  && 0 == memcmp(uri, global_prometheus_output->url_path, strlen(global_prometheus_output->url_path)))
 	{		
 		return global_prometheus_output->fs_instance_cnt;
 	}
 	
-	for( i = 0; i < global_prometheus_output->fs_instance_cnt; i++)
+	for(i = 0; i < global_prometheus_output->fs_instance_cnt; i++)
 	{
-		if(uri_len - 1 == (int)strlen(global_prometheus_output->fs_instance[i]->name) && 
-					 0 == memcmp( uri + 1, global_prometheus_output->fs_instance[i]->name, strlen(global_prometheus_output->fs_instance[i]->name)))
+		memset(instance_name_url, 0, sizeof(instance_name_url));
+		instance_name_url_len = snprintf(instance_name_url, sizeof(instance_name_url),"/%s",global_prometheus_output->fs_instance[i]->name);
+
+		if(uri_len == instance_name_url_len  
+			  && 0 == memcmp( uri, instance_name_url, instance_name_url_len))
 		{
 			return i;
 		}
@@ -1459,7 +1412,7 @@ static void prometheus_output_uri_list(struct prometheus_endpoint_instance *prom
 	return;
 }
 
-static int prometheus_output_get_metric_tags(struct metric_t *metric, char *tags_buff, unsigned int size, char *instance_app_name)
+static int prometheus_output_read_metric_tags(struct metric_t *metric, char *instance_app_name, char *tags_buff, unsigned int size)
 {
 	int i = 0;
 	char unescape[STR_LEN_256] = {0};
@@ -1482,7 +1435,7 @@ static int prometheus_output_get_metric_tags(struct metric_t *metric, char *tags
 }
 
 
-static int prometheus_output_get_metric_name(struct metric_t *metric, char *name_buff, unsigned int size, char *instance_app_name)
+static int prometheus_output_read_metric_name(struct metric_t *metric, char *instance_app_name, char *name_buff, unsigned int size)
 {
 	char unescape[256] = {0};
 	char *name_buff_append_position = name_buff;
@@ -1508,7 +1461,7 @@ static int prometheus_output_histogram_and_summary(struct metric_t *metric, char
 	int i=0,used_len=0;
 
 	struct hdr_iter iter;
-	char output_format[STR_LEN_64] = {0};
+	char *output_format = NULL;
 
 	//struct histogram_t* h=&(p->histogram);
 	struct histogram_t *h = &(metric->histogram);
@@ -1518,12 +1471,12 @@ static int prometheus_output_histogram_and_summary(struct metric_t *metric, char
 
 	if(metric->field_type == FILED_TYPE_HISTOGRAM)
 	{
-		snprintf(output_format, sizeof(output_format), "%%s_bucket{%%s,le=\"%%0.2f\"} %%llu\n");
+		output_format = (char *)"%s_bucket{%s,le=\"%0.2f\"} %llu\n";
 	}
 
 	if(metric->field_type == FIELD_TYPE_SUMMARY)
 	{
-		snprintf(output_format, sizeof(output_format), "%%s{%%s,quantile=\"%%0.2f\"} %%llu\n");
+		output_format = (char *)"%s{%s,quantile=\"%0.2f\"} %llu\n";
 	}
 
 	hdr_init(h->lowest_trackable_value,  h->highest_trackable_value, h->significant_figures, &(h_tmp));
@@ -1534,7 +1487,15 @@ static int prometheus_output_histogram_and_summary(struct metric_t *metric, char
 
 	for(i=0;i<bin_num;i++)
 	{
-		value= hdr_count_le_value(h_out, (long long)bins[i]);
+		if(metric->field_type == FILED_TYPE_HISTOGRAM)
+		{
+			value = (long long)hdr_count_le_value(h_out, (long long)bins[i]);
+		}
+		if(metric->field_type == FIELD_TYPE_SUMMARY)
+		{
+			value=(long long)hdr_value_at_percentile(h_out, bins[i]);
+		}
+	
 		used_len+=snprintf(payload+used_len,
 							payload_len-used_len,
 							output_format,
@@ -1578,26 +1539,30 @@ static int prometheus_get_instance_metric_playload(struct fieldstat_instance *in
 	int i = 0;
 	struct metric_t *metric = NULL;
 	long long value = 0;
-	char metric_name[STR_LEN_256] = {0};  //need to macro  match the regex [a-zA-Z_:][a-zA-Z0-9_:]*
-	char app_name[STR_LEN_256] = {0};       //using macro
-	char metric_tags[STR_LEN_1024] = {0};   //label name match the regex [a-zA-Z_:][a-zA-Z0-9_:]* 
+	char metric_name[256] = {0};     //match the regex [a-zA-Z_:][a-zA-Z0-9_:]*
+	char instance_name[256] = {0};
+	char metric_tags[1024] = {0};    //label name match the regex [a-zA-Z_:][a-zA-Z0-9_:]* 
 	int append_offset = offset;
+	char *new_payload = NULL;
+	int new_payload_size = 0;	
 
-	if(instance == NULL || instance->running != 1)
+	if(instance->running != 1)
 	{
 		return -1;
 	}
+
 	if(payload == NULL)
 	{
 		return -1;
 	}
 
+	new_payload = *payload;
+	new_payload_size = *payload_size;
 
-	str_unescape(instance->name, app_name, sizeof(app_name));
+	str_unescape(instance->name, instance_name, sizeof(instance_name));
 
 	for(i = 0; i < instance->metric_cnt; i++)
 	{
-		//metric = instance->metric[i];
 		metric = get_metric(instance, i);
 
 		if(metric->is_ratio == 1)
@@ -1609,38 +1574,46 @@ static int prometheus_get_instance_metric_playload(struct fieldstat_instance *in
 			continue;
 		}
 
-		//relloc
-		//type = [counter, gauge]
-		if( *payload_size - append_offset <= LEFT_MIN_BUFF_LEN)
+		if( new_payload_size - append_offset <= LEFT_MIN_BUFF_LEN)
 		{
-			*payload_size += REALLOC_SCALE_SIZE;
-			*payload = (char *)realloc(*payload, *payload_size);
+			new_payload_size += REALLOC_SCALE_SIZE;
+			new_payload = (char *)realloc(new_payload, new_payload_size);
 		}
 
-		prometheus_output_get_metric_name(metric, metric_name, sizeof(metric_name), app_name);    //TODO refactor
-		prometheus_output_get_metric_tags(metric, metric_tags, sizeof(metric_tags), app_name);    //TODO refactor
+		prometheus_output_read_metric_name(metric, instance_name, metric_name, sizeof(metric_name));
+		prometheus_output_read_metric_tags(metric, instance_name, metric_tags, sizeof(metric_tags));
 
 		switch(metric->field_type)
 		{
 			case FIELD_TYPE_COUNTER:
 			case FIELD_TYPE_GAUGE:
 				value = get_metric_unit_val(metric, FS_CALC_CURRENT, 1);
-				append_offset += snprintf(*payload + append_offset, *payload_size - append_offset,
-													"%s{%s} %llu\n", metric_name, metric_tags, value);
+				append_offset += snprintf(new_payload + append_offset, 
+											new_payload_size - append_offset,
+											"%s{%s} %llu\n", 
+											metric_name, 
+											metric_tags, 
+											value
+										);
 				break;
 			case FIELD_TYPE_SUMMARY:
 			case FILED_TYPE_HISTOGRAM:
-				append_offset += prometheus_output_histogram_and_summary(metric,*payload + append_offset, *payload_size - append_offset, app_name, metric_name, metric_tags);
+				append_offset += prometheus_output_histogram_and_summary(metric,new_payload + append_offset,
+								new_payload_size - append_offset, instance_name, metric_name, metric_tags);
 				break;
 			default:
 				break;
 		}
 	}
+
+	*payload = new_payload;
+	*payload_size = new_payload_size;
+
 	return append_offset;
 
 }
 
-static void prometheus_output_instance_metric(struct prometheus_endpoint_instance *prometheus_output, struct http_request_s* request, int fs_instance_id)
+static void prometheus_output_instance_metric(struct prometheus_endpoint_instance *prometheus_output, struct http_request_s* request, int fs_instance_idx)
 {
 	int i = 0;
 	int payload_size = 0;
@@ -1649,7 +1622,7 @@ static void prometheus_output_instance_metric(struct prometheus_endpoint_instanc
 	struct fieldstat_instance *instance = NULL;
 	struct http_response_s* response = NULL;
 
-	if(fs_instance_id == prometheus_output->fs_instance_cnt)
+	if(fs_instance_idx == prometheus_output->fs_instance_cnt)
 	{
 		for(i = 0; i < prometheus_output->fs_instance_cnt; i++)
 		{
@@ -1659,7 +1632,7 @@ static void prometheus_output_instance_metric(struct prometheus_endpoint_instanc
 	}
 	else
 	{
-		instance = prometheus_output->fs_instance[fs_instance_id];
+		instance = prometheus_output->fs_instance[fs_instance_idx];
 		payload_offset = prometheus_get_instance_metric_playload(instance, &payload, &payload_size, payload_offset);	
 	}
 
@@ -1680,62 +1653,50 @@ static void prometheus_output_instance_metric(struct prometheus_endpoint_instanc
 
 static void prometheus_endpoint_instance_output(struct http_request_s* request)
 {
+	int fs_instance_idx = -1;
 	struct http_string_s uri;
-	struct prometheus_endpoint_instance *prometheus_instance = NULL;
-	int fs_instance_idx = -1;	
+	struct prometheus_endpoint_instance *prometheus_endpoint_instance = &g_prometheus_endpoint_instance;;
 
-	prometheus_instance = &g_prometheus_endpoint_instance;
 	uri = http_request_target(request);
-	fs_instance_idx = prometheus_get_fs_instance_id(prometheus_instance, (char *)uri.buf, uri.len);
+	fs_instance_idx = prometheus_get_fs_instance_id(prometheus_endpoint_instance, (char *)uri.buf, uri.len);
 
-	if(fs_instance_idx == -1)
-	{
-		prometheus_output_uri_list(prometheus_instance, request);
-		return;
-	}
-	else
-	{
-		prometheus_output_instance_metric(prometheus_instance, request, fs_instance_idx);
-	}
+	fs_instance_idx == -1 ? 
+		prometheus_output_uri_list(prometheus_endpoint_instance, request) 
+		:prometheus_output_instance_metric(prometheus_endpoint_instance, request, fs_instance_idx);
+
 	return;
 }
 
 
-void *prometheus_endpoin_listen(void *arg)
+static void *prometheus_endpoint_listen_thread_entry(void *arg)
 {
 	struct prometheus_endpoint_instance *global_prometheus = (struct prometheus_endpoint_instance *)arg;
-
-	if(global_prometheus != NULL)
-	{
-		global_prometheus->server_handle = http_server_init(global_prometheus->port , prometheus_endpoint_instance_output);
-		http_server_listen(global_prometheus->server_handle);
-	}
-
+	http_server_listen(global_prometheus->server_handle);
 	return NULL;
 } 
 
-
 int fieldstat_global_enable_prometheus_endpoint(unsigned short listen_port, const char *url)
 {
-	if(url == NULL)
+	g_prometheus_endpoint_instance.server_handle = http_server_init(listen_port, prometheus_endpoint_instance_output);
+	if(g_prometheus_endpoint_instance.server_handle == NULL)
 	{
-		g_prometheus_endpoint_instance.url_path = (char *)calloc(strlen((char *)"/metrics")+1, 1);
-		memcpy(g_prometheus_endpoint_instance.url_path, (char *)"/metrics", strlen((char *)"/metrics"));
+		return -1;
 	}
 
+	g_prometheus_endpoint_instance.url_path = url == NULL ? strdup(PROMETHEUS_ENDPOINT_DEFAULT_URL):strdup(url);
 	g_prometheus_endpoint_instance.port = listen_port;
-	g_prometheus_endpoint_instance.url_path = strdup(url);
 	g_prometheus_endpoint_instance.running = 1;
 	g_prometheus_endpoint_instance.fs_instance = (struct fieldstat_instance **)calloc( sizeof(struct fieldstat_instance *), g_prometheus_endpoint_instance.fs_instance_size);
 
-	pthread_create(&g_prometheus_endpoint_instance.tid, NULL, prometheus_endpoin_listen, (void *)&g_prometheus_endpoint_instance);
+	pthread_create(&g_prometheus_endpoint_instance.tid, NULL, prometheus_endpoint_listen_thread_entry, (void *)&g_prometheus_endpoint_instance);
+
 	return 0;
 }
 
 
-int fieldstat_set_prometheus_output(struct fieldstat_instance *instance) //TODO 
+int fieldstat_set_prometheus_output(struct fieldstat_instance *instance)
 {
-	int i = 0;
+	int fs_instance_id = 0;
 
 	if(g_prometheus_endpoint_instance.running != 1)
 	{
@@ -1748,8 +1709,8 @@ int fieldstat_set_prometheus_output(struct fieldstat_instance *instance) //TODO
 		g_prometheus_endpoint_instance.fs_instance = (struct fieldstat_instance **)realloc(g_prometheus_endpoint_instance.fs_instance, g_prometheus_endpoint_instance.fs_instance_size);
 	}
 
-	i = g_prometheus_endpoint_instance.fs_instance_cnt++;
-	g_prometheus_endpoint_instance.fs_instance[i] = instance;
+	fs_instance_id = g_prometheus_endpoint_instance.fs_instance_cnt++;
+	g_prometheus_endpoint_instance.fs_instance[fs_instance_id] = instance;
 	return 0;
 }
 
@@ -1870,7 +1831,8 @@ error_out:
 int fieldstat_register_histogram(struct fieldstat_instance *instance, enum field_type type, const char *field_name, const char *tag_key[], const char *tag_value[], size_t n_tag, 
 		const char * bins,const long long lowest_trackable_value,long long highest_trackable_value,int significant_figures)
 {
-	struct metric_t *metric_choosen = NULL;
+	struct metric_t *metric = NULL;
+	struct metric_t **metric_slot = NULL;
 	int metric_id = -1;
 	int ret;
 
@@ -1894,16 +1856,18 @@ int fieldstat_register_histogram(struct fieldstat_instance *instance, enum field
 	}
 
 	metric_id = atomic_inc(&instance->metric_cnt) - 1;
-	metric_choosen = create_metric(instance, metric_id, type, field_name, tag_key, tag_value, n_tag);
+	metric_slot = read_metric_slot(instance, metric_id);
+	metric = metric_new(type,field_name,tag_key,tag_value,n_tag);
+	*metric_slot = metric;
 
-	metric_choosen->histogram.highest_trackable_value = (int64_t)highest_trackable_value;
-	metric_choosen->histogram.lowest_trackable_value  = (int64_t)lowest_trackable_value;
-	metric_choosen->histogram.significant_figures     = significant_figures;
-	metric_choosen->histogram.bins_num = parse_histogram_bin_format((const char*)bins, &(metric_choosen->histogram.bins), type);
+	metric->histogram.highest_trackable_value = (int64_t)highest_trackable_value;
+	metric->histogram.lowest_trackable_value  = (int64_t)lowest_trackable_value;
+	metric->histogram.significant_figures     = significant_figures;
+	metric->histogram.bins_num = parse_histogram_bin_format((const char*)bins, &(metric->histogram.bins), type);
 
-	ret = hdr_init((int64_t)lowest_trackable_value, (int64_t)highest_trackable_value, significant_figures, &(metric_choosen->histogram.changing));
+	ret = hdr_init((int64_t)lowest_trackable_value, (int64_t)highest_trackable_value, significant_figures, &(metric->histogram.changing));
 	assert(ret==0);	
-	ret = hdr_init((int64_t)lowest_trackable_value, (int64_t)highest_trackable_value, significant_figures, &(metric_choosen->histogram.accumulated));
+	ret = hdr_init((int64_t)lowest_trackable_value, (int64_t)highest_trackable_value, significant_figures, &(metric->histogram.accumulated));
 	assert(ret==0);
 
 	switch(type)

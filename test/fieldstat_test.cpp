@@ -50,6 +50,7 @@ int main(int argc, char *argv[])
 	const char *field_list_0[] = {"c0", "c1", "c2"};
 	struct metric_id_list id_list; 
 
+
 	fieldstat_global_enable_prometheus_endpoint(9010, "/metrics");
 
 	test_instance = fieldstat_instance_create("test");
@@ -66,7 +67,7 @@ int main(int argc, char *argv[])
 		printf("Set output_interval failed!\n");
 	}
 
-	ret = fieldstat_backgroud_thead_disable(test_instance);
+	ret = fieldstat_background_thead_disable(test_instance);
 	if(ret == -1)
 	{
 		printf("Set backgroud thread disable failed!\n");

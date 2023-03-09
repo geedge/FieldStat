@@ -27,11 +27,39 @@
 #define	BLOCK_LIST_SIZE			1024*16
 
 
+#define URL_MAX_LEN			2048
+#define LEN_IP_MAX			32  //?????? 32 from document 
+#define LEN_FORMAT_MAX		32
+#define LEN_PATH_MAX		256
+#define	NUM_MAX_TABLE		64
+#define TABLE_COLUMN_SIZE	32
+#define	UDP_PAYLOAD_SIZE	1460
+#define	LEFT_MIN_BUFF_LEN	1024
+#define	REALLOC_SCALE_SIZE	2048
+#define STR_LEN_32			32
+#define STR_LEN_64			64
+#define STR_LEN_256			256
+#define STR_LEN_1024		1024
+#define NUM_MAX_METRIC_IN_TABLE 1024
+#define HISTOGRAM_WIDTH	10
+#define INSTANCE_NAME_LEN	32
+#define PROMETHEUS_ENDPOINT_DEFAULT_URL "/metrics"
+
+
+
 enum field_calc_algo
 {
 	FS_CALC_CURRENT=0,
 	FS_CALC_SPEED
 };
+
+enum field_op
+{
+	FS_OP_ADD=1,
+	FS_OP_SET,
+	FS_OP_SUB
+};
+
 
 struct stat_unit_t
 {
@@ -77,14 +105,76 @@ struct metric_t
 	{
 		struct stat_unit_t counter;
 		struct stat_unit_t gauge;
-		struct stat_unit_t single;//for status and field
 		struct stat_unit_t* line; //for line
 		struct histogram_t histogram;
-		int column_seq;	//for column
 	};
 };
 
+struct fieldstat_instance
+{
+	char name[INSTANCE_NAME_LEN];
+	//char *statsd_server_ip;
+	//char statsd_server_str_ip[LEN_IP_MAX];
+	unsigned int statsd_server_ip;
+	unsigned short statsd_server_port;
+	int statsd_output_enable;
 
+	//char line_protocol_server_str_ip[LEN_IP_MAX];
+	unsigned int line_protocol_server_ip;
+	unsigned short line_protocol_server_port;
+	int line_protocol_output_enable;
+
+	char local_output_filename[LEN_PATH_MAX];
+	char local_output_format[LEN_FORMAT_MAX];
+	int local_output_enable;
+
+	int background_thread_disable;                 //default:1
+	int output_interval_s;                         //default:2
+	int running;
+
+	struct metric_t **metric_block_list[BLOCK_LIST_SIZE];
+
+	int metric_cnt;
+	int metric_size;
+	//struct metric_t **metric;
+	struct{
+		struct metric_t **column;
+		size_t column_size;
+	} table_metrics[NUM_MAX_TABLE];
+	int *index_table[NUM_MAX_TABLE][TABLE_COLUMN_SIZE];
+	int per_table_line_number[NUM_MAX_TABLE];
+
+	int table_num;
+	int line_seq;
+
+	int prometheus_output_enable;
+
+	int histogram_cnt;
+	int summary_cnt;
+
+	struct timespec last_output_time;
+
+	pthread_t cfg_mon_t;
+	char line_protocol_send_buff[UDP_PAYLOAD_SIZE];
+	size_t line_protocol_send_buff_offset;
+	int line_protocol_socket;
+	pthread_mutex_t output_lock;
+
+
+	FILE* fp;
+};
+
+struct prometheus_endpoint_instance
+{
+	unsigned short port;
+	char *url_path;
+	pthread_t tid;
+	int running;
+	struct http_server_s *server_handle;
+	int fs_instance_cnt;
+	struct fieldstat_instance **fs_instance; //TO refactor
+	int fs_instance_size;                    // number
+};
 
 
 
