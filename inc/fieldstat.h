@@ -1,7 +1,5 @@
 #pragma once
 #include <stdio.h>
-#include <time.h>
-#include <pthread.h>
 #ifdef __cplusplus
 extern "C"
 {
@@ -21,11 +19,12 @@ struct metric_id_list
 	int id[64];  // define marco
 };
 
-/*
- * @param listen_port 
- * @param url if NULL use "/metrics" default
- * */
-struct fieldstat_instance * fieldstat_instance_create(void);
+/**
+ * @param name  The instance name.
+ * @return      Instance id. NULL is failed, Not NULL is successd.
+ * the output.
+ */
+struct fieldstat_instance * fieldstat_instance_create(const char *name);
 int fieldstat_global_enable_prometheus_endpoint(unsigned short listen_port, const char *url);
 int fieldstat_set_prometheus_output(struct fieldstat_instance *instance);
 int fieldstat_set_statsd_server(struct fieldstat_instance *instance, const char *ip, unsigned short port);
@@ -33,7 +32,6 @@ int fieldstat_set_line_protocol_server(struct fieldstat_instance *instance, cons
 int fieldstat_set_local_output(struct fieldstat_instance *instance, const char *filename, const char *format);//format could be "json" or "default"
 int fieldstat_backgroud_thead_disable(struct fieldstat_instance *instance);
 int fieldstat_set_output_interval(struct fieldstat_instance *instance, int seconds);//default is 2 seconds
-int fieldstat_set_app_name(struct fieldstat_instance *instance, const char *app_name); //app_name must set delete
 
 
 /*

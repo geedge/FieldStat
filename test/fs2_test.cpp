@@ -52,12 +52,7 @@ int main(int argc, char *argv[])
 
 	fieldstat_global_enable_prometheus_endpoint(9010, "/metrics");
 
-	test_instance = fieldstat_instance_create();
-	ret = fieldstat_set_app_name(test_instance, "test");
-	if(ret == -1)
-	{
-		printf("set fieldstat app_name failed!\n");
-	}
+	test_instance = fieldstat_instance_create("test");
 
 	ret = fieldstat_set_local_output(test_instance, "./test.fs", "default");
 	if(ret == -1)

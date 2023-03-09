@@ -66,6 +66,7 @@ static __attribute__((__used__)) const char * GIT_VERSION_UNKNOWN = NULL;
 #define STR_LEN_1024		1024
 #define NUM_MAX_METRIC_IN_TABLE 1024
 #define HISTOGRAM_WIDTH	10
+#define INSTANCE_NAME_LEN	32
 
 
 enum field_op
@@ -78,6 +79,7 @@ enum field_op
 
 struct fieldstat_instance
 {
+	char name[LEN_APP_NAME];
 	//char *statsd_server_ip;
 	char statsd_server_str_ip[LEN_IP_MAX];
 	unsigned int statsd_server_ip;
@@ -95,7 +97,6 @@ struct fieldstat_instance
 
 	int background_thread_disable;                 //default:1
 	int output_interval_s;                         //default:2
-	char app_name[LEN_APP_NAME];
 	int running;
 
 	struct metric_t **metric_block_list[BLOCK_LIST_SIZE];
@@ -126,6 +127,8 @@ struct fieldstat_instance
 	char line_protocol_send_buff[UDP_PAYLOAD_SIZE];
 	size_t line_protocol_send_buff_offset;
 	int line_protocol_socket;
+	pthread_mutex_t output_lock;
+
 
 	FILE* fp;
 };
@@ -360,23 +363,6 @@ static int send_udp(int sd, unsigned int dest_ip, unsigned short dest_port, cons
 		already_sended_len=+this_sended_len;			
 	}
 	
-	return 0;
-}
-
-
-
-int fieldstat_set_app_name(struct fieldstat_instance *instance, const char *app_name)
-{
-	int len_app_name = strlen(app_name);
-	if(instance->running == 1)
-	{
-		return -1;
-	}
-	if(len_app_name <= 0 && len_app_name >= LEN_APP_NAME )
-	{
-		return -1;
-	}
-	strncpy(instance->app_name,(char*)app_name, len_app_name);
 	return 0;
 }
 
@@ -653,7 +639,7 @@ static void output_line_protocol_table(struct fieldstat_instance *instance)
 				field_set_buff_append += snprintf(field_set_buff_append, sizeof(field_set_buff) - (field_set_buff - field_set_buff), "%s=%lld,", metric->table_column_name, value);
 			}
 
-			tag_set_buff_append += snprintf(tag_set_buff_append, sizeof(tag_set_buff) - (tag_set_buff_append - tag_set_buff), ",app_name=%s", instance->app_name);
+			tag_set_buff_append += snprintf(tag_set_buff_append, sizeof(tag_set_buff) - (tag_set_buff_append - tag_set_buff), ",app_name=%s", instance->name);
 			output_line_protocol_tag_set_buf(metric, tag_set_buff_append, sizeof(tag_set_buff) - (tag_set_buff_append - tag_set_buff));
 
 			if(field_set_buff_append - field_set_buff > 0)
@@ -699,7 +685,7 @@ int line_protocol_output(struct fieldstat_instance *instance)
 				if(value != 0)
 				{
 					snprintf(field_set_buff, UDP_PAYLOAD_SIZE, "%s=%lld", metric->field_name, value);
-					tag_set_buff_append += snprintf(tag_set_buff_append, sizeof(tag_set_buff) - (tag_set_buff_append - tag_set_buff), ",app_name=%s", instance->app_name);
+					tag_set_buff_append += snprintf(tag_set_buff_append, sizeof(tag_set_buff) - (tag_set_buff_append - tag_set_buff), ",app_name=%s", instance->name);
 					/*
 					for(j = 0; j < (int)metric->n_tag; j++)
 					{
@@ -717,7 +703,7 @@ int line_protocol_output(struct fieldstat_instance *instance)
 				if(value != 0)
 				{
 					snprintf(field_set_buff, UDP_PAYLOAD_SIZE, "%s=%lld", metric->field_name, value);
-					tag_set_buff_append += snprintf(tag_set_buff_append, sizeof(tag_set_buff) - (tag_set_buff_append - tag_set_buff), ",app_name=%s", instance->app_name);
+					tag_set_buff_append += snprintf(tag_set_buff_append, sizeof(tag_set_buff) - (tag_set_buff_append - tag_set_buff), ",app_name=%s", instance->name);
 					/*
 					for(j = 0; j < (int)metric->n_tag; j++)
 					{
@@ -1269,11 +1255,16 @@ void fieldstat_instance_start(struct fieldstat_instance *instance)
 	//append instance to prometheus output
 }
 
-struct fieldstat_instance * fieldstat_instance_create(void)
+struct fieldstat_instance * fieldstat_instance_create(const char *name)
 {
 	struct fieldstat_instance *instance = (struct fieldstat_instance *)calloc(sizeof(struct fieldstat_instance),1);
 
-	strcpy(instance->app_name, "?");
+	if(strlen(name) >= INSTANCE_NAME_LEN)
+	{
+		return NULL;
+	}
+
+	strcpy(instance->name, name);
 	instance->running = 0;
 	instance->output_interval_s = 2;		//default 2s
 	instance->background_thread_disable = 0;
@@ -1402,23 +1393,32 @@ struct metric_id_list fieldstat_register_table_metrics(struct fieldstat_instance
 
 /*
 * ret = -1, output not match fieldstat instance
+	output:
+		/metrics
+		/sapp
+		/tfe
+		...
 * ret >=0 && ret < instance_cnt  output sepecify fieldstat instance 
+	output:
+		http://127.0.0.1:9273/sapp content
 * ret = instance_cnt output all fieldstat instance
+   	output:  
+		http://127.0.0.1:9273/metrics content
 */
 static int prometheus_get_fs_instance_id(struct prometheus_endpoint_instance *global_prometheus_output, char *uri, int uri_len)
 {
 	int i = 0;
 
 	if(uri_len == (int)strlen(global_prometheus_output->url_path) && 
-	         0 == memcmp(uri, global_prometheus_output->url_path, strlen(global_prometheus_output->url_path)))
+			 0 == memcmp(uri, global_prometheus_output->url_path, strlen(global_prometheus_output->url_path)))
 	{		
 		return global_prometheus_output->fs_instance_cnt;
 	}
 	
 	for( i = 0; i < global_prometheus_output->fs_instance_cnt; i++)
 	{
-		if(uri_len - 1 == (int)strlen(global_prometheus_output->fs_instance[i]->app_name) && 
-					 0 == memcmp( uri + 1, global_prometheus_output->fs_instance[i]->app_name, strlen(global_prometheus_output->fs_instance[i]->app_name)))
+		if(uri_len - 1 == (int)strlen(global_prometheus_output->fs_instance[i]->name) && 
+					 0 == memcmp( uri + 1, global_prometheus_output->fs_instance[i]->name, strlen(global_prometheus_output->fs_instance[i]->name)))
 		{
 			return i;
 		}
@@ -1445,7 +1445,7 @@ static void prometheus_output_uri_list(struct prometheus_endpoint_instance *prom
 
 	for(i = 0; i < prometheus_output->fs_instance_cnt; i++)
 	{
-		payload_append_position += snprintf(payload_append_position, payload_len - (payload_append_position - payload),"\t/%s\n", fs_instance[i]->app_name);
+		payload_append_position += snprintf(payload_append_position, payload_len - (payload_append_position - payload),"\t/%s\n", fs_instance[i]->name);
 	}
 
 	response = http_response_init();
@@ -1593,7 +1593,7 @@ static int prometheus_get_instance_metric_playload(struct fieldstat_instance *in
 	}
 
 
-	str_unescape(instance->app_name, app_name, sizeof(app_name));
+	str_unescape(instance->name, app_name, sizeof(app_name));
 
 	for(i = 0; i < instance->metric_cnt; i++)
 	{
