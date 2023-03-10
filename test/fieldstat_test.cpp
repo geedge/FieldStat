@@ -67,11 +67,11 @@ int main(int argc, char *argv[])
 		printf("Set output_interval failed!\n");
 	}
 
-	ret = fieldstat_background_thead_disable(test_instance);
-	if(ret == -1)
-	{
-		printf("Set backgroud thread disable failed!\n");
-	}
+	// ret = fieldstat_background_thead_disable(test_instance);
+	// if(ret == -1)
+	// {
+	// 	printf("Set backgroud thread disable failed!\n");
+	// }
 
 	ret = fieldstat_set_line_protocol_server(test_instance, "127.0.0.1", 8001);
 	if(ret == -1)
@@ -123,7 +123,7 @@ int main(int argc, char *argv[])
 	const char *field_list[] = {"column_0", "colunm_1", "column_2"};
 */
 	int table_id = -1;
-	table_id = fieldstat_register_table(test_instance, table_type, field_list, sizeof(field_list)/sizeof(field_list[0]));
+	table_id = fieldstat_register_table(test_instance, "table_0", field_list ,table_type, sizeof(field_list)/sizeof(field_list[0]));
 	if(table_id == -1)
 	{
 		printf("Failed to register metric table\n");
@@ -143,7 +143,7 @@ int main(int argc, char *argv[])
 		printf("%d\n", id_list.id[i]);
 	}
 	
-	table_id = fieldstat_register_table(test_instance, table_type, field_list_0, sizeof(field_list_0)/sizeof(field_list_0[0]));
+	table_id = fieldstat_register_table(test_instance, "table_1", field_list_0, table_type,  sizeof(field_list_0)/sizeof(field_list_0[0]));
 	if(table_id == -1)
 	{
 		printf("Failed to register metric table list_0\n");
@@ -163,20 +163,20 @@ int main(int argc, char *argv[])
 		snprintf(buff, sizeof(buff), "{rpc_%d}", i);
 		if (i < 2)
 		{
-			fieldstat_register_histogram(test_instance, FIELD_TYPE_SUMMARY, buff, NULL, NULL, 0, 
+			fieldstat_register_summary(test_instance, buff, NULL, NULL, 0, 
 			"0.1,0.5,0.8,0.9,0.95,0.99",1,10000,3);
 			//histogram_ids[i] = FS_register_histogram(handle, FS_CALC_SPEED, buff, 1, 100000, 3);
 		}
 		else
 		{
-			fieldstat_register_histogram(test_instance, FILED_TYPE_HISTOGRAM, buff, NULL, NULL, 0, 
+			fieldstat_register_histogram(test_instance, buff, NULL, NULL, 0, 
 			"1.0,2.0,3.0,4.0,5.0,6.0",1,10000,3);
 		}
 	}
 
-	int abcd = fieldstat_register_histogram(test_instance, FILED_TYPE_HISTOGRAM, "re_hi", NULL, NULL, 0, 
+	int abcd = fieldstat_register_histogram(test_instance,  "re_hi", NULL, NULL, 0, 
 	"10,20,30,40,50",1,10000,3);
-	abcd = fieldstat_register_histogram(test_instance, FILED_TYPE_HISTOGRAM, "re_hi000", NULL, NULL, 0, 
+	abcd = fieldstat_register_histogram(test_instance, "re_hi000", NULL, NULL, 0, 
 	"10,20,30,40,60",1,10000,3);
 	fieldstat_instance_start(test_instance);
 
@@ -195,8 +195,9 @@ int main(int argc, char *argv[])
 	}
 
 
-	sleep(1);
-	fieldstat_passive_output(test_instance);
+	//sleep(1);
+	//fieldstat_passive_output(test_instance);
+	fieldstat_instance_start(test_instance);
 	printf("Testing for fieldstat\n");
 	sleep(10000);
 	return 0;

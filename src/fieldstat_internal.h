@@ -31,8 +31,8 @@
 #define LEN_IP_MAX			32  //?????? 32 from document 
 #define LEN_FORMAT_MAX		32
 #define LEN_PATH_MAX		256
-#define	NUM_MAX_TABLE		64
-#define TABLE_COLUMN_SIZE	32
+#define	TABLE_MAX_NUM		64
+#define TABLE_COLUMN_SIZE	64
 #define	UDP_PAYLOAD_SIZE	1460
 #define	LEFT_MIN_BUFF_LEN	1024
 #define	REALLOC_SCALE_SIZE	2048
@@ -44,6 +44,7 @@
 #define HISTOGRAM_WIDTH	10
 #define INSTANCE_NAME_LEN	32
 #define PROMETHEUS_ENDPOINT_DEFAULT_URL "/metrics"
+#define	TABLE_LINE_SCALE_NUM		1024
 
 
 
@@ -100,15 +101,37 @@ struct metric_t
 	size_t line_seq;
 	int table_column_id;
 	char *table_column_name;
+	char *table_name;
 
 	union
 	{
 		struct stat_unit_t counter;
 		struct stat_unit_t gauge;
-		struct stat_unit_t* line; //for line
 		struct histogram_t histogram;
 	};
 };
+
+struct table_line
+{
+	char *name;
+	size_t n_tag;
+	char *tag_key[N_TAG_MAX];
+	char *tag_value[N_TAG_MAX];
+
+	int metric_id_belong_to_line[TABLE_COLUMN_SIZE];
+};
+
+struct table_metric
+{
+	char *name;
+	char *column_name[TABLE_COLUMN_SIZE];
+	enum field_type column_type[TABLE_COLUMN_SIZE];
+	int column_cnt;
+
+	int line_cnt;
+	struct table_line **line_block[BLOCK_LIST_SIZE];
+};
+
 
 struct fieldstat_instance
 {
@@ -135,14 +158,12 @@ struct fieldstat_instance
 	struct metric_t **metric_block_list[BLOCK_LIST_SIZE];
 
 	int metric_cnt;
-	int metric_size;
 	//struct metric_t **metric;
-	struct{
-		struct metric_t **column;
-		size_t column_size;
-	} table_metrics[NUM_MAX_TABLE];
-	int *index_table[NUM_MAX_TABLE][TABLE_COLUMN_SIZE];
-	int per_table_line_number[NUM_MAX_TABLE];
+
+	struct table_metric *table_metrics[TABLE_MAX_NUM];
+
+	int *index_table[TABLE_MAX_NUM][TABLE_COLUMN_SIZE];
+	int per_table_line_number[TABLE_MAX_NUM];
 
 	int table_num;
 	int line_seq;
