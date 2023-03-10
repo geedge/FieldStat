@@ -1,9 +1,28 @@
-#ifndef	__FIELD_STAT2_INTERNAL_H__
-#define	__FIELD_STAT2_INTERNAL_H__
+#pragma once
 
 #include <pthread.h>
 #include "hdr_histogram.h"
 #include "threadsafe_counter.h"
+#include "fieldstat.h"
+#include <assert.h>
+#include <string.h>
+#include "cJSON.h"
+#include <sys/socket.h>//socket
+#include <sys/types.h>//socket
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <string.h> //strerror
+#include <errno.h>//strerror
+#include <fcntl.h>//fcntl
+#include <unistd.h>//fcntl
+#include <net/if.h>//fcntl
+#include <sys/ioctl.h>//ioctl
+#include <stdio.h>
+#include <time.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <assert.h>
+#include <sys/time.h>
 
 #define	INIT_STAT_FIELD_NUM		1024
 #define	MAX_STAT_COLUMN_NUM		64
@@ -197,6 +216,16 @@ struct prometheus_endpoint_instance
 	int fs_instance_size;                    // number
 };
 
+void prometheus_endpoint_instance_output(struct http_request_s* request);
 
-
-#endif
+char* __str_dup(const char* str);
+long long hdr_count_le_value(const struct hdr_histogram* h, long long value);
+struct metric_t * get_metric(struct fieldstat_instance *instance, int metric_id);
+long long get_metric_unit_val(struct metric_t *metric,enum field_calc_algo calc_type,int is_refer);
+int is_valid_field_name(const char* name);
+struct metric_t ** read_metric_slot(struct fieldstat_instance *instance, int metric_id);
+struct metric_t* metric_new(enum field_type type, const char *field_name, const char *tag_key[], const char *tag_value[], size_t n_tag);
+int fieldstat_output_file(struct fieldstat_instance *instance,long long interval_ms);
+struct table_line * read_table_line(struct table_metric *table, int line_id);
+int send_udp(int sd, unsigned int dest_ip, unsigned short dest_port, const char * data, int len);
+int line_protocol_output(struct fieldstat_instance *instance);
