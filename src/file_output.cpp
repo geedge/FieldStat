@@ -166,7 +166,7 @@ static int output_file_format_default_type_counter(struct fieldstat_instance *in
 			//metric = instance->metric[metric_id[i+j]];
 			metric = get_metric(instance, metric_id[i+j]);
 			value  = get_metric_unit_val(metric,FS_CALC_CURRENT, 1);
-			append_pos += snprintf(append_pos, 
+			append_pos += snprintf(append_pos,
 									sizeof(print_buf) - (append_pos - print_buf), 
 									"%10lld\t", 
 									value

@@ -17,189 +17,268 @@
 #define TEST_RUNTIME_REG_LINE_NUM 6
 
 
+int g_counter_id[3];
+int g_gauge_id[3];
+int g_histogram_id = -1;
+int g_summary_id = -1;
+struct metric_id_list g_id_list;
 
-int main(int argc, char *argv[])
+struct thread_para
+{
+	int loops;
+	struct fieldstat_instance * instance;
+	int thread_id;
+};
+
+static void* worker_thread(void* arg)
+{
+	
+	struct thread_para* para=(struct thread_para*)arg;
+	int loops = para->loops, i=0;
+	struct fieldstat_instance *instance = para->instance;
+	while (loops > 0)
+	{
+		loops--;
+		for (i = 0; i < 3; i++)
+		{
+			fieldstat_value_incrby(instance,g_counter_id[i], i + 1);
+		}
+		for (i = 0; i < 3; i++)
+		{
+			fieldstat_value_incrby(instance, g_gauge_id[i], i + 10);
+		}
+		for(i = 0; i < 10; i ++)
+		{
+			fieldstat_value_set(instance,g_histogram_id, i + 1);
+		}
+		for (i = 101; i < 201; i++)
+		{
+			fieldstat_value_set(instance, g_summary_id, i);
+		}
+
+		for(i = 0; i < g_id_list.count; i++)
+		{
+			fieldstat_value_incrby(instance, g_id_list.id[i], 1);
+		}
+
+		sleep(1);
+	}
+	return NULL;
+}
+
+
+int set_instance_parameter(struct fieldstat_instance *instance)
 {
 	int ret = 0;
-	int i = 0;
-	char buff[128];
-	struct fieldstat_instance * test_instance = NULL;
-	const char *tag_key[] = {"A","B","C"};
-	const char *tag_value[] = {"a","b","c"};
 
-	const char *tag_key0[] = {"A0","B0","C0"};
-	const char *tag_value0[] = {"a0","b0","c0"};
+	do {
+		ret = fieldstat_global_enable_prometheus_endpoint(9010, "/metrics");
+		if(ret == -1)
+		{
+			printf("Failed to enable prometheus endpoint\n");
+			break;
+		}
 
-	const char *tag_key1[] = {"A1","B1","C1"};
-	const char *tag_value1[] = {"a1","b1","c1"};
+		ret = fieldstat_set_local_output(instance, "./test.fs", "default");
+		if(ret == -1)
+		{
+			printf("set fieldstat local_outpud failed!\n");
+			break;
+		}
 
-	const char *tag_key2[] = {"A2","B2","C2"};
-	const char *tag_value2[] = {"a2","b2","c2"};
-
-	const char *tag_key3[] = {"A3","B3","C3"};
-	const char *tag_value3[] = {"a3","b3","c3"};
-
-	const char *tag_key4[] = {"A4","B4","C4"};
-	const char *tag_value4[] = {"a4","b4","c4"};
-
-	//const char *tag_key5[] = {"A5","B5","C5"};
-	//const char *tag_value5[] = {"a5","b5","c5"};
-
-	enum field_type table_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
-	const char *field_list[] = {"column_0", "colunm_1", "column_2"};
-	const char *field_list_0[] = {"c0", "c1", "c2"};
-	struct metric_id_list id_list; 
-
-
-	fieldstat_global_enable_prometheus_endpoint(9010, "/metrics");
-
-	test_instance = fieldstat_instance_create("test");
-
-	ret = fieldstat_set_local_output(test_instance, "./test.fs", "default");
-	if(ret == -1)
-	{
-		printf("set fieldstat local_outpud failed!\n");
-	}
-
-	ret = fieldstat_set_output_interval(test_instance, 5);
-	if(ret == -1)
-	{
-		printf("Set output_interval failed!\n");
-	}
-
-	// ret = fieldstat_background_thread_disable(test_instance);
-	// if(ret == -1)
-	// {
-	// 	printf("Set backgroud thread disable failed!\n");
-	// }
-
-	ret = fieldstat_set_line_protocol_server(test_instance, "127.0.0.1", 8001);
-	if(ret == -1)
-	{
-		printf("Failed to set line_protocol server\n");
-	}
-
-	ret = fieldstat_set_statsd_server(test_instance, "192.168.100.1", 8002);
-	if(ret == -1)
-	{
-		printf("Failed to set statsd_server!\n");
-	}
-
-	ret = fieldstat_set_prometheus_output(test_instance);
-	if(ret == -1)
-	{
-		printf("Failed to set prometheus_output_enable!\n");
-	}
-
-	ret = fieldstat_register(test_instance, FIELD_TYPE_COUNTER, "metric_0", tag_key, tag_value, sizeof(tag_key)/sizeof(tag_key[0]));
-	if(ret == -1)
-	{
-		printf("Failed to register metric!\n");
-	}
-
-	fieldstat_value_set(test_instance, ret, 1);
-
-	ret = fieldstat_register(test_instance, FIELD_TYPE_COUNTER, "metric_1", tag_key0, tag_value0, sizeof(tag_key0)/sizeof(tag_key0[0]));
-	if(ret == -1)
-	{
-		printf("Failed to register metric!\n");
-	}
-	fieldstat_value_set(test_instance, ret, 2);
-	ret = fieldstat_register(test_instance, FIELD_TYPE_GAUGE, "gauge_0",tag_key1, tag_value1, sizeof(tag_key1)/sizeof(tag_key1[0]));
-	if(ret == -1)
-	{
-		printf("Failed to register metric gauge_0\n");
-	}
-	fieldstat_value_set(test_instance, ret, 9999);
-	ret = fieldstat_register(test_instance, FIELD_TYPE_GAUGE, "gauge_0_tag", NULL, NULL, 0);
-	if(ret == -1)
-	{
-		printf("Failed to register metric gauge_0_tag\n");
-	}
-	//fieldstat_value_set(test_instance, ret, 1111);
-	fieldstat_value_decrby(test_instance, ret, 22);
+		ret = fieldstat_set_output_interval(instance, 1);
+		if(ret == -1)
+		{
+			printf("Set output_interval failed!\n");
+			break;
+		}		
+		
+		ret = fieldstat_set_line_protocol_server(instance, "127.0.0.1", 8001);
+		if(ret == -1)
+		{
+			printf("Failed to set line_protocol server\n");
+			break;
+		}
+		ret = fieldstat_set_prometheus_output(instance);
+		if(ret == -1)
+		{
+			printf("Failed to set prometheus_output_enable!\n");
+			break;
+		}
 /*
-	enum field_type table_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
-	const char *field_list[] = {"column_0", "colunm_1", "column_2"};
+		ret = fieldstat_background_thread_disable(instance);
+		if(ret == -1)
+		{
+			printf("Failed to disable filedstat background thread\n");
+		}
 */
+	}while(0);
+
+
+	return ret;
+}
+
+int test_register_by_fieldstat_type(struct fieldstat_instance *instance)
+{
+	int ret = 0;
+//Register counter start
+	ret = fieldstat_register(instance, FIELD_TYPE_COUNTER, "counter_no_tags",NULL,NULL,0);
+	if(ret == -1)
+	{
+		printf("Failed ot register counter_no_tags, type = counter\n");
+		return ret;
+	}
+	g_counter_id[0] = ret;
+	const char * counter_with_one_key[] = {"C_one_tag"};
+	const char * counter_with_one_value[] = {"C_one_tag_yes"};
+
+	ret = fieldstat_register(instance, FIELD_TYPE_COUNTER,"counter_with_one_tag", counter_with_one_key, 
+							counter_with_one_value, sizeof(counter_with_one_key)/sizeof(counter_with_one_key[0]));
+	if(ret == -1)
+	{
+		printf("Failed ot register counter_with_one_tag, type = counter\n");
+		return ret;
+	}
+	g_counter_id[1] = ret;
+
+	const char * counter_with_keys[] = {"C_tags_0","C_tags_1","C_tags_2"};
+	const char * counter_with_values[] = {"C_tags_0_yes", "C_tags_1_yes","C_tags_2_yes"};
+
+	ret = fieldstat_register(instance, FIELD_TYPE_COUNTER,"counter_with_tags", counter_with_keys, 
+							counter_with_values, sizeof(counter_with_keys)/sizeof(counter_with_keys[0]));
+	if(ret == -1)
+	{
+		printf("Failed ot register counter_with_tags, type = counter\n");
+		return ret;
+	}
+	g_counter_id[2] = ret;
+//Register counter end
+
+//Register gauge start 
+
+	ret = fieldstat_register(instance, FIELD_TYPE_GAUGE, "gauge_no_tags",NULL,NULL,0);
+	if(ret == -1)
+	{
+		printf("Failed ot register gauge_no_tags, type = gauge\n");
+		return ret;
+	}
+	g_gauge_id[0] = ret;
+
+	const char * gauge_with_one_key[] = {"G_one_tag"};
+	const char * gauge_with_one_value[] = {"G_one_tag_yes"};
+	ret = fieldstat_register(instance, FIELD_TYPE_GAUGE,"gauge_with_one_tag", gauge_with_one_key, 
+							gauge_with_one_value, sizeof(gauge_with_one_key)/sizeof(gauge_with_one_key[0]));
+	if(ret == -1)
+	{
+		printf("Failed ot register gauge_with_one_tag, type = gauge\n");
+		return ret;
+	}
+	g_gauge_id[1] = ret;
+
+	const char * gauge_with_keys[] = {"G_tags_0","G_tags_1","G_tags_2"};
+	const char * gauge_with_values[] = {"G_tags_0_yes", "G_tags_1_yes","G_tags_2_yes"};
+
+	ret = fieldstat_register(instance, FIELD_TYPE_GAUGE,"gauge_with_tags", gauge_with_keys, 
+							gauge_with_values, sizeof(gauge_with_keys)/sizeof(gauge_with_keys[0]));
+	if(ret == -1)
+	{
+		printf("Failed ot register gauge_with_tags, type = gauge\n");
+		return ret;
+	}
+	g_gauge_id[2] = ret;
+//Register gauge end
+
+//Register histogram and summary start
+	const char * bins_htr = "10,20,30,40,50,60,70,80,90";
+	ret = fieldstat_register_histogram(instance, "htr",NULL,NULL,0,bins_htr,1,1000,2);
+	if(ret == -1)
+	{
+		printf("Failed ot register htr, type = histogram\n");
+		return ret;
+	}
+	g_histogram_id = ret;
+	const char * bins_sar = "0.1,0.5,0.8,0.9,0.95,0.99";
+	ret = fieldstat_register_summary(instance, "sar",NULL,NULL,0,bins_sar,1,1000,2);
+	if(ret == -1)
+	{
+		printf("Failed ot register sar, type = summary\n");
+		return ret;
+	}
+	g_summary_id = ret;
+//Register histogram and summary end
+
+//Register table start
 	int table_id = -1;
-	table_id = fieldstat_register_table(test_instance, "table_0", field_list ,table_type, sizeof(field_list)/sizeof(field_list[0]));
+	const char *column[] = {"T_success_log","T_fail_log"};
+	enum field_type table_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_GAUGE};
+	struct metric_id_list id_list;
+	table_id = fieldstat_register_table(instance, "table_test", column, table_type, sizeof(column)/sizeof(column[0]));
 	if(table_id == -1)
 	{
 		printf("Failed to register metric table\n");
 	}
 
-	id_list = fieldstat_register_table_metrics(test_instance, table_id, "line_0", tag_key2, tag_value2, sizeof(tag_key2)/sizeof(tag_key2[0]));
-	for(i = 0; i < id_list.count; i++)
+	id_list = fieldstat_register_table_metrics(instance, table_id, "SUM", NULL, NULL, 0);
+	if(id_list.count == 0)
 	{
-		fieldstat_value_set(test_instance, id_list.id[i], 100 + i);
-		printf("%d\n", id_list.id[i]);
+		return -1;
 	}
+	g_id_list = id_list;
+//Register table end
 
-	id_list = fieldstat_register_table_metrics(test_instance, table_id, "line_2", tag_key3, tag_value3, sizeof(tag_key3)/sizeof(tag_key3[0]));
-	for(i = 0; i < id_list.count; i++)
-	{
-		fieldstat_value_set(test_instance,id_list.id[i], 1000 + i);
-		printf("%d\n", id_list.id[i]);
-	}
-	
-	table_id = fieldstat_register_table(test_instance, "table_1", field_list_0, table_type,  sizeof(field_list_0)/sizeof(field_list_0[0]));
-	if(table_id == -1)
-	{
-		printf("Failed to register metric table list_0\n");
-	}
-
-	id_list = fieldstat_register_table_metrics(test_instance, table_id, "line_0", tag_key4, tag_value4, sizeof(tag_key4)/sizeof(tag_key4[0]));
-	printf("id_list.num:%d\n",id_list.count);
-	for(i = 0; i < id_list.count; i++)
-	{
-		fieldstat_value_set(test_instance,id_list.id[i], 2000 + i);
-		printf("%d\n", id_list.id[i]);
-	}
+	return ret;
+}
 
 
-	for (i = 0; i < TEST_HISTOGRAM_NUM; i++)
+int main(int argc, char *argv[])
+{
+	int ret = 0;
+
+	struct fieldstat_instance *test_instance = fieldstat_instance_create("test");;
+
+	if(test_instance == NULL)
 	{
-		snprintf(buff, sizeof(buff), "{rpc_%d}", i);
-		if (i < 2)
-		{
-			fieldstat_register_summary(test_instance, buff, NULL, NULL, 0, 
-			"0.1,0.5,0.8,0.9,0.95,0.99",1,10000,3);
-			//histogram_ids[i] = FS_register_histogram(handle, FS_CALC_SPEED, buff, 1, 100000, 3);
-		}
-		else
-		{
-			fieldstat_register_histogram(test_instance, buff, NULL, NULL, 0, 
-			"1.0,2.0,3.0,4.0,5.0,6.0",1,10000,3);
-		}
+		printf("Create fieldstat instance error\n");
+		return -1;
 	}
 
-	int abcd = fieldstat_register_histogram(test_instance,  "re_hi", NULL, NULL, 0, 
-	"10,20,30,40,50",1,10000,3);
-	abcd = fieldstat_register_histogram(test_instance, "re_hi000", NULL, NULL, 0, 
-	"10,20,30,40,60",1,10000,3);
+	ret = set_instance_parameter(test_instance);
+
+	if(ret == -1)
+	{
+		printf("Set fieldstat instance parameter error\n");
+		return ret;
+	}
+
+	ret = test_register_by_fieldstat_type(test_instance);
+
+	if(ret == -1)
+	{
+		printf("Set fieldstat instance parameter error\n");
+		return ret;
+	}
+
+
 	fieldstat_instance_start(test_instance);
+	sleep(1);
 
-	for(i = 0; i < id_list.count; i++)
+	int thread_num=100;
+	pthread_t threads[thread_num];
+	struct thread_para para;
+	para.loops=10;
+	para.instance= test_instance;
+	for(int i=0; i<thread_num; i++)
 	{
-		fieldstat_value_set(test_instance,id_list.id[i], 5000 + i);
-		printf("%d\n", id_list.id[i]);
+		pthread_create(&(threads[i]), NULL, worker_thread, &para);
 	}
-
-	//long long preset[] = {1, 4, 10, 50, 20, 30, 40, 200, 300, 400, 600, 1000, 2000, 4000, 5000};
-	long long preset[] = {1,2,3,4,5,6,3000,3500,3600,3700,3800,4000,4000};
-	for (i = 0; (size_t)i < sizeof(preset) / sizeof(long long); i++)
+	void *temp;
+	for(int i=0; i<thread_num; i++)
 	{
-		fieldstat_value_set(test_instance,abcd, preset[i]);
-		//FS_operate(handle, histogram_ids[i], 0, FS_OP_SET, preset[j]);
+		pthread_join(threads[i], (void**)&temp);
 	}
-
-
-	//sleep(1);
 	//fieldstat_passive_output(test_instance);
-	fieldstat_instance_start(test_instance);
-	printf("Testing for fieldstat\n");
-	sleep(10000);
+	sleep(1000);
+
 	return 0;
 }
 
