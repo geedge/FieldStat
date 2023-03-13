@@ -225,7 +225,7 @@ int fieldstat_set_output_interval(struct fieldstat_instance *instance, int secon
 	return 0;
 }
 
-int fieldstat_background_thead_disable(struct fieldstat_instance *instance)
+int fieldstat_background_thread_disable(struct fieldstat_instance *instance)
 {
 	if(instance->running == 1)
 	{
@@ -442,13 +442,14 @@ void fieldstat_instance_start(struct fieldstat_instance *instance)
 
 struct fieldstat_instance * fieldstat_instance_create(const char *name)
 {
-	struct fieldstat_instance *instance = (struct fieldstat_instance *)calloc(sizeof(struct fieldstat_instance),1);
+	struct fieldstat_instance *instance =  NULL;
 
 	if(strlen(name) >= INSTANCE_NAME_LEN)
 	{
 		return NULL;
 	}
 
+	instance = (struct fieldstat_instance *)calloc(sizeof(struct fieldstat_instance),1);
 	strcpy(instance->name, name);
 	instance->running = 0;
 	instance->output_interval_s = 2;

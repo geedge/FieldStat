@@ -1,9 +1,6 @@
 cmake_minimum_required (VERSION 2.8)
 
-set(lib_name MESA_field_stat2)
-
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_C_STANDARD 11)
+set(lib_name fieldstat)
 
 project (${lib_name})
 
@@ -59,7 +56,7 @@ set_target_properties(${lib_name}_static PROPERTIES OUTPUT_NAME ${lib_name})
 
 install(TARGETS ${lib_name}_shared LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib COMPONENT LIBRARIES)
 install(TARGETS ${lib_name}_static LIBRARY ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib COMPONENT LIBRARIES)
-install(FILES inc/field_stat2.h   DESTINATION   ${CMAKE_INSTALL_PREFIX}/include/MESA COMPONENT HEADER)
+install(FILES inc/fieldstat.h   DESTINATION   ${CMAKE_INSTALL_PREFIX}/include/MESA COMPONENT HEADER)
 
 include(Package)
 

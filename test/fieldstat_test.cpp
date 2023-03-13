@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
 		printf("Set output_interval failed!\n");
 	}
 
-	// ret = fieldstat_background_thead_disable(test_instance);
+	// ret = fieldstat_background_thread_disable(test_instance);
 	// if(ret == -1)
 	// {
 	// 	printf("Set backgroud thread disable failed!\n");

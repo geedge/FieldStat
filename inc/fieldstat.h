@@ -4,6 +4,9 @@
 extern "C"
 {
 #endif
+
+#define TABLE_COLUMN_MAX_SIZE 64
+
 enum field_type
 {
 	FIELD_TYPE_COUNTER,
@@ -16,13 +19,13 @@ struct fieldstat_instance;
 struct metric_id_list
 {
 	int count;
-	int id[64];  // define marco
+	int id[TABLE_COLUMN_MAX_SIZE];  // define marco
 };
 
 /**
  * Create fieldstat instance.
  * @param name  The instance name.
- * @return Instance id. NULL is failed, Not NULL is successd.
+ * @return Instance ptr. NULL is failed, Not NULL is successd.
  */
 struct fieldstat_instance * fieldstat_instance_create(const char *name);
 /**
@@ -67,7 +70,7 @@ int fieldstat_set_local_output(struct fieldstat_instance *instance, const char *
  * @param instance The Fieldstat instance.
  * @return -1 is failed. 0 is success.
  */
-int fieldstat_background_thead_disable(struct fieldstat_instance *instance);
+int fieldstat_background_thread_disable(struct fieldstat_instance *instance);
 /**
  * Set the output interval in seconds
  * @param seconds  In seconds.
@@ -82,7 +85,7 @@ int fieldstat_set_output_interval(struct fieldstat_instance *instance, int secon
  * @param tag_key Tag key array
  * @param tag_value Tag key array
  * @param n_tag size of tag_key[] and tag_value[]
- * @return -1 is failed. 0 is success.
+ * @return metric id. -1 is failed. >=0 is success.
  */
 int fieldstat_register(struct fieldstat_instance *instance, enum field_type type, const char *field_name, const char *tag_key[], const char *tag_value[], size_t n_tag);
 /**
@@ -92,7 +95,7 @@ int fieldstat_register(struct fieldstat_instance *instance, enum field_type type
  * @param column_name column name array.
  * @param column_type column type array. Type in [counter, gauge]
  * @param n_column size of column_type[] and column_name[]
- * @return -1 is failed. 0 is success.
+ * @return metric id.  -1 is failed. >=0 is success.
  */
 int fieldstat_register_table(struct fieldstat_instance *instance, const char *name, const char *column_name[], enum field_type column_type[], size_t n_column);
 /**
@@ -103,7 +106,7 @@ int fieldstat_register_table(struct fieldstat_instance *instance, const char *na
  * @param tag_key Tag key array
  * @param tag_value Tag key array
  * @param n_tag size of tag_key[] and tag_value[]
- * @return -1 is failed. 0 is success.
+ * @return metric id. -1 is failed. >=0 is success.
  */
 struct metric_id_list fieldstat_register_table_metrics(struct fieldstat_instance * instance, int table_id, const char *line_name, const char *tag_key[], const char *tag_value[],size_t n_tag);
 /**
@@ -149,7 +152,7 @@ void fieldstat_passive_output(struct fieldstat_instance *instance);
  * @param tag_value   the array of tag value
  * @param n_tag       the number of tags
  * @param quantiles   the quantiles of summary output
- * @return metric id: -1 is failed,  > 0 is success
+ * @return metric id: -1 is failed,  >= 0 is success
  * the output.
  */
 int fieldstat_register_histogram(struct fieldstat_instance *instance, const char *field_name, const char *tag_key[], const char *tag_value[], size_t n_tag, 
@@ -163,7 +166,7 @@ int fieldstat_register_histogram(struct fieldstat_instance *instance, const char
  * @param tag_value   the array of tag value
  * @param n_tag       the number of tags
  * @param quantiles   the quantiles of summary output
- * @return metric id: -1 is failed,  > 0 is success
+ * @return metric id: -1 is failed,  >= 0 is success
  * the output.
  */
 int fieldstat_register_summary(struct fieldstat_instance *instance, const char *field_name, const char *tag_key[], const char *tag_value[], size_t n_tag, 
