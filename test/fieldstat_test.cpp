@@ -282,7 +282,7 @@ int main(int argc, char *argv[])
 {
 	int ret = 0;
 
-	struct fieldstat_instance *test_instance = fieldstat_instance_create("test");;
+	struct fieldstat_instance *test_instance = fieldstat_instance_create("test");
 
 	if(test_instance == NULL)
 	{

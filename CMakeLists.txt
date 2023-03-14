@@ -40,6 +40,11 @@ file(GLOB SRC
     "src/*.cpp"
 )
 
+add_subdirectory(vendor)
+add_subdirectory(test/src)
+enable_testing()
+add_subdirectory(./ctest)
+
 # Shared Library Output
 add_library(${lib_name}_shared SHARED ${SRC})
 set_target_properties(${lib_name}_shared PROPERTIES LINK_FLAGS
