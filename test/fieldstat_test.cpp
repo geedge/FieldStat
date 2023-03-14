@@ -28,6 +28,8 @@ struct thread_para
 	int loops;
 	struct fieldstat_instance * instance;
 	int thread_id;
+	int shaping_table_id;
+	int sce_table_id;
 };
 
 static void* worker_thread(void* arg)
@@ -65,6 +67,52 @@ static void* worker_thread(void* arg)
 	}
 	return NULL;
 }
+
+static void* dynamic_register(void* arg)
+{
+	char name[32] = {0}; 
+	struct thread_para* para=(struct thread_para*)arg;
+	int loops = para->loops;
+	struct fieldstat_instance *instance = para->instance;
+	int shaping_table_id = para->shaping_table_id;
+	int sce_table_id = para->sce_table_id;
+	const char * bins_htr = "10,20,30,40,50,60,70,80,90";
+	const char * bins_sar = "0.1,0.5,0.8,0.9,0.95,0.99";
+	const char * tags_key[] = {"disable_output_prometheus"};
+	const char * tags_value[] = {"yes"};
+
+	while (loops > 0)
+	{
+		loops--;
+		//fieldstat_value_incrby(instance,g_counter_id[i], i + 1);
+		snprintf(name, sizeof(name), "counter_%d_%d", loops, rand()%10000);
+		fieldstat_register(instance,FIELD_TYPE_COUNTER,name,tags_key,tags_value,sizeof(tags_key)/sizeof(tags_key[0]));
+
+		memset(name, 0, sizeof(name));
+		snprintf(name, sizeof(name), "gauge_%d_%d", loops, rand()%10000);
+		fieldstat_register(instance,FIELD_TYPE_GAUGE, name, tags_key,tags_value,sizeof(tags_key)/sizeof(tags_key[0]));
+
+		memset(name, 0, sizeof(name));
+		snprintf(name, sizeof(name), "summary_%d_%d", loops, rand()%10000);
+		fieldstat_register_histogram(instance,name,tags_key,tags_value,sizeof(tags_key)/sizeof(tags_key[0]),bins_htr,1,10000,2);
+
+		memset(name, 0, sizeof(name));
+		snprintf(name, sizeof(name), "histogram_%d_%d", loops, rand()%10000);
+		fieldstat_register_summary(instance,name,tags_key,tags_value,sizeof(tags_key)/sizeof(tags_key[0]),bins_sar,1,10000,2);
+
+		memset(name, 0, sizeof(name));
+		snprintf(name, sizeof(name), "shp_%d_%d", loops, rand()%10000);
+		fieldstat_register_table_metrics(instance,shaping_table_id,name,tags_key,tags_value,sizeof(tags_key)/sizeof(tags_key[0]));
+
+		memset(name, 0, sizeof(name));
+		snprintf(name, sizeof(name), "sce_%d_%d", loops, rand()%10000);
+		fieldstat_register_table_metrics(instance,sce_table_id,name,tags_key,tags_value,sizeof(tags_key)/sizeof(tags_key[0]));
+
+		sleep(1);
+	}
+	return NULL;
+}
+
 
 
 int set_instance_parameter(struct fieldstat_instance *instance)
@@ -264,19 +312,32 @@ int main(int argc, char *argv[])
 
 	int thread_num=100;
 	pthread_t threads[thread_num];
+
+	pthread_t threads_reg[thread_num];
+
 	struct thread_para para;
+	const char *shaping_column[] = {"in_rx_pkts","in_tx_pkts"};
+	enum field_type shaping_type[] = {FIELD_TYPE_COUNTER,FIELD_TYPE_GAUGE};
+	para.shaping_table_id = fieldstat_register_table(test_instance,"shaping",shaping_column,shaping_type,sizeof(shaping_column)/sizeof(shaping_column[0]));
+	const char *sce_column[] = {"sent_bytes","recv_pkts"};
+	enum field_type sce_type[] = {FIELD_TYPE_COUNTER,FIELD_TYPE_COUNTER};
+	para.sce_table_id = fieldstat_register_table(test_instance, "sce", sce_column,sce_type, sizeof(sce_column)/sizeof(sce_column[0]));
 	para.loops=10;
 	para.instance= test_instance;
 	for(int i=0; i<thread_num; i++)
 	{
 		pthread_create(&(threads[i]), NULL, worker_thread, &para);
+		pthread_create(&(threads_reg[i]), NULL, dynamic_register, &para);
 	}
 	void *temp;
 	for(int i=0; i<thread_num; i++)
 	{
 		pthread_join(threads[i], (void**)&temp);
+		pthread_join(threads_reg[i], (void**)&temp);
 	}
-	//fieldstat_passive_output(test_instance);
+	fieldstat_passive_output(test_instance);
+	sleep(1);
+	fieldstat_passive_output(test_instance);
 	sleep(1000);
 
 	return 0;

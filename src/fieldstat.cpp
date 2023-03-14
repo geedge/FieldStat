@@ -49,6 +49,18 @@ int is_valid_field_name(const char* name)
 }
 
 
+void get_current_table_line_cnt(struct fieldstat_instance *instance, int n_table, int *tables_line_cnt)
+{
+	for(int i = 0; i < n_table; i++)
+	{
+		if(instance->table_metrics[i] == NULL)
+		{
+			continue;
+		}
+		tables_line_cnt[i] = instance->table_metrics[i]->line_cnt;
+	}
+}
+
 struct metric_t * get_metric(struct fieldstat_instance *instance, int metric_id)
 {
 	int block_index = 0;
@@ -316,7 +328,6 @@ int fieldstat_register(struct fieldstat_instance *instance, enum field_type type
 	metric_id = atomic_inc(&instance->metric_cnt) - 1;
 	metric_slot = read_metric_slot(instance, metric_id);
 	metric = metric_new(type,field_name,tag_key,tag_value,n_tag);
-	*metric_slot = metric;
 
 	switch(type)
 	{
@@ -329,6 +340,7 @@ int fieldstat_register(struct fieldstat_instance *instance, enum field_type type
 		default:
 			assert(0);
 	}
+	*metric_slot = metric;
 	return metric_id;
 }
 
@@ -347,13 +359,15 @@ long long get_metric_unit_val(struct metric_t *metric,enum field_calc_algo calc_
 		default:
 			break;
 	}
+
 	value = threadsafe_counter_read(&(target->changing));
 	//value= threadsafe_counter_read(&(target->changing));
 	if(is_refer == 0)
 	{
 		target->previous_changed = value;
 		target->accumulated += value;
-		threadsafe_counter_set(&(target->changing), 0);
+//		threadsafe_counter_set(&(target->changing), 0);
+		threadsafe_counter_sub(&(target->changing), value);
 	}
 	switch(calc_type)
 	{
@@ -564,7 +578,6 @@ struct metric_id_list fieldstat_register_table_metrics(struct fieldstat_instance
 	line_id = atomic_inc(&(table->line_cnt)) - 1;
 	line_slot = read_table_line_slot(table,line_id);
 	table_line = table_line_new(line_name, tag_key, tag_value, n_tag);
-	*line_slot = table_line;
 
 	for(i = 0; i < table->column_cnt; i++)
 	{
@@ -580,7 +593,7 @@ struct metric_id_list fieldstat_register_table_metrics(struct fieldstat_instance
 		ret_metric_id_list.id[ret_metric_id_list.count ++] = metric_id;
 
 	}
-
+	*line_slot = table_line;
 	return ret_metric_id_list;
 }
 
@@ -727,7 +740,6 @@ static int fieldstat_register_histogram_and_summary(struct fieldstat_instance *i
 	metric_id = atomic_inc(&instance->metric_cnt) - 1;
 	metric_slot = read_metric_slot(instance, metric_id);
 	metric = metric_new(type,field_name,tag_key,tag_value,n_tag);
-	*metric_slot = metric;
 
 	metric->histogram.highest_trackable_value = (int64_t)highest_trackable_value;
 	metric->histogram.lowest_trackable_value  = (int64_t)lowest_trackable_value;
@@ -750,6 +762,7 @@ static int fieldstat_register_histogram_and_summary(struct fieldstat_instance *i
 		default:
 			break;
 	}
+	*metric_slot = metric;
 	return metric_id;
 }
 

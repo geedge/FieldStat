@@ -41,7 +41,7 @@ static int print_buf_tag_append_position(char *tag_key[], char *tag_value[], siz
 	return append_pos - print_buf_tags;
 }
 
-static int output_file_format_default_type_gauge(struct fieldstat_instance *instance,long long interval_ms,char *print_buf, unsigned int size)
+static int output_file_format_default_type_gauge(struct fieldstat_instance *instance,int current_metric_cnt,long long interval_ms,char *print_buf, unsigned int size)
 {
 	int i = 0, j = 0;
 	//display_manifest_t* p = NULL;
@@ -52,10 +52,14 @@ static int output_file_format_default_type_gauge(struct fieldstat_instance *inst
 	char *append_pos = print_buf;
 	char print_buf_tags[1024];
 
-	for(i = 0; i < instance->metric_cnt; i++)
+	for(i = 0; i < current_metric_cnt; i++)
 	{
 		//metric = instance->metric[i];
 		metric = get_metric(instance, i);
+		if(metric == NULL)
+		{
+			continue;
+		}
 		if(metric->field_type != FIELD_TYPE_GAUGE)
 		{
 			continue;
@@ -108,7 +112,7 @@ static int output_file_format_default_type_gauge(struct fieldstat_instance *inst
 }
 
 
-static int output_file_format_default_type_counter(struct fieldstat_instance *instance,long long interval_ms,char*print_buf, unsigned int size)
+static int output_file_format_default_type_counter(struct fieldstat_instance *instance, int current_metric_cnt, long long interval_ms,char*print_buf, unsigned int size)
 {
 	int i=0,j=0;
 	//display_manifest_t* p=NULL;
@@ -120,11 +124,15 @@ static int output_file_format_default_type_counter(struct fieldstat_instance *in
 	int metric_cnt = 0;
 	char print_buf_tags[1024];
 
-	for(i = 0;i < instance->metric_cnt; i++)
+	for(i = 0;i < current_metric_cnt; i++)
 	{
 		//p=_handle->display[i];
 		//metric = instance->metric[i];
 		metric = get_metric(instance, i);
+		if(metric == NULL)
+		{
+			continue;
+		}
 		if(metric->field_type != FIELD_TYPE_COUNTER)
 		{
 			continue;
@@ -211,7 +219,7 @@ static int output_file_format_default_type_counter(struct fieldstat_instance *in
 	return append_pos - print_buf;
 }
 
-static int output_file_format_default_table(struct fieldstat_instance *instance,long long interval_ms,char*print_buf, unsigned int size)
+static int output_file_format_default_table(struct fieldstat_instance *instance,int tables_line_cnt[], int current_table_cnt,long long interval_ms,char*print_buf, unsigned int size)
 {
 	int i = 0, j = 0, k = 0;
 	struct table_metric *table =  NULL;
@@ -221,7 +229,7 @@ static int output_file_format_default_table(struct fieldstat_instance *instance,
 	long long value = 0;
 	char* append_pos = print_buf;
 
-	for(i = 0; i < instance->table_num; i++)   //per table
+	for(i = 0; i < current_table_cnt; i++)   //per table
 	{
 		table = instance->table_metrics[i];
 		append_pos += snprintf(append_pos, size - (append_pos - print_buf),"%-20s\t\t",table->name);
@@ -234,9 +242,13 @@ static int output_file_format_default_table(struct fieldstat_instance *instance,
 									table->column_name[j]
 								);
 		}
-		for(j = 0; j < table->line_cnt; j++)  //per line
+		for(j = 0; j < tables_line_cnt[i]; j++)  //per line
 		{
 			line = read_table_line(table,j);
+			if(line == NULL)
+			{
+				continue;
+			}
 			//print table line name + tag
 			append_pos += snprintf(append_pos,
 									size - (append_pos - print_buf), 
@@ -385,14 +397,14 @@ static int output_file_print_hdr_unit(struct metric_t *metric, char*print_buf, s
 	return pos-print_buf;
 }
 
-static int output_file_format_default_type_histogram_and_summary(struct fieldstat_instance *instance, long long interval_ms, char*print_buf, size_t size)
+static int output_file_format_default_type_histogram_and_summary(struct fieldstat_instance *instance, int current_metric_cnt,long long interval_ms, char*print_buf, size_t size)
 {
 	int i = 0, j = 0, metric_num = 0;
 	char *pos = print_buf;
 	//display_manifest_t* p=NULL;
 	struct metric_t *metric = NULL;
-	struct metric_t  *metric_array[INIT_STAT_FIELD_NUM] = {NULL};
-	int metric_is_print[INIT_STAT_FIELD_NUM] = {0};
+	struct metric_t  *metric_array[current_metric_cnt] = {NULL};
+	int metric_is_print[current_metric_cnt] = {0};
 
 	if(instance->histogram_cnt == 0 
 		&& instance->summary_cnt == 0)
@@ -400,9 +412,13 @@ static int output_file_format_default_type_histogram_and_summary(struct fieldsta
 		return 0;
 	}
 
-	for(i = 0; i < instance->metric_cnt; i ++)
+	for(i = 0; i < current_metric_cnt; i ++)
 	{
 		metric = get_metric(instance, i);
+		if(metric == NULL)
+		{
+			continue;
+		}
 		if(metric->field_type != FIELD_TYPE_SUMMARY 
 			&& metric->field_type != FILED_TYPE_HISTOGRAM)
 		{
@@ -450,7 +466,11 @@ static int output_file_format_default_type_histogram_and_summary(struct fieldsta
 
 int fieldstat_output_file(struct fieldstat_instance *instance,long long interval_ms)
 {
-	size_t print_buf_sz = instance->metric_cnt*1024;
+	int tables_line_cnt[TABLE_MAX_NUM];
+	int current_table_cnt = instance->table_num;
+	get_current_table_line_cnt(instance, current_table_cnt, tables_line_cnt);
+	int current_metric_cnt = instance->metric_cnt;
+	size_t print_buf_sz = current_metric_cnt*1024;
 	char *print_buf = NULL;
 	char *append_pos = NULL;
 	time_t current = 0;
@@ -478,10 +498,10 @@ int fieldstat_output_file(struct fieldstat_instance *instance,long long interval
 		append_pos += snprintf(append_pos, print_buf_sz - (append_pos - print_buf),"%s\n",draw_boundary);
 
 		//pthread_mutex_lock(&(_handle->reg_lock)); //TODO
-		append_pos += output_file_format_default_type_gauge(instance, interval_ms, append_pos, print_buf_sz - (append_pos - print_buf));
-		append_pos += output_file_format_default_type_counter(instance, interval_ms, append_pos, print_buf_sz - (append_pos - print_buf));
-		append_pos += output_file_format_default_table(instance, interval_ms, append_pos, print_buf_sz - (append_pos - print_buf));
-		append_pos += output_file_format_default_type_histogram_and_summary(instance, interval_ms, append_pos, print_buf_sz - (append_pos - print_buf));
+		append_pos += output_file_format_default_type_gauge(instance, current_metric_cnt, interval_ms, append_pos, print_buf_sz - (append_pos - print_buf));
+		append_pos += output_file_format_default_type_counter(instance, current_metric_cnt, interval_ms, append_pos, print_buf_sz - (append_pos - print_buf));
+		append_pos += output_file_format_default_table(instance, tables_line_cnt, current_table_cnt, interval_ms, append_pos, print_buf_sz - (append_pos - print_buf));
+		append_pos += output_file_format_default_type_histogram_and_summary(instance,current_metric_cnt,interval_ms, append_pos, print_buf_sz - (append_pos - print_buf));
 		//TODO  output table,output histogram,output summary 
 		//pthread_mutex_unlock(&(_handle->reg_lock));//TODO
 	}

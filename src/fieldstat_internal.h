@@ -229,3 +229,4 @@ int fieldstat_output_file(struct fieldstat_instance *instance,long long interval
 struct table_line * read_table_line(struct table_metric *table, int line_id);
 int send_udp(int sd, unsigned int dest_ip, unsigned short dest_port, const char * data, int len);
 int line_protocol_output(struct fieldstat_instance *instance);
+void get_current_table_line_cnt(struct fieldstat_instance *instance, int n_table, int *table_line_cnt);

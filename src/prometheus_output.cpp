@@ -241,6 +241,20 @@ static int prometheus_output_histogram_and_summary(struct metric_t *metric, char
 	return used_len;
 }
 
+static int is_output_prometheus(struct metric_t *metric)
+{
+	int i = 0, ret = 0;
+	for(i = 0; i < (int)metric->n_tag; i++)
+	{
+		if(strcmp(metric->tag_key[i], "disable_output_prometheus") == 0
+			&& strcmp(metric->tag_value[i], "yes") == 0)
+		{
+			ret = 1;
+			break;
+		}
+	}
+	return ret;
+}
 
 
 static int prometheus_get_instance_metric_playload(struct fieldstat_instance *instance, char **payload, int *payload_size, int offset)
@@ -254,6 +268,7 @@ static int prometheus_get_instance_metric_playload(struct fieldstat_instance *in
 	int append_offset = offset;
 	char *new_payload = NULL;
 	int new_payload_size = 0;	
+	int current_metric_cnt = instance->metric_cnt;
 
 	if(instance->running != 1)
 	{
@@ -270,10 +285,17 @@ static int prometheus_get_instance_metric_playload(struct fieldstat_instance *in
 
 	str_unescape(instance->name, instance_name, sizeof(instance_name));
 
-	for(i = 0; i < instance->metric_cnt; i++)
+	for(i = 0; i < current_metric_cnt; i++)
 	{
 		metric = get_metric(instance, i);
-
+		if(metric == NULL)
+		{
+			continue;
+		}
+		if(is_output_prometheus(metric) == 1)
+		{
+			continue;
+		}
 		if(metric->is_ratio == 1)
 		{
 			continue;

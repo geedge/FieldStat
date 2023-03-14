@@ -56,7 +56,7 @@ static int output_line_protocol_tag_set_buf(char *tag_key[], char *tag_value[], 
 }
 
 
-static void output_line_protocol_table(struct fieldstat_instance *instance)
+static void output_line_protocol_table(struct fieldstat_instance *instance,int tables_line_cnt[], int current_table_cnt)
 {
 	int i = 0, j = 0, k = 0;
 	metric_t *metric = NULL;
@@ -72,13 +72,45 @@ static void output_line_protocol_table(struct fieldstat_instance *instance)
 
 	struct table_metric *table = NULL;
 	struct table_line *line = NULL;
+	int line_value_is_not_zero = 0;
 
-	for(i = 0; i < instance->table_num; i++)
+	for(i = 0; i < current_table_cnt; i++)
 	{
 		table = instance->table_metrics[i];
-		for(j = 0; j < table->line_cnt; j++)
+		for(j = 0; j < tables_line_cnt[i]; j++)
 		{
 			line = read_table_line(table, j);
+			if(line == NULL)
+			{
+				continue;
+			}
+			line_value_is_not_zero = 0;
+			tag_pos = tag_set_buff;
+			field_pos = field_set_buff;
+			for(k = 0; k < table->column_cnt; k ++)
+			{
+				metric = get_metric(instance, line->metric_id_belong_to_line[k]);
+
+				value = metric->field_type == FIELD_TYPE_GAUGE ? 
+					get_metric_unit_val(metric, FS_CALC_CURRENT, 1):
+					get_metric_unit_val(metric, FS_CALC_SPEED, 1);
+				if(value != 0)
+				{
+					line_value_is_not_zero = 1;
+				}
+					field_pos += snprintf(field_pos, 
+											sizeof(field_set_buff) - (field_set_buff - field_set_buff), 
+											"%s=%lld,", 
+											metric->table_column_name, 
+											value
+										);
+
+			}
+			if(line_value_is_not_zero == 0)
+			{
+				continue;
+			}
+
 			tag_pos += snprintf(tag_pos, 
 						sizeof(tag_set_buff) - (tag_pos - tag_set_buff), 
 						",app_name=%s,table_name=%s",
@@ -89,31 +121,13 @@ static void output_line_protocol_table(struct fieldstat_instance *instance)
 			tag_pos += output_line_protocol_tag_set_buf(line->tag_key, line->tag_value, line->n_tag, tag_pos, 
 														sizeof(tag_set_buff) - (tag_pos - tag_set_buff));
 
-			for(k = 0; k < table->column_cnt; k ++)
-			{
-				metric = get_metric(instance, line->metric_id_belong_to_line[k]);
 
-				value = metric->field_type == FIELD_TYPE_GAUGE ? 
-					get_metric_unit_val(metric, FS_CALC_CURRENT, 1):
-					get_metric_unit_val(metric, FS_CALC_SPEED, 1);
-
-					field_pos += snprintf(field_pos, 
-											sizeof(field_set_buff) - (field_set_buff - field_set_buff), 
-											"%s=%lld,", 
-											metric->table_column_name, 
-											value
-										);
-
-			}
 			if(field_pos - field_set_buff > 0)
 			{
 				*(field_pos - 1) = '\0';
 			}
 			// measurement,tag_set field_set
 			append_line_protocol_line(instance, metric->field_name, tag_set_buff, field_set_buff);
-			tag_pos = tag_set_buff;
-			field_pos = field_set_buff;
-
 		}
 
 	}
@@ -130,10 +144,20 @@ int line_protocol_output(struct fieldstat_instance *instance)
 	memset(field_set_buff, 0, sizeof(field_set_buff));
 	memset(tag_set_buff,  0, sizeof(tag_set_buff));
 	char *tag_pos = tag_set_buff;
+	//print current time instance start
+	int tables_line_cnt[TABLE_MAX_NUM];
+	int current_table_cnt = instance->table_num;
+	get_current_table_line_cnt(instance, current_table_cnt, tables_line_cnt);
+	int current_metric_cnt = instance->metric_cnt;
+	//print current time instance end
 
-	for(i = 0; i < instance->metric_cnt; i++)
+	for(i = 0; i < current_metric_cnt; i++)
 	{
 		metric = get_metric(instance, i);
+		if(metric == NULL)
+		{
+			continue;
+		}
 		if(metric->is_ratio == 1)
 		{
 			continue;
@@ -183,7 +207,7 @@ int line_protocol_output(struct fieldstat_instance *instance)
 		}
 	}
 
-	output_line_protocol_table(instance);
+	output_line_protocol_table(instance,tables_line_cnt,current_table_cnt);
 	flush_line_protocol_metric(instance);
 
 	return 0;
