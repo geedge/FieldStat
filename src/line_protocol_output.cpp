@@ -59,7 +59,7 @@ static int output_line_protocol_tag_set_buf(char *tag_key[], char *tag_value[], 
 static void output_line_protocol_table(struct fieldstat_instance *instance,int tables_line_cnt[], int current_table_cnt)
 {
 	int i = 0, j = 0, k = 0;
-	metric_t *metric = NULL;
+	struct metric *metric = NULL;
 	long long value = 0;
 	//double ratio = 0.0;
 	char field_set_buff[UDP_PAYLOAD_SIZE];
@@ -135,7 +135,7 @@ static void output_line_protocol_table(struct fieldstat_instance *instance,int t
 
 int line_protocol_output(struct fieldstat_instance *instance)
 {
-	metric_t *metric = NULL;
+	struct metric *metric = NULL;
 	long long value=0;
 	int i=0;
 	char field_set_buff[UDP_PAYLOAD_SIZE];

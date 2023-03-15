@@ -100,7 +100,7 @@ struct histogram_t
 };
 
 
-struct metric_t
+struct metric
 {
 	char *field_name;
 	enum field_type field_type;
@@ -170,19 +170,18 @@ struct fieldstat_instance
 	char local_output_format[LEN_FORMAT_MAX];
 	int local_output_enable;
 
-	int background_thread_disable;                 //default:1
-	int output_interval_s;                         //default:2
+	int background_thread_disable;
+	int output_interval_ms;
 	int running;
 
-	struct metric_t **metric_block_list[BLOCK_LIST_SIZE];
+	struct metric **metric_block_list[BLOCK_LIST_SIZE];
 
 	int metric_cnt;
-	//struct metric_t **metric;
+	//struct metric **metric;
 
 	struct table_metric *table_metrics[TABLE_MAX_NUM];
 
 	int *index_table[TABLE_MAX_NUM][TABLE_COLUMN_SIZE];
-	int per_table_line_number[TABLE_MAX_NUM];
 
 	int table_num;
 	int line_seq;
@@ -220,11 +219,11 @@ void prometheus_endpoint_instance_output(struct http_request_s* request);
 
 char* __str_dup(const char* str);
 long long hdr_count_le_value(const struct hdr_histogram* h, long long value);
-struct metric_t * get_metric(struct fieldstat_instance *instance, int metric_id);
-long long get_metric_unit_val(struct metric_t *metric,enum field_calc_algo calc_type,int is_refer);
+struct metric * get_metric(struct fieldstat_instance *instance, int metric_id);
+long long get_metric_unit_val(struct metric *metric,enum field_calc_algo calc_type,int is_refer);
 int is_valid_field_name(const char* name);
-struct metric_t ** read_metric_slot(struct fieldstat_instance *instance, int metric_id);
-struct metric_t* metric_new(enum field_type type, const char *field_name, const char *tag_key[], const char *tag_value[], size_t n_tag);
+struct metric ** read_metric_slot(struct fieldstat_instance *instance, int metric_id);
+struct metric * metric_new(enum field_type type, const char *field_name, struct fieldstat_tag tags[], size_t n_tag);
 int fieldstat_output_file(struct fieldstat_instance *instance,long long interval_ms);
 struct table_line * read_table_line(struct table_metric *table, int line_id);
 int send_udp(int sd, unsigned int dest_ip, unsigned short dest_port, const char * data, int len);

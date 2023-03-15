@@ -61,12 +61,12 @@ void get_current_table_line_cnt(struct fieldstat_instance *instance, int n_table
 	}
 }
 
-struct metric_t * get_metric(struct fieldstat_instance *instance, int metric_id)
+struct metric * get_metric(struct fieldstat_instance *instance, int metric_id)
 {
 	int block_index = 0;
 	int block_in_index = 0;
-	struct metric_t ** metrics_array = NULL;
-	struct metric_t * metric = NULL;
+	struct metric ** metrics_array = NULL;
+	struct metric * metric = NULL;
 
 	if(instance == NULL)
 	{
@@ -81,26 +81,54 @@ struct metric_t * get_metric(struct fieldstat_instance *instance, int metric_id)
 	return metric;
 }
 
-
-struct metric_t* metric_new(enum field_type type, const char *field_name, const char *tag_key[], const char *tag_value[], size_t n_tag)
+void add_tags_to_metric(const struct fieldstat_tag tags[], size_t n_tag, char *tag_key[], char *tag_value[])
 {
 	int i = 0;
-	struct metric_t* metric=(struct metric_t*)calloc(sizeof(struct metric_t),1);
-	metric->field_name =__str_dup(field_name);
+	struct fieldstat_tag *tag = NULL;
+	char str_longlong[32] = {0};
+	char str_double[32] = {0};
+
+	for(i = 0; i < (int)n_tag; i++)
+	{
+		tag = (struct fieldstat_tag *)&tags[i];
+		tag_key[i] = __str_dup(tag->key);
+		switch(tag->value_type)
+		{
+			case 0:
+				memset(str_longlong, 0, sizeof(str_longlong));
+				snprintf(str_longlong, sizeof(str_longlong), "%lld", tag->value_int);
+				tag_value[i] = __str_dup((const char *)str_longlong);
+				break;
+			case 1:
+				memset(str_double, 0, sizeof(str_double));
+				snprintf(str_double, sizeof(str_double), "%lf", tag->value_double);
+				tag_value[i] = __str_dup((const char *)str_double);
+				break;
+			case 2:
+				tag_value[i] = __str_dup(tag->value_str);
+				break;
+			default:
+				assert(0);
+				break;
+		}
+	}
+}
+
+struct metric * metric_new(enum field_type type, const char *field_name, const struct fieldstat_tag tags[], size_t n_tag)
+{
+	struct metric *metric = (struct metric*)calloc(sizeof(struct metric),1);
+	metric->field_name = __str_dup(field_name);
 	metric->field_type = type;
 	metric->is_ratio = 0;
 	metric->output_scaling = 1;
 	metric->n_tag = n_tag;
 
-	for(i = 0; i < (int)n_tag; i++)
-	{
-		metric->tag_key[i]   = __str_dup(tag_key[i]);
-		metric->tag_value[i] = __str_dup(tag_value[i]);
-	}
+	add_tags_to_metric(tags, n_tag, metric->tag_key, metric->tag_value);
+
 	return metric;
 }
 
-void metric_free(struct metric_t* metric)
+void metric_free(struct metric *metric)
 {
 	int i = 0;
 
@@ -122,11 +150,11 @@ void metric_free(struct metric_t* metric)
 	return;
 }
 
-struct metric_t ** read_metric_slot(struct fieldstat_instance *instance, int metric_id)
+struct metric ** read_metric_slot(struct fieldstat_instance *instance, int metric_id)
 {
 	int block_index = 0;
 	int in_block_index = 0;
-	struct metric_t ** metrics_block = NULL;
+	struct metric ** metrics_block = NULL;
 
 	if(instance == NULL)
 	{
@@ -137,15 +165,15 @@ struct metric_t ** read_metric_slot(struct fieldstat_instance *instance, int met
 	if(in_block_index == 0)
 	{
 		assert(instance->metric_block_list[block_index] == NULL);
-		instance->metric_block_list[block_index] = (struct metric_t **)calloc(sizeof(struct metric *), NUM_INIT_METRICS);	
+		instance->metric_block_list[block_index] = (struct metric **)calloc(sizeof(struct metric *), NUM_INIT_METRICS);	
 	}
 	else
 	{
 		while (instance->metric_block_list[block_index] == NULL);
 	}
-	metrics_block = (struct metric_t **)instance->metric_block_list[block_index];
+	metrics_block = (struct metric **)instance->metric_block_list[block_index];
 
-	return (struct metric_t **)&(metrics_block[in_block_index]);
+	return (struct metric **)&(metrics_block[in_block_index]);
 }
 
 
@@ -227,17 +255,17 @@ int send_udp(int sd, unsigned int dest_ip, unsigned short dest_port, const char 
 	return 0;
 }
 
-int fieldstat_set_output_interval(struct fieldstat_instance *instance, int seconds)
+int fieldstat_set_output_interval(struct fieldstat_instance *instance, int milliseconds)
 {
-	if(instance->running == 1 || seconds <= 0 )
+	if(instance->running == 1 || milliseconds <= 0 )
 	{
 		return -1;
 	}
-	instance->output_interval_s = seconds;
+	instance->output_interval_ms = milliseconds;
 	return 0;
 }
 
-int fieldstat_background_thread_disable(struct fieldstat_instance *instance)
+int fieldstat_disable_background_thread(struct fieldstat_instance *instance)
 {
 	if(instance->running == 1)
 	{
@@ -311,11 +339,11 @@ int fieldstat_set_statsd_server(struct fieldstat_instance *instance, const char 
 	return 0;
 }
 
-int fieldstat_register(struct fieldstat_instance *instance, enum field_type type, const char *field_name, const char *tag_key[], const char *tag_value[], size_t n_tag)
+int fieldstat_register(struct fieldstat_instance *instance, enum field_type type, const char *field_name, const struct fieldstat_tag tags[], size_t n_tag)
 {
 	int metric_id = 0;
-	struct metric_t * metric = NULL;
-	struct metric_t **metric_slot = NULL;
+	struct metric *metric = NULL;
+	struct metric **metric_slot = NULL;
 	if(!is_valid_field_name(field_name))
 	{
 		return -1;
@@ -327,7 +355,7 @@ int fieldstat_register(struct fieldstat_instance *instance, enum field_type type
 
 	metric_id = atomic_inc(&instance->metric_cnt) - 1;
 	metric_slot = read_metric_slot(instance, metric_id);
-	metric = metric_new(type,field_name,tag_key,tag_value,n_tag);
+	metric = metric_new(type, field_name, tags, n_tag);
 
 	switch(type)
 	{
@@ -344,7 +372,7 @@ int fieldstat_register(struct fieldstat_instance *instance, enum field_type type
 	return metric_id;
 }
 
-long long get_metric_unit_val(struct metric_t *metric,enum field_calc_algo calc_type,int is_refer)
+long long get_metric_unit_val(struct metric *metric,enum field_calc_algo calc_type,int is_refer)
 {
 	stat_unit_t* target = NULL;
 	long long value = 0;
@@ -437,7 +465,7 @@ void *fieldstat_thread_schema_output(void *arg)
 	while(instance->background_thread_disable == 0)
 	{
 		fieldstat_passive_output(instance);
-		sleep(instance->output_interval_s);
+		usleep(instance->output_interval_ms * 1000);
 	}
 	return NULL;
 }
@@ -454,7 +482,7 @@ void fieldstat_instance_start(struct fieldstat_instance *instance)
 	//append instance to prometheus output
 }
 
-struct fieldstat_instance * fieldstat_instance_create(const char *name)
+struct fieldstat_instance * fieldstat_instance_new(const char *name)
 {
 	struct fieldstat_instance *instance =  NULL;
 
@@ -466,7 +494,7 @@ struct fieldstat_instance * fieldstat_instance_create(const char *name)
 	instance = (struct fieldstat_instance *)calloc(sizeof(struct fieldstat_instance),1);
 	strcpy(instance->name, name);
 	instance->running = 0;
-	instance->output_interval_s = 2;
+	instance->output_interval_ms = 2000;
 	instance->background_thread_disable = 0;
 
 	return instance;
@@ -488,7 +516,7 @@ struct table_metric* table_metric_new(const char *name, const char *column_name[
 	return table_metric;
 }
 
- int fieldstat_register_table(struct fieldstat_instance *instance, const char *name, const char *column_name[], enum field_type column_type[], size_t n_column)
+ int fieldstat_register_table(struct fieldstat_instance *instance, const char *table_name, const char *column_name[], enum field_type column_type[], size_t n_column)
  {
 	int table_id = 0;
 
@@ -505,7 +533,7 @@ struct table_metric* table_metric_new(const char *name, const char *column_name[
 	}
 
 	table_id = atomic_inc(&instance->table_num) - 1;
-	table_metric = table_metric_new(name, column_name, column_type, n_column);
+	table_metric = table_metric_new(table_name, column_name, column_type, n_column);
 	instance->table_metrics[table_id] = table_metric;
 
 	return table_id;
@@ -533,27 +561,23 @@ static struct table_line ** read_table_line_slot(struct table_metric *table, int
 	return (struct table_line **)&(line[in_block_index]);
 }
 
-static struct table_line *table_line_new(const char *name, const char *tag_key[], const char *tag_value[],size_t n_tag)
+static struct table_line *table_line_new(const char *name, const struct fieldstat_tag tags[],size_t n_tag)
 {
-	int i = 0;
 	struct table_line *table_line = (struct table_line *)calloc(sizeof(struct table_line), 1);
 
 	table_line->name = __str_dup(name);
 	table_line->n_tag = n_tag;
 
-	for(i = 0; i < (int)n_tag; i++)
-	{
-		table_line->tag_key[i] = __str_dup(tag_key[i]);
-		table_line->tag_value[i] = __str_dup(tag_value[i]);
-	}
+	add_tags_to_metric(tags, n_tag, table_line->tag_key, table_line->tag_value);
+
 	return table_line;
 }
 
 
-struct metric_id_list fieldstat_register_table_metrics(struct fieldstat_instance * instance, int table_id, const char *line_name, const char *tag_key[], const char *tag_value[],size_t n_tag)
+int fieldstat_register_table_row(struct fieldstat_instance * instance, int table_id, const char *row_name, const struct fieldstat_tag tags[], size_t n_tag, int output_metric_ids[], int *output_metric_ids_cnt)
 {
 	int metric_id = 0;
-	struct metric_t *metric = NULL;
+	struct metric *metric = NULL;
 
 	int line_id = 0;
 	int i = 0;
@@ -561,27 +585,24 @@ struct metric_id_list fieldstat_register_table_metrics(struct fieldstat_instance
 	struct table_metric *table = NULL;
 	struct table_line **line_slot = NULL;
 	struct table_line *table_line = NULL;
-	struct metric_id_list ret_metric_id_list;
-	memset(&ret_metric_id_list, 0, sizeof(struct metric_id_list));
-	
 
 	if(table_id < 0 || table_id >= TABLE_MAX_NUM)
 	{
-		return ret_metric_id_list;
+		return -1;
 	}
-	if(!is_valid_field_name(line_name) || n_tag > N_TAG_MAX)
+	if(!is_valid_field_name(row_name) || n_tag > N_TAG_MAX)
 	{
-		return ret_metric_id_list;
+		return -1;
 	}
 
 	table = instance->table_metrics[table_id];
 	line_id = atomic_inc(&(table->line_cnt)) - 1;
-	line_slot = read_table_line_slot(table,line_id);
-	table_line = table_line_new(line_name, tag_key, tag_value, n_tag);
+	line_slot = read_table_line_slot(table, line_id);
+	table_line = table_line_new(row_name, tags, n_tag);
 
 	for(i = 0; i < table->column_cnt; i++)
 	{
-		metric_id = fieldstat_register(instance, table->column_type[i], line_name,tag_key, tag_value, n_tag);
+		metric_id = fieldstat_register(instance, table->column_type[i], row_name, tags, n_tag);
 
 		table_line->metric_id_belong_to_line[i] = metric_id;
 
@@ -590,25 +611,25 @@ struct metric_id_list fieldstat_register_table_metrics(struct fieldstat_instance
 		metric->table_column_name = __str_dup(table->column_name[i]); 
 		metric->table_name = __str_dup(table->name);
 		metric->belong_to_table = 1;
-		ret_metric_id_list.id[ret_metric_id_list.count ++] = metric_id;
 
+		output_metric_ids[(*output_metric_ids_cnt)++] = metric_id;
 	}
 	*line_slot = table_line;
-	return ret_metric_id_list;
+	return 0;
 }
 
 
-static int fieldstat_value_operate(struct fieldstat_instance *instance, int field_id, enum field_op op, long long value)
+static int fieldstat_value_operate(struct fieldstat_instance *instance, int metric_id, enum field_op op, long long value)
 {
-	struct metric_t * metric = NULL;
+	struct metric * metric = NULL;
 	struct stat_unit_t *target = NULL;
 
-	if(field_id >= instance->metric_cnt)
+	if(metric_id >= instance->metric_cnt)
 	{
 		return -1;
 	}
 
-	metric = get_metric(instance, field_id);
+	metric = get_metric(instance, metric_id);
 
 	switch(metric->field_type)
 	{
@@ -646,24 +667,24 @@ static int fieldstat_value_operate(struct fieldstat_instance *instance, int fiel
 }
 
 
-int fieldstat_value_incrby(struct fieldstat_instance *instance, int field_id, long long increment)
+int fieldstat_value_incrby(struct fieldstat_instance *instance, int metric_id, long long increment)
 {
 	int ret = 0;
-	ret = fieldstat_value_operate(instance, field_id, FS_OP_ADD, increment);
+	ret = fieldstat_value_operate(instance, metric_id, FS_OP_ADD, increment);
 	return ret;
 }
 
-int fieldstat_value_set(struct fieldstat_instance *instance, int field_id, long long retain)
+int fieldstat_value_set(struct fieldstat_instance *instance, int metric_id, long long retain)
 {
 	int ret = 0;
-	ret = fieldstat_value_operate(instance, field_id, FS_OP_SET, retain);
+	ret = fieldstat_value_operate(instance, metric_id, FS_OP_SET, retain);
 	return ret;
 }
 
-int fieldstat_value_decrby(struct fieldstat_instance *instance, int field_id, long long decrment)
+int fieldstat_value_decrby(struct fieldstat_instance *instance, int metric_id, long long decrment)
 {
 	int ret = 0;
-	ret = fieldstat_value_operate(instance, field_id, FS_OP_SUB, decrment);
+	ret = fieldstat_value_operate(instance, metric_id, FS_OP_SUB, decrment);
 	return ret;
 }
 
@@ -710,11 +731,11 @@ error_out:
 }
 
 
-static int fieldstat_register_histogram_and_summary(struct fieldstat_instance *instance, enum field_type type, const char *field_name, const char *tag_key[], const char *tag_value[], size_t n_tag, 
-		const char * bins, long long lowest_trackable_value,long long highest_trackable_value,int significant_figures)
+static int fieldstat_register_histogram_and_summary(struct fieldstat_instance *instance, enum field_type type, const char *field_name, const struct fieldstat_tag tags[], size_t n_tag, 
+		const char * bins, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures)
 {
-	struct metric_t *metric = NULL;
-	struct metric_t **metric_slot = NULL;
+	struct metric *metric = NULL;
+	struct metric **metric_slot = NULL;
 	int metric_id = -1;
 	int ret;
 
@@ -739,7 +760,7 @@ static int fieldstat_register_histogram_and_summary(struct fieldstat_instance *i
 
 	metric_id = atomic_inc(&instance->metric_cnt) - 1;
 	metric_slot = read_metric_slot(instance, metric_id);
-	metric = metric_new(type,field_name,tag_key,tag_value,n_tag);
+	metric = metric_new(type, field_name, tags, n_tag);
 
 	metric->histogram.highest_trackable_value = (int64_t)highest_trackable_value;
 	metric->histogram.lowest_trackable_value  = (int64_t)lowest_trackable_value;
@@ -767,17 +788,17 @@ static int fieldstat_register_histogram_and_summary(struct fieldstat_instance *i
 }
 
 
-int fieldstat_register_histogram(struct fieldstat_instance *instance, const char *field_name, const char *tag_key[], const char *tag_value[], size_t n_tag, 
-		const char * bins, long long lowest_trackable_value,long long highest_trackable_value,int significant_figures)
+int fieldstat_register_histogram(struct fieldstat_instance *instance, const char *field_name,const struct fieldstat_tag tags[], size_t n_tag, 
+		const char * bins, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures)
 {
-	return fieldstat_register_histogram_and_summary(instance, FILED_TYPE_HISTOGRAM, field_name, tag_key, tag_value, n_tag, 
+	return fieldstat_register_histogram_and_summary(instance, FILED_TYPE_HISTOGRAM, field_name, tags, n_tag, 
 		bins, lowest_trackable_value, highest_trackable_value, significant_figures);
 }
 
-int fieldstat_register_summary(struct fieldstat_instance *instance, const char *field_name, const char *tag_key[], const char *tag_value[], size_t n_tag, 
-		const char * bins,long long lowest_trackable_value,long long highest_trackable_value,int significant_figures)
+int fieldstat_register_summary(struct fieldstat_instance *instance, const char *field_name, const struct fieldstat_tag tags[], size_t n_tag, 
+		const char * bins, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures)
 {
-	return fieldstat_register_histogram_and_summary(instance, FIELD_TYPE_SUMMARY, field_name, tag_key, tag_value, n_tag, 
+	return fieldstat_register_histogram_and_summary(instance, FIELD_TYPE_SUMMARY, field_name, tags, n_tag, 
 		bins, lowest_trackable_value, highest_trackable_value, significant_figures);
 }
 

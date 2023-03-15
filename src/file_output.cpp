@@ -45,7 +45,7 @@ static int output_file_format_default_type_gauge(struct fieldstat_instance *inst
 {
 	int i = 0, j = 0;
 	//display_manifest_t* p = NULL;
-	metric_t *metric = NULL;
+	struct metric *metric = NULL;
 	long long value = 0;
 	//double ratio = 0.0;
 	//char* pos=print_buf;
@@ -116,7 +116,7 @@ static int output_file_format_default_type_counter(struct fieldstat_instance *in
 {
 	int i=0,j=0;
 	//display_manifest_t* p=NULL;
-	metric_t *metric = NULL;
+	struct metric *metric = NULL;
 	long long value = 0;
 	//double ratio = 0.0;
 	char* append_pos = print_buf;
@@ -225,7 +225,7 @@ static int output_file_format_default_table(struct fieldstat_instance *instance,
 	struct table_metric *table =  NULL;
 	struct table_line  *line = NULL;
 	int metric_id = 0;
-	struct metric_t *metric = NULL;
+	struct metric *metric = NULL;
 	long long value = 0;
 	char* append_pos = print_buf;
 
@@ -293,7 +293,7 @@ static int output_file_format_default_table(struct fieldstat_instance *instance,
 	return append_pos - print_buf;
 }
 
-static int output_file_print_hdr_head(struct metric_t *metric, char *print_buf, size_t size)
+static int output_file_print_hdr_head(struct metric *metric, char *print_buf, size_t size)
 {
 	char * pos = print_buf;
 	char bin_format[STR_LEN_256], str_format[STR_LEN_256];
@@ -339,15 +339,15 @@ static int output_file_print_hdr_head(struct metric_t *metric, char *print_buf, 
 	return pos-print_buf;
 }
 
-static int output_file_print_hdr_unit(struct metric_t *metric, char*print_buf, size_t size)
+static int output_file_print_hdr_unit(struct metric *metric, char *print_buf, size_t size)
 {
 	double * bins = metric->histogram.bins;
 	int bins_num  = metric->histogram.bins_num;
 	char* pos=print_buf;
 	long long value=0;
 	int i=0;
-	struct histogram_t* h=&(metric->histogram);
-	struct hdr_histogram* h_out=NULL, *h_tmp=NULL;
+	struct histogram_t *h=&(metric->histogram);
+	struct hdr_histogram *h_out=NULL, *h_tmp=NULL;
 	char int_format[STR_LEN_256], double_format[STR_LEN_256];
 	snprintf(int_format, sizeof(int_format), "%%%dlld",HISTOGRAM_WIDTH);
 	snprintf(double_format, sizeof(double_format), "%%%d.2lf",HISTOGRAM_WIDTH);
@@ -402,8 +402,8 @@ static int output_file_format_default_type_histogram_and_summary(struct fieldsta
 	int i = 0, j = 0, metric_num = 0;
 	char *pos = print_buf;
 	//display_manifest_t* p=NULL;
-	struct metric_t *metric = NULL;
-	struct metric_t  *metric_array[current_metric_cnt] = {NULL};
+	struct metric *metric = NULL;
+	struct metric *metric_array[current_metric_cnt] = {NULL};
 	int metric_is_print[current_metric_cnt] = {0};
 
 	if(instance->histogram_cnt == 0 
