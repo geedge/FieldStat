@@ -9,3 +9,7 @@ include_directories(${PROJECT_SOURCE_DIR}/src/)
 
 add_executable(gtest_fieldstat ${SRC} gtest_fieldstat.cpp)
 target_link_libraries(gtest_fieldstat gtest-static)
+
+
+add_executable(gtest_dynamic_fieldstat ${SRC} gtest_dynamic_fieldstat.cpp)
+target_link_libraries(gtest_dynamic_fieldstat gtest-static)

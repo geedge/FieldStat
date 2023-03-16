@@ -107,12 +107,11 @@ static void* dynamic_register(void* arg)
 		memset(name, 0, sizeof(name));
 		snprintf(name, sizeof(name), "shp_%d_%d", loops, rand()%10000);
 		int id_list[16];
-		int id_cnt;
-		fieldstat_register_table_row(instance, shaping_table_id, name, tags, 1, id_list, &id_cnt);
+		fieldstat_register_table_row(instance, shaping_table_id, name, tags, 1, id_list);
 
 		memset(name, 0, sizeof(name));
 		snprintf(name, sizeof(name), "sce_%d_%d", loops, rand()%10000);
-		fieldstat_register_table_row(instance, sce_table_id, name, tags, 1, id_list, &id_cnt);
+		fieldstat_register_table_row(instance, sce_table_id, name, tags, 1, id_list);
 
 		sleep(1);
 	}
@@ -293,8 +292,8 @@ int test_register_by_fieldstat_type(struct fieldstat_instance *instance)
 	{
 		printf("Failed to register metric table\n");
 	}
-
-	ret = fieldstat_register_table_row(instance, table_id, "SUM", NULL, 0, g_id_list, &g_id_cnt);
+	g_id_cnt = sizeof(column)/sizeof(column[0]);
+	ret = fieldstat_register_table_row(instance, table_id, "SUM", NULL, 0, g_id_list);
 	if(ret == -1)
 	{
 		return -1;

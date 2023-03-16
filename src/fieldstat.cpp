@@ -193,7 +193,7 @@ struct table_line * read_table_line(struct table_metric *table, int line_id)
 }
 
 
-static int startup_udp()
+int startup_udp()
 {
 	int sd_udp=-1;
 	int flags;
@@ -527,7 +527,7 @@ struct table_metric* table_metric_new(const char *name, const char *column_name[
 		return -1;
 	}
 
-	if(instance->table_num > TABLE_MAX_NUM)
+	if(instance->table_num >= TABLE_MAX_NUM)
 	{
 		return -1;
 	}
@@ -549,7 +549,7 @@ static struct table_line ** read_table_line_slot(struct table_metric *table, int
 	in_block_index = line_id % NUM_INIT_METRICS;
 	if(in_block_index == 0)
 	{
-		assert(table->line_block[in_block_index] == NULL);
+		assert(table->line_block[block_index] == NULL);
 		table->line_block[block_index] = (struct table_line **)calloc(sizeof(struct table_line *), NUM_INIT_METRICS); 	
 	}
 	else
@@ -574,7 +574,7 @@ static struct table_line *table_line_new(const char *name, const struct fieldsta
 }
 
 
-int fieldstat_register_table_row(struct fieldstat_instance * instance, int table_id, const char *row_name, const struct fieldstat_tag tags[], size_t n_tag, int output_metric_ids[], int *output_metric_ids_cnt)
+int fieldstat_register_table_row(struct fieldstat_instance * instance, int table_id, const char *row_name, const struct fieldstat_tag tags[], size_t n_tag, int output_metric_ids[])
 {
 	int metric_id = 0;
 	struct metric *metric = NULL;
@@ -612,25 +612,15 @@ int fieldstat_register_table_row(struct fieldstat_instance * instance, int table
 		metric->table_name = __str_dup(table->name);
 		metric->belong_to_table = 1;
 
-		output_metric_ids[(*output_metric_ids_cnt)++] = metric_id;
+		output_metric_ids[i] = metric_id;
 	}
 	*line_slot = table_line;
 	return 0;
 }
 
-
-static int fieldstat_value_operate(struct fieldstat_instance *instance, int metric_id, enum field_op op, long long value)
+void metric_value_operate(struct metric *metric, enum field_op op, long long value)
 {
-	struct metric * metric = NULL;
 	struct stat_unit_t *target = NULL;
-
-	if(metric_id >= instance->metric_cnt)
-	{
-		return -1;
-	}
-
-	metric = get_metric(instance, metric_id);
-
 	switch(metric->field_type)
 	{
 		case FIELD_TYPE_COUNTER:
@@ -642,7 +632,7 @@ static int fieldstat_value_operate(struct fieldstat_instance *instance, int metr
 		case FIELD_TYPE_SUMMARY:
 		case FILED_TYPE_HISTOGRAM: 
 			hdr_record_value(metric->histogram.changing, (int64_t) value);
-			return 0;
+			return;
 		default:
 			break;
 	}
@@ -661,7 +651,21 @@ static int fieldstat_value_operate(struct fieldstat_instance *instance, int metr
 		default:
 			assert(0);
 			break;
+	}	
+}
+
+static int fieldstat_value_operate(struct fieldstat_instance *instance, int metric_id, enum field_op op, long long value)
+{
+	struct metric * metric = NULL;
+
+	if(metric_id >= instance->metric_cnt)
+	{
+		return -1;
 	}
+
+	metric = get_metric(instance, metric_id);
+
+	metric_value_operate(metric, op, value);
 
 	return 0;
 }

@@ -1,5 +1,5 @@
 {
-  global: 	*FS_*;
+  global: 	*fieldstat_*;
 	GIT_VERSION*;
   local: *;
 };

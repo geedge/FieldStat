@@ -23,6 +23,7 @@
 #include <pthread.h>
 #include <assert.h>
 #include <sys/time.h>
+#include "uthash.h"
 
 #define	INIT_STAT_FIELD_NUM		1024
 #define	MAX_STAT_COLUMN_NUM		64
@@ -215,6 +216,38 @@ struct prometheus_endpoint_instance
 	int fs_instance_size;                    // number
 };
 
+struct dynamic_metric
+{
+	char metric_key[512];
+	struct metric **metrics;
+	UT_hash_handle hh;
+};
+
+struct fieldstat_dynamic_instance
+{
+	char name[INSTANCE_NAME_LEN];
+	unsigned int line_protocol_server_ip;
+	unsigned short line_protocol_server_port;
+	int line_protocol_output_enable;
+
+	int background_thread_disable;
+	int output_interval_ms;
+	int running;
+
+	struct table_metric *table_metrics[TABLE_MAX_NUM];
+	int table_num;
+	struct timespec last_output_time;
+
+	pthread_t cfg_mon_t;
+	char line_protocol_send_buff[UDP_PAYLOAD_SIZE];
+	size_t line_protocol_send_buff_offset;
+	int line_protocol_socket;
+
+	struct dynamic_metric **n_thread_dynamic_metric;
+	int n_thread;
+
+};
+
 void prometheus_endpoint_instance_output(struct http_request_s* request);
 
 char* __str_dup(const char* str);
@@ -223,9 +256,14 @@ struct metric * get_metric(struct fieldstat_instance *instance, int metric_id);
 long long get_metric_unit_val(struct metric *metric,enum field_calc_algo calc_type,int is_refer);
 int is_valid_field_name(const char* name);
 struct metric ** read_metric_slot(struct fieldstat_instance *instance, int metric_id);
-struct metric * metric_new(enum field_type type, const char *field_name, struct fieldstat_tag tags[], size_t n_tag);
+struct metric * metric_new(enum field_type type, const char *field_name, const struct fieldstat_tag tags[], size_t n_tag);
 int fieldstat_output_file(struct fieldstat_instance *instance,long long interval_ms);
 struct table_line * read_table_line(struct table_metric *table, int line_id);
 int send_udp(int sd, unsigned int dest_ip, unsigned short dest_port, const char * data, int len);
 int line_protocol_output(struct fieldstat_instance *instance);
 void get_current_table_line_cnt(struct fieldstat_instance *instance, int n_table, int *table_line_cnt);
+int startup_udp();
+
+void metric_value_operate(struct metric *metric, enum field_op op, long long value);
+struct table_metric* table_metric_new(const char *name, const char *column_name[], enum field_type column_type[], size_t n_column);
+int line_protocol_dynamic_metric_output(struct fieldstat_dynamic_instance *instance);

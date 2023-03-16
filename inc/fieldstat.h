@@ -5,8 +5,6 @@ extern "C"
 {
 #endif
 
-#define TABLE_COLUMN_MAX_SIZE 64
-
 enum field_type
 {
 	FIELD_TYPE_COUNTER,
@@ -15,7 +13,7 @@ enum field_type
 	FIELD_TYPE_SUMMARY
 };
 
-struct fieldstat_instance;
+
 struct fieldstat_tag{
 	const char *key;
 	int value_type;  // 0 int, 1 double, 2 str
@@ -25,6 +23,9 @@ struct fieldstat_tag{
 		const char *value_str;
 	};
 };
+
+struct fieldstat_instance;
+struct fieldstat_dynamic_instance;
 
 /**
  * Create fieldstat instance.
@@ -117,10 +118,9 @@ int fieldstat_register_table(struct fieldstat_instance *instance, const char *ta
  * @param tags The tag array.
  * @param n_tag Size of tags[]
  * @param output_metric_ids Output metric ids
- * @param output_metric_ids_cnt Output metric id count
  * @return -1 is failed. 0 is success.
  */
-int fieldstat_register_table_row(struct fieldstat_instance *instance, int table_id, const char *row_name, const struct fieldstat_tag tags[],size_t n_tag, int output_metric_ids[], int *output_metric_ids_cnt);
+int fieldstat_register_table_row(struct fieldstat_instance *instance, int table_id, const char *row_name, const struct fieldstat_tag tags[],size_t n_tag, int output_metric_ids[]);
 /**
  * Increment fieldstat metric value by metric_id.
  * @param instance The fieldstat instance.
@@ -171,7 +171,6 @@ void fieldstat_passive_output(struct fieldstat_instance *instance);
  * the results from the histogram will be accurate up to the first three digits.  Must
  * be a value between 1 and 5 (inclusive).
  * @return metric id: -1 is failed,  >= 0 is success
- * the output.
  */
 int fieldstat_register_histogram(struct fieldstat_instance *instance, const char *field_name, const struct fieldstat_tag tags[], size_t n_tag, 
 		const char *upper_inclusive_bounds, const long long lowest_trackable_value, long long highest_trackable_value, int significant_figures);
@@ -192,10 +191,75 @@ int fieldstat_register_histogram(struct fieldstat_instance *instance, const char
  * the results from the histogram will be accurate up to the first three digits.  Must
  * be a value between 1 and 5 (inclusive).
  * @return metric id: -1 is failed,  >= 0 is success
- * the output.
  */
 int fieldstat_register_summary(struct fieldstat_instance *instance, const char *field_name, const struct fieldstat_tag tags[], size_t n_tag, 
 		const char *quantiles, const long long lowest_trackable_value, long long highest_trackable_value, int significant_figures);
+
+/**
+ * Register dynamic fieldstat instance.
+ * @param instance fieldstat instance
+ * @param name The instance name.
+ * @param n_thread The count of thread.
+ * @return  ptr dynamic_instance. NULL is failad. Not NULL is successd.
+ */
+struct fieldstat_dynamic_instance * fieldstat_dynamic_instance_new(const char *name, int n_thread);
+
+/**
+ * Enable output metric to line protocol server.
+ * The operation should be executed in single-threaded fashion.
+ * @param instance The fieldstat instance.
+ * @param ip  Line protocol server ip.
+ * @param port Line protocol server port. i.e., 80,8080
+ * @return -1 is failed. 0 is success.
+ */
+int fieldstat_dynamic_set_line_protocol_server(struct fieldstat_dynamic_instance *instance, const char *ip, unsigned short port);
+/**
+ * Disable the background thread.
+ * The operation should be executed in single-threaded fashion.
+ * @param instance The fieldstat instance.
+ * @return -1 is failed. 0 is success.
+ */
+int fieldstat_dynamic_disable_background_thread(struct fieldstat_dynamic_instance *instance);
+/**
+ * Set the output interval in milliseconds
+ * The operation should be executed in single-threaded fashion.
+ * @param seconds  In milliseconds.
+ * @return -1 is failed. 0 is success.
+ */
+int fieldstat_dynamic_set_output_interval(struct fieldstat_dynamic_instance *instance, int milliseconds);
+/**
+ * Passive output
+ * @param instance The fieldstat instance.
+ */
+void fieldstat_dynamic_passive_output(struct fieldstat_dynamic_instance *instance);
+/**
+ * Make the fieldstat instance affect.
+ * @param instance The fieldstat instance.
+ */
+void fieldstat_dynamic_instance_start(struct fieldstat_dynamic_instance *instance);
+/**
+ * Set the output interval in milliseconds
+ * The operation should be executed in single-threaded fashion.
+ * @param seconds  In milliseconds.
+ * @return -1 is failed. 0 is success.
+ */
+
+int fieldstat_register_dynamic_table(struct fieldstat_dynamic_instance *instance, const char *table_name, const char *column_name[], enum field_type column_type[], size_t n_column, unsigned int out_column_ids[]);
+
+int fieldstat_dynamic_metric_value_incrby(struct fieldstat_dynamic_instance *instance, enum field_type type, const char *field_name, long long value, const struct fieldstat_tag tags[], size_t n_tags, int thread_id);
+
+int fieldstat_dynamic_metric_value_set(struct fieldstat_dynamic_instance *instance, enum field_type type, const char *field_name, long long value, const struct fieldstat_tag tags[], size_t n_tags, int thread_id);
+
+int fieldstat_dynamic_metric_value_decrby(struct fieldstat_dynamic_instance *instance, enum field_type type, const char *field_name, long long value, const struct fieldstat_tag tags[], size_t n_tags, int thread_id);
+
+
+int fieldstat_dynamic_table_metric_value_incrby(struct fieldstat_dynamic_instance *instance, int table_id, unsigned int column_id, const char *row_name, long long value, const struct fieldstat_tag tags[], size_t n_tags, int thread_id);
+
+int fieldstat_dynamic_table_metric_value_set(struct fieldstat_dynamic_instance *instance, int table_id, unsigned int column_id, const char *row_name, long long value, const struct fieldstat_tag tags[], size_t n_tags, int thread_id);
+
+int fieldstat_dynamic_table_metric_value_decrby(struct fieldstat_dynamic_instance *instance, int table_id, unsigned int column_id, const char *row_name, long long value, const struct fieldstat_tag tags[], size_t n_tags, int thread_id);
+
+
 
 #ifdef __cplusplus
 }
