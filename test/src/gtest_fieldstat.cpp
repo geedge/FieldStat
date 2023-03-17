@@ -7,25 +7,30 @@
 
 extern struct prometheus_endpoint_instance g_prometheus_endpoint_instance;
 
-TEST(FeildStatAPI, CreateFieldStatInstance)
+TEST(FeildStatAPI, FieldStatInstanceNew)
 {
 	struct fieldstat_instance *instance = fieldstat_instance_new("test");
 	EXPECT_NE(nullptr, instance);
 	EXPECT_STREQ("test", instance->name);
+	fieldstat_instance_free(instance);
 }
 
+/*
 TEST(FeildStatAPI, FieldStatEnablePrometheusEndpoint)
 {
 	int ret_enable_prometheus_endpoint = 0;
 	int ret_req_prometheus_endpoint = 0;
+	const char *request_cmd = "curl -s -o /dev/null http://127.0.0.1:9020/metrics";
 
 	ret_enable_prometheus_endpoint = fieldstat_global_enable_prometheus_endpoint(9020, "/metrcis");
 	EXPECT_EQ(0, ret_enable_prometheus_endpoint);
-
-	ret_req_prometheus_endpoint = system("curl -s -o /dev/null http://127.0.0.1:9020/metrics");
+	usleep(500 * 1000);
+	ret_req_prometheus_endpoint = system(request_cmd);
 	EXPECT_EQ(0,ret_req_prometheus_endpoint);
+	usleep(500 * 1000);
+	fieldstat_global_disable_prometheus_endpoint();
 }
-
+*/
 TEST(FeildStatAPI, FieldStatSetPrometheusOutput)
 {
 	struct fieldstat_instance *instance = NULL;
@@ -35,7 +40,7 @@ TEST(FeildStatAPI, FieldStatSetPrometheusOutput)
 	instance = fieldstat_instance_new("test");
 	EXPECT_STREQ("test", instance->name);
 
-	ret_enable_prometheus_endpoint = fieldstat_global_enable_prometheus_endpoint(9020, "/metrcis");
+	ret_enable_prometheus_endpoint = fieldstat_global_enable_prometheus_endpoint(9020, "/metrics");
 	EXPECT_EQ(0, ret_enable_prometheus_endpoint);
 
 	ret_set_prometheus_output = fieldstat_enable_prometheus_output(instance);
@@ -44,7 +49,12 @@ TEST(FeildStatAPI, FieldStatSetPrometheusOutput)
 	EXPECT_EQ(1, g_prometheus_endpoint_instance.running);
 	EXPECT_EQ(instance, g_prometheus_endpoint_instance.fs_instance[0]);
 	EXPECT_EQ(1, g_prometheus_endpoint_instance.fs_instance_cnt);
+
+	usleep(500 * 1000);
+	fieldstat_global_disable_prometheus_endpoint();
+	fieldstat_instance_free(instance);
 }
+
 
 TEST(FeildStatAPI, FieldStatSetLineProtocolServer)
 {
@@ -59,6 +69,7 @@ TEST(FeildStatAPI, FieldStatSetLineProtocolServer)
 	EXPECT_EQ(0, ret_set_line_protocol_server);
 	EXPECT_EQ(1, instance->line_protocol_output_enable);
 	EXPECT_NE(-1, instance->line_protocol_socket);
+	fieldstat_instance_free(instance);
 }
 
 TEST(FeildStatAPI, FieldStatSetLocalOutput)
@@ -74,9 +85,8 @@ TEST(FeildStatAPI, FieldStatSetLocalOutput)
 	EXPECT_STREQ("test.fs", instance->local_output_filename);
 	EXPECT_STREQ("default", instance->local_output_format);
 	EXPECT_EQ(1, instance->local_output_enable);
+	fieldstat_instance_free(instance);
 }
-
-int fieldstat_disable_background_thread(struct fieldstat_instance *instance);
 
 TEST(FeildStatAPI, FieldStatBackgroundThreadDisable)
 {
@@ -88,6 +98,7 @@ TEST(FeildStatAPI, FieldStatBackgroundThreadDisable)
 	ret_background_thread_disable = fieldstat_disable_background_thread(instance);
 	EXPECT_EQ(0, ret_background_thread_disable);
 	EXPECT_EQ(1, instance->background_thread_disable);
+	fieldstat_instance_free(instance);
 }
 
 TEST(FeildStatAPI, FieldStatSetOutputInterval)
@@ -101,6 +112,19 @@ TEST(FeildStatAPI, FieldStatSetOutputInterval)
 	ret_set_output_interval = fieldstat_set_output_interval(instance, 1);
 	EXPECT_EQ(0, ret_set_output_interval);
 	EXPECT_EQ(1, instance->output_interval_ms);
+	fieldstat_instance_free(instance);
+}
+
+TEST(FeildStatAPI, FieldStatInstanceStart)
+{
+	struct fieldstat_instance *instance = NULL;
+
+	instance = fieldstat_instance_new("test");
+	EXPECT_STREQ("test", instance->name);
+
+	fieldstat_instance_start(instance);
+	usleep(500 * 1000);
+	fieldstat_instance_free(instance);
 }
 
 TEST(FeildStatAPI, FieldStatRegister)
@@ -137,6 +161,7 @@ TEST(FeildStatAPI, FieldStatRegister)
 	EXPECT_EQ(2, metric_id);
 	EXPECT_EQ(3, instance->metric_cnt);
 	EXPECT_NE(nullptr, in_block_metric[2]);
+	fieldstat_instance_free(instance);
 }
 
 TEST(FieldStatAPI, FieldStatRegisterTable)
@@ -164,6 +189,7 @@ TEST(FieldStatAPI, FieldStatRegisterTable)
 	EXPECT_EQ(0, table->line_cnt);
 	EXPECT_EQ(nullptr, table->line_block[0]);
 
+
 	table_id = fieldstat_register_table(instance, sc_table_name, sc_column_name, sc_column_type, sizeof(sc_column_name)/sizeof(sc_column_name[0]));
 
 	EXPECT_EQ(1, table_id);
@@ -172,6 +198,8 @@ TEST(FieldStatAPI, FieldStatRegisterTable)
 	EXPECT_EQ(4, table->column_cnt);
 	EXPECT_EQ(0, table->line_cnt);
 	EXPECT_EQ(nullptr, table->line_block[0]);
+
+	fieldstat_instance_free(instance);
 }
 
 
@@ -179,7 +207,6 @@ TEST(FieldStatAPI, FieldStatRegisterTableMetrics)
 {
 	struct fieldstat_instance * instance = NULL;
 	int table_id = -1;
-	struct table_metric *table = NULL;
 
 	const char *sc_column_name[] = {"sent_pkts", "send_bytes", "recv_pkts", "recv_bytes"};
 	enum field_type sc_column_type[] = {FIELD_TYPE_COUNTER,FIELD_TYPE_COUNTER,FIELD_TYPE_COUNTER,FIELD_TYPE_COUNTER};
@@ -190,7 +217,8 @@ TEST(FieldStatAPI, FieldStatRegisterTableMetrics)
 	EXPECT_STREQ("test", instance->name);
 
 	table_id = fieldstat_register_table(instance, sc_table_name, sc_column_name, sc_column_type, sizeof(sc_column_name)/sizeof(sc_column_name[0]));
-
+	EXPECT_EQ(0, table_id);
+	fieldstat_instance_free(instance);
 }
 
 

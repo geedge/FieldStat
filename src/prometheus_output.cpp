@@ -8,6 +8,7 @@ struct prometheus_endpoint_instance g_prometheus_endpoint_instance =
 	NULL,
 	0,
 	0,
+	0,
 	NULL,
 	0,
 	NULL,
@@ -98,17 +99,24 @@ static void prometheus_output_uri_list(struct prometheus_endpoint_instance *prom
 
 	fs_instance = prometheus_output->fs_instance;
 	
-
-	payload_len = prometheus_output->fs_instance_cnt * 128; //TODO using marco, len?
-	payload_append_position = payload = (char *)calloc(1,payload_len);
-	
-	payload_append_position += snprintf(payload_append_position, payload_len - (payload_append_position - payload),"url_path:\n\t%s\n", prometheus_output->url_path);
-
-	for(i = 0; i < prometheus_output->fs_instance_cnt; i++)
+	if(prometheus_output->fs_instance_cnt > 0)
 	{
-		payload_append_position += snprintf(payload_append_position, payload_len - (payload_append_position - payload),"\t/%s\n", fs_instance[i]->name);
-	}
+		payload_len = prometheus_output->fs_instance_cnt * 128; //TODO using marco, len?
+		printf("payload_len =%d\n, n_instance =%d\n", payload_len, prometheus_output->fs_instance_cnt);
+		payload = (char *)calloc(1,payload_len);
+		payload_append_position = payload;
+		payload_append_position += snprintf(payload_append_position, payload_len - (payload_append_position - payload),"url_path:\n\t%s\n", prometheus_output->url_path);
 
+		for(i = 0; i < prometheus_output->fs_instance_cnt; i++)
+		{
+			payload_append_position += snprintf(payload_append_position, payload_len - (payload_append_position - payload),"\t/%s\n", fs_instance[i]->name);
+		}
+	}
+	else
+	{
+		payload = (char *)calloc(1, 128);
+		strncpy(payload, "Not Invaild instance\n", 128);
+	}
 	response = http_response_init();
 	http_response_status(response, 404);
 	http_response_header(response, "Content-Type", "text/plain; charset=utf-8");
@@ -130,7 +138,7 @@ static int prometheus_output_read_metric_tags(struct metric *metric, char *insta
 
 	append_pos += snprintf(append_pos, size - (append_pos - tags_buff), "app_name=\"%s\"", instance_name);
 
-	if(metric->belong_to_table == 1)
+	if(metric->table)
 	{
 		append_pos += snprintf(append_pos, size - (append_pos - tags_buff), ",line_name=\"%s\"", metric->field_name);
 	}
@@ -149,9 +157,9 @@ static int prometheus_output_read_metric_name(struct metric *metric, char *insta
 {
 	char unescape[256] = {0};
 	char *append_pos = name_buff;
-	if(metric->belong_to_table == 1)
+	if(metric->table)
 	{
-		str_unescape(metric->table_column_name, unescape, sizeof(unescape));
+		str_unescape(metric->table->column_name[metric->table_column_id], unescape, sizeof(unescape));
 	}
 	else
 	{
@@ -417,9 +425,8 @@ int fieldstat_global_enable_prometheus_endpoint(unsigned short listen_port, cons
 	g_prometheus_endpoint_instance.port = listen_port;
 	g_prometheus_endpoint_instance.running = 1;
 	g_prometheus_endpoint_instance.fs_instance = (struct fieldstat_instance **)calloc( sizeof(struct fieldstat_instance *), g_prometheus_endpoint_instance.fs_instance_size);
-
 	pthread_create(&g_prometheus_endpoint_instance.tid, NULL, prometheus_endpoint_listen_thread_entry, (void *)&g_prometheus_endpoint_instance);
-
+	g_prometheus_endpoint_instance.thread_created = 1;
 	return 0;
 }
 
@@ -443,4 +450,35 @@ int fieldstat_enable_prometheus_output(struct fieldstat_instance *instance)
 	return 0;
 }
 
+
+void fieldstat_global_disable_prometheus_endpoint()
+{
+	void *pthread_ret;
+
+	if(g_prometheus_endpoint_instance.thread_created == 1)
+	{
+		pthread_cancel(g_prometheus_endpoint_instance.tid);
+		pthread_join(g_prometheus_endpoint_instance.tid, &pthread_ret);
+		g_prometheus_endpoint_instance.running = 0;
+		g_prometheus_endpoint_instance.thread_created = 0;
+		free(g_prometheus_endpoint_instance.server_handle);
+		g_prometheus_endpoint_instance.server_handle = NULL;
+	}
+
+	if(g_prometheus_endpoint_instance.url_path)
+	{
+		free(g_prometheus_endpoint_instance.url_path);
+		g_prometheus_endpoint_instance.url_path = NULL;
+	}
+
+	if(g_prometheus_endpoint_instance.fs_instance)
+	{
+		free(g_prometheus_endpoint_instance.fs_instance);
+		g_prometheus_endpoint_instance.fs_instance = NULL;
+		g_prometheus_endpoint_instance.fs_instance_cnt = 0;
+		g_prometheus_endpoint_instance.fs_instance_size = 0;
+	}
+
+	return;
+}
 

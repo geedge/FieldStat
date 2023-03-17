@@ -214,53 +214,125 @@ struct fieldstat_dynamic_instance * fieldstat_dynamic_instance_new(const char *n
  */
 int fieldstat_dynamic_set_line_protocol_server(struct fieldstat_dynamic_instance *instance, const char *ip, unsigned short port);
 /**
- * Disable the background thread.
+ * Disable the dynamic metric output background thread.
  * The operation should be executed in single-threaded fashion.
  * @param instance The fieldstat instance.
  * @return -1 is failed. 0 is success.
  */
 int fieldstat_dynamic_disable_background_thread(struct fieldstat_dynamic_instance *instance);
 /**
- * Set the output interval in milliseconds
+ * Set the dynamic metric output interval in milliseconds
  * The operation should be executed in single-threaded fashion.
  * @param seconds  In milliseconds.
  * @return -1 is failed. 0 is success.
  */
 int fieldstat_dynamic_set_output_interval(struct fieldstat_dynamic_instance *instance, int milliseconds);
 /**
- * Passive output
+ * Dynamic metrics passive output
  * @param instance The fieldstat instance.
  */
 void fieldstat_dynamic_passive_output(struct fieldstat_dynamic_instance *instance);
 /**
- * Make the fieldstat instance affect.
+ * Make the fieldstat dynamic instance affect.
  * @param instance The fieldstat instance.
  */
 void fieldstat_dynamic_instance_start(struct fieldstat_dynamic_instance *instance);
 /**
- * Set the output interval in milliseconds
- * The operation should be executed in single-threaded fashion.
- * @param seconds  In milliseconds.
+ * Register table. Max table num is 64. Max table columns is 64.
+ * @param instance The fieldstat dynamic instance.
+ * @param table_name  The table name.
+ * @param column_name column name array.
+ * @param column_type column type array. Type in [counter, gauge]
+ * @param n_column size of column_type[] and column_name[]
+ * @param out_column_ids output metric id in table row.
+ * @return table id.  -1 is failed. >=0 is success.
+ */
+int fieldstat_register_dynamic_table(struct fieldstat_dynamic_instance *instance, const char *table_name, const char *column_name[], enum field_type column_type[], size_t n_column, unsigned int out_column_ids[]);
+/**
+ * fieldstat dynamic instance metric value increment operate. metirc type in[gauge, counter]
+ * @param instance The fieldstat dynamic instance.
+ * @param type The metric type.
+ * @param field_name The metric field name.
+ * @param value The increment value.
+ * @param tags The tag array.
+ * @param n_tag Size of tags[]
+ * @param thread_id The thread id of the call.
  * @return -1 is failed. 0 is success.
  */
-
-int fieldstat_register_dynamic_table(struct fieldstat_dynamic_instance *instance, const char *table_name, const char *column_name[], enum field_type column_type[], size_t n_column, unsigned int out_column_ids[]);
-
 int fieldstat_dynamic_metric_value_incrby(struct fieldstat_dynamic_instance *instance, enum field_type type, const char *field_name, long long value, const struct fieldstat_tag tags[], size_t n_tags, int thread_id);
-
+/**
+ * fieldstat dynamic instance metric value set operate. metirc type in[gauge, counter]
+ * @param instance The fieldstat dynamic instance.
+ * @param type The metric type.
+ * @param field_name The metric field name.
+ * @param value The set value.
+ * @param tags The tag array.
+ * @param n_tag Size of tags[]
+ * @param thread_id The thread id of the call.
+ * @return -1 is failed. 0 is success.
+ */
 int fieldstat_dynamic_metric_value_set(struct fieldstat_dynamic_instance *instance, enum field_type type, const char *field_name, long long value, const struct fieldstat_tag tags[], size_t n_tags, int thread_id);
-
+/**
+ * fieldstat dynamic instance metric value decrment operate. metirc type in[gauge, counter]
+ * @param instance The fieldstat dynamic instance.
+ * @param type The metric type.
+ * @param field_name The metric field name.
+ * @param value The decrment value.
+ * @param tags The tag array.
+ * @param n_tag Size of tags[]
+ * @param thread_id The thread id of the call.
+ * @return -1 is failed. 0 is success.
+ */
 int fieldstat_dynamic_metric_value_decrby(struct fieldstat_dynamic_instance *instance, enum field_type type, const char *field_name, long long value, const struct fieldstat_tag tags[], size_t n_tags, int thread_id);
-
-
+/**
+ * fieldstat dynamic instance table metric value incrment operate.
+ * @param instance The fieldstat dynamic instance.
+ * @param table_id The table id.
+ * @param column_id The column id.
+ * @param row_name The row name of table.
+ * @param value The incrment value.
+ * @param tags The tag array.
+ * @param n_tag Size of tags[]
+ * @param thread_id The thread id of the call.
+ * @return -1 is failed. 0 is success.
+ */
 int fieldstat_dynamic_table_metric_value_incrby(struct fieldstat_dynamic_instance *instance, int table_id, unsigned int column_id, const char *row_name, long long value, const struct fieldstat_tag tags[], size_t n_tags, int thread_id);
-
+/**
+ * fieldstat dynamic instance table metric value set operate.
+ * @param instance The fieldstat dynamic instance.
+ * @param table_id The table id.
+ * @param column_id The column id.
+ * @param row_name The row name of table.
+ * @param value The set value.
+ * @param tags The tag array.
+ * @param n_tag Size of tags[]
+ * @param thread_id The thread id of the call.
+ * @return -1 is failed. 0 is success.
+ */
 int fieldstat_dynamic_table_metric_value_set(struct fieldstat_dynamic_instance *instance, int table_id, unsigned int column_id, const char *row_name, long long value, const struct fieldstat_tag tags[], size_t n_tags, int thread_id);
-
+/**
+ * fieldstat dynamic instance table metric value decrment operate.
+ * @param instance The fieldstat dynamic instance.
+ * @param table_id The table id.
+ * @param column_id The column id.
+ * @param row_name The row name of table.
+ * @param value The decrment value.
+ * @param tags The tag array.
+ * @param n_tag Size of tags[]
+ * @param thread_id The thread id of the call.
+ * @return -1 is failed. 0 is success.
+ */
 int fieldstat_dynamic_table_metric_value_decrby(struct fieldstat_dynamic_instance *instance, int table_id, unsigned int column_id, const char *row_name, long long value, const struct fieldstat_tag tags[], size_t n_tags, int thread_id);
-
-
-
+/**
+ * fieldstat instance free.
+ * @param instance The fieldstat instance need to free.
+ */
+void fieldstat_instance_free(struct fieldstat_instance *instance);
+/**
+ * fieldstat dynamic instance free.
+ * @param instance The fieldstat dynamic instance need to free.
+ */
+void fieldstat_dynamic_instance_free(struct fieldstat_dynamic_instance *instance);
 #ifdef __cplusplus
 }
 #endif

@@ -100,37 +100,6 @@ struct histogram_t
 	double *bins;
 };
 
-
-struct metric
-{
-	char *field_name;
-	enum field_type field_type;
-	size_t n_tag;
-	char *tag_key[N_TAG_MAX];
-	char *tag_value[N_TAG_MAX];
-	int output_scaling;
-
-	int is_invisible;
-	int is_ratio;
-	int not_send_to_server;
-	int numerator_id;
-	int denominator_id;
-
-	int belong_to_table;
-	int table_id;
-	size_t line_seq;
-	int table_column_id;
-	char *table_column_name;
-	char *table_name;
-
-	union
-	{
-		struct stat_unit_t counter;
-		struct stat_unit_t gauge;
-		struct histogram_t histogram;
-	};
-};
-
 struct table_line
 {
 	char *name;
@@ -153,6 +122,38 @@ struct table_metric
 };
 
 
+struct metric
+{
+	char *field_name;
+	enum field_type field_type;
+	size_t n_tag;
+	char *tag_key[N_TAG_MAX];
+	char *tag_value[N_TAG_MAX];
+	int output_scaling;
+
+	int is_invisible;
+	int is_ratio;
+	int not_send_to_server;
+	int numerator_id;
+	int denominator_id;
+/*
+	int belong_to_table;
+	int table_id;
+	char *table_column_name;
+	char *table_name;
+	int table_column_cnt;
+*/
+	struct table_metric *table;
+	int table_column_id;
+
+	union
+	{
+		struct stat_unit_t counter;
+		struct stat_unit_t gauge;
+		struct histogram_t histogram;
+	};
+};
+
 struct fieldstat_instance
 {
 	char name[INSTANCE_NAME_LEN];
@@ -161,6 +162,7 @@ struct fieldstat_instance
 	unsigned int statsd_server_ip;
 	unsigned short statsd_server_port;
 	int statsd_output_enable;
+	int line_protocol_socket;
 
 	//char line_protocol_server_str_ip[LEN_IP_MAX];
 	unsigned int line_protocol_server_ip;
@@ -170,8 +172,12 @@ struct fieldstat_instance
 	char local_output_filename[LEN_PATH_MAX];
 	char local_output_format[LEN_FORMAT_MAX];
 	int local_output_enable;
+	FILE* local_output_fp;
 
 	int background_thread_disable;
+	pthread_t background_thread;
+	int background_thread_is_created;
+
 	int output_interval_ms;
 	int running;
 
@@ -182,10 +188,7 @@ struct fieldstat_instance
 
 	struct table_metric *table_metrics[TABLE_MAX_NUM];
 
-	int *index_table[TABLE_MAX_NUM][TABLE_COLUMN_SIZE];
-
 	int table_num;
-	int line_seq;
 
 	int prometheus_output_enable;
 
@@ -194,14 +197,9 @@ struct fieldstat_instance
 
 	struct timespec last_output_time;
 
-	pthread_t cfg_mon_t;
 	char line_protocol_send_buff[UDP_PAYLOAD_SIZE];
 	size_t line_protocol_send_buff_offset;
-	int line_protocol_socket;
-	pthread_mutex_t output_lock;
 
-
-	FILE* fp;
 };
 
 struct prometheus_endpoint_instance
@@ -209,6 +207,7 @@ struct prometheus_endpoint_instance
 	unsigned short port;
 	char *url_path;
 	pthread_t tid;
+	int thread_created;
 	int running;
 	struct http_server_s *server_handle;
 	int fs_instance_cnt;
@@ -238,7 +237,8 @@ struct fieldstat_dynamic_instance
 	int table_num;
 	struct timespec last_output_time;
 
-	pthread_t cfg_mon_t;
+	pthread_t background_thread;
+	int background_thread_is_created;
 	char line_protocol_send_buff[UDP_PAYLOAD_SIZE];
 	size_t line_protocol_send_buff_offset;
 	int line_protocol_socket;
@@ -255,8 +255,10 @@ long long hdr_count_le_value(const struct hdr_histogram* h, long long value);
 struct metric * get_metric(struct fieldstat_instance *instance, int metric_id);
 long long get_metric_unit_val(struct metric *metric,enum field_calc_algo calc_type,int is_refer);
 int is_valid_field_name(const char* name);
+int is_valid_tags(const struct fieldstat_tag *tags, size_t n_tags);
 struct metric ** read_metric_slot(struct fieldstat_instance *instance, int metric_id);
 struct metric * metric_new(enum field_type type, const char *field_name, const struct fieldstat_tag tags[], size_t n_tag);
+void metric_free(struct metric *metric);
 int fieldstat_output_file(struct fieldstat_instance *instance,long long interval_ms);
 struct table_line * read_table_line(struct table_metric *table, int line_id);
 int send_udp(int sd, unsigned int dest_ip, unsigned short dest_port, const char * data, int len);
@@ -266,4 +268,12 @@ int startup_udp();
 
 void metric_value_operate(struct metric *metric, enum field_op op, long long value);
 struct table_metric* table_metric_new(const char *name, const char *column_name[], enum field_type column_type[], size_t n_column);
+void table_metric_free(struct table_metric *table);
+
+struct table_line *table_line_new(const char *name, const struct fieldstat_tag tags[],size_t n_tag);
+void table_line_free(struct table_line *table_line);
 int line_protocol_dynamic_metric_output(struct fieldstat_dynamic_instance *instance);
+
+struct table_line ** read_table_line_slot(struct table_metric *table, int line_id);
+
+void fieldstat_global_disable_prometheus_endpoint();

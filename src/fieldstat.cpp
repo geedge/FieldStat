@@ -48,6 +48,45 @@ int is_valid_field_name(const char* name)
 	return 1;
 }
 
+int is_valid_tag_value(const char* value)
+{
+	const char* reserverd="|:\n\r \t<>[]#!@";
+	unsigned int i=0,j=0;
+	for(i=0;i<strlen(value);i++)
+	{
+		for(j=0;j<strlen(reserverd);j++)
+		if(value[i]==reserverd[j])
+		{
+			return 0;
+		}
+	}
+	return 1;
+}
+
+
+int is_valid_tags(const struct fieldstat_tag *tags, size_t n_tags)
+{
+	int i = 0;
+	struct fieldstat_tag *tag = NULL;
+
+	for(i = 0; i < (int)n_tags; i++)
+	{
+		tag = (struct fieldstat_tag *)&tags[i];
+		if (0 == is_valid_field_name(tag->key))
+		{
+			return 0;
+		}
+
+		if(tag->value_type == 2)
+		{
+			if (0 == is_valid_tag_value(tag->value_str))
+			{
+				return 0;
+			}
+		}
+	}
+	return 1;
+}
 
 void get_current_table_line_cnt(struct fieldstat_instance *instance, int n_table, int *tables_line_cnt)
 {
@@ -144,6 +183,11 @@ void metric_free(struct metric *metric)
 		metric->tag_value[i] = NULL;
 	}
 	metric->n_tag = 0;
+
+	if(metric->table)
+	{
+		metric->table = NULL;
+	}
 
 	free(metric);
 
@@ -353,6 +397,11 @@ int fieldstat_register(struct fieldstat_instance *instance, enum field_type type
 		return -1;
 	}
 
+	if(0 == is_valid_tags(tags, n_tag))
+	{
+		return -1;
+	}
+
 	metric_id = atomic_inc(&instance->metric_cnt) - 1;
 	metric_slot = read_metric_slot(instance, metric_id);
 	metric = metric_new(type, field_name, tags, n_tag);
@@ -477,7 +526,7 @@ void fieldstat_instance_start(struct fieldstat_instance *instance)
 	clock_gettime(CLOCK_MONOTONIC,&(instance->last_output_time));
 	if(instance->background_thread_disable == 0)
 	{
-		pthread_create(&(instance->cfg_mon_t), NULL, fieldstat_thread_schema_output, (void*)instance);
+		pthread_create(&(instance->background_thread), NULL, fieldstat_thread_schema_output, (void*)instance);
 	}
 	//append instance to prometheus output
 }
@@ -490,6 +539,10 @@ struct fieldstat_instance * fieldstat_instance_new(const char *name)
 	{
 		return NULL;
 	}
+	if(!is_valid_field_name(name))
+	{
+		return NULL;
+	}
 
 	instance = (struct fieldstat_instance *)calloc(sizeof(struct fieldstat_instance),1);
 	strcpy(instance->name, name);
@@ -499,6 +552,65 @@ struct fieldstat_instance * fieldstat_instance_new(const char *name)
 
 	return instance;
 }
+
+void fieldstat_instance_free(struct fieldstat_instance *instance)
+{
+	int i = 0;
+	void *pthread_ret;
+	struct metric *metric = NULL;
+	if(instance == NULL)
+	{
+		return;
+	}
+
+	if(instance->background_thread_is_created == 1)
+	{
+		pthread_cancel(instance->background_thread);
+		pthread_join(instance->background_thread, &pthread_ret);
+		instance->background_thread_is_created = 0;
+		instance->running = 0;
+	}
+
+	if(instance->local_output_fp)
+	{
+		fclose(instance->local_output_fp);
+		instance->local_output_fp = NULL;
+		instance->local_output_enable = 0;
+	}
+
+	if(instance->line_protocol_socket != -1)
+	{
+		close(instance->line_protocol_socket);
+		instance->line_protocol_socket = -1;
+	}
+
+	for(i = 0; i < instance->metric_cnt; i++)
+	{
+		metric = get_metric(instance, i);
+		metric_free(metric);
+	}
+
+	for(i = 0; i < instance->table_num; i++)
+	{
+		table_metric_free(instance->table_metrics[i]);
+		instance->table_metrics[i] = NULL;
+	}
+
+	if(instance->metric_block_list != NULL)
+	{
+		for(i = 0; i < BLOCK_LIST_SIZE; i++)
+		{
+			if(instance->metric_block_list[i] != NULL)
+			{
+				free(instance->metric_block_list[i]);
+				instance->metric_block_list[i] = NULL;
+			}
+		}
+	}
+	free(instance);
+	return;
+}
+
 
 struct table_metric* table_metric_new(const char *name, const char *column_name[], enum field_type column_type[], size_t n_column)
 {
@@ -516,11 +628,69 @@ struct table_metric* table_metric_new(const char *name, const char *column_name[
 	return table_metric;
 }
 
+void table_metric_free(struct table_metric *table)
+{
+	int i = 0;
+	struct table_line *table_line = NULL;
+
+	if(table == NULL)
+	{
+		return;
+	}
+	free(table->name);
+	table->name = NULL;
+	for(i = 0; i < (int)table->column_cnt; i++)
+	{
+		if(table->column_name[i] == NULL)
+		{
+			continue;
+		}
+		free(table->column_name[i]);
+		table->column_name[i] = NULL;	
+	}
+
+	for(i = 0; i < table->line_cnt; i++)
+	{
+		table_line = read_table_line(table, i);
+		table_line_free(table_line);
+	}
+
+	if(table->line_block != NULL)
+	{
+		for(i = 0; i < BLOCK_LIST_SIZE; i++)
+		{
+			if(table->line_block[i] == NULL)
+			{
+				continue;
+			}
+			free(table->line_block[i]);
+			table->line_block[i] = NULL;
+		}
+	}
+	table->column_cnt = 0;
+	free(table);
+	return;
+}
+
+
  int fieldstat_register_table(struct fieldstat_instance *instance, const char *table_name, const char *column_name[], enum field_type column_type[], size_t n_column)
  {
 	int table_id = 0;
 
 	struct table_metric *table_metric = NULL;
+
+	if(!is_valid_field_name(table_name))
+	{
+		return -1;
+	}
+
+	for(int i = 0; i < (int)n_column; i++)
+	{
+		if(!is_valid_field_name(column_name[i]))
+		{
+			return -1;
+		}
+	}
 
 	if(n_column <= 0 || n_column > TABLE_COLUMN_SIZE)
 	{
@@ -539,7 +709,7 @@ struct table_metric* table_metric_new(const char *name, const char *column_name[
 	return table_id;
  }
 
-static struct table_line ** read_table_line_slot(struct table_metric *table, int line_id)
+struct table_line ** read_table_line_slot(struct table_metric *table, int line_id)
 {
 	int block_index = 0;
 	int in_block_index = 0;
@@ -561,7 +731,7 @@ static struct table_line ** read_table_line_slot(struct table_metric *table, int
 	return (struct table_line **)&(line[in_block_index]);
 }
 
-static struct table_line *table_line_new(const char *name, const struct fieldstat_tag tags[],size_t n_tag)
+struct table_line *table_line_new(const char *name, const struct fieldstat_tag tags[],size_t n_tag)
 {
 	struct table_line *table_line = (struct table_line *)calloc(sizeof(struct table_line), 1);
 
@@ -572,6 +742,32 @@ static struct table_line *table_line_new(const char *name, const struct fieldsta
 
 	return table_line;
 }
+
+
+void table_line_free(struct table_line *table_line)
+{
+	if(table_line == NULL)
+	{
+		return;
+	}
+	
+	free(table_line->name);
+
+	table_line->name = NULL;
+
+	for(int i = 0; i < (int)table_line->n_tag; i++)
+	{
+		free(table_line->tag_key[i]);
+		table_line->tag_key[i] = NULL;
+
+		free(table_line->tag_value[i]);
+		table_line->tag_value[i] = NULL;
+	}
+	table_line->n_tag = 0;
+
+	free(table_line);
+}
+
 
 
 int fieldstat_register_table_row(struct fieldstat_instance * instance, int table_id, const char *row_name, const struct fieldstat_tag tags[], size_t n_tag, int output_metric_ids[])
@@ -595,6 +791,11 @@ int fieldstat_register_table_row(struct fieldstat_instance * instance, int table
 		return -1;
 	}
 
+	if(0 == is_valid_tags(tags, n_tag))
+	{
+		return -1;
+	}
+
 	table = instance->table_metrics[table_id];
 	line_id = atomic_inc(&(table->line_cnt)) - 1;
 	line_slot = read_table_line_slot(table, line_id);
@@ -607,11 +808,15 @@ int fieldstat_register_table_row(struct fieldstat_instance * instance, int table
 		table_line->metric_id_belong_to_line[i] = metric_id;
 
 		metric = get_metric(instance, metric_id);
+
+		metric->table = table;
+		metric->table_column_id = i;
+/*
 		metric->table_id = table_id;
 		metric->table_column_name = __str_dup(table->column_name[i]); 
 		metric->table_name = __str_dup(table->name);
 		metric->belong_to_table = 1;
-
+*/
 		output_metric_ids[i] = metric_id;
 	}
 	*line_slot = table_line;

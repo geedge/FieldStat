@@ -121,7 +121,7 @@ static void output_line_protocol_table(struct fieldstat_instance *instance,int t
 					field_pos += snprintf(field_pos, 
 											sizeof(field_set_buff) - (field_set_buff - field_set_buff), 
 											"%s=%lld,", 
-											metric->table_column_name, 
+											metric->table->column_name[metric->table_column_id], 
 											value
 										);
 
@@ -178,7 +178,7 @@ int line_protocol_output(struct fieldstat_instance *instance)
 			continue;
 		}
 
-		if(metric->belong_to_table == 1)
+		if(metric->table)
 		{
 			continue;
 		}
@@ -258,7 +258,7 @@ static void append_line_protocol_dynamic_row(struct fieldstat_dynamic_instance *
 	{
 		flush_line_protocol_dynamic_metric(instance);
 	}
-	printf("Line_protocol metric: %s%s %s\n",measurement,tag_set,field_set);
+	//printf("Line_protocol metric: %s:%s %s\n",measurement,tag_set,field_set);
 	instance->line_protocol_send_buff_offset += snprintf(instance->line_protocol_send_buff + instance->line_protocol_send_buff_offset,
 														sizeof(instance->line_protocol_send_buff) - instance->line_protocol_send_buff_offset,
 														"%s%s %s\n",
@@ -294,16 +294,16 @@ int line_protocol_dynamic_metric_output(struct fieldstat_dynamic_instance *insta
 			metrics = dyn_metric->metrics;
 			metric = metrics[0];
 			memset(tag_set_buff, 0, sizeof(tag_set_buff));
-			memset(field_set_buff, 0 ,sizeof(field_set_buff));
+			memset(field_set_buff, 0,sizeof(field_set_buff));
 			field_used_len = 0;
 			tag_used_len = 0;
 
-			if(metric->belong_to_table == 1)
+			if(metric->table)
 			{
-				table = instance->table_metrics[metric->table_id];
+				table = metric->table;
 				for(j = 0; j < table->column_cnt; j++)
 				{
-					metric = metrics[i];
+					metric = metrics[j];
 					value = metric->field_type == FIELD_TYPE_GAUGE ? 
 						get_metric_unit_val(metric, FS_CALC_CURRENT, 0):
 						get_metric_unit_val(metric, FS_CALC_SPEED, 0);
@@ -314,15 +314,18 @@ int line_protocol_dynamic_metric_output(struct fieldstat_dynamic_instance *insta
 					field_used_len += snprintf(field_set_buff + field_used_len, 
 											sizeof(field_set_buff) - field_used_len, 
 											"%s=%lld,", 
-											metric->table_column_name, 
+											metric->table->column_name[metric->table_column_id], 
 											value
 										);
 					
 				}
-				if(row_value_is_not_zero == 1)
+				if(row_value_is_not_zero != 1)
 				{
 					continue;
 				}
+				metric = metrics[0];
+				field_used_len--;
+				field_set_buff[field_used_len] = '\0';
 				tag_used_len += snprintf(tag_set_buff + tag_used_len, 
 										sizeof(tag_set_buff) - tag_used_len, 
 										",app_name=%s,table_name=%s",

@@ -64,7 +64,7 @@ static int output_file_format_default_type_gauge(struct fieldstat_instance *inst
 		{
 			continue;
 		}
-		if(metric->belong_to_table == 1)
+		if(metric->table)
 		{
 			continue;
 		}
@@ -137,7 +137,7 @@ static int output_file_format_default_type_counter(struct fieldstat_instance *in
 		{
 			continue;
 		}
-		if(metric->belong_to_table == 1)
+		if(metric->table)
 		{
 			continue;
 		}
@@ -403,8 +403,8 @@ static int output_file_format_default_type_histogram_and_summary(struct fieldsta
 	char *pos = print_buf;
 	//display_manifest_t* p=NULL;
 	struct metric *metric = NULL;
-	struct metric *metric_array[current_metric_cnt] = {NULL};
-	int metric_is_print[current_metric_cnt] = {0};
+	struct metric *metric_array[current_metric_cnt];
+	int metric_is_print[current_metric_cnt];
 
 	if(instance->histogram_cnt == 0 
 		&& instance->summary_cnt == 0)
@@ -476,10 +476,10 @@ int fieldstat_output_file(struct fieldstat_instance *instance,long long interval
 	time_t current = 0;
 	char ctime_buff[STR_LEN_32]={0};
 
-	if(instance->fp == NULL)
+	if(instance->local_output_fp == NULL)
 	{
-		instance->fp = fopen(instance->local_output_filename, "w");
-		if(instance->fp == NULL)
+		instance->local_output_fp = fopen(instance->local_output_filename, "w");
+		if(instance->local_output_fp == NULL)
 		{
 			printf("Field Stat: open %s failed.\n",instance->local_output_filename);
 			assert(0);
@@ -511,10 +511,10 @@ int fieldstat_output_file(struct fieldstat_instance *instance,long long interval
 		//TODO from json output
     }
 
-	fseek(instance->fp,0,SEEK_SET);
-	fwrite(print_buf,append_pos - print_buf,1,instance->fp);
+	fseek(instance->local_output_fp, 0, SEEK_SET);
+	fwrite(print_buf,append_pos - print_buf,1,instance->local_output_fp);
 
-	fflush(instance->fp);
+	fflush(instance->local_output_fp);
 
 	if(print_buf)
 	{

@@ -8,6 +8,11 @@ struct fieldstat_dynamic_instance * fieldstat_dynamic_instance_new(const char *n
 	{
 		return NULL;
 	}
+	
+	if(!is_valid_field_name(name))
+	{
+		return NULL;
+	}
 
 	instance = (struct fieldstat_dynamic_instance *)calloc(sizeof(struct fieldstat_dynamic_instance), 1);
 
@@ -22,9 +27,81 @@ struct fieldstat_dynamic_instance * fieldstat_dynamic_instance_new(const char *n
 	return instance;
 }
 
+void fieldstat_dynamic_instance_free(struct fieldstat_dynamic_instance *instance)
+{
+	int i = 0;
+	struct dynamic_metric **head = NULL;
+	struct dynamic_metric *dyn_metric, *tmp_dyn_metric;
+	void *pthread_ret;
+
+	if(instance == NULL)
+	{
+		return;
+	}
+	
+	if(instance->background_thread_is_created == 1)
+	{
+		pthread_cancel(instance->background_thread);
+		pthread_join(instance->background_thread, &pthread_ret);
+		instance->background_thread_is_created = 0;
+		instance->running = 0;
+	}
+
+	if(instance->line_protocol_socket != -1)
+	{
+		close(instance->line_protocol_socket);
+		instance->line_protocol_socket = -1;
+	}
+
+	for(i = 0; i < instance->n_thread; i++)
+	{
+		head = &instance->n_thread_dynamic_metric[i];
+		HASH_ITER(hh, *head, dyn_metric, tmp_dyn_metric)
+		{
+			HASH_DEL(*head, dyn_metric);
+			if(dyn_metric->metrics)
+			{
+				int n_loop = 0;
+				struct metric *metric = dyn_metric->metrics[0];
+				if(metric->table)
+				{
+					n_loop = metric->table->column_cnt;
+				}
+				else
+				{
+					n_loop = 1;
+				}
+				for(int j = 0; j < n_loop; j ++)
+				{
+					metric_free(dyn_metric->metrics[j]);
+					dyn_metric->metrics[j] = NULL;
+				}
+				free(dyn_metric->metrics);
+				dyn_metric->metrics = NULL;
+			}
+			free(dyn_metric);
+		}
+		instance->n_thread_dynamic_metric[i] = NULL;
+	}
+
+	for(i = 0; i < instance->table_num; i++)
+	{
+		table_metric_free(instance->table_metrics[i]);
+		instance->table_metrics[i] = NULL;
+	}
+
+	free(instance->n_thread_dynamic_metric);
+	instance->n_thread_dynamic_metric = NULL;
+	free(instance);
+
+	return;
+}
+
+
+
 int fieldstat_dynamic_set_line_protocol_server(struct fieldstat_dynamic_instance *instance, const char *ip, unsigned short port)
 {
-	if(instance->running == 1)
+	if(instance == NULL || instance->running == 1)
 	{
 		return -1;
 	}
@@ -85,6 +162,7 @@ void fieldstat_dynamic_passive_output(struct fieldstat_dynamic_instance *instanc
 	}
 	if(ret == -1)
 	{
+		printf("Passive return: output ret -1\n");
 		return;
 	}
 	memcpy(&(instance->last_output_time),&this_output_time, sizeof(this_output_time));
@@ -107,7 +185,8 @@ void fieldstat_dynamic_instance_start(struct fieldstat_dynamic_instance *instanc
 	clock_gettime(CLOCK_MONOTONIC, &(instance->last_output_time));
 	if(instance->background_thread_disable == 0)
 	{
-		pthread_create(&(instance->cfg_mon_t), NULL, fieldstat_dynamic_thread_schema_output, (void*)instance);
+		pthread_create(&(instance->background_thread), NULL, fieldstat_dynamic_thread_schema_output, (void*)instance);
+		instance->background_thread_is_created = 1;
 	}
 }
 
@@ -117,6 +196,19 @@ int fieldstat_register_dynamic_table(struct fieldstat_dynamic_instance *instance
 	int i = 0;
 
 	struct table_metric *table_metric = NULL;
+
+	if(!is_valid_field_name(table_name))
+	{
+		return -1;
+	}
+
+	for(i = 0; i < (int)n_column; i++)
+	{
+		if(!is_valid_field_name(column_name[i]))
+		{
+			return -1;
+		}
+	}
 
 	if(n_column <= 0 || n_column > TABLE_COLUMN_SIZE)
 	{
@@ -226,11 +318,15 @@ static struct metric * create_dynamic_table_metric(struct fieldstat_dynamic_inst
 				assert(0);
 				break;
 		}
+		metric->table = table;
+		metric->table_column_id = i;
+/*
 		metric->table_id = table_id;
 		metric->table_column_name = __str_dup(table->column_name[i]); 
 		metric->table_name = __str_dup(table->name);
 		metric->belong_to_table = 1;
-
+		metric->table_column_cnt = table->column_cnt;
+*/
 		value->metrics[i] = metric;
 	}
 
@@ -297,21 +393,48 @@ static int fieldstat_dynamic_metric_value_operate(struct fieldstat_dynamic_insta
 int fieldstat_dynamic_metric_value_incrby(struct fieldstat_dynamic_instance *instance, enum field_type type, const char *field_name, long long value, const struct fieldstat_tag tags[], size_t n_tags, int thread_id)
 {
 	int ret = 0;
-	fieldstat_dynamic_metric_value_operate(instance, FS_OP_ADD, type, field_name, value, tags, n_tags, thread_id);
+	if(!is_valid_field_name(field_name))
+	{
+		return -1;
+	}
+
+	if(0 == is_valid_tags(tags, n_tags))
+	{
+		return -1;
+	}
+	ret = fieldstat_dynamic_metric_value_operate(instance, FS_OP_ADD, type, field_name, value, tags, n_tags, thread_id);
 	return ret;
 }
 
 int fieldstat_dynamic_metric_value_set(struct fieldstat_dynamic_instance *instance, enum field_type type, const char *field_name, long long value, const struct fieldstat_tag tags[], size_t n_tags, int thread_id)
 {
 	int ret = 0;
-	fieldstat_dynamic_metric_value_operate(instance, FS_OP_SET, type, field_name, value, tags, n_tags, thread_id);
+	if(!is_valid_field_name(field_name))
+	{
+		return -1;
+	}
+	if(0 == is_valid_tags(tags, n_tags))
+	{
+		return -1;
+	}
+
+	ret = fieldstat_dynamic_metric_value_operate(instance, FS_OP_SET, type, field_name, value, tags, n_tags, thread_id);
 	return ret;
 }
 
 int fieldstat_dynamic_metric_value_decrby(struct fieldstat_dynamic_instance *instance, enum field_type type, const char *field_name, long long value, const struct fieldstat_tag tags[], size_t n_tags, int thread_id)
 {
 	int ret = 0;
-	fieldstat_dynamic_metric_value_operate(instance, FS_OP_SUB, type, field_name, value, tags, n_tags, thread_id);
+	if(!is_valid_field_name(field_name))
+	{
+		return -1;
+	}
+	if(0 == is_valid_tags(tags, n_tags))
+	{
+		return -1;
+	}
+
+	ret = fieldstat_dynamic_metric_value_operate(instance, FS_OP_SUB, type, field_name, value, tags, n_tags, thread_id);
 	return ret;
 }
 
@@ -336,21 +459,48 @@ int fieldstat_dynamic_table_metric_value_operate(struct fieldstat_dynamic_instan
 int fieldstat_dynamic_table_metric_value_incrby(struct fieldstat_dynamic_instance *instance, int table_id, unsigned int column_id, const char *row_name, long long value, const struct fieldstat_tag tags[], size_t n_tags, int thread_id)
 {
 	int ret = 0;
-	fieldstat_dynamic_table_metric_value_operate( instance, FS_OP_ADD, table_id, column_id, row_name, value, tags, n_tags, thread_id);
+	if(!is_valid_field_name(row_name))
+	{
+		return -1;
+	}
+	if(0 == is_valid_tags(tags, n_tags))
+	{
+		return -1;
+	}
+
+	ret = fieldstat_dynamic_table_metric_value_operate( instance, FS_OP_ADD, table_id, column_id, row_name, value, tags, n_tags, thread_id);
 	return ret;
 }
 
 int fieldstat_dynamic_table_metric_value_set(struct fieldstat_dynamic_instance *instance, int table_id, unsigned int column_id, const char *row_name, long long value, const struct fieldstat_tag tags[], size_t n_tags, int thread_id)
 {
 	int ret = 0;
-	fieldstat_dynamic_table_metric_value_operate( instance, FS_OP_SET, table_id, column_id, row_name, value, tags, n_tags, thread_id);
+	if(!is_valid_field_name(row_name))
+	{
+		return -1;
+	}
+	if(0 == is_valid_tags(tags, n_tags))
+	{
+		return -1;
+	}
+
+	ret = fieldstat_dynamic_table_metric_value_operate( instance, FS_OP_SET, table_id, column_id, row_name, value, tags, n_tags, thread_id);
 	return ret;
 }
 
 int fieldstat_dynamic_table_metric_value_decrby(struct fieldstat_dynamic_instance *instance, int table_id, unsigned int column_id, const char *row_name, long long value, const struct fieldstat_tag tags[], size_t n_tags, int thread_id)
 {
 	int ret = 0;
-	fieldstat_dynamic_table_metric_value_operate( instance, FS_OP_SUB, table_id, column_id, row_name, value, tags, n_tags, thread_id);
+	if(!is_valid_field_name(row_name))
+	{
+		return -1;
+	}
+	if(0 == is_valid_tags(tags, n_tags))
+	{
+		return -1;
+	}
+
+	ret = fieldstat_dynamic_table_metric_value_operate( instance, FS_OP_SUB, table_id, column_id, row_name, value, tags, n_tags, thread_id);
 	return ret;
 }
 
