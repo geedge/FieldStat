@@ -512,8 +512,10 @@ int fieldstat_output_file(struct fieldstat_instance *instance,long long interval
     }
 
 	fseek(instance->local_output_fp, 0, SEEK_SET);
-	fwrite(print_buf,append_pos - print_buf,1,instance->local_output_fp);
-
+	if(print_buf)
+	{
+		fwrite(print_buf, append_pos - print_buf, 1,instance->local_output_fp);
+	}
 	fflush(instance->local_output_fp);
 
 	if(print_buf)

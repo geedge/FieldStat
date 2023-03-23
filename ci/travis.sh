@@ -54,10 +54,17 @@ cmake3 -DCMAKE_CXX_FLAGS=$CXX_FLAGS \
 
 make
 
+
+if [ -n "${UNIT_TEST}" ]; then
+	yum install -y  https://dl.influxdata.com/telegraf/releases/telegraf-1.25.1-1.x86_64.rpm
+	/usr/bin/telegraf -config  ../test/bin/telegraf_unit_test.conf --quiet &
+	make test
+	ctest --verbose
+fi
+
 if [ -n "${PACKAGE}" ]; then
 	make package
 fi
-
 
 if [ -n "${UPLOAD_RPM}" ]; then	
 	cp ~/rpm_upload_tools.py ./

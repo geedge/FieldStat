@@ -119,7 +119,7 @@ static void output_line_protocol_table(struct fieldstat_instance *instance,int t
 					line_value_is_not_zero = 1;
 				}
 					field_pos += snprintf(field_pos, 
-											sizeof(field_set_buff) - (field_set_buff - field_set_buff), 
+											sizeof(field_set_buff) - (field_pos - field_set_buff), 
 											"%s=%lld,", 
 											metric->table->column_name[metric->table_column_id], 
 											value

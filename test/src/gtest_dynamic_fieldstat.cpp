@@ -614,14 +614,15 @@ void parse_telegraf_cjson_output(const char *compare)
 	cJSON_DeleteItemFromObject(cjson_tags, "host");
 	
 	cjson_metric_str = cJSON_PrintUnformatted(cjson_metric);
-	ret = strcmp(cjson_metric_str, compare);
-	EXPECT_EQ(0, ret);
-	cJSON_Delete(cjson_metric);
+	EXPECT_NE(nullptr, cjson_metric_str);
 	if(cjson_metric_str)
 	{
+		ret = strcmp(cjson_metric_str, compare);
+		EXPECT_EQ(0, ret);
 		free(cjson_metric_str);
 		cjson_metric_str = NULL;
 	}
+	cJSON_Delete(cjson_metric);
 	return;
 }
 
@@ -1054,14 +1055,16 @@ void parse_telegraf_cjson_output_not_equal(const char *compare)
 	EXPECT_NE(nullptr, cjson_tags);
 	cJSON_DeleteItemFromObject(cjson_tags, "host");
 	cjson_metric_str = cJSON_PrintUnformatted(cjson_metric);
-	ret = strcmp(cjson_metric_str, compare);
-	EXPECT_NE(0, ret);
-	cJSON_Delete(cjson_metric);
+	EXPECT_NE(nullptr, cjson_metric_str);
+
 	if(cjson_metric_str)
 	{
+		ret = strcmp(cjson_metric_str, compare);
+		EXPECT_NE(0, ret);
 		free(cjson_metric_str);
 		cjson_metric_str = NULL;
 	}
+	cJSON_Delete(cjson_metric);
 	return;
 }
 
@@ -1187,13 +1190,14 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolMultiMetric)
 		memset(compare, 0, sizeof(compare));
 		snprintf(compare, sizeof(compare), "{\"fields\":{\"Active_sessions_%d\":12},\"name\":\"Active_sessions_%d\",\"tags\":{\"app_name\":\"firewall\"}}", n_line, n_line);
 		cjson_metric_str = cJSON_PrintUnformatted(cjson_metric);
-		EXPECT_STREQ(compare, cjson_metric_str);
-		cJSON_Delete(cjson_metric);
+		EXPECT_NE(nullptr, cjson_metric_str);
 		if(cjson_metric_str)
 		{
+			EXPECT_STREQ(compare, cjson_metric_str);
 			free(cjson_metric_str);
 			cjson_metric_str = NULL;
 		}
+		cJSON_Delete(cjson_metric);
 		n_line++;
 	}
 	fclose(fp);
@@ -1263,13 +1267,14 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolMultiTableRow)
 
 		snprintf(compare, sizeof(compare), "{\"fields\":{\"bytes\":30,\"packages\":30},\"name\":\"security_rule_hits_%d\",\"tags\":{\"app_name\":\"firewall\",\"table_name\":\"shaping\"}}", n_line);
 		cjson_metric_str = cJSON_PrintUnformatted(cjson_metric);
-		EXPECT_STREQ(compare, cjson_metric_str);
-		cJSON_Delete(cjson_metric);
+		EXPECT_NE(nullptr, cjson_metric_str);
 		if(cjson_metric_str)
 		{
+			EXPECT_STREQ(compare, cjson_metric_str);
 			free(cjson_metric_str);
 			cjson_metric_str = NULL;
 		}
+		cJSON_Delete(cjson_metric);
 		n_line++;
 	}
 	fclose(fp);
@@ -2574,5 +2579,4 @@ int main(int argc, char *argv[])
 {
 	testing::InitGoogleTest(&argc, argv);
 	return RUN_ALL_TESTS();
-    return 0;
 }

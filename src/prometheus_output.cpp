@@ -188,12 +188,12 @@ static int prometheus_output_histogram_and_summary(struct metric *metric, char *
 
 	if(metric->field_type == FILED_TYPE_HISTOGRAM)
 	{
-		output_format = (char *)"%s_bucket{%s,le=\"%0.2f\"} %llu\n";
+		output_format = (char *)"%s_bucket{%s,le=\"%0.2f\"} %lld\n";
 	}
 
 	if(metric->field_type == FIELD_TYPE_SUMMARY)
 	{
-		output_format = (char *)"%s{%s,quantile=\"%0.2f\"} %llu\n";
+		output_format = (char *)"%s{%s,quantile=\"%0.2f\"} %lld\n";
 	}
 
 	hdr_init(h->lowest_trackable_value,  h->highest_trackable_value, h->significant_figures, &(h_tmp));
@@ -224,7 +224,7 @@ static int prometheus_output_histogram_and_summary(struct metric *metric, char *
 	}
 	used_len+=snprintf(payload+used_len,
 							payload_len-used_len,
-							"%s_count{%s} %llu\n",
+							"%s_count{%s} %lld\n",
 							metric_name,
 							metric_tags,
 							(long long)h_out->total_count
@@ -237,7 +237,7 @@ static int prometheus_output_histogram_and_summary(struct metric *metric, char *
 	}
 	used_len+=snprintf(payload+used_len,
 			payload_len-used_len,
-			"%s_sum{%s} %llu\n",
+			"%s_sum{%s} %lld\n",
 			metric_name,
 			metric_tags,
 			sum
@@ -329,7 +329,7 @@ static int prometheus_get_instance_metric_playload(struct fieldstat_instance *in
 				value = get_metric_unit_val(metric, FS_CALC_CURRENT, 1);
 				append_offset += snprintf(new_payload + append_offset, 
 											new_payload_size - append_offset,
-											"%s{%s} %llu\n", 
+											"%s{%s} %lld\n", 
 											metric_name, 
 											metric_tags, 
 											value

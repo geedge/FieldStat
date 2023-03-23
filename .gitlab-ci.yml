@@ -27,7 +27,7 @@ stages:
     - yum install -y libmnl-devel
     - yum install -y libnfnetlink-devel
     - ./ci/travis.sh
-      - cd build
+    - cd build
   tags:
   - share
 
@@ -47,6 +47,7 @@ branch_build_debug_for_centos7:
   extends: .build_by_travis_for_centos7
   variables:
     BUILD_TYPE: Debug
+    UNIT_TEST: 1
   except:
     - /^develop.*$/i
     - /^master.*$/i
@@ -56,6 +57,7 @@ branch_build_release_for_centos7:
   stage: build
   variables:
     BUILD_TYPE: RelWithDebInfo
+    UNIT_TEST: 1
   extends: .build_by_travis_for_centos7
   except:
     - /^develop.*$/i
@@ -67,6 +69,7 @@ develop_build_debug_for_centos7:
   extends: .build_by_travis_for_centos7
   variables:
     BUILD_TYPE: Debug
+    UNIT_TEST: 1
     PACKAGE: 1
     UPLOAD_RPM: 1
     ASAN_OPTION: ADDRESS
@@ -86,6 +89,7 @@ develop_build_release_for_centos7:
   extends: .build_by_travis_for_centos7
   variables:
     BUILD_TYPE: RelWithDebInfo
+    UNIT_TEST: 1
     PACKAGE: 1
     UPLOAD_RPM: 1
     TESTING_VERSION_BUILD: 1
@@ -103,6 +107,7 @@ release_build_debug_for_centos7:
   stage: build
   variables:
     BUILD_TYPE: Debug
+    UNIT_TEST: 1
     PACKAGE: 1
     UPLOAD_RPM: 1
     PULP3_REPO_NAME: framework-stable-x86_64.el7
@@ -119,6 +124,7 @@ release_build_release_for_centos7:
   stage: build
   variables:
     BUILD_TYPE: RelWithDebInfo
+    UNIT_TEST: 1
     PACKAGE: 1
     UPLOAD_RPM: 1
     UPLOAD_SYMBOL_FILES: 1
@@ -138,6 +144,7 @@ branch_build_debug_for_centos8:
   extends: .build_by_travis_for_centos8
   variables:
     BUILD_TYPE: Debug
+    UNIT_TEST: 1
   except:
     - /^develop.*$/i
     - /^master.*$/i
@@ -147,6 +154,7 @@ branch_build_release_for_centos8:
   stage: build
   variables:
     BUILD_TYPE: RelWithDebInfo
+    UNIT_TEST: 1
   extends: .build_by_travis_for_centos8
   except:
     - /^develop.*$/i
@@ -158,6 +166,7 @@ develop_build_debug_for_centos8:
   extends: .build_by_travis_for_centos8
   variables:
     BUILD_TYPE: Debug
+    UNIT_TEST: 1
     PACKAGE: 1
     UPLOAD_RPM: 1
     ASAN_OPTION: ADDRESS
@@ -177,6 +186,7 @@ develop_build_release_for_centos8:
   extends: .build_by_travis_for_centos8
   variables:
     BUILD_TYPE: RelWithDebInfo
+    UNIT_TEST: 1
     PACKAGE: 1
     UPLOAD_RPM: 1
     TESTING_VERSION_BUILD: 1
@@ -194,6 +204,7 @@ release_build_debug_for_centos8:
   stage: build
   variables:
     BUILD_TYPE: Debug
+    UNIT_TEST: 1
     PACKAGE: 1
     UPLOAD_RPM: 1
     PULP3_REPO_NAME: framework-stable-x86_64.el8
@@ -210,6 +221,7 @@ release_build_release_for_centos8:
   stage: build
   variables:
     BUILD_TYPE: RelWithDebInfo
+    UNIT_TEST: 1
     PACKAGE: 1
     UPLOAD_RPM: 1
     UPLOAD_SYMBOL_FILES: 1

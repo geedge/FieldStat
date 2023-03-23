@@ -293,7 +293,7 @@ int send_udp(int sd, unsigned int dest_ip, unsigned short dest_port, const char 
 				return -1;
 			}
 		}
-		already_sended_len=+this_sended_len;			
+		already_sended_len += this_sended_len;			
 	}
 	
 	return 0;
