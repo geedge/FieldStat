@@ -93,7 +93,7 @@ static void prometheus_output_uri_list(struct prometheus_endpoint_instance *prom
 	int i = 0;
 	int payload_len = 0;
 	char *payload = NULL;
-	char *payload_append_position = NULL;
+	int used_len = 0;
 	struct fieldstat_instance **fs_instance = NULL;
 	struct http_response_s* response = NULL;
 
@@ -101,15 +101,13 @@ static void prometheus_output_uri_list(struct prometheus_endpoint_instance *prom
 	
 	if(prometheus_output->fs_instance_cnt > 0)
 	{
-		payload_len = prometheus_output->fs_instance_cnt * 128; //TODO using marco, len?
-		printf("payload_len =%d\n, n_instance =%d\n", payload_len, prometheus_output->fs_instance_cnt);
+		payload_len = prometheus_output->fs_instance_cnt * 128;
 		payload = (char *)calloc(payload_len, sizeof(char));
-		payload_append_position = payload;
-		payload_append_position += snprintf(payload_append_position, payload_len - (payload_append_position - payload),"url_path:\n\t%s\n", prometheus_output->url_path);
+		used_len += snprintf(payload + used_len, payload_len - used_len, "url_path:\n\t%s\n", prometheus_output->url_path);
 
 		for(i = 0; i < prometheus_output->fs_instance_cnt; i++)
 		{
-			payload_append_position += snprintf(payload_append_position, payload_len - (payload_append_position - payload),"\t/%s\n", fs_instance[i]->name);
+			used_len += snprintf(payload + used_len, payload_len - used_len, "\t/%s\n", fs_instance[i]->name);
 		}
 	}
 	else
@@ -128,35 +126,33 @@ static void prometheus_output_uri_list(struct prometheus_endpoint_instance *prom
 	return;
 }
 
-static int prometheus_output_read_metric_tags(struct metric *metric, char *instance_name, char *tags_buff, unsigned int size)
+static int prometheus_output_read_metric_tags(struct metric *metric, char *instance_name, char *tags_buf, unsigned int size)
 {
 	int i = 0;//used_len = 0;
 	char unescape[STR_LEN_256] = {0};
-	char *append_pos = tags_buff;
-	
-	//used_len += snprint(tags_buff, size - used_len, "app_name=\"%s\"", instance_name);
+	int used_len = 0;
 
-	append_pos += snprintf(append_pos, size - (append_pos - tags_buff), "app_name=\"%s\"", instance_name);
+	used_len += snprintf(tags_buf + used_len, size - used_len, "app_name=\"%s\"", instance_name);
 
 	if(metric->table)
 	{
-		append_pos += snprintf(append_pos, size - (append_pos - tags_buff), ",line_name=\"%s\"", metric->field_name);
+		used_len += snprintf(tags_buf + used_len, size - used_len, ",line_name=\"%s\"", metric->field_name);
 	}
 
 	for(i = 0; i < (int)metric->n_tag; i++)
 	{
 		memset(unescape, 0, sizeof(unescape));
 		str_unescape(metric->tag_key[i], unescape, sizeof(unescape));
-		append_pos += snprintf(append_pos, size - (append_pos - tags_buff), ",%s=\"%s\"", unescape, metric->tag_value[i]);
+		used_len += snprintf(tags_buf, size - used_len, ",%s=\"%s\"", unescape, metric->tag_value[i]);
 	}
-	return append_pos - tags_buff;
+	return used_len;
 }
 
 
-static int prometheus_output_read_metric_name(struct metric *metric, char *instance_app_name, char *name_buff, unsigned int size)
+static int prometheus_output_read_metric_name(struct metric *metric, char *instance_app_name, char *name_buf, unsigned int size)
 {
 	char unescape[256] = {0};
-	char *append_pos = name_buff;
+	int used_len = 0;
 	if(metric->table)
 	{
 		str_unescape(metric->table->column_name[metric->table_column_id], unescape, sizeof(unescape));
@@ -165,9 +161,9 @@ static int prometheus_output_read_metric_name(struct metric *metric, char *insta
 	{
 		str_unescape(metric->field_name, unescape, sizeof(unescape));
 	}
-	append_pos += snprintf(append_pos, size - (append_pos - name_buff), "%s_%s", instance_app_name, unescape);
+	used_len += snprintf(name_buf, size - used_len, "%s_%s", instance_app_name, unescape);
 
-	return append_pos - name_buff;
+	return used_len;
 }
 
 
