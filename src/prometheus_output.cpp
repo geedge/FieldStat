@@ -103,7 +103,7 @@ static void prometheus_output_uri_list(struct prometheus_endpoint_instance *prom
 	{
 		payload_len = prometheus_output->fs_instance_cnt * 128; //TODO using marco, len?
 		printf("payload_len =%d\n, n_instance =%d\n", payload_len, prometheus_output->fs_instance_cnt);
-		payload = (char *)calloc(1,payload_len);
+		payload = (char *)calloc(payload_len, sizeof(char));
 		payload_append_position = payload;
 		payload_append_position += snprintf(payload_append_position, payload_len - (payload_append_position - payload),"url_path:\n\t%s\n", prometheus_output->url_path);
 
@@ -114,7 +114,7 @@ static void prometheus_output_uri_list(struct prometheus_endpoint_instance *prom
 	}
 	else
 	{
-		payload = (char *)calloc(1, 128);
+		payload = (char *)calloc(128, sizeof(char));
 		strncpy(payload, "Not Invaild instance\n", 128);
 	}
 	response = http_response_init();
@@ -424,7 +424,7 @@ int fieldstat_global_enable_prometheus_endpoint(unsigned short listen_port, cons
 	g_prometheus_endpoint_instance.url_path = url_path == NULL ? strdup(PROMETHEUS_ENDPOINT_DEFAULT_URL):strdup(url_path);
 	g_prometheus_endpoint_instance.port = listen_port;
 	g_prometheus_endpoint_instance.running = 1;
-	g_prometheus_endpoint_instance.fs_instance = (struct fieldstat_instance **)calloc( sizeof(struct fieldstat_instance *), g_prometheus_endpoint_instance.fs_instance_size);
+	g_prometheus_endpoint_instance.fs_instance = (struct fieldstat_instance **)calloc(g_prometheus_endpoint_instance.fs_instance_size, sizeof(struct fieldstat_instance *));
 	pthread_create(&g_prometheus_endpoint_instance.tid, NULL, prometheus_endpoint_listen_thread_entry, (void *)&g_prometheus_endpoint_instance);
 	g_prometheus_endpoint_instance.thread_created = 1;
 	return 0;

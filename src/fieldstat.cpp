@@ -28,7 +28,7 @@ static __attribute__((__used__)) const char * GIT_VERSION_UNKNOWN = NULL;
 char* __str_dup(const char* str)
 {
 	char* dup=NULL;
-	dup=(char*)calloc(sizeof(char),strlen(str)+1);
+	dup=(char*)calloc(strlen(str)+1, sizeof(char));
 	memcpy(dup, str, strlen(str));
 	return dup;
 }
@@ -155,7 +155,7 @@ void add_tags_to_metric(const struct fieldstat_tag tags[], size_t n_tag, char *t
 
 struct metric * metric_new(enum field_type type, const char *field_name, const struct fieldstat_tag tags[], size_t n_tag)
 {
-	struct metric *metric = (struct metric*)calloc(sizeof(struct metric),1);
+	struct metric *metric = (struct metric*)calloc(1, sizeof(struct metric));
 	metric->field_name = __str_dup(field_name);
 	metric->field_type = type;
 	metric->is_ratio = 0;
@@ -209,7 +209,7 @@ struct metric ** read_metric_slot(struct fieldstat_instance *instance, int metri
 	if(in_block_index == 0)
 	{
 		assert(instance->metric_block_list[block_index] == NULL);
-		instance->metric_block_list[block_index] = (struct metric **)calloc(sizeof(struct metric *), NUM_INIT_METRICS);	
+		instance->metric_block_list[block_index] = (struct metric **)calloc(NUM_INIT_METRICS, sizeof(struct metric *));	
 	}
 	else
 	{
@@ -544,7 +544,7 @@ struct fieldstat_instance * fieldstat_instance_new(const char *name)
 		return NULL;
 	}
 
-	instance = (struct fieldstat_instance *)calloc(sizeof(struct fieldstat_instance),1);
+	instance = (struct fieldstat_instance *)calloc(1, sizeof(struct fieldstat_instance));
 	strcpy(instance->name, name);
 	instance->running = 0;
 	instance->output_interval_ms = 2000;
@@ -615,7 +615,7 @@ void fieldstat_instance_free(struct fieldstat_instance *instance)
 struct table_metric* table_metric_new(const char *name, const char *column_name[], enum field_type column_type[], size_t n_column)
 {
 	int i = 0;
-	struct table_metric *table_metric = (struct table_metric *)calloc(sizeof(struct table_metric), 1);
+	struct table_metric *table_metric = (struct table_metric *)calloc(1, sizeof(struct table_metric));
 
 	table_metric->column_cnt = (int)n_column;
 	table_metric->name = __str_dup(name);
@@ -720,7 +720,7 @@ struct table_line ** read_table_line_slot(struct table_metric *table, int line_i
 	if(in_block_index == 0)
 	{
 		assert(table->line_block[block_index] == NULL);
-		table->line_block[block_index] = (struct table_line **)calloc(sizeof(struct table_line *), NUM_INIT_METRICS); 	
+		table->line_block[block_index] = (struct table_line **)calloc(NUM_INIT_METRICS, sizeof(struct table_line *)); 	
 	}
 	else
 	{
@@ -733,7 +733,7 @@ struct table_line ** read_table_line_slot(struct table_metric *table, int line_i
 
 struct table_line *table_line_new(const char *name, const struct fieldstat_tag tags[],size_t n_tag)
 {
-	struct table_line *table_line = (struct table_line *)calloc(sizeof(struct table_line), 1);
+	struct table_line *table_line = (struct table_line *)calloc(1, sizeof(struct table_line));
 
 	table_line->name = __str_dup(name);
 	table_line->n_tag = n_tag;
@@ -911,7 +911,7 @@ static int parse_histogram_bin_format(const char* format, double **output_bins, 
 			comma_num++;
 		}
 	}
-	bins=(double*)calloc(sizeof(double),comma_num+1);
+	bins=(double*)calloc(comma_num+1, sizeof(double));
 	for (token = dup_format,i=0; ; token= NULL, i++)
 	{
 		sub_token= strtok_r(token,",", &saveptr);

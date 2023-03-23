@@ -403,14 +403,22 @@ static int output_file_format_default_type_histogram_and_summary(struct fieldsta
 	char *pos = print_buf;
 	//display_manifest_t* p=NULL;
 	struct metric *metric = NULL;
-	struct metric *metric_array[current_metric_cnt];
-	int metric_is_print[current_metric_cnt];
+	struct metric **metric_array = NULL;
+	int *printed_metric_id = NULL;
+
+	if(current_metric_cnt < 1)
+	{
+		return 0;
+	}
 
 	if(instance->histogram_cnt == 0 
 		&& instance->summary_cnt == 0)
 	{
 		return 0;
 	}
+
+	metric_array = (struct metric **)calloc(current_metric_cnt, sizeof(struct metric *));
+	printed_metric_id = (int *)calloc(current_metric_cnt, sizeof(int));
 
 	for(i = 0; i < current_metric_cnt; i ++)
 	{
@@ -429,7 +437,7 @@ static int output_file_format_default_type_histogram_and_summary(struct fieldsta
 
 	for(i = 0; i < metric_num; i++)
 	{
-		if(metric_is_print[i] == 1)
+		if(printed_metric_id[i] == 1)
 		{
 			continue;
 		}
@@ -449,7 +457,7 @@ static int output_file_format_default_type_histogram_and_summary(struct fieldsta
 				continue;
 			}
 			pos += output_file_print_hdr_unit(metric_array[j], pos, size-(pos-print_buf));
-			metric_is_print[j] = 1;
+			printed_metric_id[j] = 1;
 		}
 		if(pos-print_buf>0)
 		{
@@ -460,6 +468,17 @@ static int output_file_format_default_type_histogram_and_summary(struct fieldsta
 			pos+=snprintf(pos,size-(pos-print_buf),"\n%s\n", draw_line);
 		}
 	}
+	if(metric_array)
+	{
+		free(metric_array);
+		metric_array = NULL;
+	}
+	if(printed_metric_id)
+	{
+		free(printed_metric_id);
+		printed_metric_id = NULL;
+	}
+
 	return pos-print_buf;	
 }
 
@@ -491,7 +510,7 @@ int fieldstat_output_file(struct fieldstat_instance *instance,long long interval
 	{
 		time(&current);
 		ctime_r(&current, ctime_buff);
-		print_buf = (char*)calloc(sizeof(char), print_buf_sz);
+		print_buf = (char*)calloc(print_buf_sz, sizeof(char));
 		append_pos = print_buf;
 		append_pos += snprintf(append_pos, print_buf_sz - (append_pos - print_buf), "%s%s", draw_boundary, ctime_buff);
 		append_pos --;//jump '\n' generate by ctime()

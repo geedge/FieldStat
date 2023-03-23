@@ -14,7 +14,7 @@ struct fieldstat_dynamic_instance * fieldstat_dynamic_instance_new(const char *n
 		return NULL;
 	}
 
-	instance = (struct fieldstat_dynamic_instance *)calloc(sizeof(struct fieldstat_dynamic_instance), 1);
+	instance = (struct fieldstat_dynamic_instance *)calloc(1, sizeof(struct fieldstat_dynamic_instance));
 
 	strcpy(instance->name, name);
 	instance->running = 0;
@@ -22,7 +22,7 @@ struct fieldstat_dynamic_instance * fieldstat_dynamic_instance_new(const char *n
 	instance->background_thread_disable = 0;
 
 	instance->n_thread = n_thread;
-	instance->n_thread_dynamic_metric = (struct dynamic_metric **)calloc(sizeof(struct dynamic_metric *), instance->n_thread);
+	instance->n_thread_dynamic_metric = (struct dynamic_metric **)calloc(instance->n_thread, sizeof(struct dynamic_metric *));
 
 	return instance;
 }
@@ -296,12 +296,12 @@ static struct metric * create_dynamic_table_metric(struct fieldstat_dynamic_inst
 
 	head = &instance->n_thread_dynamic_metric[thread_id];
 
-	value = (struct dynamic_metric *)calloc(sizeof(struct dynamic_metric), 1);
+	value = (struct dynamic_metric *)calloc(1, sizeof(struct dynamic_metric));
 	build_dynamic_metric_key(table_id, row_name, tags, n_tags, sizeof(value->metric_key), value->metric_key);
 
 
 	table = instance->table_metrics[table_id];
-	value->metrics = (struct metric **)calloc(sizeof(struct metric *), table->column_cnt);
+	value->metrics = (struct metric **)calloc(table->column_cnt, sizeof(struct metric *));
 	for(i = 0; i < table->column_cnt; i ++)
 	{
 		metric = metric_new(table->column_type[i], row_name, tags, n_tags);
@@ -344,10 +344,10 @@ static struct metric * create_dynamic_metric(struct fieldstat_dynamic_instance *
 
 	head = &instance->n_thread_dynamic_metric[thread_id];
 
-	insert = (struct dynamic_metric *)calloc(sizeof(struct dynamic_metric), 1);
+	insert = (struct dynamic_metric *)calloc(1, sizeof(struct dynamic_metric));
 	build_dynamic_metric_key(-1, field_name, tags, n_tags, sizeof(insert->metric_key), insert->metric_key);
 
-	insert->metrics = (struct metric **)calloc(sizeof(struct metric *), 1);
+	insert->metrics = (struct metric **)calloc(1, sizeof(struct metric *));
 	metric = metric_new(type, field_name, tags, n_tags);
 
 	switch(metric->field_type)
