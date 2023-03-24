@@ -1,245 +1,367 @@
 #include "fieldstat_internal.h"
 
-static void flush_line_protocol_metric_send_buff(struct fieldstat_instance *instance)
+
+static void flush_send_buf(struct line_protocol_output *line_protocol_output)
 {
-	if(instance->line_protocol_send_buff_offset == 0)
+	if(line_protocol_output == NULL || line_protocol_output->send_buf_offset == 0)
 	{
 		return;
 	}
 
-	if(instance->line_protocol_server_ip > 0 && instance->line_protocol_server_port > 0)
+	if(line_protocol_output->server_ip > 0 && line_protocol_output->server_port > 0)
 	{
-		send_udp(instance->line_protocol_socket, instance->line_protocol_server_ip,
-				(unsigned short)instance->line_protocol_server_port, 
-				instance->line_protocol_send_buff, 
-				instance->line_protocol_send_buff_offset
-			);
+		send_udp(line_protocol_output->send_socket, line_protocol_output->server_ip,
+				line_protocol_output->server_port, line_protocol_output->send_buf, line_protocol_output->send_buf_offset);
+
 	}
-	instance->line_protocol_send_buff_offset = 0;
-	memset(instance->line_protocol_send_buff, 0, sizeof(instance->line_protocol_send_buff));
+	line_protocol_output->send_buf_offset = 0;
+	memset(line_protocol_output->send_buf, 0, sizeof(line_protocol_output->send_buf));
+
 	return;
 }
 
-static void append_line_protocol_metric_to_send_buff(struct fieldstat_instance *instance, const char* measurement, char *tag_set, char *field_set)
+
+static void send_line_buf(struct line_protocol_output *line_protocol_output, char *line_buf, unsigned int line_buf_len)
 {
-	if(field_set==NULL)
+	if(line_protocol_output == NULL || line_buf == NULL)
 	{
 		return;
 	}
-	if(UDP_PAYLOAD_SIZE - (unsigned int)instance->line_protocol_send_buff_offset < strlen(measurement) + strlen(field_set) + strlen(tag_set) + 2)
+
+	if(UDP_PAYLOAD_SIZE - line_protocol_output->send_buf_offset < line_buf_len)
 	{
-		flush_line_protocol_metric_send_buff(instance);
+		flush_send_buf(line_protocol_output);
 	}
-	printf("Line_protocol metric: %s%s %s\n",measurement,tag_set,field_set);
-	instance->line_protocol_send_buff_offset += snprintf(instance->line_protocol_send_buff + instance->line_protocol_send_buff_offset,
-														sizeof(instance->line_protocol_send_buff) - instance->line_protocol_send_buff_offset,
-														"%s%s %s\n",
-														measurement, tag_set, field_set
-													);
+
+	line_protocol_output->send_buf_offset += snprintf(line_protocol_output->send_buf + line_protocol_output->send_buf_offset,
+													sizeof(line_protocol_output->send_buf) - line_protocol_output->send_buf_offset,
+													"%s", line_buf);
 	return;
 }
 
-static int output_line_protocol_tag_set_buf(char *tag_key[], char *tag_value[], int n_tag, char *tag_set_buf, unsigned int size)
+
+static int add_measurement(const char* measurement, char *line_buf, unsigned int line_buf_size)
 {
-	int i = 0;
 	int used_len = 0;
-	for(i = 0; i < n_tag; i++)
+
+	used_len = snprintf(line_buf, line_buf_size, "%s", measurement);
+
+	return used_len;	
+}
+
+
+static int add_default_tag_set(const char *instance_name, const char *table_name, char *line_buf, unsigned int line_buf_size)
+{
+	int used_len = 0;
+
+	if(instance_name == NULL)
 	{
-		used_len += snprintf(tag_set_buf + used_len, size - used_len, ",%s=%s", tag_key[i], tag_value[i]);
+		return 0;
 	}
+
+	if(table_name)
+	{
+		used_len += snprintf(line_buf, line_buf_size, ",app_name=%s,table_name=%s", instance_name, table_name);
+	}
+	else
+	{
+		used_len += snprintf(line_buf, line_buf_size, ",app_name=%s", instance_name);
+	}
+
 	return used_len;
 }
 
 
-static void output_line_protocol_table(struct fieldstat_instance *instance,int tables_line_cnt[], int current_table_cnt)
+static int add_user_tag_set(struct metric *metric, char *line_buf, unsigned int line_buf_size)
 {
-	int i = 0, j = 0, k = 0;
-	struct metric *metric = NULL;
-	long long value = 0;
-	//double ratio = 0.0;
-	char field_set_buff[UDP_PAYLOAD_SIZE];
-	char tag_set_buff[UDP_PAYLOAD_SIZE];
+	int used_len = 0;
 
-	int tags_used_len = 0;
-	int fields_used_len = 0;
-
-	struct table_metric *table = NULL;
-	struct table_line *line = NULL;
-	int line_value_is_not_zero = 0;
-
-	for(i = 0; i < current_table_cnt; i++)
+	for(int i = 0; i < (int)metric->n_tag; i++)
 	{
-		table = instance->table_metrics[i];
-		for(j = 0; j < tables_line_cnt[i]; j++)
-		{
-			line = read_table_line(table, j);
-			if(line == NULL)
-			{
-				continue;
-			}
-			line_value_is_not_zero = 0;
-			tags_used_len = 0;
-			fields_used_len = 0;
-			memset(field_set_buff, 0, sizeof(field_set_buff));
-			memset(tag_set_buff,  0, sizeof(tag_set_buff));
-			line_value_is_not_zero = 0;
-			for(k = 0; k < table->column_cnt; k ++)
-			{
-				metric = get_metric(instance, line->metric_id_belong_to_line[k]);
-
-				value = metric->field_type == FIELD_TYPE_GAUGE ? 
-					get_metric_unit_val(metric, FS_CALC_CURRENT, 1):
-					get_metric_unit_val(metric, FS_CALC_SPEED, 1);
-				if(value != 0)
-				{
-					line_value_is_not_zero = 1;
-				}
-					fields_used_len += snprintf(field_set_buff + fields_used_len, 
-											sizeof(field_set_buff) - fields_used_len, 
-											"%s=%lld,", 
-											metric->table->column_name[metric->table_column_id], 
-											value
-										);
-
-			}
-			if(line_value_is_not_zero == 0)
-			{
-				continue;
-			}
-			tags_used_len += snprintf(tag_set_buff + tags_used_len, 
-								sizeof(tag_set_buff) - tags_used_len, 
-								",app_name=%s,table_name=%s",
-								instance->name,
-								table->name
-							);
-			
-			tags_used_len += output_line_protocol_tag_set_buf(line->tag_key, line->tag_value, line->n_tag, 
-														tag_set_buff + tags_used_len, 
-														sizeof(tag_set_buff) - tags_used_len);
-
-			// measurement,tag_set field_set
-			append_line_protocol_metric_to_send_buff(instance, metric->field_name, tag_set_buff, field_set_buff);
-		}
-
+		used_len += snprintf(line_buf + used_len, line_buf_size - used_len, ",%s=%s", metric->tag_key[i], metric->tag_value[i]);
 	}
+
+	return used_len;	
 }
 
-int line_protocol_output(struct fieldstat_instance *instance)
+static long long read_single_metric_value(struct metric *metric)
 {
-	struct metric *metric = NULL;
 	long long value = 0;
+	metric->field_type == FIELD_TYPE_GAUGE
+		?value = get_metric_unit_val(metric, FS_CALC_CURRENT, 0)
+		:value = get_metric_unit_val(metric, FS_CALC_SPEED, 0);
+	return value;
+}
+
+static int read_table_row_value(struct fieldstat_instance *instance, struct table_line *row, int n_column, long long *out_row_value)
+{
 	int i = 0;
-	char field_set_buff[UDP_PAYLOAD_SIZE];
-	char tag_set_buff[UDP_PAYLOAD_SIZE];
-	int tags_used_len = 0;
+	struct metric *metric = NULL;
 
-	//print current time instance start
-	int tables_line_cnt[TABLE_MAX_NUM];
-	int current_table_cnt = instance->table_num;
-	get_current_table_line_cnt(instance, current_table_cnt, tables_line_cnt);
-	int current_metric_cnt = instance->metric_cnt;
-	//print current time instance end
-
-	for(i = 0; i < current_metric_cnt; i++)
+	if(row == NULL)
 	{
-		metric = get_metric(instance, i);
-		if(metric == NULL)
-		{
-			continue;
-		}
-		if(metric->is_ratio == 1)
-		{
-			continue;
-		}
-
-		if(metric->table)
-		{
-			continue;
-		}
-		memset(field_set_buff, 0, sizeof(field_set_buff));
-		memset(tag_set_buff,  0, sizeof(tag_set_buff));
-		tags_used_len = 0;
-		switch(metric->field_type)
-		{
-			case FIELD_TYPE_GAUGE:
-				value = get_metric_unit_val(metric, FS_CALC_CURRENT, 1);
-				if(value != 0)
-				{
-					snprintf(field_set_buff, UDP_PAYLOAD_SIZE, "%s=%lld", metric->field_name, value);
-					tags_used_len += snprintf(tag_set_buff + tags_used_len, 
-										sizeof(tag_set_buff) - tags_used_len, 
-										",app_name=%s", 
-										instance->name
-									);
-					output_line_protocol_tag_set_buf(metric->tag_key, metric->tag_value, metric->n_tag, tag_set_buff + tags_used_len, sizeof(tag_set_buff) - tags_used_len);
-					append_line_protocol_metric_to_send_buff(instance, metric->field_name, tag_set_buff, field_set_buff);
-
-				}
-				break;
-			case FIELD_TYPE_COUNTER:
-				value = get_metric_unit_val(metric, FS_CALC_SPEED, 1);
-				if(value != 0)
-				{
-					snprintf(field_set_buff, UDP_PAYLOAD_SIZE, "%s=%lld", metric->field_name, value);
-					tags_used_len += snprintf(tag_set_buff + tags_used_len, 
-											sizeof(tag_set_buff) - tags_used_len, 
-											",app_name=%s", 
-											instance->name
-										);
-					output_line_protocol_tag_set_buf(metric->tag_key, metric->tag_value, metric->n_tag, tag_set_buff + tags_used_len, sizeof(tag_set_buff) - tags_used_len);
-					append_line_protocol_metric_to_send_buff(instance, metric->field_name, tag_set_buff, field_set_buff);
-				}
-				break;
-			default:
-				break;
-
-		}
+		return -1;
 	}
 
-	output_line_protocol_table(instance, tables_line_cnt, current_table_cnt);
-	flush_line_protocol_metric_send_buff(instance);
-
+	for(i = 0; i < n_column; i++)
+	{
+		metric = get_metric(instance, row->metric_id_belong_to_line[i]);
+		out_row_value[i] = read_single_metric_value(metric);
+	}
 	return 0;
 }
 
-static void flush_line_protocol_dynamic_metric(struct fieldstat_dynamic_instance *instance)
+
+static int is_send_table_row(long long *row_value, int n_column)
 {
-	if(instance->line_protocol_send_buff_offset == 0)
+	int i = 0;
+	int is_send = 0;
+
+	for(i = 0; i < n_column; i++)
 	{
-		return;
+		if(row_value[i] != 0)
+		{
+			is_send = 1;
+			break;
+		}
+	}
+	return is_send;
+}
+
+
+static int add_field_set(char *field_key, long long field_value, char *line_buf, int line_buf_size)
+{
+	int used_len = 0;
+
+	used_len += snprintf(line_buf, line_buf_size, "%s=%lld", field_key, field_value);
+
+	return used_len;
+}
+
+
+static int add_table_row_field_set(char *column_name[], long long *row_value, int n_column, char *line_buf, int line_buf_size)
+{
+	int used_len = 0;
+
+	for(int i = 0; i < n_column; i++)
+	{
+		used_len += add_field_set(column_name[i], row_value[i], line_buf + used_len, line_buf_size - used_len);
+		used_len += snprintf(line_buf + used_len, line_buf_size - used_len, ",");		
 	}
 
-	if(instance->line_protocol_server_ip > 0 && instance->line_protocol_server_port > 0)
+	if(used_len > 0)
 	{
-		send_udp(instance->line_protocol_socket, instance->line_protocol_server_ip,
-				(unsigned short)instance->line_protocol_server_port, 
-				instance->line_protocol_send_buff, 
-				instance->line_protocol_send_buff_offset
-			);
+		used_len--;
+		line_buf[used_len] = '\0';
 	}
-	instance->line_protocol_send_buff_offset = 0;
-	memset(instance->line_protocol_send_buff, 0, sizeof(instance->line_protocol_send_buff));	
+
+	return used_len;
+}
+
+
+
+static int build_single_metric_line_buf(char *instance_name, struct metric *metric, char *line_buf, int line_buf_size)
+{
+	int used_len = 0;
+	long long value = 0;
+
+	value = read_single_metric_value(metric);
+
+	if(value == 0)
+	{
+		return 0;
+	}
+
+	used_len += add_measurement(metric->field_name, line_buf, line_buf_size);
+
+	used_len += add_default_tag_set(instance_name, NULL, line_buf + used_len, line_buf_size - used_len);
+
+	used_len += add_user_tag_set(metric, line_buf + used_len, line_buf_size - used_len);
+
+	used_len += snprintf(line_buf + used_len, line_buf_size - used_len, " ");
+
+	used_len += add_field_set(metric->field_name, value, line_buf + used_len, line_buf_size - used_len);
+
+	used_len += snprintf(line_buf + used_len, line_buf_size - used_len, "\n");
+
+	return used_len;
+}
+
+static int build_table_row_line_buf(struct fieldstat_instance *instance, struct table_metric *table,  struct table_line *row, char *line_buf, int line_buf_size)
+{
+	int used_len = 0;
+	struct metric *metric = NULL;
+
+	if(table->column_cnt <= 0)
+	{
+		return 0;
+	}
+
+	long long row_value[table->column_cnt] = {0};
+
+	
+	if(-1 == read_table_row_value(instance, row, table->column_cnt, row_value))
+	{
+		return 0;
+	}
+
+	if(1 != is_send_table_row(row_value, table->column_cnt))
+	{
+		return 0;
+	}
+
+	metric = get_metric(instance, row->metric_id_belong_to_line[0]);
+
+	used_len += add_measurement(metric->field_name, line_buf, line_buf_size);
+
+	used_len += add_default_tag_set(instance->name, table->name, line_buf + used_len, line_buf_size - used_len);
+
+	used_len += add_user_tag_set(metric, line_buf + used_len, line_buf_size - used_len);
+
+	used_len += snprintf(line_buf + used_len, line_buf_size - used_len, " ");
+
+	used_len += add_table_row_field_set(table->column_name, row_value, table->column_cnt, line_buf + used_len, line_buf_size - used_len);
+
+	used_len += snprintf(line_buf + used_len, line_buf_size - used_len, "\n");
+
+	return used_len;
+}
+
+
+static void output_line_protocol_single_metric(struct fieldstat_instance *instance, int n_cur_metric)
+{
+	int i = 0;
+	int used_len = 0;
+
+	struct metric *metric = NULL;
+	char line_buf[UDP_PAYLOAD_SIZE];
+
+	for(i = 0; i < n_cur_metric; i++)
+	{
+		metric = get_metric(instance, i);
+
+		if(metric == NULL || metric->table != NULL)
+		{
+			continue;
+		}
+		memset(line_buf, 0, sizeof(line_buf));
+
+		used_len = build_single_metric_line_buf(instance->name, metric, line_buf, sizeof(line_buf));
+
+		send_line_buf(&instance->line_protocol_output, line_buf, used_len);
+	}
 	return;
 }
 
-static void append_line_protocol_dynamic_row(struct fieldstat_dynamic_instance *instance, const char* measurement, char *tag_set, char *field_set)
+
+static int read_dynamic_table_row(struct metric **row_metric, int n_column, long long *out_row_value)
 {
-	if(field_set==NULL)
+	int i = 0;
+	struct metric *metric = NULL;
+
+	if(row_metric == NULL || n_column < 1)
 	{
-		return;
+		return -1;
 	}
-	if(UDP_PAYLOAD_SIZE - (unsigned int)instance->line_protocol_send_buff_offset < strlen(measurement) + strlen(field_set) + strlen(tag_set) + 2)
+
+	for(i = 0; i < n_column; i++)
 	{
-		flush_line_protocol_dynamic_metric(instance);
+		metric = row_metric[i];
+		out_row_value[i] = read_single_metric_value(metric);
 	}
-	//printf("Line_protocol metric: %s:%s %s\n",measurement,tag_set,field_set);
-	instance->line_protocol_send_buff_offset += snprintf(instance->line_protocol_send_buff + instance->line_protocol_send_buff_offset,
-														sizeof(instance->line_protocol_send_buff) - instance->line_protocol_send_buff_offset,
-														"%s%s %s\n",
-														measurement, tag_set, field_set
-													);
+	return 0;
+
+}
+
+
+static void output_line_protocol_table_row(struct fieldstat_instance *instance, int n_cur_table, int n_cur_table_row[])
+{
+	int i = 0, j = 0;
+	int used_len = 0;
+
+	char line_buf[UDP_PAYLOAD_SIZE];
+	struct table_metric *table = NULL;
+	struct table_line *row = NULL;
+
+	for(i = 0; i < n_cur_table; i++)
+	{
+		table = instance->table_metrics[i];
+
+		for(j = 0; j < n_cur_table_row[i]; j++)
+		{
+			row = read_table_line(table, j);
+			if(row == NULL)
+			{
+				continue;
+			}
+			memset(line_buf, 0, sizeof(line_buf));
+			used_len = build_table_row_line_buf(instance, table, row, line_buf, sizeof(line_buf));
+			send_line_buf(&instance->line_protocol_output, line_buf, used_len);
+		}
+	}
+	
 	return;
 }
+
+
+
+int line_protocol_output(struct fieldstat_instance *instance)
+{
+
+	//print current time instance start
+	int tables_row_cnt[TABLE_MAX_NUM];
+	int n_cur_table = instance->table_num;
+	get_current_table_line_cnt(instance, n_cur_table, tables_row_cnt);
+	int n_cur_metric = instance->metric_cnt;
+	//print current time instance end
+
+	output_line_protocol_single_metric(instance, n_cur_metric);
+
+	output_line_protocol_table_row(instance, n_cur_table, tables_row_cnt);
+
+	flush_send_buf(&instance->line_protocol_output);
+	return 0;
+}
+
+
+static int build_dynamic_table_row_line_buf(struct fieldstat_dynamic_instance *instance, struct table_metric *table, struct metric **row_metric, char *line_buf, int line_buf_size)
+{
+	int used_len = 0;
+	struct metric *metric = NULL;
+
+	if(table->column_cnt <= 0)
+	{
+		return 0;
+	}
+	long long row_value[table->column_cnt] = {0};
+
+	if(-1 == read_dynamic_table_row(row_metric, table->column_cnt, row_value))
+	{
+		return 0;
+	}
+
+	if(1 != is_send_table_row(row_value, table->column_cnt))
+	{
+		return 0;
+	}
+
+	metric = row_metric[0];
+
+	used_len += add_measurement(metric->field_name, line_buf, line_buf_size);
+
+	used_len += add_default_tag_set(instance->name, table->name, line_buf + used_len, line_buf_size - used_len);
+
+	used_len += add_user_tag_set(metric, line_buf + used_len, line_buf_size - used_len);
+
+	used_len += snprintf(line_buf + used_len, line_buf_size - used_len, " ");
+
+	used_len += add_table_row_field_set(table->column_name, row_value, table->column_cnt, line_buf + used_len, line_buf_size - used_len);
+
+	used_len += snprintf(line_buf + used_len, line_buf_size - used_len, "\n");
+
+	return used_len;
+}
+
 
 
 int line_protocol_dynamic_metric_output(struct fieldstat_dynamic_instance *instance)
@@ -248,89 +370,31 @@ int line_protocol_dynamic_metric_output(struct fieldstat_dynamic_instance *insta
 	struct dynamic_metric *dyn_metric, *tmp_dyn_metric;
 	struct metric **metrics = NULL;
 	struct metric *metric = NULL;
-	struct table_metric *table = NULL;
 
-	char tag_set_buff[UDP_PAYLOAD_SIZE];
-	char field_set_buff[UDP_PAYLOAD_SIZE];
+	char line_buf[UDP_PAYLOAD_SIZE];
+	int used_len = 0;
 
-	int field_used_len = 0;
-	int tag_used_len = 0;
-	int i = 0, j = 0;
-	long long value;
-	int row_value_is_not_zero = 0;
-
-	for(i = 0; i < instance->n_thread; i++)
+	for(int i = 0; i < instance->n_thread; i++)
 	{
 		head = &instance->n_thread_dynamic_metric[i];
 		HASH_ITER(hh, *head, dyn_metric, tmp_dyn_metric)
 		{
-			row_value_is_not_zero = 0;
 			metrics = dyn_metric->metrics;
 			metric = metrics[0];
-			memset(tag_set_buff, 0, sizeof(tag_set_buff));
-			memset(field_set_buff, 0,sizeof(field_set_buff));
-			field_used_len = 0;
-			tag_used_len = 0;
-
+			used_len = 0;
+			memset(line_buf, 0, sizeof(line_buf));
 			if(metric->table)
 			{
-				table = metric->table;
-				for(j = 0; j < table->column_cnt; j++)
-				{
-					metric = metrics[j];
-					value = metric->field_type == FIELD_TYPE_GAUGE ? 
-						get_metric_unit_val(metric, FS_CALC_CURRENT, 0):
-						get_metric_unit_val(metric, FS_CALC_SPEED, 0);
-					if(value != 0)
-					{
-						row_value_is_not_zero = 1;
-					}
-					field_used_len += snprintf(field_set_buff + field_used_len, 
-											sizeof(field_set_buff) - field_used_len, 
-											"%s=%lld,", 
-											metric->table->column_name[metric->table_column_id], 
-											value
-										);
-					
-				}
-				if(row_value_is_not_zero != 1)
-				{
-					continue;
-				}
-				metric = metrics[0];
-				field_used_len--;
-				field_set_buff[field_used_len] = '\0';
-				tag_used_len += snprintf(tag_set_buff + tag_used_len, 
-										sizeof(tag_set_buff) - tag_used_len, 
-										",app_name=%s,table_name=%s",
-										instance->name,
-										table->name
-									);
-				
+				used_len = build_dynamic_table_row_line_buf(instance, metric->table, metrics, line_buf, sizeof(line_buf));
 			}
 			else
 			{
-				value = metric->field_type == FIELD_TYPE_GAUGE ? 
-						get_metric_unit_val(metric, FS_CALC_CURRENT, 0):
-						get_metric_unit_val(metric, FS_CALC_SPEED, 0);
-				if(value == 0)
-				{
-					continue;
-				}
-				snprintf(field_set_buff, sizeof(field_set_buff), "%s=%lld", metric->field_name, value);
-				tag_used_len += snprintf(tag_set_buff + tag_used_len, 
-										sizeof(tag_set_buff) - tag_used_len, 
-										",app_name=%s", 
-										instance->name
-									);
-
+				used_len = build_single_metric_line_buf(instance->name, metric, line_buf, sizeof(line_buf));
 			}
-			tag_used_len += output_line_protocol_tag_set_buf(metric->tag_key, metric->tag_value, metric->n_tag, 
-							tag_set_buff + tag_used_len, sizeof(tag_set_buff) - tag_used_len);
-			append_line_protocol_dynamic_row(instance, metric->field_name, tag_set_buff, field_set_buff);
-		}    
+			send_line_buf(&instance->line_protocol_output, line_buf, used_len);
+		}
 
 	}
-	flush_line_protocol_dynamic_metric(instance);
+	flush_send_buf(&instance->line_protocol_output);
 	return 0;
 }

@@ -148,25 +148,30 @@ struct metric
 	};
 };
 
+
+struct line_protocol_output
+{
+	unsigned int server_ip;
+	unsigned short server_port;
+	int send_socket;
+	char send_buf[UDP_PAYLOAD_SIZE];
+	unsigned int send_buf_offset;
+};
+
 struct fieldstat_instance
 {
 	char name[INSTANCE_NAME_LEN];
-	//char *statsd_server_ip;
-	//char statsd_server_str_ip[LEN_IP_MAX];
 	unsigned int statsd_server_ip;
 	unsigned short statsd_server_port;
 	int statsd_output_enable;
-	int line_protocol_socket;
-
-	//char line_protocol_server_str_ip[LEN_IP_MAX];
-	unsigned int line_protocol_server_ip;
-	unsigned short line_protocol_server_port;
-	int line_protocol_output_enable;
 
 	char local_output_filename[LEN_PATH_MAX];
 	char local_output_format[LEN_FORMAT_MAX];
 	int local_output_enable;
 	FILE* local_output_fp;
+
+	struct line_protocol_output line_protocol_output;
+	int line_protocol_output_enable;
 
 	int background_thread_disable;
 	pthread_t background_thread;
@@ -190,9 +195,6 @@ struct fieldstat_instance
 	int summary_cnt;
 
 	struct timespec last_output_time;
-
-	char line_protocol_send_buff[UDP_PAYLOAD_SIZE];
-	size_t line_protocol_send_buff_offset;
 
 };
 
@@ -219,8 +221,7 @@ struct dynamic_metric
 struct fieldstat_dynamic_instance
 {
 	char name[INSTANCE_NAME_LEN];
-	unsigned int line_protocol_server_ip;
-	unsigned short line_protocol_server_port;
+	struct line_protocol_output line_protocol_output;
 	int line_protocol_output_enable;
 
 	int background_thread_disable;
@@ -233,9 +234,6 @@ struct fieldstat_dynamic_instance
 
 	pthread_t background_thread;
 	int background_thread_is_created;
-	char line_protocol_send_buff[UDP_PAYLOAD_SIZE];
-	size_t line_protocol_send_buff_offset;
-	int line_protocol_socket;
 
 	struct dynamic_metric **n_thread_dynamic_metric;
 	int n_thread;
@@ -271,3 +269,6 @@ int line_protocol_dynamic_metric_output(struct fieldstat_dynamic_instance *insta
 struct table_line ** read_table_line_slot(struct table_metric *table, int line_id);
 
 void fieldstat_global_disable_prometheus_endpoint();
+
+int enable_line_protocol_output(struct line_protocol_output *line_protocol_output, const char *ip, unsigned short port);
+void disable_line_protocol_output(struct line_protocol_output *line_protocol_output);

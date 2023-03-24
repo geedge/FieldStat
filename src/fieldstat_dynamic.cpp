@@ -47,10 +47,10 @@ void fieldstat_dynamic_instance_free(struct fieldstat_dynamic_instance *instance
 		instance->running = 0;
 	}
 
-	if(instance->line_protocol_socket != -1)
+	if(instance->line_protocol_output_enable == 1)
 	{
-		close(instance->line_protocol_socket);
-		instance->line_protocol_socket = -1;
+		disable_line_protocol_output(&instance->line_protocol_output);
+		instance->line_protocol_output_enable  = 0;
 	}
 
 	for(i = 0; i < instance->n_thread; i++)
@@ -98,23 +98,22 @@ void fieldstat_dynamic_instance_free(struct fieldstat_dynamic_instance *instance
 }
 
 
-
 int fieldstat_dynamic_set_line_protocol_server(struct fieldstat_dynamic_instance *instance, const char *ip, unsigned short port)
 {
+	int ret = 0;
+
 	if(instance == NULL || instance->running == 1)
 	{
 		return -1;
 	}
 
-	if(1 != inet_pton(AF_INET, ip, (void *)&(instance->line_protocol_server_ip)))
+	ret = enable_line_protocol_output(&instance->line_protocol_output, ip, port);
+	if(ret == 0)
 	{
-		return -1;
+		instance->line_protocol_output_enable = 1;
 	}
-	instance->line_protocol_socket = startup_udp();
-	instance->line_protocol_server_port   = port;
-	instance->line_protocol_output_enable = 1;
 
-	return 0;
+	return ret;
 }
 
 int fieldstat_dynamic_disable_background_thread(struct fieldstat_dynamic_instance *instance)

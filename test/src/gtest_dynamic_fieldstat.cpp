@@ -80,11 +80,11 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicInstanceSetPara)
 
 	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8080);
 	EXPECT_EQ(0, ret);
-	EXPECT_EQ(8080, instance->line_protocol_server_port);
+	EXPECT_EQ(8080, instance->line_protocol_output.server_port);
 	ret = inet_pton(AF_INET, "127.0.0.1", (void *)&(input_ip));
 	EXPECT_EQ(1, ret);
-	EXPECT_EQ(input_ip, instance->line_protocol_server_ip);
-	EXPECT_NE(-1, instance->line_protocol_socket);
+	EXPECT_EQ(input_ip, instance->line_protocol_output.server_ip);
+	EXPECT_NE(-1, instance->line_protocol_output.send_socket);
 
 	ret = fieldstat_dynamic_disable_background_thread(instance);
 	EXPECT_EQ(0, ret);
@@ -1065,8 +1065,7 @@ void parse_telegraf_cjson_output_not_equal(const char *compare)
 
 	if(cjson_metric_str)
 	{
-		ret = strcmp(cjson_metric_str, compare);
-		EXPECT_NE(0, ret);
+		EXPECT_STRNE(cjson_metric_str, compare);
 		free(cjson_metric_str);
 		cjson_metric_str = NULL;
 	}

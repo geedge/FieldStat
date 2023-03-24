@@ -350,20 +350,19 @@ int fieldstat_set_local_output(struct fieldstat_instance *instance, const char *
 
 int fieldstat_set_line_protocol_server(struct fieldstat_instance *instance, const char *ip, unsigned short port)
 {
-	if(instance->running == 1)
+	int ret = 0;
+	if(instance == NULL || instance->running == 1)
 	{
 		return -1;
 	}
+	ret = enable_line_protocol_output(&instance->line_protocol_output, ip, port);
 
-	if(1 != inet_pton(AF_INET, ip, (void *)&(instance->line_protocol_server_ip)))
+	if(ret == 0)
 	{
-		return -1;
+		instance->line_protocol_output_enable = 1;
 	}
-	instance->line_protocol_socket = startup_udp();
-	instance->line_protocol_server_port   = port;
-	instance->line_protocol_output_enable = 1;
 
-	return 0;
+	return ret;
 }
 
 int fieldstat_set_statsd_server(struct fieldstat_instance *instance, const char *ip, unsigned short port)
@@ -578,10 +577,10 @@ void fieldstat_instance_free(struct fieldstat_instance *instance)
 		instance->local_output_enable = 0;
 	}
 
-	if(instance->line_protocol_socket != -1)
+	if(instance->line_protocol_output_enable == 1)
 	{
-		close(instance->line_protocol_socket);
-		instance->line_protocol_socket = -1;
+		disable_line_protocol_output(&instance->line_protocol_output);
+		instance->line_protocol_output_enable  = 0;
 	}
 
 	for(i = 0; i < instance->metric_cnt; i++)
@@ -1017,3 +1016,35 @@ int fieldstat_register_summary(struct fieldstat_instance *instance, const char *
 		bins, lowest_trackable_value, highest_trackable_value, significant_figures, output_window);
 }
 
+
+int enable_line_protocol_output(struct line_protocol_output *line_protocol_output, const char *ip, unsigned short port)
+{
+	if(line_protocol_output == NULL)
+	{
+		return -1;
+	}
+
+	if(1 != inet_pton(AF_INET, ip, (void *)&(line_protocol_output->server_ip)))
+	{
+		return -1;
+	}
+	line_protocol_output->server_port = port;
+	line_protocol_output->send_socket = startup_udp();
+
+	return 0;
+}
+
+void disable_line_protocol_output(struct line_protocol_output *line_protocol_output)
+{
+	if(line_protocol_output == NULL)
+	{
+		return;
+	}
+
+	if(line_protocol_output->send_socket != -1)
+	{
+		close(line_protocol_output->send_socket);
+		line_protocol_output->send_socket = -1;
+	}
+	return;
+}
