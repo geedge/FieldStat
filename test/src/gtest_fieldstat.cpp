@@ -215,12 +215,40 @@ TEST(FieldStatAPI, FieldStatRegisterTableMetrics)
 
 	instance = fieldstat_instance_new("test");
 	EXPECT_STREQ("test", instance->name);
-
 	table_id = fieldstat_register_table(instance, sc_table_name, sc_column_name, sc_column_type, sizeof(sc_column_name)/sizeof(sc_column_name[0]));
 	EXPECT_EQ(0, table_id);
 	fieldstat_instance_free(instance);
 }
 
+
+TEST(FeildStatAPI, FieldStatLocalOutputFormatJson)
+{
+	int metric_id = -1;
+	int ret_set_local_output = 0;
+	struct fieldstat_instance * instance = NULL;
+	int ret = 0;
+
+	instance = fieldstat_instance_new("test");
+	EXPECT_STREQ("test", instance->name);
+
+	metric_id = fieldstat_register(instance, FIELD_TYPE_COUNTER, "Traffic_bytes",NULL,0);
+	EXPECT_EQ(0, metric_id);
+
+	ret_set_local_output = fieldstat_set_local_output(instance,"test.json","json");
+	EXPECT_EQ(0, ret_set_local_output);
+	instance->running = 1;
+
+	ret = fieldstat_value_incrby(instance, metric_id, 10);
+	EXPECT_EQ(0, ret);
+	fieldstat_passive_output(instance);
+	sleep(1);
+	ret = fieldstat_value_incrby(instance, metric_id, 10);
+	sleep(1);
+	fieldstat_passive_output(instance);
+	EXPECT_EQ(0, ret);
+	instance->running = 0;
+	fieldstat_instance_free(instance);	
+}
 
 int main(int argc, char *argv[]) 
 {

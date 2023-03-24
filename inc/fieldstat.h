@@ -170,10 +170,11 @@ void fieldstat_passive_output(struct fieldstat_instance *instance);
  * of figures in a decimal number that will be maintained.  E.g. a value of 3 will mean
  * the results from the histogram will be accurate up to the first three digits.  Must
  * be a value between 1 and 5 (inclusive).
+ * @param output_window The of output data. 1: output the data in the time interval window, 0: output data all the time.
  * @return metric id: -1 is failed,  >= 0 is success
  */
 int fieldstat_register_histogram(struct fieldstat_instance *instance, const char *field_name, const struct fieldstat_tag tags[], size_t n_tag, 
-		const char *upper_inclusive_bounds, const long long lowest_trackable_value, long long highest_trackable_value, int significant_figures);
+		const char *upper_inclusive_bounds, const long long lowest_trackable_value, long long highest_trackable_value, int significant_figures, int output_window);
 
 /**
  * Register summary metric
@@ -190,10 +191,11 @@ int fieldstat_register_histogram(struct fieldstat_instance *instance, const char
  * of figures in a decimal number that will be maintained.  E.g. a value of 3 will mean
  * the results from the histogram will be accurate up to the first three digits.  Must
  * be a value between 1 and 5 (inclusive).
+ * @param output_window The of output data. 1: output the data in the time interval window, 0: output data all the time.
  * @return metric id: -1 is failed,  >= 0 is success
  */
 int fieldstat_register_summary(struct fieldstat_instance *instance, const char *field_name, const struct fieldstat_tag tags[], size_t n_tag, 
-		const char *quantiles, const long long lowest_trackable_value, long long highest_trackable_value, int significant_figures);
+		const char *quantiles, const long long lowest_trackable_value, long long highest_trackable_value, int significant_figures, int output_window);
 
 /**
  * Register dynamic fieldstat instance.

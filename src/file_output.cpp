@@ -314,7 +314,10 @@ static int output_file_print_hdr_unit(struct metric *metric, char *print_buf, si
 	h_tmp=atomic_set(&(h->changing), h_tmp);// left h_tmp is used to avoid warining [-Wunused-value]
 
 	hdr_add(h->accumulated, h->previous_changed);
-	h_out = h->accumulated; //TODO
+
+	metric->output_window == 0
+		?h_out = h->accumulated
+		:h_out = h->previous_changed;
 
 	used_len += snprintf(print_buf + used_len, size - used_len, "%-10s\t", metric->field_name);
 
@@ -431,6 +434,132 @@ static int output_file_format_default_type_histogram_and_summary(struct fieldsta
 }
 
 
+int output_file_format_json(struct fieldstat_instance *instance, int n_cur_metric, char **print_buf)
+{
+	int i = 0;
+	long long value = 0;
+	struct metric *metric = NULL;
+	cJSON *root_obj  = NULL;
+	cJSON *metrics_array_obj = NULL;
+	cJSON *tmp_obj = NULL;
+	char tmp_output_name[64];
+	const char* extra[]={"MAX", "MIN", "AVG", "STDDEV", "CNT"};
+	long long tmp_histogram_values[sizeof(extra)/sizeof(char*)];
+
+	if(instance == NULL || n_cur_metric <= 0)
+	{
+		return 0;
+	}
+	struct timespec this_output_time;
+
+	clock_gettime(CLOCK_MONOTONIC ,&this_output_time);
+
+
+
+	root_obj = cJSON_CreateObject();
+	cJSON_AddNumberToObject(root_obj, "unix timestamp", this_output_time.tv_sec);
+	cJSON_AddNumberToObject(root_obj, "output interval", (double)instance->output_interval_ms/1000);
+	metrics_array_obj = cJSON_CreateArray();
+
+	for(i = 0; i < n_cur_metric; i++)
+	{
+		metric = get_metric(instance, i);
+		if(metric == NULL)
+		{
+			continue;
+		}
+
+		switch(metric->field_type)
+		{
+			case FIELD_TYPE_COUNTER:
+			case FIELD_TYPE_GAUGE:
+				tmp_obj = cJSON_CreateObject();
+				cJSON_AddStringToObject(tmp_obj, "name", metric->field_name);
+				if(metric->table)
+				{
+					cJSON_AddStringToObject(tmp_obj, "table_name", metric->table->name);
+					cJSON_AddStringToObject(tmp_obj, "column_name", metric->table->column_name[metric->table_column_id]);	
+				}
+				metric->field_type ==  FIELD_TYPE_COUNTER 
+					?cJSON_AddStringToObject(tmp_obj, "type", "gauge")
+					:cJSON_AddStringToObject(tmp_obj, "type", "counter");
+				value = get_metric_unit_val(metric, FS_CALC_CURRENT, 1);
+				cJSON_AddNumberToObject(tmp_obj, "acc", value);	
+				value = get_metric_unit_val(metric, FS_CALC_SPEED, 0);
+				cJSON_AddNumberToObject(tmp_obj, "diff", value);
+				cJSON_AddItemToArray(metrics_array_obj, tmp_obj);
+				break;
+			case FIELD_TYPE_SUMMARY:
+			case FILED_TYPE_HISTOGRAM:
+				struct histogram_t* h=&(metric->histogram);
+				struct hdr_histogram* h_out=NULL, *h_tmp=NULL;
+				hdr_init(h->lowest_trackable_value,  h->highest_trackable_value, h->significant_figures, &(h_tmp));
+				if(h->previous_changed!=NULL)	hdr_close(h->previous_changed);
+
+				h->previous_changed=atomic_read(&(h->changing));
+				h_tmp=atomic_set(&(h->changing), h_tmp);// left h_tmp is used to avoid warining [-Wunused-value]
+
+				hdr_add(h->accumulated, h->previous_changed);
+				metric->output_window == 0
+					?h_out = h->accumulated
+					:h_out = h->previous_changed;
+				tmp_obj = cJSON_CreateObject();
+
+				for(int j = 0; j < metric->histogram.bins_num; j++)
+				{
+					if(metric->field_type == FIELD_TYPE_SUMMARY)
+					{
+						value = (long long)hdr_value_at_percentile(h_out, metric->histogram.bins[j]);
+						cJSON_AddStringToObject(tmp_obj, "type", "summary");
+						snprintf(tmp_output_name, sizeof(tmp_output_name), "%s.p%.2f", metric->field_name, metric->histogram.bins[j]);
+					}
+					if(metric->field_type == FILED_TYPE_HISTOGRAM)
+					{
+						value = hdr_count_le_value(h_out, (long long)metric->histogram.bins[j]);
+						cJSON_AddStringToObject(tmp_obj, "type", "histogram");
+						snprintf(tmp_output_name, sizeof(tmp_output_name), "%s.le=%.2f", metric->field_name, metric->histogram.bins[j]);
+					}
+					cJSON_AddStringToObject(tmp_obj, "name", tmp_output_name);
+					
+					cJSON_AddNumberToObject(tmp_obj, "acc", value);
+					cJSON_AddNumberToObject(tmp_obj, "diff", value);
+					cJSON_AddItemToArray(metrics_array_obj, tmp_obj);
+				}
+				tmp_histogram_values[0] = h_out->total_count==0?0:(long long)hdr_max(h_out);
+				tmp_histogram_values[1] = h_out->total_count==0?0:(long long)hdr_min(h_out);
+				tmp_histogram_values[2] = h_out->total_count==0?0:hdr_mean(h_out);
+				tmp_histogram_values[3] = h_out->total_count==0?0:hdr_stddev(h_out);
+				tmp_histogram_values[4] = (long long)h_out->total_count;
+				for(unsigned int j = 0; j < sizeof(extra)/sizeof(char*); j++)
+				{
+					tmp_obj = cJSON_CreateObject();
+					snprintf(tmp_output_name, sizeof(tmp_output_name), "%s.%s", metric->field_name, extra[j]);
+					cJSON_AddStringToObject(tmp_obj, "name", tmp_output_name);
+					if(metric->field_type == FIELD_TYPE_SUMMARY)
+					{
+						cJSON_AddStringToObject(tmp_obj, "type", "summary");	
+					}
+					if(metric->field_type == FILED_TYPE_HISTOGRAM)
+					{
+						cJSON_AddStringToObject(tmp_obj, "type", "histogram");
+					}
+					cJSON_AddNumberToObject(tmp_obj, "acc", tmp_histogram_values[j]);
+					cJSON_AddNumberToObject(tmp_obj, "diff", tmp_histogram_values[j]);
+					cJSON_AddItemToArray(metrics_array_obj, tmp_obj);
+				}
+				break;
+		}
+
+	}
+	cJSON_AddItemToObject(root_obj, "metrics", metrics_array_obj);
+	
+	*print_buf = cJSON_PrintUnformatted(root_obj);
+    cJSON_Delete(root_obj);
+	//cJSON_Delete(metrics_array_obj);
+	return strlen(*print_buf) + 1;
+}
+
+
 int fieldstat_output_file(struct fieldstat_instance *instance,long long interval_ms)
 {
 	int used_len = 0;
@@ -482,7 +611,7 @@ int fieldstat_output_file(struct fieldstat_instance *instance,long long interval
 
     if(!strcmp(instance->local_output_format, "json"))
     {
-		//TODO from json output
+		used_len = output_file_format_json(instance, current_metric_cnt, &print_buf);		
     }
 
 	fseek(instance->local_output_fp, 0, SEEK_SET);

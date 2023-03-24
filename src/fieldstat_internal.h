@@ -136,15 +136,9 @@ struct metric
 	int not_send_to_server;
 	int numerator_id;
 	int denominator_id;
-/*
-	int belong_to_table;
-	int table_id;
-	char *table_column_name;
-	char *table_name;
-	int table_column_cnt;
-*/
 	struct table_metric *table;
 	int table_column_id;
+	int output_window;
 
 	union
 	{

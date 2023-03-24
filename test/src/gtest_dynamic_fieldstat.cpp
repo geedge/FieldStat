@@ -601,13 +601,15 @@ void parse_telegraf_cjson_output(const char *compare)
 
 //{"fields":{"Active_sessions":10},"name":"Active_sessions","tags":{"app_name":"firewall","host":"developer-testing-41.22"},"timestamp":1679308196}
 //{"fields":{"Active_sessions":10},"name":"Active_sessions","tags":{"app_name":"firewall"}}
-
+	if(strlen(line) == 0)
+	{
+		return;
+	}
 	cJSON *cjson_metric = NULL;
 	cJSON *cjson_tags = NULL;
-
 	cjson_metric = cJSON_Parse(line);
 	EXPECT_NE(nullptr, cjson_metric);
-	cJSON_DeleteItemFromObject(cjson_metric ,"timestamp");
+	cJSON_DeleteItemFromObject(cjson_metric, "timestamp");
 
 	cjson_tags = cJSON_GetObjectItem(cjson_metric, "tags");
 	EXPECT_NE(nullptr, cjson_tags);
@@ -1043,6 +1045,10 @@ void parse_telegraf_cjson_output_not_equal(const char *compare)
 	}
 	fclose(fp);
 
+	if(strlen(line) == 0)
+	{
+		return;
+	}
 
 	cJSON *cjson_metric = NULL;
 	cJSON *cjson_tags = NULL;

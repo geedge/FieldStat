@@ -941,7 +941,7 @@ error_out:
 
 
 static int fieldstat_register_histogram_and_summary(struct fieldstat_instance *instance, enum field_type type, const char *field_name, const struct fieldstat_tag tags[], size_t n_tag, 
-		const char * bins, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures)
+		const char * bins, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures, int output_window)
 {
 	struct metric *metric = NULL;
 	struct metric **metric_slot = NULL;
@@ -967,9 +967,15 @@ static int fieldstat_register_histogram_and_summary(struct fieldstat_instance *i
 		return -1;
 	}
 
+	if(output_window != 0 && output_window != 1)
+	{
+		return -1;
+	}
+
 	metric_id = atomic_inc(&instance->metric_cnt) - 1;
 	metric_slot = read_metric_slot(instance, metric_id);
 	metric = metric_new(type, field_name, tags, n_tag);
+	metric->output_window = output_window;
 
 	metric->histogram.highest_trackable_value = (int64_t)highest_trackable_value;
 	metric->histogram.lowest_trackable_value  = (int64_t)lowest_trackable_value;
@@ -998,16 +1004,16 @@ static int fieldstat_register_histogram_and_summary(struct fieldstat_instance *i
 
 
 int fieldstat_register_histogram(struct fieldstat_instance *instance, const char *field_name,const struct fieldstat_tag tags[], size_t n_tag, 
-		const char * bins, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures)
+		const char * bins, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures, int output_window)
 {
 	return fieldstat_register_histogram_and_summary(instance, FILED_TYPE_HISTOGRAM, field_name, tags, n_tag, 
-		bins, lowest_trackable_value, highest_trackable_value, significant_figures);
+		bins, lowest_trackable_value, highest_trackable_value, significant_figures, output_window);
 }
 
 int fieldstat_register_summary(struct fieldstat_instance *instance, const char *field_name, const struct fieldstat_tag tags[], size_t n_tag, 
-		const char * bins, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures)
+		const char * bins, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures, int output_window)
 {
 	return fieldstat_register_histogram_and_summary(instance, FIELD_TYPE_SUMMARY, field_name, tags, n_tag, 
-		bins, lowest_trackable_value, highest_trackable_value, significant_figures);
+		bins, lowest_trackable_value, highest_trackable_value, significant_figures, output_window);
 }
 
