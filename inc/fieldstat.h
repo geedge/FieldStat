@@ -335,6 +335,31 @@ void fieldstat_instance_free(struct fieldstat_instance *instance);
  * @param instance The fieldstat dynamic instance need to free.
  */
 void fieldstat_dynamic_instance_free(struct fieldstat_dynamic_instance *instance);
+/**
+ * fieldstat dynamic instance table metric value get operate.
+ * @param instance The fieldstat dynamic instance.
+ * @param table_id The table id.
+ * @param column_id The column id.
+ * @param row_name The row name of table.
+ * @param value The set value.
+ * @param tags The tag array.
+ * @param n_tag Size of tags[]
+ * @param thread_id The thread id of the call.
+ * @return  long long value.
+ */
+long long fieldstat_dynamic_table_metric_value_get(struct fieldstat_dynamic_instance *instance, int table_id, unsigned int column_id, const char *row_name, const struct fieldstat_tag tags[], size_t n_tags, int thread_id);
+/**
+ * fieldstat dynamic instance metric value set operate. metirc type in[gauge, counter]
+ * @param instance The fieldstat dynamic instance.
+ * @param field_name The metric field name.
+ * @param value The set value.
+ * @param tags The tag array.
+ * @param n_tag Size of tags[]
+ * @param thread_id The thread id of the call.
+ * @return long long value.
+ */
+long long fieldstat_dynamic_metric_value_get(struct fieldstat_dynamic_instance *instance, const char *field_name, const struct fieldstat_tag tags[], size_t n_tags, int thread_id);
+
 #ifdef __cplusplus
 }
 #endif

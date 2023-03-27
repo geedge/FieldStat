@@ -1,6 +1,6 @@
 cmake_minimum_required (VERSION 2.8)
 
-set(lib_name fieldstat)
+set(lib_name fieldstat3)
 
 project (${lib_name})
 

@@ -1034,7 +1034,6 @@ void parse_telegraf_cjson_output_not_equal(const char *compare)
 	FILE *fp;
 	char line[1024] = {0};
 	char *cjson_metric_str = NULL;
-	int ret = 0;
 
 	fp = fopen(telegraf_output_file, "r");
 	EXPECT_NE(nullptr, fp);
@@ -2579,6 +2578,56 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicInstanceMultiSetMultiMetric)
 }
 
 
+TEST(FeildStatDynamicAPI, FieldStatDynamicMetricValueGet)
+{
+	int n_thread = 48;
+	int ret = 0;
+	long long value = 0;
+	struct fieldstat_dynamic_instance *instance = NULL;
+
+	instance = fieldstat_dynamic_instance_new("firewall", n_thread);
+	EXPECT_NE(nullptr, instance);
+
+	ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_TYPE_GAUGE, "Active_sessions", 1000, NULL, 0, 0);
+	EXPECT_EQ(0, ret);
+	value = fieldstat_dynamic_metric_value_get(instance, "Active_sessions", NULL, 0, 0);
+	EXPECT_EQ(1000, value);
+	fieldstat_dynamic_instance_free(instance);
+}
+
+
+TEST(FeildStatDynamicAPI, FieldStatDynamicTableMetricValueGet)
+{
+	int n_thread = 48;
+	int ret = 0;
+	int table_id = -1;
+	long long value = 0;
+
+	const char *column_name[] = {"packages", "bytes"};
+	enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+	unsigned int out_column_ids[2];
+
+	struct fieldstat_dynamic_instance *instance = NULL;
+
+	instance = fieldstat_dynamic_instance_new("firewall", n_thread);
+	EXPECT_NE(nullptr, instance);
+
+	table_id = fieldstat_register_dynamic_table(instance, "shaping", column_name, column_type, sizeof(column_name)/sizeof(column_name[0]), out_column_ids);
+	EXPECT_EQ(0, table_id);
+
+	ret = fieldstat_dynamic_table_metric_value_incrby(instance, table_id, out_column_ids[0], "security_rule_hits", 1000, NULL, 0, 0); 
+	EXPECT_EQ(0, ret);
+	ret = fieldstat_dynamic_table_metric_value_incrby(instance, table_id, out_column_ids[1], "security_rule_hits", 2000, NULL, 0, 0);
+	EXPECT_EQ(0, ret);
+
+	value = fieldstat_dynamic_table_metric_value_get(instance, table_id, out_column_ids[0], "security_rule_hits", NULL, 0, 0);
+	EXPECT_EQ(1000, value);
+
+	value = fieldstat_dynamic_table_metric_value_get(instance, table_id, out_column_ids[1], "security_rule_hits", NULL, 0, 0);
+	EXPECT_EQ(2000, value);
+
+	fieldstat_dynamic_instance_free(instance);
+}
 
 int main(int argc, char *argv[]) 
 {

@@ -26,7 +26,6 @@
 #include "uthash.h"
 
 #define	INIT_STAT_FIELD_NUM		1024
-#define	MAX_STAT_COLUMN_NUM		64
 #define MAX_PATH_LEN			256
 #define	UDP_PAYLOAD_SIZE		1460
 

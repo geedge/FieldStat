@@ -503,3 +503,32 @@ int fieldstat_dynamic_table_metric_value_decrby(struct fieldstat_dynamic_instanc
 	return ret;
 }
 
+
+static long long dynamic_metric_value_read(struct fieldstat_dynamic_instance *instance, int table_id, unsigned int column_id, const char *field_name, const struct fieldstat_tag tags[], size_t n_tags, int thread_id)
+{
+	long long value = 0;
+	struct metric * metric = NULL;
+	metric = read_dynamic_metric(instance, table_id, column_id, field_name, tags, n_tags, thread_id);
+	if(metric == NULL)
+	{
+		return 0;
+	}
+	metric->field_type == FIELD_TYPE_GAUGE
+		?value = get_metric_unit_val(metric, FS_CALC_CURRENT, 0)
+		:value = get_metric_unit_val(metric, FS_CALC_SPEED, 0);
+	return value;
+}
+
+long long fieldstat_dynamic_metric_value_get(struct fieldstat_dynamic_instance *instance, const char *field_name, const struct fieldstat_tag tags[], size_t n_tags, int thread_id)
+{
+	long long value = 0;
+	value = dynamic_metric_value_read(instance, -1, -1, field_name, tags, n_tags, thread_id);
+	return value;
+}
+
+long long fieldstat_dynamic_table_metric_value_get(struct fieldstat_dynamic_instance *instance, int table_id, unsigned int column_id, const char *row_name, const struct fieldstat_tag tags[], size_t n_tags, int thread_id)
+{
+	long long value = 0;
+	value = dynamic_metric_value_read(instance, table_id, column_id, row_name, tags, n_tags, thread_id);
+	return value;
+}

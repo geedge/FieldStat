@@ -252,7 +252,6 @@ TEST(FeildStatAPI, FieldStatLocalOutputFormatJson)
 
 TEST(FeildStatAPI, FieldStatLineProtocolOutputTableMetric)
 {
-	int metric_id = -1;
 	int ret = 0;
 	int n_loops = 1;
 	struct fieldstat_instance * instance = NULL;
