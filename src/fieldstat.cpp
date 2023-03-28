@@ -526,6 +526,7 @@ void fieldstat_instance_start(struct fieldstat_instance *instance)
 	if(instance->background_thread_disable == 0)
 	{
 		pthread_create(&(instance->background_thread), NULL, fieldstat_thread_schema_output, (void*)instance);
+		instance->background_thread_is_created = 1;
 	}
 	//append instance to prometheus output
 }

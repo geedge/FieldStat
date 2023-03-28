@@ -15,22 +15,17 @@ TEST(FeildStatAPI, FieldStatInstanceNew)
 	fieldstat_instance_free(instance);
 }
 
-/*
+
 TEST(FeildStatAPI, FieldStatEnablePrometheusEndpoint)
 {
-	int ret_enable_prometheus_endpoint = 0;
-	int ret_req_prometheus_endpoint = 0;
-	const char *request_cmd = "curl -s -o /dev/null http://127.0.0.1:9020/metrics";
+	int ret = 0;
 
-	ret_enable_prometheus_endpoint = fieldstat_global_enable_prometheus_endpoint(9020, "/metrcis");
-	EXPECT_EQ(0, ret_enable_prometheus_endpoint);
-	usleep(500 * 1000);
-	ret_req_prometheus_endpoint = system(request_cmd);
-	EXPECT_EQ(0,ret_req_prometheus_endpoint);
+	ret = fieldstat_global_enable_prometheus_endpoint(9020, "/metrcis");
+	EXPECT_EQ(0, ret);
 	usleep(500 * 1000);
 	fieldstat_global_disable_prometheus_endpoint();
 }
-*/
+
 TEST(FeildStatAPI, FieldStatSetPrometheusOutput)
 {
 	struct fieldstat_instance *instance = NULL;
