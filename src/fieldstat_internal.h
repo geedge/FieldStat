@@ -194,7 +194,7 @@ struct fieldstat_instance
 	int summary_cnt;
 
 	struct timespec last_output_time;
-
+	int output_type;   // 0b0000:not output, 0b1000:output file, 0b0100:output line_protocol, 0b0010: output statsd, 0b0001: output prometheus 
 };
 
 struct prometheus_endpoint_instance
@@ -236,6 +236,7 @@ struct fieldstat_dynamic_instance
 
 	struct dynamic_metric **n_thread_dynamic_metric;
 	int n_thread;
+	int output_type;   // 0b0000:not output, 0b1000:output file, 0b0100:output line_protocol, 0b0010: output statsd, 0b0001: output prometheus 
 
 };
 
@@ -245,12 +246,13 @@ char* __str_dup(const char* str);
 long long hdr_count_le_value(const struct hdr_histogram* h, long long value);
 struct metric * get_metric(struct fieldstat_instance *instance, int metric_id);
 long long get_metric_unit_val(struct metric *metric,enum field_calc_algo calc_type,int is_refer);
+long long read_metric_current_value(struct metric *metric);
 int is_valid_field_name(const char* name);
 int is_valid_tags(const struct fieldstat_tag *tags, size_t n_tags);
 struct metric ** read_metric_slot(struct fieldstat_instance *instance, int metric_id);
 struct metric * metric_new(enum field_type type, const char *field_name, const struct fieldstat_tag tags[], size_t n_tag);
 void metric_free(struct metric *metric);
-int fieldstat_output_file(struct fieldstat_instance *instance,long long interval_ms);
+int file_output(struct fieldstat_instance *instance,long long interval_ms);
 struct table_line * read_table_line(struct table_metric *table, int line_id);
 int send_udp(int sd, unsigned int dest_ip, unsigned short dest_port, const char * data, int len);
 int line_protocol_output(struct fieldstat_instance *instance);

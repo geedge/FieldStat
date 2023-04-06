@@ -84,12 +84,16 @@ static int add_user_tag_set(struct metric *metric, char *line_buf, unsigned int 
 	return used_len;	
 }
 
-static long long read_single_metric_value(struct metric *metric)
+static long long read_single_metric_value(struct metric *metric, int output_type)
 {
 	long long value = 0;
+	int is_refer = 1;
+	(output_type >= 4 && output_type < 8)
+		?is_refer = 0
+		:is_refer = 1;
 	metric->field_type == FIELD_TYPE_GAUGE
-		?value = get_metric_unit_val(metric, FS_CALC_CURRENT, 0)
-		:value = get_metric_unit_val(metric, FS_CALC_SPEED, 0);
+		?value = get_metric_unit_val(metric, FS_CALC_CURRENT, is_refer)
+		:value = get_metric_unit_val(metric, FS_CALC_SPEED, is_refer);
 	return value;
 }
 
@@ -141,12 +145,12 @@ static int add_table_row_field_set(char *column_name[], long long *row_value, in
 
 
 
-static int build_single_metric_line_buf(char *instance_name, struct metric *metric, char *line_buf, int line_buf_size)
+static int build_single_metric_line_buf(char *instance_name, int output_type, struct metric *metric, char *line_buf, int line_buf_size)
 {
 	int used_len = 0;
 	long long value = 0;
 
-	value = read_single_metric_value(metric);
+	value = read_single_metric_value(metric, output_type);
 
 	if(value == 0)
 	{
@@ -169,7 +173,7 @@ static int build_single_metric_line_buf(char *instance_name, struct metric *metr
 }
 
 
-static int read_table_row_value(struct metric **row_metric, int n_column, long long *out_row_value)
+static int read_table_row_value(struct metric **row_metric, int output_type, int n_column, long long *out_row_value)
 {
 	int i = 0;
 	struct metric *metric = NULL;
@@ -182,13 +186,13 @@ static int read_table_row_value(struct metric **row_metric, int n_column, long l
 	for(i = 0; i < n_column; i++)
 	{
 		metric = row_metric[i];
-		out_row_value[i] = read_single_metric_value(metric);
+		out_row_value[i] = read_single_metric_value(metric, output_type);
 	}
 	return 0;
 
 }
 
-static int build_table_row_line_buf(char *instance_name, struct table_metric *table, struct metric **row_metric, char *line_buf, int line_buf_size)
+static int build_table_row_line_buf(char *instance_name, int output_type, struct table_metric *table, struct metric **row_metric, char *line_buf, int line_buf_size)
 {
 	int used_len = 0;
 	struct metric *metric = NULL;
@@ -199,7 +203,7 @@ static int build_table_row_line_buf(char *instance_name, struct table_metric *ta
 	}
 	long long row_value[table->column_cnt];
 
-	if(-1 == read_table_row_value(row_metric, table->column_cnt, row_value))
+	if(-1 == read_table_row_value(row_metric, output_type, table->column_cnt, row_value))
 	{
 		return 0;
 	}
@@ -245,7 +249,7 @@ static void output_line_protocol_single_metric(struct fieldstat_instance *instan
 		}
 		memset(line_buf, 0, sizeof(line_buf));
 
-		used_len = build_single_metric_line_buf(instance->name, metric, line_buf, sizeof(line_buf));
+		used_len = build_single_metric_line_buf(instance->name, instance->output_type, metric, line_buf, sizeof(line_buf));
 
 		send_line_buf(&instance->line_protocol_output, line_buf, used_len);
 	}
@@ -280,7 +284,7 @@ static void output_line_protocol_table_row(struct fieldstat_instance *instance, 
 				row_metrics[k] = get_metric(instance, row->metric_id_belong_to_line[k]);
 			}
 
-			used_len = build_table_row_line_buf(instance->name, table, row_metrics, line_buf, sizeof(line_buf));
+			used_len = build_table_row_line_buf(instance->name, instance->output_type, table, row_metrics, line_buf, sizeof(line_buf));
 
 			send_line_buf(&instance->line_protocol_output, line_buf, used_len);
 		}
@@ -330,11 +334,11 @@ int line_protocol_dynamic_metric_output(struct fieldstat_dynamic_instance *insta
 			memset(line_buf, 0, sizeof(line_buf));
 			if(metric->table)
 			{
-				used_len = build_table_row_line_buf(instance->name, metric->table, metrics, line_buf, sizeof(line_buf));
+				used_len = build_table_row_line_buf(instance->name, instance->output_type, metric->table, metrics, line_buf, sizeof(line_buf));
 			}
 			else
 			{
-				used_len = build_single_metric_line_buf(instance->name, metric, line_buf, sizeof(line_buf));
+				used_len = build_single_metric_line_buf(instance->name, instance->output_type, metric, line_buf, sizeof(line_buf));
 			}
 			send_line_buf(&instance->line_protocol_output, line_buf, used_len);
 		}

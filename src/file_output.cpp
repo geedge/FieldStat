@@ -53,11 +53,6 @@ static int output_file_format_default_type_gauge(struct fieldstat_instance *inst
 		{
 			continue;
 		}
-		if(metric->is_invisible == 1)
-		{
-			value = get_metric_unit_val(metric, FS_CALC_SPEED, 0);
-			continue;
-		}
 
 		value = get_metric_unit_val(metric, FS_CALC_CURRENT, 0);
 		memset(tags_buf, 0, sizeof(tags_buf));
@@ -113,11 +108,6 @@ static int output_file_format_default_type_counter(struct fieldstat_instance *in
 		}
 		if(metric->table)
 		{
-			continue;
-		}
-		if(metric->is_invisible == 1)
-		{
-			get_metric_unit_val(metric, FS_CALC_CURRENT, 0);
 			continue;
 		}
 		metric_id[metric_cnt] = i;
@@ -481,8 +471,8 @@ int output_file_format_json(struct fieldstat_instance *instance, int n_cur_metri
 					cJSON_AddStringToObject(tmp_obj, "column_name", metric->table->column_name[metric->table_column_id]);	
 				}
 				metric->field_type ==  FIELD_TYPE_COUNTER 
-					?cJSON_AddStringToObject(tmp_obj, "type", "gauge")
-					:cJSON_AddStringToObject(tmp_obj, "type", "counter");
+					?cJSON_AddStringToObject(tmp_obj, "type", "counter")
+					:cJSON_AddStringToObject(tmp_obj, "type", "gauge");
 				value = get_metric_unit_val(metric, FS_CALC_CURRENT, 1);
 				cJSON_AddNumberToObject(tmp_obj, "acc", value);	
 				value = get_metric_unit_val(metric, FS_CALC_SPEED, 0);
@@ -560,7 +550,7 @@ int output_file_format_json(struct fieldstat_instance *instance, int n_cur_metri
 }
 
 
-int fieldstat_output_file(struct fieldstat_instance *instance,long long interval_ms)
+int file_output(struct fieldstat_instance *instance,long long interval_ms)
 {
 	int used_len = 0;
 	int current_table_cnt = 0;

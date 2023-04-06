@@ -344,6 +344,7 @@ int fieldstat_set_local_output(struct fieldstat_instance *instance, const char *
 	strncpy(instance->local_output_filename, (char *)filename, len_filename);
 	strncpy(instance->local_output_format, (char *)format, len_format);
 	instance->local_output_enable  = 1;
+	instance->output_type |= 8;
 
 	return 0;
 }
@@ -360,6 +361,7 @@ int fieldstat_set_line_protocol_server(struct fieldstat_instance *instance, cons
 	if(ret == 0)
 	{
 		instance->line_protocol_output_enable = 1;
+		instance->output_type |= 4;
 	}
 
 	return ret;
@@ -379,6 +381,7 @@ int fieldstat_set_statsd_server(struct fieldstat_instance *instance, const char 
 
 	instance->statsd_server_port   = port;
 	instance->statsd_output_enable = 1;
+	instance->output_type |= 2;
 	return 0;
 }
 
@@ -460,6 +463,28 @@ long long get_metric_unit_val(struct metric *metric,enum field_calc_algo calc_ty
 	return value;
 }
 
+long long read_metric_current_value(struct metric *metric)
+{
+	stat_unit_t* target = NULL;
+	long long value = 0;
+	switch(metric->field_type)
+	{
+		case FIELD_TYPE_COUNTER:
+			target = &(metric->counter);
+			break;
+		case FIELD_TYPE_GAUGE:
+			target = &(metric->gauge);
+			break;
+		default:
+			break;
+	}
+
+	value = threadsafe_counter_read(&(target->changing));
+	value += target->accumulated;
+
+	return value;
+}
+
 long long hdr_count_le_value(const struct hdr_histogram* h, long long value)
 {
 	struct hdr_iter iter;
@@ -494,7 +519,7 @@ void fieldstat_passive_output(struct fieldstat_instance *instance)
 
 	if(instance->local_output_enable)
 	{
-		ret = fieldstat_output_file(instance, interval_ms);
+		ret = file_output(instance, interval_ms);
 	}
 	if(instance->line_protocol_output_enable)
 	{

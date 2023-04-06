@@ -129,14 +129,14 @@ static void prometheus_output_uri_list(struct prometheus_endpoint_instance *prom
 static int prometheus_output_read_metric_tags(struct metric *metric, char *instance_name, char *tags_buf, unsigned int size)
 {
 	int i = 0;//used_len = 0;
-	char unescape[STR_LEN_256] = {0};
+	char unescape[256] = {0};
 	int used_len = 0;
 
 	used_len += snprintf(tags_buf + used_len, size - used_len, "app_name=\"%s\"", instance_name);
 
 	if(metric->table)
 	{
-		used_len += snprintf(tags_buf + used_len, size - used_len, ",line_name=\"%s\"", metric->field_name);
+		used_len += snprintf(tags_buf + used_len, size - used_len, ",table_name=\"%s\",line_name=\"%s\"", metric->table->name, metric->field_name);
 	}
 
 	for(i = 0; i < (int)metric->n_tag; i++)
@@ -322,7 +322,9 @@ static int prometheus_get_instance_metric_playload(struct fieldstat_instance *in
 		{
 			case FIELD_TYPE_COUNTER:
 			case FIELD_TYPE_GAUGE:
-				value = get_metric_unit_val(metric, FS_CALC_CURRENT, 1);
+				instance->output_type == 1
+					?value = get_metric_unit_val(metric, FS_CALC_CURRENT, 0)
+					:value = get_metric_unit_val(metric, FS_CALC_CURRENT, 1);
 				append_offset += snprintf(new_payload + append_offset, 
 											new_payload_size - append_offset,
 											"%s{%s} %lld\n", 
@@ -443,6 +445,7 @@ int fieldstat_enable_prometheus_output(struct fieldstat_instance *instance)
 
 	fs_instance_id = g_prometheus_endpoint_instance.fs_instance_cnt++;
 	g_prometheus_endpoint_instance.fs_instance[fs_instance_id] = instance;
+	instance->output_type |= 1;
 	return 0;
 }
 

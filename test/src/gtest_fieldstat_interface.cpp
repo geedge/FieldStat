@@ -291,6 +291,7 @@ TEST(FeildStatAPI, FieldStatLineProtocolOutputTableMetric)
 
 	ret = fieldstat_set_line_protocol_server(instance, "127.0.0.1", 8600);
 	EXPECT_EQ(0, ret);
+	EXPECT_EQ(4, instance->output_type);
 	ret = fieldstat_disable_background_thread(instance);
 	EXPECT_EQ(0, ret);
 	fieldstat_instance_start(instance);

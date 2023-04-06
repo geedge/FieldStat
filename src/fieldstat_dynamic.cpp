@@ -111,6 +111,7 @@ int fieldstat_dynamic_set_line_protocol_server(struct fieldstat_dynamic_instance
 	if(ret == 0)
 	{
 		instance->line_protocol_output_enable = 1;
+		instance->output_type |= 4;
 	}
 
 	return ret;
@@ -513,9 +514,8 @@ static long long dynamic_metric_value_read(struct fieldstat_dynamic_instance *in
 	{
 		return 0;
 	}
-	metric->field_type == FIELD_TYPE_GAUGE
-		?value = get_metric_unit_val(metric, FS_CALC_CURRENT, 0)
-		:value = get_metric_unit_val(metric, FS_CALC_SPEED, 0);
+	value = read_metric_current_value(metric);
+
 	return value;
 }
 
