@@ -17,3 +17,6 @@ target_link_libraries(gtest_dynamic_fieldstat gtest-static)
 
 add_executable(gtest_dynamic_fieldstat_output ${SRC} gtest_dynamic_fieldstat_output.cpp)
 target_link_libraries(gtest_dynamic_fieldstat_output gtest-static)
+
+add_executable(gtest_fieldstat_output_file_instance ${SRC} gtest_fieldstat_output_file_instance.cpp)
+target_link_libraries(gtest_fieldstat_output_file_instance gtest-static)

@@ -332,7 +332,208 @@ TEST(FeildStatAPI, FieldStatLineProtocolOutputTableMetric)
 	EXPECT_EQ(n_line, n_loops);
 
 	fieldstat_instance_free(instance);
+}
 
+TEST(FeildStatAPI, SetMetricRatioPara)
+{
+	int ret = 0;
+	struct fieldstat_instance * instance = NULL;
+	int table_id = -1;
+	int output_metric_ids[10] = {0};
+	FILE *fp;
+	int n_line = 0;
+	int n_loops = 5;
+	char line[2048] = {0};
+	cJSON *cjson_metric = NULL;
+	cJSON *cjson_tags = NULL;
+	char *cjson_metric_str = NULL;
+
+	const char *output_file_path = "/tmp/fieldstat.txt"; 
+	const char *output_telegraf_path = "/tmp/metrics.out";
+	const char *table_column_name[] = {"rule", "reg/v6", "stream", "IN_Bps", "cpu_us", "PROC_Bps", "IN_Tps", "PROC_Tps","hit_cnt", "hit_rate"};
+	const char *compared_file_output = "Sum                                      0"
+									"                   0            0.00e+00            5.00e+02"
+									"            5.00e+00            5.00e+01            0.00e+00"
+									"            0.00e+00            0.00e+00            0.00e+00\n";
+
+	const char *compare = "{\"fields\":{\"IN_Bps\":1000,\"IN_Tps\":0,\"PROC_Tps\":0,\"cpu_us\":10,"
+						  "\"hit_cnt\":0,\"hit_rate\":0,\"reg/v6\":0,\"rule\":0,\"stream\":0},"
+						  "\"name\":\"Sum\",\"tags\":{\"app_name\":\"maat\",\"table_name\":\"maat_info\"}}";
+
+
+	enum field_type table_column_type[10] = {FIELD_TYPE_GAUGE, FIELD_TYPE_GAUGE, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+
+	instance = fieldstat_instance_new("maat");
+	EXPECT_STREQ("maat", instance->name);
+
+	table_id = fieldstat_register_table(instance, "maat_info", table_column_name, table_column_type, sizeof(table_column_name)/sizeof(table_column_name[0]));
+	EXPECT_EQ(0, table_id);
+	ret = fieldstat_register_table_row(instance, table_id, "Sum", NULL, 0, output_metric_ids);
+	EXPECT_EQ(0, ret);
+	ret = fieldstat_set_metric_ratio_para(instance, output_metric_ids[5], output_metric_ids[3], output_metric_ids[4], 1);
+	EXPECT_EQ(0, ret);
+	ret = fieldstat_set_local_output(instance, output_file_path, "default");
+	EXPECT_EQ(0, ret);
+	ret = fieldstat_set_line_protocol_server(instance, "127.0.0.1", 8600);
+	EXPECT_EQ(0, ret);
+	ret = system("cat /dev/null > /tmp/metrics.out");
+	EXPECT_EQ(0, ret);
+	fieldstat_instance_start(instance);
+	fieldstat_value_incrby(instance, output_metric_ids[3], 1000);
+	fieldstat_value_incrby(instance, output_metric_ids[4], 10);
+	sleep(3);
+
+	fp = fopen("/tmp/fieldstat.txt", "r");
+	EXPECT_NE(nullptr, fp);
+
+	while(!feof(fp))
+	{
+		if(NULL == fgets(line, sizeof(line), fp))
+		{
+			continue;
+		}
+		if(n_line == 3)
+		{
+			EXPECT_STREQ(compared_file_output, line);
+		}
+		n_line++;
+	}
+	fclose(fp);
+	EXPECT_EQ(n_line, n_loops);
+
+	fp = fopen(output_telegraf_path, "r");
+	EXPECT_NE(nullptr, fp);
+	n_line = 0;
+
+	while(!feof(fp))
+	{
+		if(NULL == fgets(line, sizeof(line), fp))
+		{
+			continue;
+		}
+		cjson_metric = cJSON_Parse(line);
+		EXPECT_NE(nullptr, cjson_metric);
+		cJSON_DeleteItemFromObject(cjson_metric, "timestamp");
+
+		cjson_tags = cJSON_GetObjectItem(cjson_metric, "tags");
+		EXPECT_NE(nullptr, cjson_tags);
+		cJSON_DeleteItemFromObject(cjson_tags, "host");
+		cjson_metric_str = cJSON_PrintUnformatted(cjson_metric);
+		EXPECT_NE(nullptr, cjson_metric_str);
+		if(cjson_metric_str)
+		{
+			EXPECT_STREQ(compare, cjson_metric_str);
+			free(cjson_metric_str);
+			cjson_metric_str = NULL;
+		}
+		cJSON_Delete(cjson_metric);
+		n_line++;
+	}
+	fclose(fp);
+
+	fieldstat_instance_free(instance);
+}
+
+TEST(FeildStatAPI, SetMetricInvisible)
+{
+	int ret = 0;
+	struct fieldstat_instance * instance = NULL;
+	int table_id = -1;
+	int output_metric_ids[10] = {0};
+	FILE *fp;
+	int n_line = 0;
+	int n_loops = 5;
+	char line[2048] = {0};
+	cJSON *cjson_metric = NULL;
+	cJSON *cjson_tags = NULL;
+	char *cjson_metric_str = NULL;
+
+	const char *output_file_path = "/tmp/fieldstat.txt"; 
+	const char *output_telegraf_path = "/tmp/metrics.out";
+	const char *table_column_name[] = {"rule", "reg/v6", "stream", "IN_Bps", "cpu_us", "PROC_Bps", "IN_Tps", "PROC_Tps","hit_cnt", "hit_rate"};
+	const char *compared_file_output = "Sum                   "
+									"                   0                   0            0.00e+00"
+									"            5.00e+02            5.00e+01            0.00e+00"
+									"            0.00e+00            0.00e+00            0.00e+00\n";
+
+	const char *compare = "{\"fields\":{\"IN_Bps\":1000,\"IN_Tps\":0,\"PROC_Tps\":0,"
+						  "\"hit_cnt\":0,\"hit_rate\":0,\"reg/v6\":0,\"rule\":0,\"stream\":0},"
+						  "\"name\":\"Sum\",\"tags\":{\"app_name\":\"maat\",\"table_name\":\"maat_info\"}}";
+
+
+	enum field_type table_column_type[10] = {FIELD_TYPE_GAUGE, FIELD_TYPE_GAUGE, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+
+	instance = fieldstat_instance_new("maat");
+	EXPECT_STREQ("maat", instance->name);
+
+	table_id = fieldstat_register_table(instance, "maat_info", table_column_name, table_column_type, sizeof(table_column_name)/sizeof(table_column_name[0]));
+	EXPECT_EQ(0, table_id);
+	ret = fieldstat_register_table_row(instance, table_id, "Sum", NULL, 0, output_metric_ids);
+	EXPECT_EQ(0, ret);
+	ret = fieldstat_set_metric_ratio_para(instance, output_metric_ids[5], output_metric_ids[3], output_metric_ids[4], 1);
+	EXPECT_EQ(0, ret);
+	ret = fieldstat_set_metric_invisible_para(instance, output_metric_ids[4]);
+	EXPECT_EQ(0, ret);
+	ret = fieldstat_set_local_output(instance, output_file_path, "default");
+	EXPECT_EQ(0, ret);
+	ret = fieldstat_set_line_protocol_server(instance, "127.0.0.1", 8600);
+	EXPECT_EQ(0, ret);
+	ret = system("cat /dev/null > /tmp/metrics.out");
+	EXPECT_EQ(0, ret);
+	fieldstat_instance_start(instance);
+	fieldstat_value_incrby(instance, output_metric_ids[3], 1000);
+	fieldstat_value_incrby(instance, output_metric_ids[4], 10);
+	sleep(3);
+
+	fp = fopen("/tmp/fieldstat.txt", "r");
+	EXPECT_NE(nullptr, fp);
+
+	while(!feof(fp))
+	{
+		if(NULL == fgets(line, sizeof(line), fp))
+		{
+			continue;
+		}
+		if(n_line == 3)
+		{
+			EXPECT_STREQ(compared_file_output, line);
+		}
+		n_line++;
+	}
+	fclose(fp);
+	EXPECT_EQ(n_line, n_loops);
+
+	fp = fopen(output_telegraf_path, "r");
+	EXPECT_NE(nullptr, fp);
+	n_line = 0;
+
+	while(!feof(fp))
+	{
+		if(NULL == fgets(line, sizeof(line), fp))
+		{
+			continue;
+		}
+		cjson_metric = cJSON_Parse(line);
+		EXPECT_NE(nullptr, cjson_metric);
+		cJSON_DeleteItemFromObject(cjson_metric, "timestamp");
+
+		cjson_tags = cJSON_GetObjectItem(cjson_metric, "tags");
+		EXPECT_NE(nullptr, cjson_tags);
+		cJSON_DeleteItemFromObject(cjson_tags, "host");
+		cjson_metric_str = cJSON_PrintUnformatted(cjson_metric);
+		EXPECT_NE(nullptr, cjson_metric_str);
+		if(cjson_metric_str)
+		{
+			EXPECT_STREQ(compare, cjson_metric_str);
+			free(cjson_metric_str);
+			cjson_metric_str = NULL;
+		}
+		cJSON_Delete(cjson_metric);
+		n_line++;
+	}
+	fclose(fp);
+
+	fieldstat_instance_free(instance);
 }
 
 

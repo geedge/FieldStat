@@ -1074,3 +1074,68 @@ void disable_line_protocol_output(struct line_protocol_output *line_protocol_out
 	}
 	return;
 }
+
+
+int fieldstat_set_metric_ratio_para(struct fieldstat_instance *instance, int metric_id, int numerator_metric_id, int denominator_metric_id, int output_scaling)
+{
+	struct metric *metric = NULL;
+	struct metric *metric_n = NULL;
+	struct metric *metric_d = NULL;
+	if(instance->running == 1)
+	{
+		return -1;
+	}
+	if(metric_id  >= instance->metric_cnt || numerator_metric_id  >= instance->metric_cnt ||denominator_metric_id >= instance->metric_cnt)
+	{
+		return -1;
+	}
+	
+	metric   = get_metric(instance, metric_id);
+	metric_n = get_metric(instance, numerator_metric_id);
+	metric_d = get_metric(instance, denominator_metric_id);
+
+	if(metric->field_type != FIELD_TYPE_GAUGE && metric->field_type != FIELD_TYPE_COUNTER)
+	{
+		return -1;
+	}
+
+	if(metric_n->field_type != FIELD_TYPE_GAUGE && metric_n->field_type != FIELD_TYPE_COUNTER)
+	{
+		return -1;
+	}
+
+	if(metric_d->field_type != FIELD_TYPE_GAUGE && metric_d->field_type != FIELD_TYPE_COUNTER)
+	{
+		return -1;
+	}
+	if(output_scaling == 0)
+	{
+		return -1;
+	}
+
+	metric->is_ratio = 1;
+	metric->numerator_id = numerator_metric_id;
+	metric->denominator_id = denominator_metric_id;
+	metric->output_scaling = output_scaling;
+
+	return 0;
+}
+
+
+int fieldstat_set_metric_invisible_para(struct fieldstat_instance *instance, int metric_id)
+{
+	struct metric *metric = NULL;
+	if(instance->running == 1)
+	{
+		return -1;
+	}
+	if(metric_id >= instance->metric_cnt)
+	{
+		return -1;
+	}
+	
+	metric = get_metric(instance, metric_id);
+	metric->is_invisible = 1;
+
+	return 0;
+}

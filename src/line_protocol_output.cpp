@@ -173,9 +173,10 @@ static int build_single_metric_line_buf(char *instance_name, int output_type, st
 }
 
 
-static int read_table_row_value(struct metric **row_metric, int output_type, int n_column, long long *out_row_value)
+static int read_table_row(struct metric **row_metric, char *column_name[], int output_type, int n_column, char *out_column_name[], long long *out_row_value)
 {
 	int i = 0;
+	int n_send = 0;
 	struct metric *metric = NULL;
 
 	if(row_metric == NULL || n_column < 1)
@@ -186,9 +187,15 @@ static int read_table_row_value(struct metric **row_metric, int output_type, int
 	for(i = 0; i < n_column; i++)
 	{
 		metric = row_metric[i];
-		out_row_value[i] = read_single_metric_value(metric, output_type);
+		if(metric->is_ratio == 1 || metric->is_invisible == 1)
+		{
+			continue;
+		}
+		out_row_value[n_send] = read_single_metric_value(metric, output_type);
+		out_column_name[n_send] = column_name[i];
+		n_send++;
 	}
-	return 0;
+	return n_send;
 
 }
 
@@ -196,19 +203,22 @@ static int build_table_row_line_buf(char *instance_name, int output_type, struct
 {
 	int used_len = 0;
 	struct metric *metric = NULL;
+	int n_send = 0;
 
 	if(table->column_cnt <= 0)
 	{
 		return 0;
 	}
 	long long row_value[table->column_cnt];
+	char *column_name[table->column_cnt];
+	n_send = read_table_row(row_metric, table->column_name, output_type, table->column_cnt, column_name, row_value);
 
-	if(-1 == read_table_row_value(row_metric, output_type, table->column_cnt, row_value))
+	if(n_send < 1)
 	{
 		return 0;
 	}
 
-	if(1 != is_send_table_row(row_value, table->column_cnt))
+	if(1 != is_send_table_row(row_value, n_send))
 	{
 		return 0;
 	}
@@ -223,7 +233,7 @@ static int build_table_row_line_buf(char *instance_name, int output_type, struct
 
 	used_len += snprintf(line_buf + used_len, line_buf_size - used_len, " ");
 
-	used_len += add_table_row_field_set(table->column_name, row_value, table->column_cnt, line_buf + used_len, line_buf_size - used_len);
+	used_len += add_table_row_field_set(column_name, row_value, n_send, line_buf + used_len, line_buf_size - used_len);
 
 	used_len += snprintf(line_buf + used_len, line_buf_size - used_len, "\n");
 
@@ -244,6 +254,10 @@ static void output_line_protocol_single_metric(struct fieldstat_instance *instan
 		metric = get_metric(instance, i);
 
 		if(metric == NULL || metric->table != NULL)
+		{
+			continue;
+		}
+		if(metric->is_ratio == 1)
 		{
 			continue;
 		}

@@ -349,16 +349,32 @@ void fieldstat_dynamic_instance_free(struct fieldstat_dynamic_instance *instance
  */
 long long fieldstat_dynamic_table_metric_value_get(struct fieldstat_dynamic_instance *instance, int table_id, unsigned int column_id, const char *row_name, const struct fieldstat_tag tags[], size_t n_tags, int thread_id);
 /**
- * fieldstat dynamic instance metric value set operate. metirc type in[gauge, counter]
+ * fieldstat dynamic instance metric value get operate. metirc type in[gauge, counter]
  * @param instance The fieldstat dynamic instance.
  * @param field_name The metric field name.
- * @param value The set value.
  * @param tags The tag array.
  * @param n_tag Size of tags[]
  * @param thread_id The thread id of the call.
  * @return long long value.
  */
 long long fieldstat_dynamic_metric_value_get(struct fieldstat_dynamic_instance *instance, const char *field_name, const struct fieldstat_tag tags[], size_t n_tags, int thread_id);
+/**
+ * fieldstat set metric ratio parameter. 
+ * @param instance The fieldstat instance.
+ * @param metric_id  The metric id need to set ratio.
+ * @param numerator_metric_id The metric id as numerator.
+ * @param denominator_metric_id The metric id as denominator.
+ * @return  -1 is failed. 0 is success.
+ */
+int fieldstat_set_metric_ratio_para(struct fieldstat_instance *instance, int metric_id, int numerator_metric_id, int denominator_metric_id, int output_scaling);
+
+/**
+ * fieldstat set metric invisible parameter. 
+ * @param instance The fieldstat instance.
+ * @param metric_id  The metric id need to set invisible.
+ * @return  -1 is failed. 0 is success.
+ */
+int fieldstat_set_metric_invisible_para(struct fieldstat_instance *instance, int metric_id);
 
 #ifdef __cplusplus
 }

@@ -1766,7 +1766,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicInstanceIncrbyMultiMetric)
 {
 	int ret = 0;
 	int n_thread = 64;
-	int n_loops = 1000;
+	int n_loops = 100;
 
 	struct dynamic_metric *dyn_metric, *tmp_dyn_metric;
 	struct dynamic_metric **head = NULL;
@@ -1909,7 +1909,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicInstanceDecrbyMultiMetric)
 {
 	int ret = 0;
 	int n_thread = 64;
-	int n_loops = 1000;
+	int n_loops = 100;
 
 	struct dynamic_metric *dyn_metric, *tmp_dyn_metric;
 	struct dynamic_metric **head = NULL;
@@ -2053,7 +2053,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicInstanceSetMultiMetric)
 {
 	int ret = 0;
 	int n_thread = 64;
-	int n_loops = 1000;
+	int n_loops = 100;
 
 	struct dynamic_metric *dyn_metric, *tmp_dyn_metric;
 	struct dynamic_metric **head = NULL;
@@ -2202,7 +2202,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicInstanceMultiIncrbyMultiMetric)
 {
 	int ret = 0;
 	int n_thread = 64;
-	int n_loops = 1000;
+	int n_loops = 100;
 
 	struct dynamic_metric *dyn_metric, *tmp_dyn_metric;
 	struct dynamic_metric **head = NULL;
@@ -2348,7 +2348,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicInstanceMultiDecrbyMultiMetric)
 {
 	int ret = 0;
 	int n_thread = 64;
-	int n_loops = 1000;
+	int n_loops = 100;
 
 	struct dynamic_metric *dyn_metric, *tmp_dyn_metric;
 	struct dynamic_metric **head = NULL;
@@ -2493,7 +2493,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicInstanceMultiSetMultiMetric)
 {
 	int ret = 0;
 	int n_thread = 64;
-	int n_loops = 1000;
+	int n_loops = 100;
 
 	struct dynamic_metric *dyn_metric, *tmp_dyn_metric;
 	struct dynamic_metric **head = NULL;

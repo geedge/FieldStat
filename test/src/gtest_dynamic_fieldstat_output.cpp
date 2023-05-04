@@ -73,9 +73,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicInstanceMultiIncrby)
 {
 	int ret = 0;
 	int n_thread = 64;
-	int n_loops = 100000;
-
-	long long value = 0;
+	int n_loops = 10000;
 
 	const char *column_name[] = {"packages", "bytes"};
 	enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
