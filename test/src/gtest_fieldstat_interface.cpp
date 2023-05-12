@@ -379,9 +379,10 @@ TEST(FeildStatAPI, SetMetricRatioPara)
 	ret = system("cat /dev/null > /tmp/metrics.out");
 	EXPECT_EQ(0, ret);
 	fieldstat_instance_start(instance);
+	sleep(1);
 	fieldstat_value_incrby(instance, output_metric_ids[3], 1000);
 	fieldstat_value_incrby(instance, output_metric_ids[4], 10);
-	sleep(3);
+	sleep(2);
 
 	fp = fopen("/tmp/fieldstat.txt", "r");
 	EXPECT_NE(nullptr, fp);
@@ -481,9 +482,10 @@ TEST(FeildStatAPI, SetMetricInvisible)
 	ret = system("cat /dev/null > /tmp/metrics.out");
 	EXPECT_EQ(0, ret);
 	fieldstat_instance_start(instance);
+	sleep(1);
 	fieldstat_value_incrby(instance, output_metric_ids[3], 1000);
 	fieldstat_value_incrby(instance, output_metric_ids[4], 10);
-	sleep(3);
+	sleep(2);
 
 	fp = fopen("/tmp/fieldstat.txt", "r");
 	EXPECT_NE(nullptr, fp);

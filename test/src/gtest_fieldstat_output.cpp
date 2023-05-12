@@ -71,8 +71,9 @@ TEST(FeildStatOutput, OutputFile)
 	ret = fieldstat_set_local_output(instance, output_file_path, "default");
 	EXPECT_EQ(0, ret);
 	fieldstat_instance_start(instance);
+	sleep(1);
 	fieldstat_value_incrby(instance, output_metric_ids[0], 1000);
-	sleep(3);
+	sleep(2);
 	fp = fopen(output_file_path, "r");
 	EXPECT_NE(nullptr, fp);
 	int n_line = 0;
@@ -152,9 +153,10 @@ TEST(FeildStatOutput, OutputLineProtocol)
 	EXPECT_EQ(0, ret);
 	EXPECT_EQ(4, instance->output_type);
 	fieldstat_instance_start(instance);
-	fieldstat_value_incrby(instance, output_metric_ids[0], 1000);
 	ret = system("cat /dev/null > /tmp/metrics.out");
-	sleep(3);
+	sleep(1);
+	fieldstat_value_incrby(instance, output_metric_ids[0], 1000);
+	sleep(2);
 	fp = fopen(telegraf_output_file, "r");
 	EXPECT_NE(nullptr, fp);
 	int n_line = 0;
@@ -339,8 +341,9 @@ TEST(FeildStatOutput, OutputFileAndLineProtocol)
 	ret = system("cat /dev/null > /tmp/metrics.out");
 	//ret = system("cat /dev/null > /tmp/fieldstat.txt");
 	fieldstat_instance_start(instance);
+	sleep(1);
 	fieldstat_value_incrby(instance, output_metric_ids[0], 1000);
-	sleep(3);
+	sleep(2);
 	int n_line = 0;
 	fp = fopen(telegraf_output_file, "r");
 	EXPECT_NE(nullptr, fp);
@@ -477,8 +480,9 @@ TEST(FeildStatOutput, OutputFileAndPrometheus)
 	ret = system("cat /dev/null > /tmp/prometheus.txt");
 	//ret = system("cat /dev/null > /tmp/fieldstat.txt");
 	fieldstat_instance_start(instance);
+	sleep(1);
 	fieldstat_value_incrby(instance, output_metric_ids[0], 1000);
-	sleep(3);
+	sleep(2);
 	system("curl -s  http://127.0.0.1:9021/metrics -o /tmp/prometheus.txt");
 	int n_line = 0;
 
@@ -625,8 +629,9 @@ TEST(FeildStatOutput, OutputFileAndPrometheusAndLineProtocol)
 	ret = system("cat /dev/null > /tmp/prometheus.txt");
 	//ret = system("cat /dev/null > /tmp/fieldstat.txt");
 	fieldstat_instance_start(instance);
+	sleep(1);
 	fieldstat_value_incrby(instance, output_metric_ids[0], 1000);
-	sleep(3);
+	sleep(2);
 	system("curl -s  http://127.0.0.1:9022/metrics -o /tmp/prometheus.txt");
 	int n_line = 0;
 

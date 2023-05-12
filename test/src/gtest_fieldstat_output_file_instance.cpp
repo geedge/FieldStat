@@ -123,8 +123,9 @@ TEST(FeildStatOutput, OutputMaatTable)
 	ret = fieldstat_set_local_output(instance, output_file_path, "default");
 	EXPECT_EQ(0, ret);
 	fieldstat_instance_start(instance);
+	sleep(1);
 	fieldstat_value_incrby(instance, output_metric_ids[0], 9223372036854775807);
-	sleep(3);
+	sleep(2);
 
 	fp = fopen("/tmp/fieldstat.txt", "r");
 	EXPECT_NE(nullptr, fp);
@@ -205,8 +206,9 @@ TEST(FeildStatOutput, OutputMaatGaugeType)
 	ret = fieldstat_set_local_output(instance, output_file_path, "default");
 	EXPECT_EQ(0, ret);
 	fieldstat_instance_start(instance);
+	sleep(1);
 	fieldstat_value_incrby(instance, 0, 922);
-	sleep(3);
+	sleep(2);
 
 	fp = fopen("/tmp/fieldstat.txt", "r");
 	EXPECT_NE(nullptr, fp);
