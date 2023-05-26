@@ -268,6 +268,10 @@ static int output_file_format_default_table(struct fieldstat_instance *instance,
 		for(j = 0; j < table->column_cnt; j ++)
 		{
 			//print table column
+			if(table->column_invisible[j] == 1)
+			{
+				continue;
+			}
 			used_len += snprintf(print_buf + used_len, size - used_len, "%20.19s", table->column_name[j]);
 		}
 		for(j = 0; j < tables_line_cnt[i]; j++)  //per line

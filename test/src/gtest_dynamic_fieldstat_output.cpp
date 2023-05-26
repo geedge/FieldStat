@@ -85,7 +85,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicInstanceMultiIncrby)
 
 
 	struct fieldstat_dynamic_instance *instance = fieldstat_dynamic_instance_new("firewall", n_thread);
-	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8600);
+	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8700);
 	EXPECT_EQ(0, ret);
 
 	table_id = fieldstat_register_dynamic_table(instance, "shaping", column_name, column_type, sizeof(column_name)/sizeof(column_name[0]), out_column_ids);

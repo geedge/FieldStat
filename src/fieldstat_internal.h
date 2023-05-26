@@ -114,6 +114,7 @@ struct table_metric
 	char *name;
 	char *column_name[TABLE_COLUMN_SIZE];
 	enum field_type column_type[TABLE_COLUMN_SIZE];
+	int column_invisible[TABLE_COLUMN_SIZE];
 	int column_cnt;
 
 	int line_cnt;

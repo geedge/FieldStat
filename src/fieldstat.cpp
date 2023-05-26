@@ -1137,5 +1137,10 @@ int fieldstat_set_metric_invisible_para(struct fieldstat_instance *instance, int
 	metric = get_metric(instance, metric_id);
 	metric->is_invisible = 1;
 
+	if(metric->table != NULL)
+	{
+		metric->table->column_invisible[metric->table_column_id] = 1;
+	}
+
 	return 0;
 }

@@ -641,7 +641,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolNoTag)
 
 	EXPECT_NE(nullptr, instance);
 
-	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8600);
+	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8700);
 	EXPECT_EQ(0, ret);
 
 	ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_TYPE_GAUGE, "Active_sessions", 10, NULL, 0, 0);
@@ -668,7 +668,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolOneTag)
 
 	EXPECT_NE(nullptr, instance);
 
-	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8600);
+	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8700);
 	EXPECT_EQ(0, ret);
 	ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_TYPE_GAUGE, "Active_sessions", 11, tags, 1, 0);
 	ret = line_protocol_dynamic_metric_output(instance);
@@ -699,7 +699,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolTwoTags)
 
 	EXPECT_NE(nullptr, instance);
 
-	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8600);
+	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8700);
 	EXPECT_EQ(0, ret);
 
 	ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_TYPE_GAUGE, "Active_sessions", 12, tags, 2, 0);
@@ -729,7 +729,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolTableMetricNoTag)
 	table_id = fieldstat_register_dynamic_table(instance, "shaping", column_name, column_type, sizeof(column_name)/sizeof(column_name[0]), out_column_ids);
 	EXPECT_EQ(0, table_id);
 
-	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8600);
+	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8700);
 	EXPECT_EQ(0, ret);
 
 	ret = fieldstat_dynamic_table_metric_value_incrby(instance, table_id, out_column_ids[0], "security_rule_hits", 30, NULL, 0, 0);
@@ -768,7 +768,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolTableMetricOneTag)
 	table_id = fieldstat_register_dynamic_table(instance, "shaping", column_name, column_type, sizeof(column_name)/sizeof(column_name[0]), out_column_ids);
 	EXPECT_EQ(0, table_id);
 
-	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8600);
+	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8700);
 	EXPECT_EQ(0, ret);
 
 	ret = fieldstat_dynamic_table_metric_value_incrby(instance, table_id, out_column_ids[0], "security_rule_hits", 30, tags, sizeof(tags)/sizeof(tags[0]), 0);
@@ -811,7 +811,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolTableMetricTowTags)
 	table_id = fieldstat_register_dynamic_table(instance, "shaping", column_name, column_type, sizeof(column_name)/sizeof(column_name[0]), out_column_ids);
 	EXPECT_EQ(0, table_id);
 
-	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8600);
+	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8700);
 	EXPECT_EQ(0, ret);
 
 	ret = fieldstat_dynamic_table_metric_value_incrby(instance, table_id, out_column_ids[0], "security_rule_hits", 30, tags, sizeof(tags)/sizeof(tags[0]), 0);
@@ -837,7 +837,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolTypeGauge)
 	instance = fieldstat_dynamic_instance_new("firewall", n_thread);
 	EXPECT_NE(nullptr, instance);
 
-	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8600);
+	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8700);
 	EXPECT_EQ(0, ret);
 
 	ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_TYPE_GAUGE, "Active_sessions", 12, NULL, 0, 0);
@@ -870,7 +870,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolTypeCounter)
 	instance = fieldstat_dynamic_instance_new("firewall", n_thread);
 	EXPECT_NE(nullptr, instance);
 
-	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8600);
+	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8700);
 	EXPECT_EQ(0, ret);
 
 	ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_TYPE_COUNTER, "Active_sessions", 12, NULL, 0, 0);
@@ -908,7 +908,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolTableMetricTypeAllCo
 	table_id = fieldstat_register_dynamic_table(instance, "shaping", column_name, column_type, sizeof(column_name)/sizeof(column_name[0]), out_column_ids);
 	EXPECT_EQ(0, table_id);
 
-	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8600);
+	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8700);
 	EXPECT_EQ(0, ret);
 
 	ret = fieldstat_dynamic_table_metric_value_incrby(instance, table_id, out_column_ids[0], "security_rule_hits", 30, NULL, 0, 0);
@@ -955,7 +955,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolTableMetricTypeAllGa
 	table_id = fieldstat_register_dynamic_table(instance, "shaping", column_name, column_type, sizeof(column_name)/sizeof(column_name[0]), out_column_ids);
 	EXPECT_EQ(0, table_id);
 
-	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8600);
+	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8700);
 	EXPECT_EQ(0, ret);
 
 	ret = fieldstat_dynamic_table_metric_value_incrby(instance, table_id, out_column_ids[0], "security_rule_hits", 30, NULL, 0, 0);
@@ -1001,7 +1001,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolTableMetricTypeOneCo
 	table_id = fieldstat_register_dynamic_table(instance, "shaping", column_name, column_type, sizeof(column_name)/sizeof(column_name[0]), out_column_ids);
 	EXPECT_EQ(0, table_id);
 
-	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8600);
+	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8700);
 	EXPECT_EQ(0, ret);
 
 	ret = fieldstat_dynamic_table_metric_value_incrby(instance, table_id, out_column_ids[0], "security_rule_hits", 30, NULL, 0, 0);
@@ -1084,7 +1084,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolValueZero)
 	instance = fieldstat_dynamic_instance_new("firewall", n_thread);
 	EXPECT_NE(nullptr, instance);
 
-	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8600);
+	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8700);
 	EXPECT_EQ(0, ret);
 
 	ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_TYPE_GAUGE, "Active_sessions", 0, NULL, 0, 0);
@@ -1115,7 +1115,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolTableMetricValueZero
 	table_id = fieldstat_register_dynamic_table(instance, "shaping", column_name, column_type, sizeof(column_name)/sizeof(column_name[0]), out_column_ids);
 	EXPECT_EQ(0, table_id);
 
-	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8600);
+	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8700);
 	EXPECT_EQ(0, ret);
 
 	ret = fieldstat_dynamic_table_metric_value_incrby(instance, table_id, out_column_ids[0], "security_rule_hits", 0, NULL, 0, 0);
@@ -1160,7 +1160,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolMultiMetric)
 
 	instance = fieldstat_dynamic_instance_new("firewall", n_thread);
 	EXPECT_NE(nullptr, instance);
-	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8600);
+	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8700);
 	EXPECT_EQ(0, ret);
 	for(int i = 0; i < loops; i++)
 	{
@@ -1233,7 +1233,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolMultiTableRow)
 
 	instance = fieldstat_dynamic_instance_new("firewall", n_thread);
 	EXPECT_NE(nullptr, instance);
-	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8600);
+	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8700);
 	EXPECT_EQ(0, ret);
 	table_id = fieldstat_register_dynamic_table(instance, "shaping", column_name, column_type, sizeof(column_name)/sizeof(column_name[0]), out_column_ids);
 	EXPECT_EQ(0, table_id);

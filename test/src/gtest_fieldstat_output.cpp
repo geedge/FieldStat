@@ -149,7 +149,7 @@ TEST(FeildStatOutput, OutputLineProtocol)
 	ret = fieldstat_register_table_row(instance, table_id, "TRAFFIC", NULL, 0, output_metric_ids);
 	EXPECT_EQ(0, ret);
 
-	ret = fieldstat_set_line_protocol_server(instance, "127.0.0.1", 8600);
+	ret = fieldstat_set_line_protocol_server(instance, "127.0.0.1", 8700);
 	EXPECT_EQ(0, ret);
 	EXPECT_EQ(4, instance->output_type);
 	fieldstat_instance_start(instance);
@@ -332,7 +332,7 @@ TEST(FeildStatOutput, OutputFileAndLineProtocol)
 	ret = fieldstat_register_table_row(instance, table_id, "TRAFFIC", NULL, 0, output_metric_ids);
 	EXPECT_EQ(0, ret);
 
-	ret = fieldstat_set_line_protocol_server(instance, "127.0.0.1", 8600);
+	ret = fieldstat_set_line_protocol_server(instance, "127.0.0.1", 8700);
 	EXPECT_EQ(0, ret);
 	ret = fieldstat_set_local_output(instance, output_file_path, "default");
 	EXPECT_EQ(0, ret);
