@@ -564,6 +564,58 @@ TEST(FeildStatAPI, SetMetricInvisible)
 	fieldstat_instance_free(instance);
 }
 
+TEST(FeildStatAPI, RegisterSummary)
+{
+	int ret = 0;
+	struct fieldstat_instance * instance = NULL;
+	const char * quantiles = "0.1,0.5,0.8,0.9,0.95,0.99";
+
+	instance = fieldstat_instance_new("maat");
+
+	ret = fieldstat_register_summary(instance, "latency", NULL, 0, quantiles, 1, 5, 2, 0);
+	EXPECT_EQ(0, ret);
+
+	ret = fieldstat_register_summary(instance, "latency", NULL, 0, quantiles, -1, 5, 2, 0);
+	EXPECT_EQ(-1, ret);
+
+	ret = fieldstat_register_summary(instance, "latency", NULL, 0, quantiles, 2, 3, 2, 0);
+	EXPECT_EQ(-1, ret);
+
+	ret = fieldstat_register_summary(instance, "latency", NULL, 0, quantiles, 1, 5, 10, 0);
+	EXPECT_EQ(-1, ret);
+
+	ret = fieldstat_register_summary(instance, "latency", NULL, 0, quantiles, 1, 5, 2, 2);
+	EXPECT_EQ(-1, ret);
+
+	fieldstat_instance_free(instance);
+}
+
+TEST(FeildStatAPI, RegisterHistogram)
+{
+	int ret = 0;
+	struct fieldstat_instance * instance = NULL;
+	const char * quantiles = "0.1,0.5,0.8,0.9,0.95,0.99";
+
+	instance = fieldstat_instance_new("maat");
+
+	ret = fieldstat_register_histogram(instance, "latency", NULL, 0, quantiles, 1, 5, 2, 0);
+	EXPECT_EQ(0, ret);
+
+	ret = fieldstat_register_histogram(instance, "latency", NULL, 0, quantiles, -1, 5, 2, 0);
+	EXPECT_EQ(-1, ret);
+
+	ret = fieldstat_register_histogram(instance, "latency", NULL, 0, quantiles, 2, 3, 2, 0);
+	EXPECT_EQ(-1, ret);
+
+	ret = fieldstat_register_histogram(instance, "latency", NULL, 0, quantiles, 1, 5, 10, 0);
+	EXPECT_EQ(-1, ret);
+
+	ret = fieldstat_register_histogram(instance, "latency", NULL, 0, quantiles, 1, 5, 2, 2);
+	EXPECT_EQ(-1, ret);
+
+	fieldstat_instance_free(instance);
+}
+
 
 int main(int argc, char *argv[]) 
 {

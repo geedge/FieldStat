@@ -206,7 +206,7 @@ static int prometheus_output_histogram_and_summary(struct metric *metric, char *
 		}
 		if(metric->field_type == FIELD_TYPE_SUMMARY)
 		{
-			value=(long long)hdr_value_at_percentile(h_out, bins[i]);
+			value=(long long)hdr_value_at_percentile(h_out, bins[i]*100);
 		}
 	
 		used_len+=snprintf(payload+used_len,

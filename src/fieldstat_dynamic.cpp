@@ -208,6 +208,10 @@ int fieldstat_register_dynamic_table(struct fieldstat_dynamic_instance *instance
 		{
 			return -1;
 		}
+		if(column_type[i] != FIELD_TYPE_GAUGE && column_type[i] != FIELD_TYPE_COUNTER)
+		{
+			return -1;
+		}
 	}
 
 	if(n_column <= 0 || n_column > TABLE_COLUMN_SIZE)
@@ -402,6 +406,12 @@ int fieldstat_dynamic_metric_value_incrby(struct fieldstat_dynamic_instance *ins
 	{
 		return -1;
 	}
+
+	if(type != FIELD_TYPE_GAUGE && type != FIELD_TYPE_COUNTER)
+	{
+		return -1;
+	}
+
 	ret = fieldstat_dynamic_metric_value_operate(instance, FS_OP_ADD, type, field_name, value, tags, n_tags, thread_id);
 	return ret;
 }
@@ -414,6 +424,10 @@ int fieldstat_dynamic_metric_value_set(struct fieldstat_dynamic_instance *instan
 		return -1;
 	}
 	if(0 == is_valid_tags(tags, n_tags))
+	{
+		return -1;
+	}
+	if(type != FIELD_TYPE_GAUGE && type != FIELD_TYPE_COUNTER)
 	{
 		return -1;
 	}
@@ -430,6 +444,11 @@ int fieldstat_dynamic_metric_value_decrby(struct fieldstat_dynamic_instance *ins
 		return -1;
 	}
 	if(0 == is_valid_tags(tags, n_tags))
+	{
+		return -1;
+	}
+
+	if(type != FIELD_TYPE_GAUGE && type != FIELD_TYPE_COUNTER)
 	{
 		return -1;
 	}

@@ -170,6 +170,7 @@ struct metric * metric_new(enum field_type type, const char *field_name, const s
 void metric_free(struct metric *metric)
 {
 	int i = 0;
+	struct histogram_t *h = NULL;
 
 	free(metric->field_name);
 	metric->field_name = NULL;
@@ -187,6 +188,31 @@ void metric_free(struct metric *metric)
 	if(metric->table)
 	{
 		metric->table = NULL;
+	}
+	if(metric->field_type == FIELD_TYPE_SUMMARY || 
+	   metric->field_type == FILED_TYPE_HISTOGRAM)
+	{
+		h = &metric->histogram;
+		if(h->changing != NULL)
+		{
+			hdr_close(h->changing);
+			h->changing = NULL;
+		}
+		if(h->accumulated != NULL)
+		{
+			hdr_close(h->accumulated);
+			h->accumulated = NULL;
+		}
+		if(h->previous_changed != NULL)
+		{
+			hdr_close(h->previous_changed);
+			h->previous_changed = NULL;
+		}
+		if(h->bins != NULL)
+		{
+			free(h->bins);
+			h->bins = NULL;
+		}
 	}
 
 	free(metric);
@@ -436,7 +462,8 @@ long long get_metric_unit_val(struct metric *metric,enum field_calc_algo calc_ty
 			target = &(metric->gauge);
 			break;
 		default:
-			break;
+			assert(0);
+			return 0;
 	}
 
 	value = threadsafe_counter_read(&(target->changing));
@@ -712,6 +739,10 @@ void table_metric_free(struct table_metric *table)
 	for(int i = 0; i < (int)n_column; i++)
 	{
 		if(!is_valid_field_name(column_name[i]))
+		{
+			return -1;
+		}
+		if(column_type[i] != FIELD_TYPE_GAUGE && column_type[i] != FIELD_TYPE_COUNTER)
 		{
 			return -1;
 		}

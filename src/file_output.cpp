@@ -390,6 +390,27 @@ static int output_file_print_hdr_head(struct metric *metric, char *print_buf, si
 	return used_len;
 }
 
+static struct hdr_histogram *read_hdr_unit_output(struct metric *metric)
+{
+	struct histogram_t *h = &(metric->histogram);
+	struct hdr_histogram *h_out = NULL, *h_tmp = NULL;
+	hdr_init(h->lowest_trackable_value, h->highest_trackable_value, 
+			 h->significant_figures, &(h_tmp));
+
+	if(h->previous_changed != NULL)	
+	{
+		hdr_close(h->previous_changed);
+	}
+
+	h->previous_changed = atomic_read(&(h->changing));
+	h_tmp=atomic_set(&(h->changing), h_tmp);
+	hdr_add(h->accumulated, h->previous_changed);
+
+	h_out = (metric->output_window == 0)?h->accumulated:h->previous_changed;
+
+	return h_out;
+}
+
 static int output_file_print_hdr_unit(struct metric *metric, char *print_buf, size_t size)
 {
 	int used_len = 0;
@@ -397,28 +418,13 @@ static int output_file_print_hdr_unit(struct metric *metric, char *print_buf, si
 	int bins_num  = metric->histogram.bins_num;
 	long long value = 0;
 	int i = 0;
-	struct histogram_t *h=&(metric->histogram);
-	struct hdr_histogram *h_out=NULL, *h_tmp=NULL;
+	struct hdr_histogram *h_out=NULL;
 	char int_format[STR_LEN_256], double_format[STR_LEN_256];
 
 	snprintf(int_format, sizeof(int_format), "%%%dlld",HISTOGRAM_WIDTH);
 	snprintf(double_format, sizeof(double_format), "%%%d.2lf",HISTOGRAM_WIDTH);
 
-	hdr_init(h->lowest_trackable_value,  h->highest_trackable_value, h->significant_figures, &(h_tmp));
-
-	if(h->previous_changed != NULL)	
-	{
-		hdr_close(h->previous_changed);
-	}
-
-	h->previous_changed=atomic_read(&(h->changing));
-	h_tmp=atomic_set(&(h->changing), h_tmp);// left h_tmp is used to avoid warining [-Wunused-value]
-
-	hdr_add(h->accumulated, h->previous_changed);
-
-	metric->output_window == 0
-		?h_out = h->accumulated
-		:h_out = h->previous_changed;
+	h_out = read_hdr_unit_output(metric);
 
 	used_len += snprintf(print_buf + used_len, size - used_len, "%-10s\t", metric->field_name);
 
@@ -442,8 +448,6 @@ static int output_file_print_hdr_unit(struct metric *metric, char *print_buf, si
 	used_len += snprintf(print_buf + used_len, size - used_len, int_format, (long long)h_out->total_count);
 
 	used_len += snprintf(print_buf + used_len, size - used_len,"\n");
-
-	h_tmp = NULL;
 
 	return used_len;
 }
@@ -592,18 +596,7 @@ int output_file_format_json(struct fieldstat_instance *instance, int n_cur_metri
 				break;
 			case FIELD_TYPE_SUMMARY:
 			case FILED_TYPE_HISTOGRAM:
-				struct histogram_t* h=&(metric->histogram);
-				struct hdr_histogram* h_out=NULL, *h_tmp=NULL;
-				hdr_init(h->lowest_trackable_value,  h->highest_trackable_value, h->significant_figures, &(h_tmp));
-				if(h->previous_changed!=NULL)	hdr_close(h->previous_changed);
-
-				h->previous_changed=atomic_read(&(h->changing));
-				h_tmp=atomic_set(&(h->changing), h_tmp);// left h_tmp is used to avoid warining [-Wunused-value]
-
-				hdr_add(h->accumulated, h->previous_changed);
-				metric->output_window == 0
-					?h_out = h->accumulated
-					:h_out = h->previous_changed;
+				struct hdr_histogram *h_out = read_hdr_unit_output(metric);
 				tmp_obj = cJSON_CreateObject();
 
 				for(int j = 0; j < metric->histogram.bins_num; j++)

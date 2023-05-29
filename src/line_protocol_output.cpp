@@ -23,7 +23,7 @@ static void flush_send_buf(struct line_protocol_output *line_protocol_output)
 
 static void send_line_buf(struct line_protocol_output *line_protocol_output, char *line_buf, unsigned int line_buf_len)
 {
-	if(line_protocol_output == NULL || line_buf == NULL)
+	if(line_protocol_output == NULL || line_buf == NULL || line_buf_len == 0)
 	{
 		return;
 	}
@@ -91,9 +91,18 @@ static long long read_single_metric_value(struct metric *metric, int output_type
 	(output_type >= 4 && output_type < 8)
 		?is_refer = 0
 		:is_refer = 1;
-	metric->field_type == FIELD_TYPE_GAUGE
-		?value = get_metric_unit_val(metric, FS_CALC_CURRENT, is_refer)
-		:value = get_metric_unit_val(metric, FS_CALC_SPEED, is_refer);
+	switch(metric->field_type)
+	{
+		case FIELD_TYPE_GAUGE:
+			value = get_metric_unit_val(metric, FS_CALC_CURRENT, is_refer);
+			break;
+		case FIELD_TYPE_COUNTER:
+			value = get_metric_unit_val(metric, FS_CALC_SPEED, is_refer);
+			break;
+		default:
+			assert(0);
+			break;
+	}
 	return value;
 }
 
@@ -119,6 +128,49 @@ static int add_field_set(char *field_key, long long field_value, char *line_buf,
 	int used_len = 0;
 
 	used_len += snprintf(line_buf, line_buf_size, "%s=%lld", field_key, field_value);
+
+	return used_len;
+}
+
+static int add_hdr_field_set(struct metric *metric, struct hdr_histogram *h_out, 
+							 char *line_buf, int line_buf_size)
+{
+	
+	int used_len = 0;
+	long long value = 0;
+	double * bins = metric->histogram.bins;
+	int bins_num  = metric->histogram.bins_num;
+
+	for(int i = 0; i < bins_num; i++)
+	{
+		switch(metric->field_type)
+		{
+			case FIELD_TYPE_SUMMARY:
+				value = (long long)hdr_value_at_percentile(h_out, bins[i]*100);
+				used_len += snprintf(line_buf + used_len, line_buf_size - used_len, 
+									 "P%d=%lld,", (int)(bins[i]*100), value);
+				break;
+			case FILED_TYPE_HISTOGRAM:
+				value = hdr_count_le_value(h_out, (long long)bins[i]);
+				used_len += snprintf(line_buf + used_len, line_buf_size - used_len, 
+									 "le%d=%lld,", (int)bins[i], value);
+				break;
+			default:
+				assert(0);
+				return 0;
+		}
+	}
+
+	used_len += snprintf(line_buf + used_len, line_buf_size - used_len, "max=%lld,", 
+						 h_out->total_count==0?0:(long long)hdr_max(h_out));
+	used_len += snprintf(line_buf + used_len, line_buf_size - used_len, "min=%lld,", 
+						 h_out->total_count==0?0:(long long)hdr_min(h_out));
+	used_len += snprintf(line_buf + used_len, line_buf_size - used_len, "avg=%0.2f,", 
+						 h_out->total_count==0?0:hdr_mean(h_out));
+	used_len += snprintf(line_buf + used_len, line_buf_size - used_len, "stddev=%0.2f,", 
+						 h_out->total_count==0?0:hdr_stddev(h_out));
+	used_len += snprintf(line_buf + used_len, line_buf_size - used_len, "cnt=%lld", 
+						 (long long)h_out->total_count);
 
 	return used_len;
 }
@@ -166,6 +218,60 @@ static int build_single_metric_line_buf(char *instance_name, int output_type, st
 	used_len += snprintf(line_buf + used_len, line_buf_size - used_len, " ");
 
 	used_len += add_field_set(metric->field_name, value, line_buf + used_len, line_buf_size - used_len);
+
+	used_len += snprintf(line_buf + used_len, line_buf_size - used_len, "\n");
+
+	return used_len;
+}
+
+static struct hdr_histogram *read_hdr_metric_value(struct metric *metric, int output_type)
+{
+	struct histogram_t *h=&(metric->histogram);
+	struct hdr_histogram *h_out = NULL, *h_tmp = NULL;
+
+	if(output_type >= 4 && output_type < 8)
+	{
+		hdr_init(h->lowest_trackable_value,  h->highest_trackable_value, 
+				 h->significant_figures, &(h_tmp));
+
+		if(h->previous_changed != NULL)	
+		{
+			hdr_close(h->previous_changed);
+		}
+		h->previous_changed = atomic_read(&(h->changing));
+		h_tmp = atomic_set(&(h->changing), h_tmp);
+		hdr_add(h->accumulated, h->previous_changed);
+	}
+	h_out = (metric->output_window == 0) ? h->accumulated : h->previous_changed;
+
+	return h_out;
+}
+
+static int build_hdr_metric_line_buf(char *instance_name, int output_type, struct metric *metric,
+									 char *line_buf, int line_buf_size)
+{
+	int used_len = 0;
+	struct hdr_histogram *h_out = NULL;
+
+	h_out = read_hdr_metric_value(metric, output_type);
+
+	if(h_out == NULL)
+	{
+		return 0;
+	}
+
+	used_len += add_measurement(metric->field_name, line_buf, line_buf_size);
+
+	used_len += add_default_tag_set(instance_name, NULL, line_buf + used_len, 
+								    line_buf_size - used_len);
+
+	used_len += add_user_tag_set(metric, line_buf + used_len, 
+								 line_buf_size - used_len);
+
+	used_len += snprintf(line_buf + used_len, line_buf_size - used_len, " ");
+
+	used_len += add_hdr_field_set(metric, h_out, line_buf + used_len, 
+								  line_buf_size - used_len);
 
 	used_len += snprintf(line_buf + used_len, line_buf_size - used_len, "\n");
 
@@ -263,7 +369,22 @@ static void output_line_protocol_single_metric(struct fieldstat_instance *instan
 		}
 		memset(line_buf, 0, sizeof(line_buf));
 
-		used_len = build_single_metric_line_buf(instance->name, instance->output_type, metric, line_buf, sizeof(line_buf));
+		switch(metric->field_type)
+		{
+			case FIELD_TYPE_GAUGE:
+			case FIELD_TYPE_COUNTER:
+				used_len = build_single_metric_line_buf(instance->name, instance->output_type, 
+														metric, line_buf, sizeof(line_buf));
+				break;
+			case FIELD_TYPE_SUMMARY:
+			case FILED_TYPE_HISTOGRAM:
+				used_len = build_hdr_metric_line_buf(instance->name, instance->output_type, 
+													 metric, line_buf, sizeof(line_buf));
+				break;
+			default:
+				assert(0);
+				break;
+		}
 
 		send_line_buf(&instance->line_protocol_output, line_buf, used_len);
 	}
