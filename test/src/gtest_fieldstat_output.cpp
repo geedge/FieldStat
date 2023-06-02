@@ -7,76 +7,99 @@
 
 extern struct prometheus_endpoint_instance g_prometheus_endpoint_instance;
 
-TEST(FeildStatOutput, OutputFile)
+
+const char *table_column_name[] = {
+	"new_conn_num", "established_conn_num", "close_conn_num", "total_in_bytes", "total_out_bytes","total_in_packets",
+	"total_out_packets", "default_conn_num", "default_in_bytes", "default_out_bytes","default_in_packets",
+	"default_out_packets", "allow_conn_num","allow_in_bytes", "allow_out_bytes","allow_in_packets", "allow_out_packets",
+	"deny_conn_num", "deny_in_bytes", "deny_out_bytes", "deny_in_packets", "deny_out_packets", "monitor_conn_num",
+	"monitor_in_bytes","monitor_out_bytes", "monitor_in_packets", "monitor_out_packets", "intercept_conn_num",
+	"intercept_in_bytes","intercept_out_bytes","intercept_in_packets", "intercept_out_packets", "ipv4_in_packets",
+	"ipv4_in_bytes", "ipv4_out_packets", "ipv4_out_bytes", "ipv6_in_packets", "ipv6_in_bytes", "ipv6_out_packets",
+	"ipv6_out_bytes", "tcp_conn_num", "tcp_in_packets","tcp_in_bytes","tcp_out_packets", "tcp_out_bytes", "udp_conn_num",
+	"udp_in_packets", "udp_in_bytes", "udp_out_packets","udp_out_bytes", "alert_bytes", "block_bytes","pinning_num",
+	"maybe_pinning_num", "not_pinning_num"
+};
+
+enum field_type table_column_type[] = {
+	FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER,
+	FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER,
+	FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER,
+	FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER,
+	FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER,
+	FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER,
+	FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER,
+	FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER,
+	FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER,
+	FIELD_TYPE_COUNTER
+};
+
+const char *file_output_path = "/tmp/fieldstat.txt";
+const char *desired_file_table_name = "table name: network_activity\n";
+const char *desired_file_table_info = "                              new_conn_num established_conn_nu"
+									  "      close_conn_num      total_in_bytes     total_out_bytes    total_in_packets"
+									  "   total_out_packets    default_conn_num    default_in_bytes   default_out_bytes"
+									  "  default_in_packets default_out_packets      allow_conn_num      allow_in_bytes"
+									  "     allow_out_bytes    allow_in_packets   allow_out_packets       deny_conn_num"
+									  "       deny_in_bytes      deny_out_bytes     deny_in_packets    deny_out_packets"
+									  "    monitor_conn_num    monitor_in_bytes   monitor_out_bytes  monitor_in_packets"
+									  " monitor_out_packets  intercept_conn_num  intercept_in_bytes intercept_out_bytes"
+									  " intercept_in_packet intercept_out_packe     ipv4_in_packets       ipv4_in_bytes"
+									  "    ipv4_out_packets      ipv4_out_bytes     ipv6_in_packets       ipv6_in_bytes"
+									  "    ipv6_out_packets      ipv6_out_bytes        tcp_conn_num      tcp_in_packets"
+									  "        tcp_in_bytes     tcp_out_packets       tcp_out_bytes        udp_conn_num"
+									  "      udp_in_packets        udp_in_bytes     udp_out_packets       udp_out_bytes"
+									  "         alert_bytes         block_bytes         pinning_num   maybe_pinning_num"
+									  "     not_pinning_num\n";
+const char *desired_file_table_data = "TRAFFIC                           5.00e+02            0.00e+00"
+									  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
+									  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
+									  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
+									  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
+									  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
+									  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
+									  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
+									  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
+									  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
+									  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
+									  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
+									  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
+									  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
+									  "            0.00e+00\n";
+
+const char *lineprotocol_output_path = "/tmp/metrics.out";
+
+const char *desired_lineprotocol_output = "{\"fields\":{\"alert_bytes\":0,\"allow_conn_num\":0,\"allow_in_bytes\":0,\"all"
+										  "ow_in_packets\":0,\"allow_out_bytes\":0,\"allow_out_packets\":0,\"block_bytes\""
+										  ":0,\"close_conn_num\":0,\"default_conn_num\":0,\"default_in_bytes\":0,\"default"
+										  "_in_packets\":0,\"default_out_bytes\":0,\"default_out_packets\":0,\"deny_conn_n"
+										  "um\":0,\"deny_in_bytes\":0,\"deny_in_packets\":0,\"deny_out_bytes\":0,\"deny_ou"
+										  "t_packets\":0,\"established_conn_num\":0,\"intercept_conn_num\":0,\"intercept_i"
+										  "n_bytes\":0,\"intercept_in_packets\":0,\"intercept_out_bytes\":0,\"intercept_ou"
+										  "t_packets\":0,\"ipv4_in_bytes\":0,\"ipv4_in_packets\":0,\"ipv4_out_bytes\":0,\""
+										  "ipv4_out_packets\":0,\"ipv6_in_bytes\":0,\"ipv6_in_packets\":0,\"ipv6_out_bytes"
+										  "\":0,\"ipv6_out_packets\":0,\"maybe_pinning_num\":0,\"monitor_conn_num\":0,\"mo"
+										  "nitor_in_bytes\":0,\"monitor_in_packets\":0,\"monitor_out_bytes\":0,\"monitor_o"
+										  "ut_packets\":0,\"new_conn_num\":1000,\"not_pinning_num\":0,\"pinning_num\":0,\""
+										  "tcp_conn_num\":0,\"tcp_in_bytes\":0,\"tcp_in_packets\":0,\"tcp_out_bytes\":0,\""
+										  "tcp_out_packets\":0,\"total_in_bytes\":0,\"total_in_packets\":0,\"total_out_byt"
+										  "es\":0,\"total_out_packets\":0,\"udp_conn_num\":0,\"udp_in_bytes\":0,\"udp_in_p"
+										  "ackets\":0,\"udp_out_bytes\":0,\"udp_out_packets\":0},\"name\":\"TRAFFIC\",\"ta"
+										  "gs\":{\"app_name\":\"tsg_statistic\",\"table_name\":\"network_activity\"}}";
+
+const char *prometheus_output_path = "/tmp/prometheus.txt";
+
+const char *desired_prometheus_output = "tsg_statistic_new_conn_num{app_name=\"tsg_statistic\",table_name=\"network_activit"
+										"y\",line_name=\"TRAFFIC\"} 1000\n";
+
+
+ 
+void check_file_output_content(int desired_line_cnt)
 {
-	int ret = 0;
-	int n_loops = 5;
-	struct fieldstat_instance * instance = NULL;
-	int table_id = -1;
-	FILE *fp;
-	char read_line_buf[2048] = {0};
-
-	int output_metric_ids[54] = {0};
-
-	const char *output_file_path = "/tmp/fieldstat.txt"; 
-	const char *compared_table_name = "table name: network_activity\n";
-	const char *compared_table_column = "                              new_conn_num established_conn_nu"
-										"      close_conn_num      total_in_bytes     total_out_bytes    total_in_packets"
-										"   total_out_packets    default_conn_num    default_in_bytes   default_out_bytes"
-										"  default_in_packets default_out_packets      allow_conn_num      allow_in_bytes"
-										"     allow_out_bytes    allow_in_packets   allow_out_packets       deny_conn_num"
-										"       deny_in_bytes      deny_out_bytes     deny_in_packets    deny_out_packets"
-										"    monitor_conn_num    monitor_in_bytes   monitor_out_bytes  monitor_in_packets"
-										" monitor_out_packets  intercept_conn_num  intercept_in_bytes intercept_out_bytes"
-										" intercept_in_packet intercept_out_packe     ipv4_in_packets       ipv4_in_bytes"
-										" ipv4_out_packetsipv     ipv6_in_packets       ipv6_in_bytes    ipv6_out_packets"
-										"      ipv6_out_bytes        tcp_conn_num      tcp_in_packets        tcp_in_bytes"
-										"     tcp_out_packets       tcp_out_bytes        udp_conn_num      udp_in_packets"
-										"        udp_in_bytes     udp_out_packets       udp_out_bytes         alert_bytes"
-										"         block_bytes         pinning_num   maybe_pinning_num     not_pinning_num\n";
-	
-	const char *compared_table_row_value = "TRAFFIC                           5.00e+02            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00\n";
-
-
-	const char *table_column_name[] = {"new_conn_num", "established_conn_num", "close_conn_num", "total_in_bytes", "total_out_bytes", "total_in_packets", 
-	"total_out_packets", "default_conn_num", "default_in_bytes", "default_out_bytes", "default_in_packets", "default_out_packets", "allow_conn_num",
-	"allow_in_bytes", "allow_out_bytes", "allow_in_packets", "allow_out_packets", "deny_conn_num", "deny_in_bytes", "deny_out_bytes", "deny_in_packets",
-	"deny_out_packets", "monitor_conn_num", "monitor_in_bytes", "monitor_out_bytes", "monitor_in_packets", "monitor_out_packets", "intercept_conn_num",
-	"intercept_in_bytes", "intercept_out_bytes", "intercept_in_packets", "intercept_out_packets", "ipv4_in_packets", "ipv4_in_bytes", "ipv4_out_packets"
-	"ipv4_out_bytes", "ipv6_in_packets", "ipv6_in_bytes", "ipv6_out_packets", "ipv6_out_bytes", "tcp_conn_num", "tcp_in_packets", "tcp_in_bytes",
-	"tcp_out_packets", "tcp_out_bytes", "udp_conn_num", "udp_in_packets", "udp_in_bytes", "udp_out_packets", "udp_out_bytes", "alert_bytes", "block_bytes",
-	"pinning_num", "maybe_pinning_num", "not_pinning_num"};
-	enum field_type table_column_type[54] = {FIELD_TYPE_COUNTER};
-
-	instance = fieldstat_instance_new("tsg_statistic");
-	EXPECT_STREQ("tsg_statistic", instance->name);
-
-	table_id = fieldstat_register_table(instance, "network_activity", table_column_name, table_column_type, sizeof(table_column_name)/sizeof(table_column_name[0]));
-	EXPECT_EQ(0, table_id);
-	ret = fieldstat_register_table_row(instance, table_id, "TRAFFIC", NULL, 0, output_metric_ids);
-	EXPECT_EQ(0, ret);
-	ret = fieldstat_set_local_output(instance, output_file_path, "default");
-	EXPECT_EQ(0, ret);
-	fieldstat_instance_start(instance);
-	sleep(1);
-	fieldstat_value_incrby(instance, output_metric_ids[0], 1000);
-	sleep(2);
-	fp = fopen(output_file_path, "r");
-	EXPECT_NE(nullptr, fp);
 	int n_line = 0;
+	char read_line_buf[2048] = {0};
+	FILE *fp = fopen(file_output_path, "r");
+	EXPECT_NE(nullptr, fp);
 
 	while(!feof(fp))
 	{
@@ -86,65 +109,142 @@ TEST(FeildStatOutput, OutputFile)
 		}
 		if(n_line == 1)
 		{
-			EXPECT_STREQ(compared_table_name, read_line_buf);
+			EXPECT_STREQ(desired_file_table_name, read_line_buf);
 		}
 		if(n_line == 2)
 		{
-			EXPECT_STREQ(compared_table_column, read_line_buf);
+			EXPECT_STREQ(desired_file_table_info, read_line_buf);
 		}
 		if(n_line == 3)
 		{
-			EXPECT_STREQ(compared_table_row_value, read_line_buf);
+			EXPECT_STREQ(desired_file_table_data, read_line_buf);
 		}
 		n_line++;
 	}
 	fclose(fp);
-	EXPECT_EQ(n_line, n_loops);
-	fieldstat_instance_free(instance);
+	EXPECT_EQ(n_line, desired_line_cnt);
+	system("cat /dev/null > /tmp/fieldstat.txt");
+}
 
+
+void check_lineprotocol_output_content(int desired_line_cnt)
+{
+	int n_line = 0;
+	char read_line_buf[2048] = {0};
+
+	cJSON *cjson_metric = NULL;
+	cJSON *cjson_tags = NULL;
+	char *cjson_metric_str = NULL;
+
+	FILE *fp = fopen(lineprotocol_output_path, "r");
+	EXPECT_NE(nullptr, fp);
+
+	while(!feof(fp))
+	{
+		if(NULL == fgets(read_line_buf, sizeof(read_line_buf), fp))
+		{
+			continue;
+		}
+		cjson_metric = cJSON_Parse(read_line_buf);
+		EXPECT_NE(nullptr, cjson_metric);
+		cJSON_DeleteItemFromObject(cjson_metric, "timestamp");
+
+		cjson_tags = cJSON_GetObjectItem(cjson_metric, "tags");
+		EXPECT_NE(nullptr, cjson_tags);
+		cJSON_DeleteItemFromObject(cjson_tags, "host");
+		cjson_metric_str = cJSON_PrintUnformatted(cjson_metric);
+		EXPECT_NE(nullptr, cjson_metric_str);
+		if(cjson_metric_str)
+		{
+			EXPECT_STREQ(desired_lineprotocol_output, cjson_metric_str);
+			free(cjson_metric_str);
+			cjson_metric_str = NULL;
+		}
+		cJSON_Delete(cjson_metric);
+		n_line++;
+	}
+	fclose(fp);
+	EXPECT_EQ(n_line, desired_line_cnt);
+	system("cat /dev/null > /tmp/metrics.out");
+}
+
+void check_prometheus_output_content(int desired_line_cnt, unsigned short listen_port)
+{
+	int n_line = 0;
+	char read_line_buf[2048] = {0};
+	char req_str[256] = {0};
+
+	system("cat /dev/null > /tmp/prometheus.txt");
+	snprintf(req_str, sizeof(req_str), 
+			"curl -s  http://127.0.0.1:%u/metrics -o /tmp/prometheus.txt",
+			listen_port);
+
+	system(req_str);
+
+	FILE *fp = fopen(prometheus_output_path, "r");
+	EXPECT_NE(nullptr, fp);
+	while(!feof(fp))
+	{
+		if(NULL == fgets(read_line_buf, sizeof(read_line_buf), fp))
+		{
+			continue;
+		}
+		if(n_line == 0)
+		{
+			EXPECT_STREQ(desired_prometheus_output, read_line_buf);
+		}
+		n_line++;
+	}
+	fclose(fp);
+	EXPECT_EQ(n_line, desired_line_cnt);
+	system("cat /dev/null > /tmp/prometheus.txt");
+}
+
+TEST(FeildStatOutput, OutputFile)
+{
+	int ret = 0, table_id = -1;
+	struct fieldstat_instance * instance = NULL;
+	int output_metric_ids[55] = {0};
+
+	instance = fieldstat_instance_new("tsg_statistic");
+	EXPECT_STREQ("tsg_statistic", instance->name);
+
+	table_id = fieldstat_register_table(instance, "network_activity",
+										table_column_name, table_column_type, 
+										sizeof(table_column_name)/sizeof(table_column_name[0]));
+	EXPECT_EQ(0, table_id);
+
+	ret = fieldstat_register_table_row(instance, table_id, "TRAFFIC", NULL, 0, output_metric_ids);
+	EXPECT_EQ(0, ret);
+
+	ret = fieldstat_set_local_output(instance, file_output_path, "default");
+	EXPECT_EQ(0, ret);
+
+	system("cat /dev/null > /tmp/fieldstat.txt");
+
+	fieldstat_instance_start(instance);
+	sleep(1);
+	fieldstat_value_incrby(instance, output_metric_ids[0], 1000);
+	sleep(2);
+
+	check_file_output_content(5);
+
+	fieldstat_instance_free(instance);
 }
 
 
 TEST(FeildStatOutput, OutputLineProtocol)
 {
-	int ret = 0;
-	int n_loops = 1;
+	int ret = 0, table_id = -1;
+	int output_metric_ids[55] = {0};
+
 	struct fieldstat_instance * instance = NULL;
-	int table_id = -1;
-	int output_metric_ids[54] = {0};
-	const char *telegraf_output_file = "/tmp/metrics.out";
-	FILE *fp;
-	char line[2048] = {0};
-	cJSON *cjson_metric = NULL;
-	cJSON *cjson_tags = NULL;
-	const char *compare = "{\"fields\":{\"alert_bytes\":0,\"allow_conn_num\":0,\"allow_in_bytes\":0,\"allow_in_packets\":0,\"allow_out_bytes\":0,"\
-							"\"allow_out_packets\":0,\"block_bytes\":0,\"close_conn_num\":0,\"default_conn_num\":0,\"default_in_bytes\":0,"\
-							"\"default_in_packets\":0,\"default_out_bytes\":0,\"default_out_packets\":0,\"deny_conn_num\":0,\"deny_in_bytes\":0,"\
-							"\"deny_in_packets\":0,\"deny_out_bytes\":0,\"deny_out_packets\":0,\"established_conn_num\":0,\"intercept_conn_num\":0,"\
-							"\"intercept_in_bytes\":0,\"intercept_in_packets\":0,\"intercept_out_bytes\":0,\"intercept_out_packets\":0,"\
-							"\"ipv4_in_bytes\":0,\"ipv4_in_packets\":0,\"ipv4_out_packetsipv4_out_bytes\":0,\"ipv6_in_bytes\":0,\"ipv6_in_packets\":0,"\
-							"\"ipv6_out_bytes\":0,\"ipv6_out_packets\":0,\"maybe_pinning_num\":0,\"monitor_conn_num\":0,\"monitor_in_bytes\":0,"\
-							"\"monitor_in_packets\":0,\"monitor_out_bytes\":0,\"monitor_out_packets\":0,\"new_conn_num\":1000,\"not_pinning_num\":0,"\
-							"\"pinning_num\":0,\"tcp_conn_num\":0,\"tcp_in_bytes\":0,\"tcp_in_packets\":0,\"tcp_out_bytes\":0,\"tcp_out_packets\":0,"\
-							"\"total_in_bytes\":0,\"total_in_packets\":0,\"total_out_bytes\":0,\"total_out_packets\":0,\"udp_conn_num\":0,"\
-							"\"udp_in_bytes\":0,\"udp_in_packets\":0,\"udp_out_bytes\":0,\"udp_out_packets\":0},\"name\":\"TRAFFIC\","\
-							"\"tags\":{\"app_name\":\"tsg_statistic\",\"table_name\":\"network_activity\"}}";
-	char *cjson_metric_str = NULL;
-
-	const char *table_column_name[] = {"new_conn_num", "established_conn_num", "close_conn_num", "total_in_bytes", "total_out_bytes", "total_in_packets", 
-	"total_out_packets", "default_conn_num", "default_in_bytes", "default_out_bytes", "default_in_packets", "default_out_packets", "allow_conn_num",
-	"allow_in_bytes", "allow_out_bytes", "allow_in_packets", "allow_out_packets", "deny_conn_num", "deny_in_bytes", "deny_out_bytes", "deny_in_packets",
-	"deny_out_packets", "monitor_conn_num", "monitor_in_bytes", "monitor_out_bytes", "monitor_in_packets", "monitor_out_packets", "intercept_conn_num",
-	"intercept_in_bytes", "intercept_out_bytes", "intercept_in_packets", "intercept_out_packets", "ipv4_in_packets", "ipv4_in_bytes", "ipv4_out_packets"
-	"ipv4_out_bytes", "ipv6_in_packets", "ipv6_in_bytes", "ipv6_out_packets", "ipv6_out_bytes", "tcp_conn_num", "tcp_in_packets", "tcp_in_bytes",
-	"tcp_out_packets", "tcp_out_bytes", "udp_conn_num", "udp_in_packets", "udp_in_bytes", "udp_out_packets", "udp_out_bytes", "alert_bytes", "block_bytes",
-	"pinning_num", "maybe_pinning_num", "not_pinning_num"};
-	enum field_type table_column_type[54] = {FIELD_TYPE_COUNTER};
-
 	instance = fieldstat_instance_new("tsg_statistic");
 	EXPECT_STREQ("tsg_statistic", instance->name);
 
-	table_id = fieldstat_register_table(instance, "network_activity", table_column_name, table_column_type, sizeof(table_column_name)/sizeof(table_column_name[0]));
+	table_id = fieldstat_register_table(instance, "network_activity", 
+										table_column_name, table_column_type,
+										sizeof(table_column_name)/sizeof(table_column_name[0]));
 	EXPECT_EQ(0, table_id);
 	ret = fieldstat_register_table_row(instance, table_id, "TRAFFIC", NULL, 0, output_metric_ids);
 	EXPECT_EQ(0, ret);
@@ -157,67 +257,24 @@ TEST(FeildStatOutput, OutputLineProtocol)
 	sleep(1);
 	fieldstat_value_incrby(instance, output_metric_ids[0], 1000);
 	sleep(2);
-	fp = fopen(telegraf_output_file, "r");
-	EXPECT_NE(nullptr, fp);
-	int n_line = 0;
 
-	while(!feof(fp))
-	{
-		if(NULL == fgets(line, sizeof(line), fp))
-		{
-			continue;
-		}
-		cjson_metric = cJSON_Parse(line);
-		EXPECT_NE(nullptr, cjson_metric);
-		cJSON_DeleteItemFromObject(cjson_metric, "timestamp");
-
-		cjson_tags = cJSON_GetObjectItem(cjson_metric, "tags");
-		EXPECT_NE(nullptr, cjson_tags);
-		cJSON_DeleteItemFromObject(cjson_tags, "host");
-		cjson_metric_str = cJSON_PrintUnformatted(cjson_metric);
-		EXPECT_NE(nullptr, cjson_metric_str);
-		if(cjson_metric_str)
-		{
-			EXPECT_STREQ(compare, cjson_metric_str);
-			free(cjson_metric_str);
-			cjson_metric_str = NULL;
-		}
-		cJSON_Delete(cjson_metric);
-		n_line++;
-	}
-	fclose(fp);
-	EXPECT_EQ(n_line, n_loops);
+	check_lineprotocol_output_content(1);
 
 	fieldstat_instance_free(instance);
-
 }
 
 TEST(FeildStatOutput, OutputPrometheus)
 {
-	int ret = 0;
-	int table_id = -1;
-	int n_loops = 54;
-	int output_metric_ids[54] = {0};
+	int ret = 0, table_id = -1;
+	int output_metric_ids[55] = {0};
 	struct fieldstat_instance * instance = NULL;
-	FILE *fp;
-	const char *prometheus_output_file = "/tmp/prometheus.txt";
-	char line[2048] = {0};
-	const char *compare = "tsg_statistic_new_conn_num{app_name=\"tsg_statistic\",table_name=\"network_activity\",line_name=\"TRAFFIC\"} 1000\n";
-
-	const char *table_column_name[] = {"new_conn_num", "established_conn_num", "close_conn_num", "total_in_bytes", "total_out_bytes", "total_in_packets", 
-	"total_out_packets", "default_conn_num", "default_in_bytes", "default_out_bytes", "default_in_packets", "default_out_packets", "allow_conn_num",
-	"allow_in_bytes", "allow_out_bytes", "allow_in_packets", "allow_out_packets", "deny_conn_num", "deny_in_bytes", "deny_out_bytes", "deny_in_packets",
-	"deny_out_packets", "monitor_conn_num", "monitor_in_bytes", "monitor_out_bytes", "monitor_in_packets", "monitor_out_packets", "intercept_conn_num",
-	"intercept_in_bytes", "intercept_out_bytes", "intercept_in_packets", "intercept_out_packets", "ipv4_in_packets", "ipv4_in_bytes", "ipv4_out_packets"
-	"ipv4_out_bytes", "ipv6_in_packets", "ipv6_in_bytes", "ipv6_out_packets", "ipv6_out_bytes", "tcp_conn_num", "tcp_in_packets", "tcp_in_bytes",
-	"tcp_out_packets", "tcp_out_bytes", "udp_conn_num", "udp_in_packets", "udp_in_bytes", "udp_out_packets", "udp_out_bytes", "alert_bytes", "block_bytes",
-	"pinning_num", "maybe_pinning_num", "not_pinning_num"};
-	enum field_type table_column_type[54] = {FIELD_TYPE_COUNTER};
 
 	instance = fieldstat_instance_new("tsg_statistic");
 	EXPECT_STREQ("tsg_statistic", instance->name);
 
-	table_id = fieldstat_register_table(instance, "network_activity", table_column_name, table_column_type, sizeof(table_column_name)/sizeof(table_column_name[0]));
+	table_id = fieldstat_register_table(instance, "network_activity", 
+										table_column_name, table_column_type,
+										sizeof(table_column_name)/sizeof(table_column_name[0]));
 	EXPECT_EQ(0, table_id);
 	ret = fieldstat_register_table_row(instance, table_id, "TRAFFIC", NULL, 0, output_metric_ids);
 	EXPECT_EQ(0, ret);
@@ -229,179 +286,41 @@ TEST(FeildStatOutput, OutputPrometheus)
 	fieldstat_value_incrby(instance, output_metric_ids[0], 1000);
 	EXPECT_EQ(0, ret);
 	sleep(1);
-	system("cat /dev/null > /tmp/prometheus.txt");
-	system("curl -s  http://127.0.0.1:9020/metrics -o /tmp/prometheus.txt");
-
-	int n_line = 0;
-	fp = fopen(prometheus_output_file, "r");
-	EXPECT_NE(nullptr, fp);
-	while(!feof(fp))
-	{
-		if(NULL == fgets(line, sizeof(line), fp))
-		{
-			continue;
-		}
-		if(n_line == 0)
-		{
-			EXPECT_STREQ(compare, line);
-		}
-		n_line++;
-	}
-	fclose(fp);
-	EXPECT_EQ(n_line, n_loops);
-
+	check_prometheus_output_content(55, 9020);
 	fieldstat_global_disable_prometheus_endpoint();
 	fieldstat_instance_free(instance);
 }
 
 TEST(FeildStatOutput, OutputFileAndLineProtocol)
 {
-	int ret = 0;
-	int n_loops = 1;
+	int ret = 0, table_id = -1;
 	struct fieldstat_instance * instance = NULL;
-	int table_id = -1;
-	int output_metric_ids[54] = {0};
-	const char *telegraf_output_file = "/tmp/metrics.out";
-	FILE *fp;
-	char line[2048] = {0};
-	char read_line_buf[2048] = {0};
-	cJSON *cjson_metric = NULL;
-	cJSON *cjson_tags = NULL;
-
-	const char *output_file_path = "/tmp/fieldstat.txt"; 
-	const char *compared_table_name = "table name: network_activity\n";
-	const char *compared_table_column = "                              new_conn_num established_conn_nu"
-										"      close_conn_num      total_in_bytes     total_out_bytes    total_in_packets"
-										"   total_out_packets    default_conn_num    default_in_bytes   default_out_bytes"
-										"  default_in_packets default_out_packets      allow_conn_num      allow_in_bytes"
-										"     allow_out_bytes    allow_in_packets   allow_out_packets       deny_conn_num"
-										"       deny_in_bytes      deny_out_bytes     deny_in_packets    deny_out_packets"
-										"    monitor_conn_num    monitor_in_bytes   monitor_out_bytes  monitor_in_packets"
-										" monitor_out_packets  intercept_conn_num  intercept_in_bytes intercept_out_bytes"
-										" intercept_in_packet intercept_out_packe     ipv4_in_packets       ipv4_in_bytes"
-										" ipv4_out_packetsipv     ipv6_in_packets       ipv6_in_bytes    ipv6_out_packets"
-										"      ipv6_out_bytes        tcp_conn_num      tcp_in_packets        tcp_in_bytes"
-										"     tcp_out_packets       tcp_out_bytes        udp_conn_num      udp_in_packets"
-										"        udp_in_bytes     udp_out_packets       udp_out_bytes         alert_bytes"
-										"         block_bytes         pinning_num   maybe_pinning_num     not_pinning_num\n";
-	
-	const char *compared_table_row_value = "TRAFFIC                           5.00e+02            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00\n";
-
-	const char *compare = "{\"fields\":{\"alert_bytes\":0,\"allow_conn_num\":0,\"allow_in_bytes\":0,\"allow_in_packets\":0,\"allow_out_bytes\":0,"\
-							"\"allow_out_packets\":0,\"block_bytes\":0,\"close_conn_num\":0,\"default_conn_num\":0,\"default_in_bytes\":0,"\
-							"\"default_in_packets\":0,\"default_out_bytes\":0,\"default_out_packets\":0,\"deny_conn_num\":0,\"deny_in_bytes\":0,"\
-							"\"deny_in_packets\":0,\"deny_out_bytes\":0,\"deny_out_packets\":0,\"established_conn_num\":0,\"intercept_conn_num\":0,"\
-							"\"intercept_in_bytes\":0,\"intercept_in_packets\":0,\"intercept_out_bytes\":0,\"intercept_out_packets\":0,"\
-							"\"ipv4_in_bytes\":0,\"ipv4_in_packets\":0,\"ipv4_out_packetsipv4_out_bytes\":0,\"ipv6_in_bytes\":0,\"ipv6_in_packets\":0,"\
-							"\"ipv6_out_bytes\":0,\"ipv6_out_packets\":0,\"maybe_pinning_num\":0,\"monitor_conn_num\":0,\"monitor_in_bytes\":0,"\
-							"\"monitor_in_packets\":0,\"monitor_out_bytes\":0,\"monitor_out_packets\":0,\"new_conn_num\":1000,\"not_pinning_num\":0,"\
-							"\"pinning_num\":0,\"tcp_conn_num\":0,\"tcp_in_bytes\":0,\"tcp_in_packets\":0,\"tcp_out_bytes\":0,\"tcp_out_packets\":0,"\
-							"\"total_in_bytes\":0,\"total_in_packets\":0,\"total_out_bytes\":0,\"total_out_packets\":0,\"udp_conn_num\":0,"\
-							"\"udp_in_bytes\":0,\"udp_in_packets\":0,\"udp_out_bytes\":0,\"udp_out_packets\":0},\"name\":\"TRAFFIC\","\
-							"\"tags\":{\"app_name\":\"tsg_statistic\",\"table_name\":\"network_activity\"}}";
-	char *cjson_metric_str = NULL;
-
-	const char *table_column_name[] = {"new_conn_num", "established_conn_num", "close_conn_num", "total_in_bytes", "total_out_bytes", "total_in_packets", 
-	"total_out_packets", "default_conn_num", "default_in_bytes", "default_out_bytes", "default_in_packets", "default_out_packets", "allow_conn_num",
-	"allow_in_bytes", "allow_out_bytes", "allow_in_packets", "allow_out_packets", "deny_conn_num", "deny_in_bytes", "deny_out_bytes", "deny_in_packets",
-	"deny_out_packets", "monitor_conn_num", "monitor_in_bytes", "monitor_out_bytes", "monitor_in_packets", "monitor_out_packets", "intercept_conn_num",
-	"intercept_in_bytes", "intercept_out_bytes", "intercept_in_packets", "intercept_out_packets", "ipv4_in_packets", "ipv4_in_bytes", "ipv4_out_packets"
-	"ipv4_out_bytes", "ipv6_in_packets", "ipv6_in_bytes", "ipv6_out_packets", "ipv6_out_bytes", "tcp_conn_num", "tcp_in_packets", "tcp_in_bytes",
-	"tcp_out_packets", "tcp_out_bytes", "udp_conn_num", "udp_in_packets", "udp_in_bytes", "udp_out_packets", "udp_out_bytes", "alert_bytes", "block_bytes",
-	"pinning_num", "maybe_pinning_num", "not_pinning_num"};
-	enum field_type table_column_type[54] = {FIELD_TYPE_COUNTER};
+	int output_metric_ids[55] = {0};
 
 	instance = fieldstat_instance_new("tsg_statistic");
 	EXPECT_STREQ("tsg_statistic", instance->name);
 
-	table_id = fieldstat_register_table(instance, "network_activity", table_column_name, table_column_type, sizeof(table_column_name)/sizeof(table_column_name[0]));
+	table_id = fieldstat_register_table(instance, "network_activity",
+										table_column_name, table_column_type,
+										sizeof(table_column_name)/sizeof(table_column_name[0]));
 	EXPECT_EQ(0, table_id);
 	ret = fieldstat_register_table_row(instance, table_id, "TRAFFIC", NULL, 0, output_metric_ids);
 	EXPECT_EQ(0, ret);
 
 	ret = fieldstat_set_line_protocol_server(instance, "127.0.0.1", 8700);
 	EXPECT_EQ(0, ret);
-	ret = fieldstat_set_local_output(instance, output_file_path, "default");
+	ret = fieldstat_set_local_output(instance, file_output_path, "default");
 	EXPECT_EQ(0, ret);
 
 	EXPECT_EQ(12, instance->output_type);
 	ret = system("cat /dev/null > /tmp/metrics.out");
-	//ret = system("cat /dev/null > /tmp/fieldstat.txt");
+	ret = system("cat /dev/null > /tmp/fieldstat.txt");
 	fieldstat_instance_start(instance);
 	sleep(1);
 	fieldstat_value_incrby(instance, output_metric_ids[0], 1000);
 	sleep(2);
-	int n_line = 0;
-	fp = fopen(telegraf_output_file, "r");
-	EXPECT_NE(nullptr, fp);
-	while(!feof(fp))
-	{
-		if(NULL == fgets(line, sizeof(line), fp))
-		{
-			continue;
-		}
-		cjson_metric = cJSON_Parse(line);
-		EXPECT_NE(nullptr, cjson_metric);
-		cJSON_DeleteItemFromObject(cjson_metric, "timestamp");
-
-		cjson_tags = cJSON_GetObjectItem(cjson_metric, "tags");
-		EXPECT_NE(nullptr, cjson_tags);
-		cJSON_DeleteItemFromObject(cjson_tags, "host");
-		cjson_metric_str = cJSON_PrintUnformatted(cjson_metric);
-		EXPECT_NE(nullptr, cjson_metric_str);
-		if(cjson_metric_str)
-		{
-			EXPECT_STREQ(compare, cjson_metric_str);
-			free(cjson_metric_str);
-			cjson_metric_str = NULL;
-		}
-		cJSON_Delete(cjson_metric);
-		n_line++;
-	}
-	fclose(fp);
-	EXPECT_EQ(n_line, n_loops);
-
-	fp = fopen("/tmp/fieldstat.txt", "r");
-	EXPECT_NE(nullptr, fp);
-	n_line = 0;
-	n_loops = 5;
-
-	while(!feof(fp))
-	{
-		if(NULL == fgets(read_line_buf, sizeof(read_line_buf), fp))
-		{
-			continue;
-		}
-		if(n_line == 1)
-		{
-			EXPECT_STREQ(compared_table_name, read_line_buf);
-		}
-		if(n_line == 2)
-		{
-			EXPECT_STREQ(compared_table_column, read_line_buf);
-		}
-		if(n_line == 3)
-		{
-			EXPECT_STREQ(compared_table_row_value, read_line_buf);
-		}
-		n_line++;
-	}
-	fclose(fp);
-	EXPECT_EQ(n_line, n_loops);
-
+	check_file_output_content(5);
+	check_lineprotocol_output_content(1);
 
 	fieldstat_instance_free(instance);
 
@@ -410,62 +329,16 @@ TEST(FeildStatOutput, OutputFileAndLineProtocol)
 
 TEST(FeildStatOutput, OutputFileAndPrometheus)
 {
-	int ret = 0;
-	int n_loops = 0;
+	int ret = 0, table_id = -1;
 	struct fieldstat_instance * instance = NULL;
-	int table_id = -1;
-	int output_metric_ids[54] = {0};
-	FILE *fp;
-	char line[2048] = {0};
-
-	const char *prometheus_output_path = "/tmp/prometheus.txt";
-	const char *file_output_path = "/tmp/fieldstat.txt";
-	const char *prometheus_output_result = "tsg_statistic_new_conn_num{app_name=\"tsg_statistic\",table_name=\"network_activity\",line_name=\"TRAFFIC\"} 1000\n";
-	const char *compared_table_name = "table name: network_activity\n";
-	const char *compared_table_column = "                              new_conn_num established_conn_nu"
-										"      close_conn_num      total_in_bytes     total_out_bytes    total_in_packets"
-										"   total_out_packets    default_conn_num    default_in_bytes   default_out_bytes"
-										"  default_in_packets default_out_packets      allow_conn_num      allow_in_bytes"
-										"     allow_out_bytes    allow_in_packets   allow_out_packets       deny_conn_num"
-										"       deny_in_bytes      deny_out_bytes     deny_in_packets    deny_out_packets"
-										"    monitor_conn_num    monitor_in_bytes   monitor_out_bytes  monitor_in_packets"
-										" monitor_out_packets  intercept_conn_num  intercept_in_bytes intercept_out_bytes"
-										" intercept_in_packet intercept_out_packe     ipv4_in_packets       ipv4_in_bytes"
-										" ipv4_out_packetsipv     ipv6_in_packets       ipv6_in_bytes    ipv6_out_packets"
-										"      ipv6_out_bytes        tcp_conn_num      tcp_in_packets        tcp_in_bytes"
-										"     tcp_out_packets       tcp_out_bytes        udp_conn_num      udp_in_packets"
-										"        udp_in_bytes     udp_out_packets       udp_out_bytes         alert_bytes"
-										"         block_bytes         pinning_num   maybe_pinning_num     not_pinning_num\n";
-	
-	const char *compared_table_row_value = "TRAFFIC                           5.00e+02            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00\n";
-
-	const char *table_column_name[] = {"new_conn_num", "established_conn_num", "close_conn_num", "total_in_bytes", "total_out_bytes", "total_in_packets", 
-	"total_out_packets", "default_conn_num", "default_in_bytes", "default_out_bytes", "default_in_packets", "default_out_packets", "allow_conn_num",
-	"allow_in_bytes", "allow_out_bytes", "allow_in_packets", "allow_out_packets", "deny_conn_num", "deny_in_bytes", "deny_out_bytes", "deny_in_packets",
-	"deny_out_packets", "monitor_conn_num", "monitor_in_bytes", "monitor_out_bytes", "monitor_in_packets", "monitor_out_packets", "intercept_conn_num",
-	"intercept_in_bytes", "intercept_out_bytes", "intercept_in_packets", "intercept_out_packets", "ipv4_in_packets", "ipv4_in_bytes", "ipv4_out_packets"
-	"ipv4_out_bytes", "ipv6_in_packets", "ipv6_in_bytes", "ipv6_out_packets", "ipv6_out_bytes", "tcp_conn_num", "tcp_in_packets", "tcp_in_bytes",
-	"tcp_out_packets", "tcp_out_bytes", "udp_conn_num", "udp_in_packets", "udp_in_bytes", "udp_out_packets", "udp_out_bytes", "alert_bytes", "block_bytes",
-	"pinning_num", "maybe_pinning_num", "not_pinning_num"};
-	enum field_type table_column_type[54] = {FIELD_TYPE_COUNTER};
+	int output_metric_ids[55] = {0};
 
 	instance = fieldstat_instance_new("tsg_statistic");
 	EXPECT_STREQ("tsg_statistic", instance->name);
 
-	table_id = fieldstat_register_table(instance, "network_activity", table_column_name, table_column_type, sizeof(table_column_name)/sizeof(table_column_name[0]));
+	table_id = fieldstat_register_table(instance, "network_activity", 
+										table_column_name, table_column_type,
+										sizeof(table_column_name)/sizeof(table_column_name[0]));
 	EXPECT_EQ(0, table_id);
 	ret = fieldstat_register_table_row(instance, table_id, "TRAFFIC", NULL, 0, output_metric_ids);
 	EXPECT_EQ(0, ret);
@@ -478,59 +351,13 @@ TEST(FeildStatOutput, OutputFileAndPrometheus)
 
 	EXPECT_EQ(9, instance->output_type);
 	ret = system("cat /dev/null > /tmp/prometheus.txt");
-	//ret = system("cat /dev/null > /tmp/fieldstat.txt");
+	ret = system("cat /dev/null > /tmp/fieldstat.txt");
 	fieldstat_instance_start(instance);
 	sleep(1);
 	fieldstat_value_incrby(instance, output_metric_ids[0], 1000);
 	sleep(2);
-	system("curl -s  http://127.0.0.1:9021/metrics -o /tmp/prometheus.txt");
-	int n_line = 0;
-
-	fp = fopen("/tmp/fieldstat.txt", "r");
-	EXPECT_NE(nullptr, fp);
-	n_line = 0;
-	n_loops = 5;
-
-	while(!feof(fp))
-	{
-		if(NULL == fgets(line, sizeof(line), fp))
-		{
-			continue;
-		}
-		if(n_line == 1)
-		{
-			EXPECT_STREQ(compared_table_name, line);
-		}
-		if(n_line == 2)
-		{
-			EXPECT_STREQ(compared_table_column, line);
-		}
-		if(n_line == 3)
-		{
-			EXPECT_STREQ(compared_table_row_value, line);
-		}
-		n_line++;
-	}
-	fclose(fp);
-	EXPECT_EQ(n_line, n_loops);
-	n_loops = 54;
-	n_line = 0;
-	fp = fopen(prometheus_output_path, "r");
-	EXPECT_NE(nullptr, fp);
-	while(!feof(fp))
-	{
-		if(NULL == fgets(line, sizeof(line), fp))
-		{
-			continue;
-		}
-		if(n_line == 0)
-		{
-			EXPECT_STREQ(prometheus_output_result, line);
-		}
-		n_line++;
-	}
-	fclose(fp);
-	EXPECT_EQ(n_line, n_loops);
+	check_file_output_content(5);
+	check_prometheus_output_content(55, 9021);
 	fieldstat_global_disable_prometheus_endpoint();
 	fieldstat_instance_free(instance);
 
@@ -538,180 +365,39 @@ TEST(FeildStatOutput, OutputFileAndPrometheus)
 
 TEST(FeildStatOutput, OutputFileAndPrometheusAndLineProtocol)
 {
-	int ret = 0;
-	int n_loops = 0;
+	int ret = 0, table_id = -1;
 	struct fieldstat_instance * instance = NULL;
-	int table_id = -1;
-	int output_metric_ids[54] = {0};
-	FILE *fp;
-	char line[2048] = {0};
-
-	const char *prometheus_output_path = "/tmp/prometheus.txt";
-	const char *file_output_path = "/tmp/fieldstat.txt";
-	const char *telegraf_output_file = "/tmp/metrics.out";
-	const char *prometheus_output_result = "tsg_statistic_new_conn_num{app_name=\"tsg_statistic\",table_name=\"network_activity\",line_name=\"TRAFFIC\"} 1000\n";
-	const char *compared_table_name = "table name: network_activity\n";
-	const char *compared_table_column = "                              new_conn_num established_conn_nu"
-										"      close_conn_num      total_in_bytes     total_out_bytes    total_in_packets"
-										"   total_out_packets    default_conn_num    default_in_bytes   default_out_bytes"
-										"  default_in_packets default_out_packets      allow_conn_num      allow_in_bytes"
-										"     allow_out_bytes    allow_in_packets   allow_out_packets       deny_conn_num"
-										"       deny_in_bytes      deny_out_bytes     deny_in_packets    deny_out_packets"
-										"    monitor_conn_num    monitor_in_bytes   monitor_out_bytes  monitor_in_packets"
-										" monitor_out_packets  intercept_conn_num  intercept_in_bytes intercept_out_bytes"
-										" intercept_in_packet intercept_out_packe     ipv4_in_packets       ipv4_in_bytes"
-										" ipv4_out_packetsipv     ipv6_in_packets       ipv6_in_bytes    ipv6_out_packets"
-										"      ipv6_out_bytes        tcp_conn_num      tcp_in_packets        tcp_in_bytes"
-										"     tcp_out_packets       tcp_out_bytes        udp_conn_num      udp_in_packets"
-										"        udp_in_bytes     udp_out_packets       udp_out_bytes         alert_bytes"
-										"         block_bytes         pinning_num   maybe_pinning_num     not_pinning_num\n";
-	
-	const char *compared_table_row_value = "TRAFFIC                           5.00e+02            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
-								  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00\n";
-
-
-
-
-	const char *table_column_name[] = {"new_conn_num", "established_conn_num", "close_conn_num", "total_in_bytes", "total_out_bytes", "total_in_packets", 
-	"total_out_packets", "default_conn_num", "default_in_bytes", "default_out_bytes", "default_in_packets", "default_out_packets", "allow_conn_num",
-	"allow_in_bytes", "allow_out_bytes", "allow_in_packets", "allow_out_packets", "deny_conn_num", "deny_in_bytes", "deny_out_bytes", "deny_in_packets",
-	"deny_out_packets", "monitor_conn_num", "monitor_in_bytes", "monitor_out_bytes", "monitor_in_packets", "monitor_out_packets", "intercept_conn_num",
-	"intercept_in_bytes", "intercept_out_bytes", "intercept_in_packets", "intercept_out_packets", "ipv4_in_packets", "ipv4_in_bytes", "ipv4_out_packets"
-	"ipv4_out_bytes", "ipv6_in_packets", "ipv6_in_bytes", "ipv6_out_packets", "ipv6_out_bytes", "tcp_conn_num", "tcp_in_packets", "tcp_in_bytes",
-	"tcp_out_packets", "tcp_out_bytes", "udp_conn_num", "udp_in_packets", "udp_in_bytes", "udp_out_packets", "udp_out_bytes", "alert_bytes", "block_bytes",
-	"pinning_num", "maybe_pinning_num", "not_pinning_num"};
-
-	cJSON *cjson_metric = NULL;
-	cJSON *cjson_tags = NULL;
-	const char *compare = "{\"fields\":{\"alert_bytes\":0,\"allow_conn_num\":0,\"allow_in_bytes\":0,\"allow_in_packets\":0,\"allow_out_bytes\":0,"\
-							"\"allow_out_packets\":0,\"block_bytes\":0,\"close_conn_num\":0,\"default_conn_num\":0,\"default_in_bytes\":0,"\
-							"\"default_in_packets\":0,\"default_out_bytes\":0,\"default_out_packets\":0,\"deny_conn_num\":0,\"deny_in_bytes\":0,"\
-							"\"deny_in_packets\":0,\"deny_out_bytes\":0,\"deny_out_packets\":0,\"established_conn_num\":0,\"intercept_conn_num\":0,"\
-							"\"intercept_in_bytes\":0,\"intercept_in_packets\":0,\"intercept_out_bytes\":0,\"intercept_out_packets\":0,"\
-							"\"ipv4_in_bytes\":0,\"ipv4_in_packets\":0,\"ipv4_out_packetsipv4_out_bytes\":0,\"ipv6_in_bytes\":0,\"ipv6_in_packets\":0,"\
-							"\"ipv6_out_bytes\":0,\"ipv6_out_packets\":0,\"maybe_pinning_num\":0,\"monitor_conn_num\":0,\"monitor_in_bytes\":0,"\
-							"\"monitor_in_packets\":0,\"monitor_out_bytes\":0,\"monitor_out_packets\":0,\"new_conn_num\":1000,\"not_pinning_num\":0,"\
-							"\"pinning_num\":0,\"tcp_conn_num\":0,\"tcp_in_bytes\":0,\"tcp_in_packets\":0,\"tcp_out_bytes\":0,\"tcp_out_packets\":0,"\
-							"\"total_in_bytes\":0,\"total_in_packets\":0,\"total_out_bytes\":0,\"total_out_packets\":0,\"udp_conn_num\":0,"\
-							"\"udp_in_bytes\":0,\"udp_in_packets\":0,\"udp_out_bytes\":0,\"udp_out_packets\":0},\"name\":\"TRAFFIC\","\
-							"\"tags\":{\"app_name\":\"tsg_statistic\",\"table_name\":\"network_activity\"}}";
-	char *cjson_metric_str = NULL;
-
-	enum field_type table_column_type[54] = {FIELD_TYPE_COUNTER};
+	int output_metric_ids[55] = {0};
 
 	instance = fieldstat_instance_new("tsg_statistic");
 	EXPECT_STREQ("tsg_statistic", instance->name);
 
-	table_id = fieldstat_register_table(instance, "network_activity", table_column_name, table_column_type, sizeof(table_column_name)/sizeof(table_column_name[0]));
+	table_id = fieldstat_register_table(instance, "network_activity",
+										table_column_name, table_column_type,
+										sizeof(table_column_name)/sizeof(table_column_name[0]));
 	EXPECT_EQ(0, table_id);
 	ret = fieldstat_register_table_row(instance, table_id, "TRAFFIC", NULL, 0, output_metric_ids);
 	EXPECT_EQ(0, ret);
 	ret = fieldstat_set_local_output(instance, file_output_path, "default");
+	EXPECT_EQ(0, ret);
+	ret = fieldstat_set_line_protocol_server(instance, "127.0.0.1", 8700);
 	EXPECT_EQ(0, ret);
 	ret = fieldstat_global_enable_prometheus_endpoint(9022, NULL);
 	EXPECT_EQ(0, ret);
 	ret = fieldstat_enable_prometheus_output(instance);
 	EXPECT_EQ(0, ret);
 
-	EXPECT_EQ(9, instance->output_type);
-	ret = system("cat /dev/null > /tmp/prometheus.txt");
-	//ret = system("cat /dev/null > /tmp/fieldstat.txt");
+	EXPECT_EQ(13, instance->output_type);
+	system("cat /dev/null > /tmp/prometheus.txt");
+	system("cat /dev/null > /tmp/fieldstat.txt");
+	system("cat /dev/null > /tmp/lineprotocol.txt");
 	fieldstat_instance_start(instance);
 	sleep(1);
 	fieldstat_value_incrby(instance, output_metric_ids[0], 1000);
 	sleep(2);
-	system("curl -s  http://127.0.0.1:9022/metrics -o /tmp/prometheus.txt");
-	int n_line = 0;
-
-	fp = fopen("/tmp/fieldstat.txt", "r");
-	EXPECT_NE(nullptr, fp);
-	n_line = 0;
-	n_loops = 5;
-
-	while(!feof(fp))
-	{
-		if(NULL == fgets(line, sizeof(line), fp))
-		{
-			continue;
-		}
-		if(n_line == 1)
-		{
-			EXPECT_STREQ(compared_table_name, line);
-		}
-		if(n_line == 2)
-		{
-			EXPECT_STREQ(compared_table_column, line);
-		}
-		if(n_line == 3)
-		{
-			EXPECT_STREQ(compared_table_row_value, line);
-		}
-		n_line++;
-	}
-	fclose(fp);
-	EXPECT_EQ(n_line, n_loops);
-	n_loops = 54;
-	n_line = 0;
-	fp = fopen(prometheus_output_path, "r");
-	EXPECT_NE(nullptr, fp);
-	while(!feof(fp))
-	{
-		if(NULL == fgets(line, sizeof(line), fp))
-		{
-			continue;
-		}
-		if(n_line == 0)
-		{
-			EXPECT_STREQ(prometheus_output_result, line);
-		}
-		n_line++;
-	}
-	fclose(fp);
-	EXPECT_EQ(n_line, n_loops);
-
-	n_loops = 1;
-	n_line = 0;
-	fp = fopen(telegraf_output_file, "r");
-	EXPECT_NE(nullptr, fp);
-
-	while(!feof(fp))
-	{
-		if(NULL == fgets(line, sizeof(line), fp))
-		{
-			continue;
-		}
-		cjson_metric = cJSON_Parse(line);
-		EXPECT_NE(nullptr, cjson_metric);
-		cJSON_DeleteItemFromObject(cjson_metric, "timestamp");
-
-		cjson_tags = cJSON_GetObjectItem(cjson_metric, "tags");
-		EXPECT_NE(nullptr, cjson_tags);
-		cJSON_DeleteItemFromObject(cjson_tags, "host");
-		cjson_metric_str = cJSON_PrintUnformatted(cjson_metric);
-		EXPECT_NE(nullptr, cjson_metric_str);
-		if(cjson_metric_str)
-		{
-			EXPECT_STREQ(compare, cjson_metric_str);
-			free(cjson_metric_str);
-			cjson_metric_str = NULL;
-		}
-		cJSON_Delete(cjson_metric);
-		n_line++;
-	}
-	fclose(fp);
-	EXPECT_EQ(n_line, n_loops);
+	check_file_output_content(5);
+	check_lineprotocol_output_content(1);
+	check_prometheus_output_content(55, 9022);
 
 	fieldstat_global_disable_prometheus_endpoint();
 	fieldstat_instance_free(instance);
@@ -1669,6 +1355,63 @@ TEST(FeildStatOutput, SummaryOutputPrometheusChange)
 	fieldstat_global_disable_prometheus_endpoint();
 	fieldstat_instance_free(instance);
 }
+
+TEST(FeildStatOutput, OutputMetricsNameWithPoint)
+{
+	int ret = 0, table_id = -1;
+	struct fieldstat_instance * instance = NULL;
+	int output_metric_ids[55] = {0};
+
+	const char *table_column_name_with_points[] = {
+		"new.conn.num", "established.conn_num", "close.conn_num", "total.in.bytes", "total_out.bytes",
+		"total_in_packets","total_out_packets", "default_conn_num","default_in_bytes", "default_out_bytes",
+		"default_in_packets", "default_out_packets","allow_conn_num","allow_in_bytes", "allow_out_bytes",
+		"allow_in_packets","allow_out_packets", "deny_conn_num", "deny_in_bytes", "deny_out_bytes",
+		"deny_in_packets", "deny_out_packets", "monitor_conn_num", "monitor_in_bytes","monitor_out_bytes",
+		"monitor_in_packets", "monitor_out_packets", "intercept_conn_num","intercept_in_bytes",
+		"intercept_out_bytes", "intercept_in_packets", "intercept_out_packets","ipv4_in_packets", 
+		"ipv4_in_bytes","ipv4_out_packets", "ipv4_out_bytes", "ipv6_in_packets", "ipv6_in_bytes",
+		"ipv6_out_packets", "ipv6_out_bytes", "tcp_conn_num", "tcp_in_packets", "tcp_in_bytes",
+		"tcp_out_packets", "tcp_out_bytes", "udp_conn_num","udp_in_packets", "udp_in_bytes",
+		"udp_out_packets", "udp_out_bytes", "alert_bytes", "block_bytes","pinning_num", "maybe_pinning_num",
+		"not_pinning_num"
+	};
+
+	instance = fieldstat_instance_new("tsg_statistic");
+	EXPECT_STREQ("tsg_statistic", instance->name);
+
+	table_id = fieldstat_register_table(instance, "network.activity", 
+										table_column_name_with_points, table_column_type,
+										sizeof(table_column_name_with_points)/sizeof(table_column_name_with_points[0]));
+	EXPECT_EQ(0, table_id);
+	ret = fieldstat_register_table_row(instance, table_id, "TRAFFIC", NULL, 0, output_metric_ids);
+	EXPECT_EQ(0, ret);
+	ret = fieldstat_set_local_output(instance, file_output_path, "default");
+	EXPECT_EQ(0, ret);
+	ret = fieldstat_set_line_protocol_server(instance, "127.0.0.1", 8700);
+	EXPECT_EQ(0, ret);
+	ret = fieldstat_global_enable_prometheus_endpoint(9028, NULL);
+	EXPECT_EQ(0, ret);
+	ret = fieldstat_enable_prometheus_output(instance);
+	EXPECT_EQ(0, ret);
+
+	EXPECT_EQ(13, instance->output_type);
+	ret = system("cat /dev/null > /tmp/prometheus.txt");
+	ret = system("cat /dev/null > /tmp/metrics.out");
+	ret = system("cat /dev/null > /tmp/fieldstat.txt");
+	fieldstat_instance_start(instance);
+	sleep(1);
+	fieldstat_value_incrby(instance, output_metric_ids[0], 1000);
+	sleep(2);
+	check_file_output_content(5);
+	check_lineprotocol_output_content(1);
+	check_prometheus_output_content(55, 9028);
+
+	fieldstat_global_disable_prometheus_endpoint();
+	fieldstat_instance_free(instance);
+
+}
+
 
 int main(int argc, char *argv[]) 
 {

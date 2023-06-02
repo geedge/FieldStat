@@ -39,7 +39,8 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicInstanceNew)
 	EXPECT_EQ(nullptr, instance);
 
 	instance = fieldstat_dynamic_instance_new("firewall.", 16);
-	EXPECT_EQ(nullptr, instance);
+	EXPECT_NE(nullptr, instance);
+	fieldstat_dynamic_instance_free(instance);
 
 	instance = fieldstat_dynamic_instance_new("firewall ", 16);
 	EXPECT_EQ(nullptr, instance);

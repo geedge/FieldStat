@@ -16,7 +16,8 @@ struct fieldstat_dynamic_instance * fieldstat_dynamic_instance_new(const char *n
 
 	instance = (struct fieldstat_dynamic_instance *)calloc(1, sizeof(struct fieldstat_dynamic_instance));
 
-	strcpy(instance->name, name);
+	strncpy(instance->name, name, strlen(name));
+	
 	instance->running = 0;
 	instance->output_interval_ms = 2000;
 	instance->background_thread_disable = 0;
@@ -242,8 +243,11 @@ static int build_dynamic_metric_key(int table_id, const char *field_name, const 
 	int i = 0;
 	int used_len = 0;
 	struct fieldstat_tag *tag = NULL;
+	char unescaped_field_name[256] = {0};
+	strncpy(unescaped_field_name, field_name,  sizeof(unescaped_field_name) - 1);
+	escaping_special_chars(unescaped_field_name);
 
-	used_len += snprintf(out_key + used_len, out_key_size - used_len, "%d%s", table_id, field_name);
+	used_len += snprintf(out_key + used_len, out_key_size - used_len, "%d%s", table_id, unescaped_field_name);
 
 	for(i = 0; i < (int)n_tags; i++)
 	{

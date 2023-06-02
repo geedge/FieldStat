@@ -9,10 +9,54 @@ extern struct prometheus_endpoint_instance g_prometheus_endpoint_instance;
 
 TEST(FeildStatAPI, FieldStatInstanceNew)
 {
-	struct fieldstat_instance *instance = fieldstat_instance_new("test");
+	struct fieldstat_instance *instance = fieldstat_instance_new("firewall");
 	EXPECT_NE(nullptr, instance);
-	EXPECT_STREQ("test", instance->name);
+	EXPECT_STREQ("firewall", instance->name);
 	fieldstat_instance_free(instance);
+
+	instance = fieldstat_instance_new("firewall-name-length-more-than-32");
+	EXPECT_EQ(nullptr, instance);
+
+	instance = fieldstat_instance_new("firewall\n");
+	EXPECT_EQ(nullptr, instance);
+
+	instance = fieldstat_instance_new("firewall|");
+	EXPECT_EQ(nullptr, instance);
+
+	instance = fieldstat_instance_new("firewall:");
+	EXPECT_EQ(nullptr, instance);
+
+	instance = fieldstat_instance_new("firewall.");
+	EXPECT_NE(nullptr, instance);
+	fieldstat_instance_free(instance);
+
+	instance = fieldstat_instance_new("firewall ");
+	EXPECT_EQ(nullptr, instance);
+
+	instance = fieldstat_instance_new("firewall\t");
+	EXPECT_EQ(nullptr, instance);
+
+	instance = fieldstat_instance_new("firewall<");
+	EXPECT_EQ(nullptr, instance);
+
+	instance = fieldstat_instance_new("firewall>");
+	EXPECT_EQ(nullptr, instance);
+
+	instance = fieldstat_instance_new("firewall[");
+	EXPECT_EQ(nullptr, instance);
+
+	instance = fieldstat_instance_new("firewall]");
+	EXPECT_EQ(nullptr, instance);
+
+	instance = fieldstat_instance_new("firewall#");
+	EXPECT_EQ(nullptr, instance);
+
+	instance = fieldstat_instance_new("firewall!");
+	EXPECT_EQ(nullptr, instance);
+
+	instance = fieldstat_instance_new("firewall@");
+	EXPECT_EQ(nullptr, instance);
+
 }
 
 

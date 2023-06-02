@@ -35,9 +35,14 @@ char* __str_dup(const char* str)
 
 int is_valid_field_name(const char* name)
 {
-	const char* reserverd="|:\n\r. \t<>[]#!@";
+	const char* reserverd="|:\n\r \t<>[]#!@";
 	unsigned int i=0,j=0;
-	for(i=0;i<strlen(name);i++)
+	unsigned int len=strlen(name);
+	if(len == 0)
+	{
+		return 0;
+	}
+	for(i=0;i<len;i++)
 	{
 		for(j=0;j<strlen(reserverd);j++)
 		if(name[i]==reserverd[j])
@@ -87,6 +92,30 @@ int is_valid_tags(const struct fieldstat_tag *tags, size_t n_tags)
 	}
 	return 1;
 }
+
+void escaping_special_chars(char* str)
+{
+	const char *escaped = ".";
+	unsigned i = 0, j = 0;
+	unsigned int len = strlen(str);
+	if(len == 0)
+	{
+		return;
+	}
+
+	for(i = 0; i < len; i++)
+	{
+		for(j = 0; j < strlen(escaped); j++)
+		{
+			if(str[i] == escaped[j])
+			{
+				str[i] = '_';
+			}
+		}
+	}
+
+}
+
 
 void get_current_table_line_cnt(struct fieldstat_instance *instance, int n_table, int *tables_line_cnt)
 {
@@ -157,6 +186,7 @@ struct metric * metric_new(enum field_type type, const char *field_name, const s
 {
 	struct metric *metric = (struct metric*)calloc(1, sizeof(struct metric));
 	metric->field_name = __str_dup(field_name);
+	escaping_special_chars(metric->field_name);
 	metric->field_type = type;
 	metric->is_ratio = 0;
 	metric->output_scaling = 1;
@@ -597,7 +627,7 @@ struct fieldstat_instance * fieldstat_instance_new(const char *name)
 	}
 
 	instance = (struct fieldstat_instance *)calloc(1, sizeof(struct fieldstat_instance));
-	strcpy(instance->name, name);
+	strncpy(instance->name, name, strlen(name));
 	instance->running = 0;
 	instance->output_interval_ms = 2000;
 	instance->background_thread_disable = 0;
@@ -671,11 +701,13 @@ struct table_metric* table_metric_new(const char *name, const char *column_name[
 
 	table_metric->column_cnt = (int)n_column;
 	table_metric->name = __str_dup(name);
+	escaping_special_chars(table_metric->name);
 
 	for(i = 0; i < (int)n_column; i++)
 	{
 		table_metric->column_name[i] = __str_dup(column_name[i]);
 		table_metric->column_type[i] = column_type[i];
+		escaping_special_chars(table_metric->column_name[i]);
 	}
 	return table_metric;
 }
@@ -792,6 +824,7 @@ struct table_line *table_line_new(const char *name, const struct fieldstat_tag t
 	struct table_line *table_line = (struct table_line *)calloc(1, sizeof(struct table_line));
 
 	table_line->name = __str_dup(name);
+	escaping_special_chars(table_line->name);
 	table_line->n_tag = n_tag;
 
 	add_tags_to_metric(tags, n_tag, table_line->tag_key, table_line->tag_value);
