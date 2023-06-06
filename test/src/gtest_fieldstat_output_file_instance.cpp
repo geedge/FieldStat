@@ -19,17 +19,24 @@ TEST(FeildStatOutput, OutputMaatTable)
 	char line[2048] = {0};
 
 	const char *output_file_path = "/tmp/fieldstat.txt"; 
-	const char *table_column_name[] = {"rule", "reg", "v6", "stream", "scan_cnt", "scan_bytes", "scan_cpu_time", "hit_cnt"};
-	const char *compared_table_row = "PXY_PROFILE_RUN_SCRIPT"
-									 " 9223372036854775807                   0                   0                   0"
-									 "                   0                   0                   0                   0\n";
+	const char *table_column_name[] = {
+		"rule", "reg", "v6", "stream", "scan_cnt", "scan_bytes", "scan_cpu_time", "hit_cnt"
+	};
+	const char *compared_table_row = "PXY_PROFILE_RUN_SCRIPTS           9223372036854775807"
+									 "                   0                   0                   0"
+									 "                   0                   0                   0"
+									 "                   0\n";
 
-	enum field_type table_column_type[8] = {FIELD_TYPE_GAUGE, FIELD_TYPE_GAUGE, FIELD_TYPE_GAUGE, FIELD_TYPE_GAUGE, FIELD_TYPE_GAUGE, FIELD_TYPE_GAUGE, FIELD_TYPE_GAUGE, FIELD_TYPE_GAUGE};
+	enum field_type table_column_type[8] = {
+		FIELD_TYPE_GAUGE, FIELD_TYPE_GAUGE, FIELD_TYPE_GAUGE, FIELD_TYPE_GAUGE, 
+		FIELD_TYPE_GAUGE, FIELD_TYPE_GAUGE, FIELD_TYPE_GAUGE, FIELD_TYPE_GAUGE
+	};
 
 	instance = fieldstat_instance_new("maat");
 	EXPECT_STREQ("maat", instance->name);
 
-	table_id = fieldstat_register_table(instance, "maat_info", table_column_name, table_column_type, sizeof(table_column_name)/sizeof(table_column_name[0]));
+	table_id = fieldstat_register_table(instance, "maat_info", table_column_name, table_column_type, 
+										sizeof(table_column_name)/sizeof(table_column_name[0]));
 	EXPECT_EQ(0, table_id);
 	ret = fieldstat_register_table_row(instance, table_id, "Sum", NULL, 0, output_metric_ids);
 	EXPECT_EQ(0, ret);

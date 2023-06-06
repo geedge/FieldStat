@@ -36,7 +36,7 @@ enum field_type table_column_type[] = {
 
 const char *file_output_path = "/tmp/fieldstat.txt";
 const char *desired_file_table_name = "table name: network_activity\n";
-const char *desired_file_table_info = "                              new_conn_num established_conn_nu"
+const char *desired_file_table_info = "               new_conn_num established_conn_nu"
 									  "      close_conn_num      total_in_bytes     total_out_bytes    total_in_packets"
 									  "   total_out_packets    default_conn_num    default_in_bytes   default_out_bytes"
 									  "  default_in_packets default_out_packets      allow_conn_num      allow_in_bytes"
@@ -51,7 +51,7 @@ const char *desired_file_table_info = "                              new_conn_nu
 									  "      udp_in_packets        udp_in_bytes     udp_out_packets       udp_out_bytes"
 									  "         alert_bytes         block_bytes         pinning_num   maybe_pinning_num"
 									  "     not_pinning_num\n";
-const char *desired_file_table_data = "TRAFFIC                           5.00e+02            0.00e+00"
+const char *desired_file_table_data = "TRAFFIC            5.00e+02            0.00e+00"
 									  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
 									  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"
 									  "            0.00e+00            0.00e+00            0.00e+00            0.00e+00"

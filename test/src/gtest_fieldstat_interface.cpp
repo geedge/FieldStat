@@ -394,27 +394,35 @@ TEST(FeildStatAPI, SetMetricRatioPara)
 
 	const char *output_file_path = "/tmp/fieldstat.txt"; 
 	const char *output_telegraf_path = "/tmp/metrics.out";
-	const char *table_column_name[] = {"rule", "reg/v6", "stream", "IN_Bps", "cpu_us", "PROC_Bps", "IN_Tps", "PROC_Tps","hit_cnt", "hit_rate"};
-	const char *compared_file_output = "Sum                                      0"
-									"                   0            0.00e+00            5.00e+02"
-									"            5.00e+00            5.00e+01            0.00e+00"
-									"            0.00e+00            0.00e+00            0.00e+00\n";
+	const char *table_column_name[] = {
+		"rule", "reg/v6", "stream", "IN_Bps", "cpu_us", "PROC_Bps", "IN_Tps", "PROC_Tps", "hit_cnt",
+		"hit_rate"
+	};
+	const char *compared_file_output = "Sum                   0"
+									   "                   0            0.00e+00            5.00e+02"
+									   "            5.00e+00            5.00e+01            0.00e+00"
+									   "            0.00e+00            0.00e+00            0.00e+00\n";
 
 	const char *compare = "{\"fields\":{\"IN_Bps\":1000,\"IN_Tps\":0,\"PROC_Tps\":0,\"cpu_us\":10,"
 						  "\"hit_cnt\":0,\"hit_rate\":0,\"reg/v6\":0,\"rule\":0,\"stream\":0},"
 						  "\"name\":\"Sum\",\"tags\":{\"app_name\":\"maat\",\"table_name\":\"maat_info\"}}";
 
 
-	enum field_type table_column_type[10] = {FIELD_TYPE_GAUGE, FIELD_TYPE_GAUGE, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+	enum field_type table_column_type[10] = {
+		FIELD_TYPE_GAUGE,   FIELD_TYPE_GAUGE,   FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, 
+		FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER
+	};
 
 	instance = fieldstat_instance_new("maat");
 	EXPECT_STREQ("maat", instance->name);
 
-	table_id = fieldstat_register_table(instance, "maat_info", table_column_name, table_column_type, sizeof(table_column_name)/sizeof(table_column_name[0]));
+	table_id = fieldstat_register_table(instance, "maat_info", table_column_name, table_column_type, 
+										sizeof(table_column_name)/sizeof(table_column_name[0]));
 	EXPECT_EQ(0, table_id);
 	ret = fieldstat_register_table_row(instance, table_id, "Sum", NULL, 0, output_metric_ids);
 	EXPECT_EQ(0, ret);
-	ret = fieldstat_set_metric_ratio_para(instance, output_metric_ids[5], output_metric_ids[3], output_metric_ids[4], 1);
+	ret = fieldstat_set_metric_ratio_para(instance, output_metric_ids[5], output_metric_ids[3], 
+										  output_metric_ids[4], 1);
 	EXPECT_EQ(0, ret);
 	ret = fieldstat_set_local_output(instance, output_file_path, "default");
 	EXPECT_EQ(0, ret);
@@ -511,16 +519,15 @@ TEST(FeildStatAPI, SetMetricInvisible)
 		FIELD_TYPE_COUNTER,
 		FIELD_TYPE_COUNTER
 	};
-	const char *compared_file_data_line = "Sum                   "
-		"                   0                   0            0.00e+00"
-		"            5.00e+02            5.00e+01            0.00e+00"
-		"            0.00e+00            0.00e+00            0.00e+00\n";
+	const char *compared_file_data_line = "Sum                   0"
+		"                   0            0.00e+00            5.00e+02"
+		"            5.00e+01            0.00e+00            0.00e+00"
+		"            0.00e+00            0.00e+00\n";
 
-	const char *compared_file_column_line = "                      "
-		"                rule              reg/v6              stream"
-		"              IN_Bps            PROC_Bps              IN_Tps"
-		"            PROC_Tps             hit_cnt            hit_rate\n";
-
+	const char *compared_file_column_line = "                   rule"
+		"              reg/v6              stream              IN_Bps"
+		"            PROC_Bps              IN_Tps            PROC_Tps"
+		"             hit_cnt            hit_rate\n";
 
 	const char *compare_telegraf_output = "{\"fields\":{\"IN_Bps\":1000,"
 		"\"IN_Tps\":0,\"PROC_Tps\":0,\"hit_cnt\":0,\"hit_rate\":0,"

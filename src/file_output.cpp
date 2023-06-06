@@ -249,40 +249,133 @@ static int output_file_format_default_type_counter(struct fieldstat_instance *in
 	return used_len;
 }
 
-static int output_file_format_default_table(struct fieldstat_instance *instance,int tables_line_cnt[], int current_table_cnt,long long interval_ms,char*print_buf, unsigned int size)
+ 
+static int build_table_cloumn0_format(struct table_metric *table, int n_table_line, char *format, 
+									  unsigned int size)
+{
+	int max_len_column0 = 0, used_len = 0;
+	struct table_line *line = NULL;
+	memset(format, 0, size);
+
+	for(int j = 0; j < n_table_line; j++)
+	{
+		line = read_table_line(table, j);
+		if(line == NULL)
+		{
+			continue;
+		}
+		max_len_column0 = (int)strlen(line->name) > max_len_column0?
+						  (int)strlen(line->name) : max_len_column0;
+	}
+	if(max_len_column0 > 0)
+	{
+		used_len += snprintf(format, size, "\n%%-%d.%ds", max_len_column0, max_len_column0);
+	}
+	return max_len_column0;
+}
+
+
+static int build_table_head(struct table_metric *table, char *column0_format, char *print_buf, 
+							unsigned int print_buf_size)
+{
+	int used_len = 0;
+
+	used_len += snprintf(print_buf + used_len, print_buf_size - used_len, "table name: %-s",
+							table->name);
+	used_len += snprintf(print_buf + used_len, print_buf_size - used_len, column0_format, " ");
+
+	for(int i = 0; i < table->column_cnt; i ++)
+	{
+		//print table column
+		if(table->column_invisible[i] == 1)
+		{
+			continue;
+		}
+		used_len += snprintf(print_buf + used_len, print_buf_size - used_len, "%20.19s", 
+								table->column_name[i]);
+	}
+	return used_len;
+}
+
+
+static int build_table_metrics_point(struct fieldstat_instance *instance, struct metric *metric,
+								 	 long long interval_ms,char *print_buf, unsigned int print_buf_size)
+{
+	int used_len = 0;
+	long long value = 0;
+	double ratio = 0.0;
+
+	if(metric->is_invisible == 1)
+	{
+		return used_len;
+	}
+	switch(metric->field_type)
+	{
+		case FIELD_TYPE_GAUGE:
+			if(metric->is_ratio == 0)
+			{
+				value = get_metric_unit_val(metric, FS_CALC_CURRENT, 0);
+				used_len += snprintf(print_buf + used_len, print_buf_size - used_len, "%20lld", 
+									 value);
+			}
+			else
+			{
+				ratio = get_ratio_value(instance, metric, FS_CALC_CURRENT);
+				used_len += snprintf(print_buf + used_len, print_buf_size - used_len, "%20.2e", 
+									 ratio);
+			}
+			break;
+
+		case FIELD_TYPE_COUNTER:
+			if(metric->is_ratio == 0)
+			{
+				value = get_metric_unit_val(metric, FS_CALC_SPEED, 0);
+				used_len += snprintf(print_buf + used_len, print_buf_size - used_len, "%20.2e", 
+									(double)value*1000/interval_ms);
+			}
+			else
+			{
+				ratio = get_ratio_value(instance, metric, FS_CALC_SPEED);
+				used_len += snprintf(print_buf + used_len, print_buf_size - used_len, "%20.2e", 
+				(double)ratio*1000/interval_ms);
+			}
+			break;
+		default:
+			break;	
+	}
+	return used_len;
+}
+
+
+
+static int output_file_format_default_table(struct fieldstat_instance *instance,int tables_line_cnt[], 
+											int current_table_cnt, long long interval_ms, char*print_buf, 
+											unsigned int size)
 {
 	int i = 0, j = 0, k = 0;
 	struct table_metric *table =  NULL;
 	struct table_line  *line = NULL;
 	int metric_id = 0;
 	struct metric *metric = NULL;
-	long long value = 0;
 	int used_len = 0;
-	double ratio = 0.0;
+	char column0_format[256] = {0};
 
 	for(i = 0; i < current_table_cnt; i++)   //per table
 	{
 		table = instance->table_metrics[i];
-		used_len += snprintf(print_buf + used_len, size - used_len, "table name: %-s\n", table->name);
-		used_len += snprintf(print_buf + used_len, size - used_len, "%-22.22s", " ");
-		for(j = 0; j < table->column_cnt; j ++)
-		{
-			//print table column
-			if(table->column_invisible[j] == 1)
-			{
-				continue;
-			}
-			used_len += snprintf(print_buf + used_len, size - used_len, "%20.19s", table->column_name[j]);
-		}
+		build_table_cloumn0_format(table, tables_line_cnt[i], column0_format, sizeof(column0_format));
+
+		used_len += build_table_head(table, column0_format, print_buf + used_len, size - used_len);
+
 		for(j = 0; j < tables_line_cnt[i]; j++)  //per line
 		{
-			line = read_table_line(table,j);
+			line = read_table_line(table, j);
 			if(line == NULL)
 			{
 				continue;
 			}
 			//print table line name + tag
-			used_len += snprintf(print_buf + used_len, size - used_len, "\n%-22.22s", line->name);
+			used_len += snprintf(print_buf + used_len, size - used_len, column0_format, line->name);
 
 			used_len += append_tags_to_print_buf(line->tag_key, line->tag_value, line->n_tag, 
 												print_buf + used_len, size - used_len);
@@ -292,40 +385,8 @@ static int output_file_format_default_table(struct fieldstat_instance *instance,
 				//print table metric value
 				metric_id = line->metric_id_belong_to_line[k];
 				metric = get_metric(instance,metric_id);
-				if(metric->is_invisible == 1)
-				{
-					continue;
-				}
-				switch(metric->field_type)
-				{
-					case FIELD_TYPE_GAUGE:
-						if(metric->is_ratio == 0)
-						{
-							value = get_metric_unit_val(metric, FS_CALC_CURRENT, 0);
-							used_len += snprintf(print_buf + used_len, size - used_len, "%20lld", value);
-						}
-						else
-						{
-							ratio = get_ratio_value(instance, metric, FS_CALC_CURRENT);
-							used_len += snprintf(print_buf + used_len, size - used_len, "%20.2e", ratio);
-						}
-						break;
-
-					case FIELD_TYPE_COUNTER:
-						if(metric->is_ratio == 0)
-						{
-							value = get_metric_unit_val(metric, FS_CALC_SPEED, 0);
-							used_len += snprintf(print_buf + used_len, size - used_len, "%20.2e", (double)value*1000/interval_ms);
-						}
-						else
-						{
-							ratio = get_ratio_value(instance, metric, FS_CALC_SPEED);
-							used_len += snprintf(print_buf + used_len, size - used_len, "%20.2e", (double)ratio*1000/interval_ms);
-						}
-						break;
-					default:
-						break;	
-				}
+				used_len += build_table_metrics_point(instance, metric, interval_ms, print_buf + used_len, 
+													  size - used_len);
 			}
 
 		} 
