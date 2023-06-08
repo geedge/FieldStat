@@ -5,13 +5,20 @@ extern "C"
 {
 #endif
 
+#define INSTANCE_NAME_MAX_LEN 32
+#define N_TAG_MAX	     	32
+#define METRICS_MAX_NUMBER 2000
+
 enum field_type
 {
 	FIELD_TYPE_COUNTER,
 	FIELD_TYPE_TOPK,
 	FIELD_TYPE_HLL,
 	FIELD_TYPE_HISTOGRAM
+    // gauge
+    // summery
 };
+
 enum fs_tag_type
 {
 	TAG_INTEGER,
@@ -40,16 +47,8 @@ int fieldstat_topk_add(struct fieldstat *instance, int field_id, const char *key
 int fieldstat_hll_add(struct fieldstat *instance, int field_id, const char *key, size_t key_len, const struct fieldstat_tag tags[], size_t n_tag);
 int fieldstat_histogram_record(struct fieldstat *instance, int field_id, long long value, long long expected, const struct fieldstat_tag tags[], size_t n_tag);
 
-enum field_type
-{
-	FIELD_TYPE_COUNTER,
-	FIELD_TYPE_GAUGE,
-	FILED_TYPE_HISTOGRAM,
-	FIELD_TYPE_SUMMARY
-};
 
-enum field_type fieldstat_get_type(struct fieldstat *instance, int field_id);
-long long fieldstat_histogram_value_at_percentile(struct fieldstat *instance, int field_id);
+
 
 #ifdef __cplusplus
 }
