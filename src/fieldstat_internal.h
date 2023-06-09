@@ -214,6 +214,8 @@ struct prometheus_endpoint_instance
 struct dynamic_metric
 {
 	char metric_key[512];
+	unsigned int metric_keylen;
+
 	struct metric **metrics;
 	UT_hash_handle hh;
 };
