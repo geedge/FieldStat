@@ -15,18 +15,18 @@ enum serializer_type {
     SERIALIZER_TYPE_MAX
 };
 
-
+struct serializer;
 /*
     * serializer
-    *  - serializer_func_access : call a metric.visit to fill this serializer with metric data.
+    *  - serializer_func_access : call a metric.dump to fill this serializer with metric data.
     * - serializer_func_gen: output a blob. Blob is the serialized data. This function should not depend on the metric anymore. The blob are free by user.
-    * - serializer_func_del: free the serializer, including all the data writen by metric.visit. Not include the blob allocated in serializer_func_gen.
+    * - serializer_func_del: free the serializer, including all the data writen by metric.dump. Not include the blob allocated in serializer_func_gen.
     * 
     * you should also write a serializer_new function to create a serializer, where realizations of the above three functions are specified.
 */
-typedef int (*serializer_func_access)(struct serializer *, struct metrics *);
+typedef int (*serializer_func_access)(struct serializer *, const struct metrics *);
 typedef int (*serializer_func_gen)
-    (struct serializer *, char */*instance name*/ ,char ** /*blob*/, size_t * /*blob_size*/);
+    (const struct serializer *, const char */*instance name*/ ,char ** /*blob*/, size_t * /*blob_size*/);
 typedef void (*serializer_func_del)(struct serializer *);
 struct serializer {
     serializer_func_del del;

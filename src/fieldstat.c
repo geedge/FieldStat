@@ -9,6 +9,7 @@
 #include "fieldstat.h"
 #include "serializer.h"
 #include "field_and_metric.h"
+#include "fieldstat_tag.h"
 
 #include "uthash.h"
 
@@ -60,8 +61,8 @@ void fieldstat_serialize(struct fieldstat *instance, char **blob, size_t *blob_s
         struct fs_field *field = instance->field_array[i];
         struct metric_hash_node *node, *tmp;
         HASH_ITER(hh, field->hash_tbl, node, tmp) {
-            struct metric *metric = node->metric;
-            if (serializer->access(serializer, instance->field_array[i]) != 0) {
+            struct metrics *metric = node->metric;
+            if (serializer->access(serializer, metric) != 0) {
                 fprintf(stderr, "serializer access failed\n");
                 return;
             }
@@ -134,6 +135,17 @@ int fieldstat_register_topk(struct fieldstat *instance, const char *field_name, 
 //     return 0;
 // }
 
+int fieldstat_topk_add(struct fieldstat *instance, int field_id, const char *key, size_t key_len, const struct fieldstat_tag tags[], size_t n_tag)
+{
+    struct fs_field *field = (struct fs_field *)instance->field_array[field_id];
+    if (field == NULL || field->type != FIELD_TYPE_TOPK) {
+        printf("ERR: field is not a topk field\n");
+        return -1;
+    }
+    field_topk_add(field, key, key_len, 1, tags, n_tag);
+    return 0;
+}
+
 // {
 //     name=<instance_name>,
 
@@ -172,10 +184,10 @@ struct fieldstat *fieldstat_deserialize_by_mpack(const char *blob, size_t blob_s
         mpack_node_t tag_v = mpack_node_map_cstr(metric_obj, "tag_v");
 
         int field_id = mpack_node_int(mpack_node_map_cstr(metric_obj, "field_id"));
-        char *field_name = mpack_node_str(mpack_node_map_cstr(metric_obj, "field_name"));
+        const char *field_name = mpack_node_str(mpack_node_map_cstr(metric_obj, "field_name"));
         mpack_node_t metric_blob_obj = mpack_node_map_cstr(root, "blob");
         size_t metric_blob_size = mpack_node_bin_size(metric_blob_obj);
-        char *metric_blob = mpack_node_bin_data(metric_blob_obj);
+        const char *metric_blob = mpack_node_bin_data(metric_blob_obj);
         enum field_type type = (enum field_type)mpack_node_int(mpack_node_map_cstr(metric_obj, "type"));
 
         struct fs_field *field = (struct fs_field *)instance->field_array[field_id];
@@ -200,7 +212,7 @@ struct fieldstat *fieldstat_deserialize_by_mpack(const char *blob, size_t blob_s
             metric->tag_num++;
         }
         char dynamic_metric_key[512];
-        int tmp_len = build_dynamic_metric_key_with_unzipped_tag(metric->tag_key, metric->tag_value, metric->tag_num, dynamic_metric_key, 512);
+        int tmp_len = build_dynamic_metric_key_with_unzipped_tag((const char **)metric->tag_key, (const char **)metric->tag_value, metric->tag_num, dynamic_metric_key, 512);
         if (tmp_len < 0) {
             fprintf(stderr, "build_dynamic_metric_key_with_unzipped_tag failed\n");
             return NULL;
@@ -239,4 +251,5 @@ int fieldstat_merge_with_blob(struct fieldstat *instance, const char *blob, size
             }
         }
     }
+    return 0;
 }

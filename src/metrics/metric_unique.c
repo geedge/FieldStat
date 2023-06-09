@@ -53,7 +53,7 @@
 //     return;
 // }
 
-// int metric_unique_visit(struct metrics *pthis, struct serializer *serializer)
+// int metric_unique_dump(struct metrics *pthis, struct serializer *serializer)
 // {
 //     struct metric_unique *unique = (struct metric_unique *)pthis;
 
@@ -102,7 +102,7 @@
 //     unique->base.name = strdup(name);
 //     unique->base.refresh = metric_unique_refresh;
 //     unique->base.del = metric_unique_del;
-//     unique->base.visit = metric_unique_visit;
+//     unique->base.dump = metric_unique_dump;
 //     unique->base.merge = metric_unique_merge;
 //     unique->base.type = FIELD_TYPE_HLL;
 //     return unique;

@@ -42,7 +42,7 @@
 // //     cJSON_Delete(root);
 // // }
 
-// // int metric_hdr_visit(struct metrics *pthis, struct serializer *serializer)
+// // int metric_hdr_dump(struct metrics *pthis, struct serializer *serializer)
 // // {
 // //     struct metric_hdr *hdr = (struct metric_hdr *)pthis;
 
@@ -156,7 +156,7 @@
 // //     struct metrics *base = (struct metrics *)hdr;
 // //     base->type = FIELD_TYPE_HISTOGRAM;
 // //     base->name = strdup(name);
-// //     base->visit = metric_hdr_visit;
+// //     base->dump = metric_hdr_dump;
 // //     base->refresh = metric_hdr_refresh;
 // //     base->del = metric_hdr_del;
 // //     base->merge = metric_hdr_merge;

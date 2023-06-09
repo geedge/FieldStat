@@ -38,7 +38,7 @@
 // {
 //     struct serializer_result *result = (struct metric_output *)pthis;
 
-//     int ret = metrics->visit(metrics, pthis);
+//     int ret = metrics->dump(metrics, pthis);
 
 //     //TODO: 写pair的借用merge + zip
 

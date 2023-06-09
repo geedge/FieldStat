@@ -60,7 +60,7 @@ int build_dynamic_metric_key(const struct fieldstat_tag tags[], size_t n_tags, s
 	return  used_len;
 }
 
-int build_dynamic_metric_key_with_unzipped_tag(const char *tag_key[], const char *tag_value[], size_t n_tags, char *out_key, size_t out_key_size)
+int build_dynamic_metric_key_with_unzipped_tag(const char * const tag_key[], const char * const tag_value[], size_t n_tags, char *out_key, size_t out_key_size)
 {
     int used_len = 0;
 

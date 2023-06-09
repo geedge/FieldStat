@@ -23,6 +23,9 @@
 /* cJSON */
 /* JSON parser in C. */
 
+#pragma GCC diagnostic ignored "-Wuninitialized"
+#pragma GCC diagnostic ignored "-Wmisleading-indentation"
+
 #include <string.h>
 #include <stdio.h>
 #include <math.h>

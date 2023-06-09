@@ -36,7 +36,7 @@
 //     cJSON_Delete(root);
 // }
 
-// int metric_counter_visit(struct metrics *pthis, struct serializer *serializer)
+// int metric_counter_dump(struct metrics *pthis, struct serializer *serializer)
 // {
 //     struct metric_counter *counter = (struct metric_counter *)pthis;
     
@@ -92,7 +92,7 @@
 
 //     base->type = FIELD_TYPE_COUNTER;
 //     base->del = metric_counter_del;
-//     base->visit = metric_counter_visit;
+//     base->dump = metric_counter_dump;
 //     base->refresh = metric_counter_refresh;
 //     base->merge = metric_counter_merge;
 

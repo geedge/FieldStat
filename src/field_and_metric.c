@@ -5,12 +5,7 @@
 #include "field_and_metric.h"
 #include "uthash.h"
 #include "metric_type_internal.h"
-
-// struct metrics *field_spawn_new_metrics(struct fs_field *field, const char *tag_key[], const char *tag_value[], size_t tag_num)
-
-// struct fs_field *field_create(enum field_type type, int field_id, const char *name, size_t name_len)
-// field_register_topk()..
-
+#include "fieldstat_tag.h"
 
 static void tags_unzip_to_metric(const struct fieldstat_tag *tags, size_t n_tag, struct metrics *metric)
 {
@@ -43,7 +38,7 @@ void field_free(struct fs_field *field)
     free(field);
 }
 
-struct metrics *find_metric_in_field(struct fs_field *field, const char *key, size_t key_len)
+struct metrics *find_metric_in_field(const struct fs_field *field, const char *key, size_t key_len)
 {
     struct metric_hash_node *node;
     HASH_FIND(hh, field->hash_tbl, key, key_len, node);
@@ -82,6 +77,7 @@ struct metrics *deserialize_for_metric_type(const char *blob, size_t blob_size, 
     return metric;
 }
 
+// TODO: 删了？
 void metric_add_tag(struct metrics *metric, const char *key, const char *value)
 {
     if (metric->tag_num >= MAX_TAG_NUM) {
@@ -93,7 +89,7 @@ void metric_add_tag(struct metrics *metric, const char *key, const char *value)
     metric->tag_num++;
 }
 
-struct metrics *field_spawn_new_metrics(struct fs_field *field, const struct fieldstat_tag tags[], size_t n_tag)
+static struct metrics *field_spawn_new_metrics(const struct fs_field *field, const struct fieldstat_tag tags[], size_t n_tag)
 {
     struct metrics *metric = NULL;
     switch (field->type) {

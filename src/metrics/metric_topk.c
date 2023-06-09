@@ -17,13 +17,13 @@ struct metric_topk {
     struct heavy_keeper *hk;
 };
 
-void metric_topk_refresh(struct metrics *pthis)
+static void metric_topk_refresh(struct metrics *pthis)
 {
     struct metric_topk *topk = (struct metric_topk *)pthis;
     heavy_keeper_clear(topk->hk);
 }
 
-void metric_topk_destroy(struct metrics *pthis)
+static void metric_topk_destroy(struct metrics *pthis)
 {
     struct metric_topk *topk = (struct metric_topk *)pthis;
     for (int i = 0; i < pthis->tag_num; i++) {
@@ -69,41 +69,32 @@ void metric_topk_destroy(struct metrics *pthis)
 //     heavy_keeper_result_free(result);
 // }
 
-int metric_topk_visit(struct metrics *pthis, struct serializer *serializer)
+
+static int metric_topk_dump(const struct metrics *pthis, struct metric_info *info_out)
 {
     struct metric_topk *topk = (struct metric_topk *)pthis;
 
-    switch (serializer->type) {
-        case SERIALIZER_TYPE_MERGE:
-        {
-            struct serializer_merge *merge = (struct serializer_merge *)serializer;
-            char *blob;
-            size_t blob_size;
-            heavy_keeper_serialization(topk->hk, &blob, &blob_size);
+    char *blob;
+    size_t blob_size;
+    heavy_keeper_serialization(topk->hk, &blob, &blob_size);
 
-            struct metric_info *info = merge->metric_info[merge->write_pos];
+    info_out->blob = blob;
+    info_out->blob_size = blob_size;
+    info_out->type = (int)FIELD_TYPE_TOPK;
+    fill_metric_base_info(pthis, info_out);
 
-            info->blob = blob;
-            info->blob_size = blob_size;
-            info->type = (int)FIELD_TYPE_TOPK;
-            // tag is filled by caller serialize_merge
-
-            return 0;
-        }
-        default:
-            assert(0);
-            return -1;
-    }
+    return 0;
 }
 
-int metric_topk_merge(struct metrics *pthis, struct metrics *from)
+static int metric_topk_merge(struct metrics *pthis, const struct metrics *from)
 {
     struct metric_topk *topk = (struct metric_topk *)pthis;
     struct metric_topk *from_topk = (struct metric_topk *)from;
     return heavy_keeper_merge(topk->hk, from_topk->hk);
 }
 
-struct metrics * metric_topk_duplicate(struct metrics *pthis)
+static void metric_topk_base_init(struct metrics *base);
+static struct metrics * metric_topk_duplicate(const struct metrics *pthis)
 {
     struct metric_topk *topk = (struct metric_topk *)pthis;
     struct metric_topk *new_topk = (struct metric_topk *)malloc(sizeof(struct metric_topk));
@@ -119,11 +110,11 @@ struct metrics * metric_topk_duplicate(struct metrics *pthis)
     return (struct metrics *)new_topk;
 }
 
-void metric_topk_base_init(struct metrics *base)
+static void metric_topk_base_init(struct metrics *base)
 {
     base->type = FIELD_TYPE_TOPK;
     base->del = metric_topk_destroy;
-    base->visit = metric_topk_visit;
+    base->dump = metric_topk_dump;
     base->refresh = metric_topk_refresh;
     base->merge = metric_topk_merge;
     base->dup = metric_topk_duplicate;
