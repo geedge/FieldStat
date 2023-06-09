@@ -6,6 +6,7 @@
 // // #include "metrics/metric_hdr.h"
 // // #include "output/serializer.h"
 // // #include "cjson/cJSON.h"
+// #include "metric_type_internal.h"
 
 // #include "field_and_metric.h"
 

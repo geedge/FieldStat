@@ -7,6 +7,7 @@
 // #include "metrics/metric_unique.h"
 // #include "cjson/cJSON.h"
 // #include "output/serializer.h"
+// #include "metric_type_internal.h"
 
 // struct metric_unique {
 //     struct metrics base;

@@ -7,9 +7,10 @@
 
 // #include "cjson/cJSON.h"
 #include "fieldstat.h"
-#include "serializer.h"
+#include "serializer_merge.h"
 #include "heavy_keeper.h"
 #include "field_and_metric.h"
+#include "metric_type_internal.h"
 
 struct metric_topk {
     struct metrics base;
@@ -25,7 +26,10 @@ void metric_topk_refresh(struct metrics *pthis)
 void metric_topk_destroy(struct metrics *pthis)
 {
     struct metric_topk *topk = (struct metric_topk *)pthis;
-    free(pthis->name);
+    for (int i = 0; i < pthis->tag_num; i++) {
+        free(pthis->tag_key[i]);
+        free(pthis->tag_value[i]);
+    }
     heavy_keeper_free(topk->hk);
     free(topk);
 }
@@ -85,11 +89,10 @@ int metric_topk_visit(struct metrics *pthis, struct serializer *serializer)
             // tag is filled by caller serialize_merge
 
             return 0;
-            break;
         }
         default:
             assert(0);
-            break;
+            return -1;
     }
 }
 
@@ -100,6 +103,22 @@ int metric_topk_merge(struct metrics *pthis, struct metrics *from)
     return heavy_keeper_merge(topk->hk, from_topk->hk);
 }
 
+struct metrics * metric_topk_duplicate(struct metrics *pthis)
+{
+    struct metric_topk *topk = (struct metric_topk *)pthis;
+    struct metric_topk *new_topk = (struct metric_topk *)malloc(sizeof(struct metric_topk));
+    new_topk->hk = heavy_keeper_new(topk->hk->K, NULL);
+    heavy_keeper_merge(new_topk->hk, topk->hk);
+    metric_topk_base_init((struct metrics *)new_topk);
+
+    new_topk->base.tag_num = pthis->tag_num;
+    for (int i = 0; i < pthis->tag_num; i++) {
+        new_topk->base.tag_key[i] = strdup(pthis->tag_key[i]);
+        new_topk->base.tag_value[i] = strdup(pthis->tag_value[i]);
+    }
+    return (struct metrics *)new_topk;
+}
+
 void metric_topk_base_init(struct metrics *base)
 {
     base->type = FIELD_TYPE_TOPK;
@@ -107,6 +126,7 @@ void metric_topk_base_init(struct metrics *base)
     base->visit = metric_topk_visit;
     base->refresh = metric_topk_refresh;
     base->merge = metric_topk_merge;
+    base->dup = metric_topk_duplicate;
 }
 
 struct metrics *metrics_topk_deserialize(const char *blob, size_t blob_size)
@@ -118,17 +138,18 @@ struct metrics *metrics_topk_deserialize(const char *blob, size_t blob_size)
     return (struct metrics *)topk;
 }
 
-struct metric_topk *metric_topk_create(int K)
+struct metrics *metric_topk_create(int K)
 {
     struct metric_topk *topk = (struct metric_topk *)malloc(sizeof(struct metric_topk));
     topk->hk = heavy_keeper_new(K, NULL);
 
     struct metrics *base = (struct metrics *)topk;
     metric_topk_base_init(base);
-    return topk;
+    return base;
 }
 
-void metric_topk_add(struct metric_topk *counter, const char *key, size_t key_len, unsigned value)
+void metric_topk_add(struct metrics *pthis, const char *key, size_t key_len, unsigned value)
 {
-    heavy_keeper_add(counter->hk, key, key_len, value);
+    struct metric_topk *topk = (struct metric_topk *)pthis;
+    heavy_keeper_add(topk->hk, key, key_len, value);
 }

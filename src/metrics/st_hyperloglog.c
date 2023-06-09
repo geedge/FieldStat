@@ -16,10 +16,11 @@ const size_t BLOB_HDR_SIZE= offsetof(struct ST_hyperloglog, registers);
 
 struct ST_hyperloglog *ST_hyperloglog_new(unsigned char precision)
 {
-    struct ST_hyperloglog *h=ALLOC(struct ST_hyperloglog, 1);
     // Ensure the precision is somewhat sane
     if (precision < HLL_MIN_PRECISION || precision > HLL_MAX_PRECISION)
         return NULL;
+
+    struct ST_hyperloglog *h=ALLOC(struct ST_hyperloglog, 1);
 
     h->cfg.precision = precision;
 
@@ -90,7 +91,7 @@ static void reset_register(const struct ST_hyperloglog *h, int idx)
 
 void ST_hyperloglog_reset(struct ST_hyperloglog *h)
 {
-    int n_register=NUM_REG(dst->cfg.precision);
+    int n_register=NUM_REG(h->cfg.precision);
 
     for(int i=0; i<n_register; i++) {
         reset_register(h, i);

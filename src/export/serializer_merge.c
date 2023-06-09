@@ -33,6 +33,9 @@
 #include "serializer.h"
 #include "serializer_merge.h"
 
+
+// TODO: 给付明卫的output里应该有可以复用的代码，不要这么多个output了，所有serializer放一个文件
+// TODO：抽空跟付明卫和OLAP的人讨论一下序列化的结果怎么对齐
 void metric_info_free(struct metric_info *p)
 {
     if (!p) {
@@ -71,13 +74,13 @@ void serializer_merge_del(struct serializer *pthis)
 
 void fill_metric_base_info_to_serializer(const struct metrics *base, struct metric_info *info_out)
 {
-    info->field_id = base->father->field_id;
-    info->field_name = strdup(base->father->name);
+    info_out->field_id = base->container->field_id;
+    info_out->field_name = strdup(base->container->name);
 
-    info->tag_num = base->tag_num;
+    info_out->tag_num = base->tag_num;
     for (int i = 0; i < base->tag_num; i++) {
-        memcpy(info->tag_name[i], base->tag_name[i], base->tag_key_len[i]);
-        memcpy(info->tag_val[i], base->tag_val[i], base->tag_val_len[i]);
+        info_out->tag_key[i] = strdup(base->tag_key[i]);
+        info_out->tag_val[i] = strdup(base->tag_value[i]);
     }
 }
 
@@ -95,24 +98,29 @@ int serializer_merge_access(struct serializer *pthis, struct metrics *metrics)
 
     return ret;
 }
-
-// {
-//     name=<instance_name>,
-
-//     "metrics"=[
-//         {
-//             "tag_k":[<tags key string>]
-//             "tag_v":[<tags value string>]
-//             "field_id":<field_id>
-//             "blob":<blob>
-//             "blob_size":<blob_size>
-
-//         }
-//         ...
-//         ]
+/*
+{
+    name=<instance_name>,
+    "metrics"=[
+        {
+            "tag_k":[<tags key string>]
+            "tag_v":[<tags value string>]
+            "field_id":<field_id>
+            "blob":<blob>
+            "blob_size":<blob_size>
+        }
+    "fields" = [ // FIXME： 这个方案改动太大了。。说实话关键是我一定要有一个metric为粒度的序列化（或者说打印），那么反正要另外加，不如加到deserilize里，还不破坏结构
+        {
+        ... id: 
+            name:
+            type: 
+            para(bin)
+        ]
     
-//     ts=<unix timestamp> //TODO
-// }
+    ts=<unix timestamp> //TODO
+}
+*/
+//TODO 
 void serialize_metric(struct serializer_merge *p, mpack_writer_t *writer)
 {
     mpack_write_cstr(writer, "metrics");
@@ -157,18 +165,19 @@ int serializer_merge_gen(struct serializer *pthis, const char *instance_name, ch
 {
     struct serializer_merge *p = (struct serializer_merge *)pthis;
     mpack_writer_t writer;
-    mpack_writer_init_growable(&writer, blob, blob_sz);
+    mpack_writer_init_growable(&writer, blob, blob_size);
     mpack_build_map(&writer);
 
     mpack_write_cstr(&writer, "name");
     mpack_write_cstr(&writer, instance_name);
 
     serialize_metric(p, &writer);
-    // TODO: ts
 
     if (mpack_writer_destroy(&writer) != mpack_ok) {
         fprintf(stderr, "An error occurred in serializer_merge_gen!\n");
+        return -1;
     }
+    return 0;
 }
 
 struct serializer_merge *serializer_merge_create(size_t metric_num)

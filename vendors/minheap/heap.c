@@ -8,11 +8,6 @@ static void min_heap_shift_down_(min_heap_t* s, unsigned hole_index, void* node)
 static void min_heap_shift_up_(min_heap_t* s, unsigned hole_index, void *node);
 static void min_heap_shift_up_unconditional_(min_heap_t* s, unsigned hole_index, void* node);
 
-struct entry_data {
-    char *str;
-    size_t len;
-};
-
 int init_heap(struct minheap *heap, int max_size, minheap_cmp cmp, minheap_getindex get, minheap_setindex set)
 {
 	heap->max_size = max_size;
@@ -31,10 +26,7 @@ int get_node_index(struct minheap *heap, void *node)
 {
 	assert(heap->get);
 	int index = heap->get(node);
-    if (heap->cur_size <= index) {
-        printf("heap->cur_size: %d, index: %d\n", heap->cur_size, index);
-        printf("content: %s\n", ((struct entry_data*)((heap_entry *)node)->value)->str);
-    }
+
 	assert(heap->cur_size > index);
 	assert(heap->nodes[index] == node);
 	return index;

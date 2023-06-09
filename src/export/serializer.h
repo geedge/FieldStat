@@ -26,7 +26,7 @@ enum serializer_type {
 */
 typedef int (*serializer_func_access)(struct serializer *, struct metrics *);
 typedef int (*serializer_func_gen)
-    (struct serializer *, char ** /*blob*/, size_t * /*blob_size*/);
+    (struct serializer *, char */*instance name*/ ,char ** /*blob*/, size_t * /*blob_size*/);
 typedef void (*serializer_func_del)(struct serializer *);
 struct serializer {
     serializer_func_del del;

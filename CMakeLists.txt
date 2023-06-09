@@ -1,20 +1,29 @@
-cmake_minimum_required (VERSION 2.8)
+cmake_minimum_required(VERSION 2.8.8)
 
-set(lib_name fieldstat3)
+set(lib_name fieldstat4)
 
 project (${lib_name})
+
+# to fix issue: cannot find pthresh
+# set(CMAKE_THREAD_LIBS_INIT "-lpthread")
+# set(CMAKE_HAVE_THREADS_LIBRARY 1)
+# set(CMAKE_USE_WIN32_THREADS_INIT 0)
+# set(CMAKE_USE_PTHREADS_INIT 1)
+# set(THREADS_PREFER_PTHREAD_FLAG ON)
 
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 include(Version)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_MACOSX_RPATH 0)
+
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -fPIC -Wall -lm")
 set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} -Wall)
 
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 	set(CMAKE_INSTALL_PREFIX "/opt/MESA" CACHE PATH "default install path" FORCE)
 endif()
 
-find_program(CMAKE_CXX_CPPCHECK NAMES cppcheck)
+find_program(CMAKE_CXX_CPPCHECK NAMES cppcheck HINTS /home/chenzizhan/heavykeeperczz/tools/home/chenzizhan/heavykeeperczz/usr/bin)
 if (CMAKE_CXX_CPPCHECK)
     list(
         APPEND CMAKE_CXX_CPPCHECK 
@@ -63,16 +72,29 @@ elseif(ASAN_OPTION MATCHES "THREAD")
 endif()
 # end of for ASAN
 
-include_directories(${PROJECT_SOURCE_DIR}/inc/)
-include_directories(${PROJECT_SOURCE_DIR}/src/)
+include_directories(${PROJECT_SOURCE_DIR}/vendors)
+include_directories(${PROJECT_SOURCE_DIR}/src)
+include_directories(${PROJECT_SOURCE_DIR}/include)
+include_directories(${PROJECT_SOURCE_DIR}/src/export)
+include_directories(${PROJECT_SOURCE_DIR}/src/metrics)
+include_directories(${PROJECT_SOURCE_DIR}/src/utils)
+
 
 file(GLOB SRC
     "src/*.c"
-    "src/*.cpp"
+    "src/metrics/*.c"
+    "src/export/*.c"
+    "src/utils/*.c"
+    "vendors/cjson/*.c"
+    "vendors/hdr_histogram/*.c"
+    "vendors/minheap/*.c"
+    "vendors/mpack/*.c"
+    "vendors/xxhash/*.c"
 )
 
-add_subdirectory(vendor)
-add_subdirectory(test/src)
+add_subdirectory(test/deps)
+
+add_subdirectory(test)
 enable_testing()
 add_subdirectory(./ctest)
 
@@ -94,12 +116,13 @@ install(TARGETS ${lib_name}_shared LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/l
 install(TARGETS ${lib_name}_static LIBRARY ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib COMPONENT LIBRARIES)
 install(FILES inc/fieldstat.h   DESTINATION   ${CMAKE_INSTALL_PREFIX}/include/MESA COMPONENT HEADER)
 
-include(Package)
 
-file(GLOB DEMO	
-    "test/*.c"
-    "test/*.cpp"
-)
+# include(Package)
 
-add_executable(demo ${DEMO})
-target_link_libraries(demo  pthread ${lib_name}_static)
+# file(GLOB DEMO	
+#     "test/*.c"
+#     "test/*.cpp"
+# )
+
+# add_executable(demo ${DEMO})
+# target_link_libraries(demo  pthread ${lib_name}_static)

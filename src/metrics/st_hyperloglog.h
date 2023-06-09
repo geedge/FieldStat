@@ -29,8 +29,6 @@ extern "C"
 #define INT_CEIL(num, denom) (((num) + (denom) - 1) / (denom))
 
 #define REGISTER_SIZE(precision) INT_WIDTH*INT_CEIL(NUM_REG(precision), REG_PER_WORD)
-32*INT_CEIL(1 << 8, 4)
-(256 + 4 - 1) / 4 = 256 / 4 = 64 * 32 = 2048
 
 struct ST_HLL_configuration
 {
@@ -56,7 +54,7 @@ double ST_hyperloglog_count(const struct ST_hyperloglog *h);
 size_t ST_hyperloglog_serialized_size(const struct ST_hyperloglog *h);
 void ST_hyperloglog_serialize(const struct ST_hyperloglog *h, char **blob, size_t *blob_sz);
 struct ST_hyperloglog *ST_hyperloglog_deserialize(const char *blob, size_t blob_sz);
-int ST_hyperloglog_merge(struct ST_hyperloglog *dst, const struct ST_hyperloglog *src)
+int ST_hyperloglog_merge(struct ST_hyperloglog *dst, const struct ST_hyperloglog *src);
 void ST_hyperloglog_merge_blob(struct ST_hyperloglog *dst, const char *blob, size_t blob_sz);
 double ST_hyperloglog_error_for_precision(unsigned char precision);
 void ST_hyperloglog_configure(struct ST_hyperloglog *h, unsigned char precision, int time_window_seconds, const struct timeval now);

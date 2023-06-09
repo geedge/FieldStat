@@ -6,7 +6,7 @@ extern "C"
 #endif
 
 #define INSTANCE_NAME_MAX_LEN 32
-#define N_TAG_MAX	     	32
+#define MAX_TAG_NUM	     	32
 #define METRICS_MAX_NUMBER 2000
 
 enum field_type
@@ -14,7 +14,7 @@ enum field_type
 	FIELD_TYPE_COUNTER,
 	FIELD_TYPE_TOPK,
 	FIELD_TYPE_HLL,
-	FIELD_TYPE_HISTOGRAM
+	FIELD_TYPE_HISTOGRAM,
     // gauge
     // summery
 };
@@ -37,6 +37,7 @@ struct fieldstat_tag{
 
 struct fieldstat;
 struct fieldstat *fieldstat_new(const char *symbol);
+void fieldstat_free(struct fieldstat *instance);
 int fieldstat_register_counter(struct fieldstat *instance, const char *field_name);
 int fieldstat_register_topk(struct fieldstat *instance, const char *field_name, int K);
 int fieldstat_register_hll(struct fieldstat *instance, const char *field_name);

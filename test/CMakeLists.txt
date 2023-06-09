@@ -1,0 +1,32 @@
+
+# include(FetchContent)
+# FetchContent_Declare(gtest
+#   QUIET
+#   URL https://github.com/google/googletest/archive/release-1.10.0.tar.gz
+# )
+# # configure build of googletest
+# set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+# set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
+# FetchContent_MakeAvailable(gtest)
+
+cmake_minimum_required(VERSION 2.8)
+
+# add_definitions(-std=c++11)
+
+include_directories(${PROJECT_SOURCE_DIR}/test)
+include_directories(${PROJECT_SOURCE_DIR}/src)
+include_directories(${PROJECT_SOURCE_DIR}/src/utils)
+include_directories(${PROJECT_SOURCE_DIR}/src/export)
+include_directories(${PROJECT_SOURCE_DIR}/src/metrics)
+include_directories(${PROJECT_SOURCE_DIR}/include)
+
+
+# add_executable(unit_tests ${SRC} gtest_topk.cpp)
+add_executable(unit_tests ${SRC} gtest_topk.cpp)
+target_link_libraries(unit_tests gtest-static)
+
+# target_link_libraries(unit_tests
+#   PRIVATE
+#     fieldstat4-shared
+#     gtest_static
+#   )
