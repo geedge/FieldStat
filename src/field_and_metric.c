@@ -77,18 +77,6 @@ struct metrics *deserialize_for_metric_type(const char *blob, size_t blob_size, 
     return metric;
 }
 
-// TODO: 删了？
-void metric_add_tag(struct metrics *metric, const char *key, const char *value)
-{
-    if (metric->tag_num >= MAX_TAG_NUM) {
-        printf("ERR: tag num exceed max tag num\n");
-        return;
-    }
-    metric->tag_key[metric->tag_num] = strdup(key);
-    metric->tag_value[metric->tag_num] = strdup(value);
-    metric->tag_num++;
-}
-
 static struct metrics *field_spawn_new_metrics(const struct fs_field *field, const struct fieldstat_tag tags[], size_t n_tag)
 {
     struct metrics *metric = NULL;

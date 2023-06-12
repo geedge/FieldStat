@@ -24,17 +24,15 @@ struct fieldstat {
     size_t n_field;
 };
 
-
-int append_field_to_instance(struct fieldstat *instance, struct fs_field *field)
+static int append_field_to_instance(struct fieldstat *instance, const struct fs_field *field)
 {
-    if (instance->n_field >= METRICS_MAX_NUMBER) {
+    if (instance->n_field >= METRICS_MAX_NUMBER) {  // TODO: realloc
         printf("append_field_to_instance: too many metrics\n");
         return -1;
     }
     instance->field_array[instance->n_field++] = field;
     return instance->n_field - 1;
 }
-
 
 struct fieldstat *fieldstat_new(const char *symbol)
 {
@@ -59,6 +57,7 @@ void fieldstat_serialize(struct fieldstat *instance, char **blob, size_t *blob_s
 
     for (int i = 0; i < instance->n_field; i++) {
         struct fs_field *field = instance->field_array[i];
+        // TODO: metric 改名 cell
         struct metric_hash_node *node, *tmp;
         HASH_ITER(hh, field->hash_tbl, node, tmp) {
             struct metrics *metric = node->metric;
@@ -104,7 +103,6 @@ int fieldstat_insert_field(struct fieldstat *instance, struct fs_field *field)
 
 int fieldstat_register_topk(struct fieldstat *instance, const char *field_name, int K)
 {
-    //TODO K->struct para   
     struct field_paras *params = malloc(sizeof(struct field_paras));
     params->para.topk.K = K;
 

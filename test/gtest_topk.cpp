@@ -20,11 +20,27 @@ std::string gen_rand_string(int len)
 
 TEST(myczzzzzzz, FieldStatDynamicInstanceSetPara)
 {
+    // Tester.instance_name;
+    // instance = Tester.get_instance;
+    // instance...
+    // [auto]Tester_serialize and merge and query
+    // Tester.parse_field(name, expectedvalue); // if string STREQ... double APPROX_EQ
+
     struct fieldstat *instance = fieldstat_new("czz");
+    // new instance
 
     int topk1_id = fieldstat_register_topk(instance, "topk", 10);
+    // register metric 
     std::string topk1_name = gen_rand_string(10);
     fieldstat_topk_add(instance, topk1_id, topk1_name.c_str(), topk1_name.length(), &TAG_STRING, 1);
+    // dynamicly add several 
+
+    // serialize 
+
+    // merge with blob
+
+    // query (read field)
+    // get benchmark(vary)
 
     fieldstat_free(instance);
 

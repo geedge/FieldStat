@@ -3,6 +3,7 @@
 #include <stddef.h>
 
 #include "field_and_metric.h"
+#include "metric_info.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -11,7 +12,7 @@ extern "C" {
 enum serializer_type {
     SERIALIZER_TYPE_BIN, // // only an array of <instance name>, [<arrayID>:<bin_which_has_java_deserialize_method_and_convert_by_base64>]
     SERIALIZER_TYPE_MERGE, // the basic serializer. May recover the instance.
-    SERIALIZER_TYPE_RESULT, // return an array: struct metric_output[]. Not s standard serializer
+    SERIALIZER_TYPE_QUERY, // return an array: struct metric_output[]. Not s standard serializer
     SERIALIZER_TYPE_MAX
 };
 
@@ -36,6 +37,9 @@ struct serializer {
 };
 
 struct serializer *serializer_create(enum serializer_type type, size_t metric_number);
+
+
+void fill_metric_base_info(const struct metrics *base, enum serializer_type serializer_type, struct metric_info *info_out);
 
 #ifdef __cplusplus
 }

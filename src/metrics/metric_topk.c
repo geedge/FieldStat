@@ -4,13 +4,16 @@
 #include <assert.h>
 #include <string.h>
 
+#include "fieldstat_tag.h"
 
 // #include "cjson/cJSON.h"
 #include "fieldstat.h"
 #include "serializer_merge.h"
+#include "serializer_query.h"
 #include "heavy_keeper.h"
 #include "field_and_metric.h"
 #include "metric_type_internal.h"
+#include "serializer.h"
 
 struct metric_topk {
     struct metrics base;
@@ -74,14 +77,35 @@ static int metric_topk_dump(const struct metrics *pthis, struct metric_info *inf
 {
     struct metric_topk *topk = (struct metric_topk *)pthis;
 
-    char *blob;
-    size_t blob_size;
-    heavy_keeper_serialization(topk->hk, &blob, &blob_size);
+    switch (info_out->type)
+    {
+    case SERIALIZER_TYPE_MERGE:{
+        struct metric_info_merge_inheritance *merge_info = (struct metric_info_merge_inheritance *)info_out;
+        char *blob = NULL;
+        size_t blob_size = 0;
+        heavy_keeper_serialization(topk->hk, &blob, &blob_size);
+        merge_info->blob = blob;
+        merge_info->blob_size = blob_size;
+        fill_metric_base_info(pthis, SERIALIZER_TYPE_MERGE, &merge_info->base);
+        break;
+    }
+    
+    case SERIALIZER_TYPE_QUERY: {
+        struct metric_info_query_inheritance *query_info = (struct metric_info_query_inheritance *)info_out;
+        struct heavy_keeper_result *result = heavy_keeper_query(topk->hk);
+        query_info->field_kvpairs = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * result->n_key);
+        memset(query_info->field_kvpairs, 0, sizeof(struct fieldstat_tag) * result->n_key);
+        query_info->field_num = result->n_key;
+        for (size_t i = 0; i < result->n_key; i++) {
+            kv_pair_write_value_int(&query_info->field_kvpairs[i], result->key[i], result->count[i]);
+        }
+        fill_metric_base_info(pthis, SERIALIZER_TYPE_QUERY, &query_info->base);
+        break;
+    }
 
-    info_out->blob = blob;
-    info_out->blob_size = blob_size;
-    info_out->type = (int)FIELD_TYPE_TOPK;
-    fill_metric_base_info(pthis, info_out);
+    default:
+        break;
+    }
 
     return 0;
 }

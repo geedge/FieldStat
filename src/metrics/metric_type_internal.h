@@ -10,8 +10,6 @@ extern "C"
 // struct metrics *metric_hdr_create(const char *name, size_t name_len, const char * bins, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures);
 // int metric_hdr_add(struct metrics *hdr, long long value);
 
-
-
 struct metrics *metric_topk_create(int K);
 struct metrics *metrics_topk_deserialize(const char *blob, size_t blob_size);
 void metric_topk_add(struct metrics *pthis, const char *key, size_t key_len, unsigned value);
@@ -27,9 +25,7 @@ void metric_topk_add(struct metrics *pthis, const char *key, size_t key_len, uns
 // int metric_unique_add(struct metrics *unique, const char *key, size_t keylen);
 
 
-// common
-void fill_metric_base_info(const struct metrics *base, struct metric_info *info_out);
-void metric_info_free(struct metric_info *p);
+// common function used by and only by metric types
 
 #ifdef __cplusplus
 }

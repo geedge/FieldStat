@@ -76,3 +76,43 @@ int build_dynamic_metric_key_with_unzipped_tag(const char * const tag_key[], con
     }
     return  used_len;
 }
+
+void kv_pair_write_value_int(struct fieldstat_tag *kv_pair, const char *key, long long value)
+{
+    if (key) { // key is optional
+        kv_pair->key = strdup(key);
+    }
+    kv_pair->type = TAG_INTEGER;
+    kv_pair->value_int = value;
+}
+
+void kv_pair_write_value_double(struct fieldstat_tag *kv_pair, const char *key, double value)
+{
+    if (key) { // key is optional
+        kv_pair->key = strdup(key);
+    }
+
+    kv_pair->type = TAG_DOUBLE;
+    kv_pair->value_double = value;
+}
+
+void kv_pair_write_value_str(struct fieldstat_tag *kv_pair, const char *key, const char *value)
+{
+    if (key) { // key is optional
+        kv_pair->key = strdup(key);
+    }
+    kv_pair->type = TAG_CSTRING;
+    kv_pair->value_str = strdup(value);
+}
+
+void kv_pair_clear(struct fieldstat_tag *kv_pair)
+{
+    if (kv_pair->key) {
+        free(kv_pair->key);
+        kv_pair->key = NULL;
+    }
+    if (kv_pair->type == TAG_CSTRING && kv_pair->value_str) {
+        free(kv_pair->value_str);
+        kv_pair->value_str = NULL;
+    }
+}

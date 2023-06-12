@@ -29,7 +29,6 @@
 #include "serializer.h"
 #include "serializer_merge.h"
 #include "metric_type_internal.h"
-
 // TODO: 给付明卫的output里应该有可以复用的代码，不要这么多个output了，所有serializer放一个文件
 // TODO：抽空跟付明卫和OLAP的人讨论一下序列化的结果怎么对齐
 
@@ -40,8 +39,11 @@ static void serializer_merge_del(struct serializer *pthis)
 
     if (p->metric_info) {
         for (size_t i = 0; i < p->metric_num; i++) {
-            metric_info_free(p->metric_info[i]);
+            metric_info_clear(&p->metric_info[i]->base);
+            free(p->metric_info[i]->blob);
+            free(p->metric_info[i]);
         }
+
         free(p->metric_info);
     }
     free(p);
@@ -55,7 +57,7 @@ static int serializer_merge_access(struct serializer *pthis, const struct metric
         return -1;
     }
 
-    int ret = metrics->dump(metrics, p->metric_info[p->write_pos]);
+    int ret = metrics->dump(metrics, (struct metric_info *)p->metric_info[p->write_pos]);
     p->write_pos++;
 
     return ret;
@@ -67,28 +69,28 @@ static void serialize_metric(const struct serializer_merge *p, mpack_writer_t *w
     mpack_start_array(writer, p->metric_num);
 
     for (int i = 0; i < p->metric_num; i++) {
-        struct metric_info *info = p->metric_info[i];
+        struct metric_info_merge_inheritance *info = p->metric_info[i];
         mpack_start_map(writer, 5);
 
         mpack_write_cstr(writer, "tag_k");
-        mpack_start_array(writer, info->tag_num);
-        for (int j = 0; j < info->tag_num; j++) {
-            mpack_write_cstr(writer, info->tag_key[j]);
+        mpack_start_array(writer, info->base.tag_num);
+        for (int j = 0; j < info->base.tag_num; j++) {
+            mpack_write_cstr(writer, info->base.tag_key[j]);
         }
         mpack_finish_array(writer);
 
         mpack_write_cstr(writer, "tag_v");
-        mpack_start_array(writer, info->tag_num);
-        for (int j = 0; j < info->tag_num; j++) {
-            mpack_write_cstr(writer, info->tag_val[j]);
+        mpack_start_array(writer, info->base.tag_num);
+        for (int j = 0; j < info->base.tag_num; j++) {
+            mpack_write_cstr(writer, info->base.tag_val[j]);
         }
         mpack_finish_array(writer);
 
         mpack_write_cstr(writer, "field_id");
-        mpack_write_i32(writer, info->field_id);
+        mpack_write_i32(writer, info->base.field_id);
 
         mpack_write_cstr(writer, "field_name");
-        mpack_write_cstr(writer, info->field_name);
+        mpack_write_cstr(writer, info->base.field_name);
 
         mpack_write_cstr(writer, "blob");
         mpack_write_bin(writer, info->blob, info->blob_size);
@@ -127,7 +129,12 @@ struct serializer_merge *serializer_merge_create(size_t metric_num)
     p->base.access = serializer_merge_access;
     p->base.gen = serializer_merge_gen;
     p->base.del = serializer_merge_del;
-    p->metric_info = (struct metric_info **)malloc(sizeof(struct metric_info *) * metric_num);
+    p->metric_info = (struct metric_info_merge_inheritance **)malloc(sizeof(struct metric_info_merge_inheritance *) * metric_num);
+
+    for (size_t i = 0; i < metric_num; i++) {
+        p->metric_info[i] = (struct metric_info_merge_inheritance *)malloc(sizeof(struct metric_info_merge_inheritance));
+        memset(p->metric_info[i], 0, sizeof(struct metric_info_merge_inheritance));
+    }
     p->metric_num = metric_num;
     p->write_pos = 0;
 
