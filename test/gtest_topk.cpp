@@ -4,7 +4,6 @@
 // #include "utils.hpp"
 
 #include "fieldstat.h"
-#include "field_and_metric.h"
 
 const struct fieldstat_tag TAG_STRING = {"IP CLIENT", TAG_CSTRING, {.value_str = "100.1.1.1"}};
 
@@ -17,6 +16,19 @@ std::string gen_rand_string(int len)
     }
     return s;
 }
+
+// serialize and merge by blob(empty dest), then create a new instance by the same register order, merge by blob(non-empty dest). query result on the merged one. Benchmark: tag, heavykeeper result.
+
+// serialize and merge by blob(empty dest), then create a new instance by the same register order, refresh, merge by blob(non-empty dest). query result on the merged one. Benchmark: tag, heavykeeper result.
+
+// multi field, same tag, add several times. 
+
+// register and merge empty to empty
+
+// register and merge empty to non-empty
+
+// compare merged one to source, they are equal
+
 
 TEST(myczzzzzzz, FieldStatDynamicInstanceSetPara)
 {

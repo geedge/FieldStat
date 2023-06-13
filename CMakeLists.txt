@@ -74,7 +74,7 @@ endif()
 
 include_directories(${PROJECT_SOURCE_DIR}/vendors)
 include_directories(${PROJECT_SOURCE_DIR}/src)
-include_directories(${PROJECT_SOURCE_DIR}/include)
+include_directories(${PROJECT_SOURCE_DIR}/include/fieldstat)
 include_directories(${PROJECT_SOURCE_DIR}/src/export)
 include_directories(${PROJECT_SOURCE_DIR}/src/metrics)
 include_directories(${PROJECT_SOURCE_DIR}/src/utils)
