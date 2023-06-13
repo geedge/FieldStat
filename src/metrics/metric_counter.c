@@ -9,7 +9,7 @@
 
 
 // struct metric_counter {
-//     struct metrics base;
+//     struct cell base;
 //     long long value;
 //     // enum metric_counter_type type;
 // };
@@ -36,7 +36,7 @@
 //     cJSON_Delete(root);
 // }
 
-// int metric_counter_dump(struct metrics *pthis, struct serializer *serializer)
+// int metric_counter_dump(struct cell *pthis, struct serializer *serializer)
 // {
 //     struct metric_counter *counter = (struct metric_counter *)pthis;
     
@@ -57,7 +57,7 @@
 //     }
 // }
 
-// void metric_counter_refresh(struct metrics *pthis)
+// void metric_counter_refresh(struct cell *pthis)
 // {
 //     if (pthis->type == METRICS_TYPE_GAUGE) {
 //         return;
@@ -66,14 +66,14 @@
 //     counter->value = 0;
 // }
 
-// void metric_counter_del(struct metrics *pthis)
+// void metric_counter_del(struct cell *pthis)
 // {
 //     struct metric_counter *counter = (struct metric_counter *)pthis;
 //     free(pthis->name);
 //     free(counter);
 // }
 
-// int metric_counter_merge(struct metrics *pthis, struct metrics *from)
+// int metric_counter_merge(struct cell *pthis, struct cell *from)
 // {
 //     struct metric_counter *dest = (struct metric_counter *)pthis;
 //     struct metric_counter *src = (struct metric_counter *)from;
@@ -88,7 +88,7 @@
 //     struct metric_counter *counter = malloc(sizeof(struct metric_counter));
 //     counter->value = 0;
 
-//     struct metrics *base = (struct metrics *)counter;
+//     struct cell *base = (struct cell *)counter;
 
 //     base->type = FIELD_TYPE_COUNTER;
 //     base->del = metric_counter_del;

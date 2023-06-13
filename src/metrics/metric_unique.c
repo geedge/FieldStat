@@ -10,18 +10,18 @@
 // #include "metric_type_internal.h"
 
 // struct metric_unique {
-//     struct metrics base;
+//     struct cell base;
 //     struct ST_hyperloglog *unique;
 // };
 
 
-// void metric_unique_refresh(struct metrics *pthis)
+// void metric_unique_refresh(struct cell *pthis)
 // {
 //     struct metric_unique *unique = (struct metric_unique *)pthis;
 //     ST_hyperloglog_reset(unique->unique);
 // }
 
-// void metric_unique_del(struct metrics *pthis)
+// void metric_unique_del(struct cell *pthis)
 // {
 //     struct metric_unique *unique = (struct metric_unique *)pthis;
 //     free(pthis->name);
@@ -53,7 +53,7 @@
 //     return;
 // }
 
-// int metric_unique_dump(struct metrics *pthis, struct serializer *serializer)
+// int metric_unique_dump(struct cell *pthis, struct serializer *serializer)
 // {
 //     struct metric_unique *unique = (struct metric_unique *)pthis;
 
@@ -82,7 +82,7 @@
 //     }
 // }
 
-// int metric_unique_merge(struct metrics *pthis, struct metrics *from)
+// int metric_unique_merge(struct cell *pthis, struct cell *from)
 // {
 //     struct metric_unique *unique = (struct metric_unique *)pthis;
 //     struct metric_unique *from_unique = (struct metric_unique *)from;

@@ -4,13 +4,13 @@
 #include "fieldstat.h"
 #include "field.h"
 #include "uthash.h"
-#include "metric.h"
+#include "fs_cell.h"
 #include "mpack/mpack.h"
 
-struct metric_hash_node {
+struct cell_hash_node {
     char *key; // kv_pair of tags
     size_t key_len; // exclude '\0'
-    struct metrics *metric;
+    struct cell *cell;
     UT_hash_handle hh;
 };
 
@@ -38,29 +38,29 @@ struct fs_field {
     enum field_type type;
     int field_id;
     char *name;
-    struct metric_hash_node *hash_tbl;
+    struct cell_hash_node *hash_tbl;
     struct field_paras *field_paras;
 };
 
-static struct metrics *find_metric_in_field(const struct fs_field *field, const char *key, size_t key_len)
+static struct cell *find_cell_in_field(const struct fs_field *field, const char *key, size_t key_len)
 {
-    struct metric_hash_node *node;
+    struct cell_hash_node *node;
     HASH_FIND(hh, field->hash_tbl, key, key_len, node);
     if (node == NULL) {
         return NULL;
     }
-    return node->metric;
+    return node->cell;
 }
 
 // key_len does not include '\0'
-void field_insert_metric(struct fs_field *field, struct metrics *metric, const char *key, size_t key_len)
+void field_insert_cell(struct fs_field *field, struct cell *cell, const char *key, size_t key_len)
 {
-    struct metric_hash_node *node = (struct metric_hash_node *)malloc(sizeof(struct metric_hash_node));
+    struct cell_hash_node *node = (struct cell_hash_node *)malloc(sizeof(struct cell_hash_node));
 
     node->key_len = key_len;
     node->key = (char *)malloc(key_len + 1);
     memcpy(node->key, key, key_len);
-    node->metric = metric;
+    node->cell = cell;
     HASH_ADD_KEYPTR(hh, field->hash_tbl, node->key, node->key_len, node);
 }
 
@@ -77,10 +77,10 @@ struct fs_field *field_new_topk(const char *name, int K)
 
 void field_free(struct fs_field *field)
 {
-    struct metric_hash_node *node, *tmp;
+    struct cell_hash_node *node, *tmp;
     HASH_ITER(hh, field->hash_tbl, node, tmp) {
-        struct metrics *metric = node->metric;
-        metric->del(metric);
+        struct cell *cell = node->cell;
+        cell->del(cell);
         HASH_DEL(field->hash_tbl, node);
         free(node);
     }
@@ -89,10 +89,10 @@ void field_free(struct fs_field *field)
 
 void field_refresh(struct fs_field *field)
 {
-    struct metric_hash_node *node, *tmp;
+    struct cell_hash_node *node, *tmp;
     HASH_ITER(hh, field->hash_tbl, node, tmp) {
-        struct metrics *metric = node->metric;
-        metric->refresh(metric);
+        struct cell *cell = node->cell;
+        cell->refresh(cell);
     }
 }
 
@@ -104,11 +104,11 @@ struct fs_field *field_dup(const struct fs_field *src)
     dst->type = src->type;
     dst->field_paras = (struct field_paras *)malloc(sizeof(struct field_paras));
     memcpy(dst->field_paras, src->field_paras, sizeof(struct field_paras));
-    struct metric_hash_node *node, *tmp;
+    struct cell_hash_node *node, *tmp;
     HASH_ITER(hh, src->hash_tbl, node, tmp) {
-        struct metrics *metric = node->metric;
-        struct metrics *new_metric = metric->dup(metric);
-        field_insert_metric(dst, new_metric, node->key, node->key_len);
+        struct cell *cell = node->cell;
+        struct cell *new_cell = cell->dup(cell);
+        field_insert_cell(dst, new_cell, node->key, node->key_len);
     }
     return dst;
 }
@@ -119,16 +119,16 @@ int field_merge(struct fs_field *dst, const struct fs_field *src)
         printf("field_merge:field type not match\n");
         return -1;
     }
-    struct metric_hash_node *node, *tmp;
+    struct cell_hash_node *node, *tmp;
     HASH_ITER(hh, src->hash_tbl, node, tmp) {
-        struct metrics *metric = node->metric;
-        struct metrics *dst_metric = find_metric_in_field(dst, node->key, node->key_len);
-        if (dst_metric == NULL) {
-            struct metrics *new_metric = metric->dup(metric);
-            field_insert_metric(dst, new_metric, node->key, node->key_len);
+        struct cell *cell = node->cell;
+        struct cell *dst_cell = find_cell_in_field(dst, node->key, node->key_len);
+        if (dst_cell == NULL) {
+            struct cell *new_cell = cell->dup(cell);
+            field_insert_cell(dst, new_cell, node->key, node->key_len);
         } else {
-            if (metric->merge(metric, dst_metric) != 0) {
-                printf("field_merge:metric merge failed\n");
+            if (cell->merge(cell, dst_cell) != 0) {
+                printf("field_merge:cell merge failed\n");
                 return -1;
             }
         }
@@ -141,20 +141,20 @@ void field_get_tags(const struct fs_field *field, struct fieldstat_tag_list **ta
     *tag_lists_out = (struct fieldstat_tag_list *)malloc(sizeof(struct fieldstat_tag_list) * HASH_COUNT(field->hash_tbl));
     *n_tag_lists_out = HASH_COUNT(field->hash_tbl);
 
-    struct metric_hash_node *node, *tmp;
+    struct cell_hash_node *node, *tmp;
     int i = 0;
     HASH_ITER(hh, field->hash_tbl, node, tmp) {
-        struct metrics *metric = node->metric;
+        struct cell *cell = node->cell;
         struct fieldstat_tag *tags = NULL;
         size_t n_tags = 0;
-        metric->read_tag(metric, &tags, &n_tags);
+        cell->read_tag(cell, &tags, &n_tags);
         (*tag_lists_out)[i].tag = tags;
         (*tag_lists_out)[i].n_tag = n_tags;
         i++;
     }
 }
 
-static void build_dynamic_metric_key(const struct fieldstat_tag tags[], size_t n_tags, char **out_key, size_t *out_key_size)
+static void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_tags, char **out_key, size_t *out_key_size)
 {
 	int i = 0;
 	int used_len = 0;
@@ -209,19 +209,19 @@ int field_topk_add(struct fs_field *field, const char *key, size_t key_len, doub
         printf("field_topk_add: field type is not topk\n");
         return -1;
     }
-    char *dynamic_metric_key = NULL;
+    char *dynamic_cell_key = NULL;
     size_t dynamic_key_size = 0;
-    build_dynamic_metric_key(tag_list, tag_num, &dynamic_metric_key, &dynamic_key_size);
+    build_dynamic_cell_key(tag_list, tag_num, &dynamic_cell_key, &dynamic_key_size);
 
-    struct metrics *metric = find_metric_in_field(field, dynamic_metric_key, dynamic_key_size);
-    if (metric == NULL) {
-        metric = metric_topk_create(field->field_paras->topk.K);
-        metric->add_tag(metric, tag_list, tag_num);
-        field_insert_metric(field, metric, dynamic_metric_key, dynamic_key_size);
-        free(dynamic_metric_key);
+    struct cell *cell = find_cell_in_field(field, dynamic_cell_key, dynamic_key_size);
+    if (cell == NULL) {
+        cell = cell_create_for_topk(field->field_paras->topk.K);
+        cell->add_tag(cell, tag_list, tag_num);
+        field_insert_cell(field, cell, dynamic_cell_key, dynamic_key_size);
+        free(dynamic_cell_key);
     }
 
-    metric_topk_add(metric, key, key_len, score);
+    cell_add_for_topk(cell, key, key_len, score);
     return 0;
 }
 
@@ -234,28 +234,28 @@ int field_topk_add(struct fs_field *field, const char *key, size_t key_len, doub
             "type":<field_type>
             "id":<field_id>
             "para":[may be null, one number, or a double array]
-            "metrics":<bin_blob>
+            "cells":<bin_blob>
             ]
         }
 }
 */
-struct metrics *deserialize_for_metric_type(const char *blob, size_t blob_size, int type)
+struct cell *deserialize_for_cell_type(const char *blob, size_t blob_size, int type)
 {
-    struct metrics *metric = NULL;
+    struct cell *cell = NULL;
     switch (type) {
         // case FIELD_TYPE_COUNTER:
-        //     metric = metric_counter_deserialize(data, data_len, 0);
+        //     cell = cell_counter_deserialize(data, data_len, 0);
         //     break;
 
         case FIELD_TYPE_TOPK:
-            metric = metrics_topk_deserialize(blob, blob_size);
+            cell = cell_deserialize_for_topk(blob, blob_size);
             break;
 
         default:
             assert(0);
             break;
     }
-    return metric;
+    return cell;
 }
 
 struct fs_field *field_new_by_deserialize(const char *blob, size_t blob_size)
@@ -286,25 +286,25 @@ struct fs_field *field_new_by_deserialize(const char *blob, size_t blob_size)
         return NULL;
     }
     field_out->field_id = id;
-    mpack_node_t metrics_arr = mpack_node_map_cstr(root, "metrics");
-    for (int i = 0; i < mpack_node_array_length(metrics_arr); i++) {
-        mpack_node_t metric_node = mpack_node_array_at(metrics_arr, i);
-        struct metrics *metric = deserialize_for_metric_type(mpack_node_str(metric_node), mpack_node_i32(mpack_node_map_cstr(metric_node, "blob_size")), type);
-        if (metric == NULL) {
-            fprintf(stderr, "deserialize_for_metric_type failed\n");
+    mpack_node_t cells_arr = mpack_node_map_cstr(root, "cells");
+    for (int i = 0; i < mpack_node_array_length(cells_arr); i++) {
+        mpack_node_t cell_node = mpack_node_array_at(cells_arr, i);
+        struct cell *cell = deserialize_for_cell_type(mpack_node_str(cell_node), mpack_node_i32(mpack_node_map_cstr(cell_node, "blob_size")), type);
+        if (cell == NULL) {
+            fprintf(stderr, "deserialize_for_cell_type failed\n");
             return NULL;
         }
 
         struct fieldstat_tag *tag_list = NULL;
         size_t tag_num = 0;
-        metric->read_tag(metric, &tag_list, &tag_num);
+        cell->read_tag(cell, &tag_list, &tag_num);
 
-        char *dynamic_metric_key = NULL;
+        char *dynamic_cell_key = NULL;
         size_t dynamic_key_size = 0;
-        build_dynamic_metric_key(tag_list, tag_num, &dynamic_metric_key, &dynamic_key_size);
-        field_insert_metric(field_out, metric, dynamic_metric_key, dynamic_key_size); // dynamic_metric_key is add to hashtable, so no need to free
+        build_dynamic_cell_key(tag_list, tag_num, &dynamic_cell_key, &dynamic_key_size);
+        field_insert_cell(field_out, cell, dynamic_cell_key, dynamic_key_size); // dynamic_cell_key is add to hashtable, so no need to free
 
-        free(dynamic_metric_key);
+        free(dynamic_cell_key);
         free(tag_list);
     }
     return field_out;
@@ -317,7 +317,7 @@ struct fs_field *field_new_by_deserialize(const char *blob, size_t blob_size)
             "type":<field_type>
             "id":<field_id>
             "para":[may be null, one number, or a double array]
-            "metrics":[<bin_blob>]
+            "cells":[<bin_blob>]
         }*/
 int field_serialize(struct fs_field *field, char **blob, size_t *blob_size)
 {
@@ -342,16 +342,16 @@ int field_serialize(struct fs_field *field, char **blob, size_t *blob_size)
             assert(0);
             break;
     }
-    struct metric_hash_node *node, *tmp;
-    mpack_write_cstr(&writer, "metrics");
+    struct cell_hash_node *node, *tmp;
+    mpack_write_cstr(&writer, "cells");
     mpack_build_array(&writer);
-    char *metric_blob;
-    size_t metric_blob_size;
+    char *cell_blob;
+    size_t cell_blob_size;
     HASH_ITER(hh, field->hash_tbl, node, tmp) {
-        struct metrics *metric = node->metric;
-        metric->serialize(metric, &metric_blob, &metric_blob_size);
-        mpack_write_bin(&writer, metric_blob, metric_blob_size);
-        free(metric_blob);
+        struct cell *cell = node->cell;
+        cell->serialize(cell, &cell_blob, &cell_blob_size);
+        mpack_write_bin(&writer, cell_blob, cell_blob_size);
+        free(cell_blob);
     }
     mpack_complete_array(&writer);
 
@@ -377,18 +377,18 @@ enum field_type field_get_type(struct fs_field *field)
 void field_query_for_topk(const struct fs_field *field, const struct fieldstat_tag *tag_list, size_t tag_num,
     char ***keys_out, long long **values_out, size_t *num_out)
 {
-    char *dynamic_metric_key = NULL;
+    char *dynamic_cell_key = NULL;
     size_t dynamic_key_size = 0;
-    build_dynamic_metric_key(tag_list, tag_num, &dynamic_metric_key, &dynamic_key_size);
-    struct metrics *metric = find_metric_in_field(field, dynamic_metric_key, dynamic_key_size);
+    build_dynamic_cell_key(tag_list, tag_num, &dynamic_cell_key, &dynamic_key_size);
+    struct cell *cell = find_cell_in_field(field, dynamic_cell_key, dynamic_key_size);
 
-    if (metric == NULL) {
+    if (cell == NULL) {
         *num_out = 0;
         *keys_out = NULL;
         *values_out = NULL;
         return;
     }
 
-    metric_topk_query(metric, keys_out, values_out, num_out);
-    free(dynamic_metric_key);
+    cell_query_for_topk(cell, keys_out, values_out, num_out);
+    free(dynamic_cell_key);
 }

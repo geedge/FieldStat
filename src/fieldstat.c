@@ -15,7 +15,7 @@
 struct fieldstat {
     char name[INSTANCE_NAME_MAX_LEN];
 
-    struct fs_field *field_array[METRICS_MAX_NUMBER]; // all the metrics are dynamic(differ from field stat 3.0) // TODO: 改成动态的
+    struct fs_field *field_array[CELL_MAX_NUMBER]; // all the metrics are dynamic(differ from field stat 3.0) // TODO: 改成动态的
     size_t n_field;
 };
 
@@ -45,8 +45,8 @@ void fieldstat_refresh(struct fieldstat *instance)
 
 static int append_field_to_instance(struct fieldstat *instance, const struct fs_field *field)
 {
-    if (instance->n_field >= METRICS_MAX_NUMBER) {  // TODO: realloc
-        printf("append_field_to_instance: too many metrics\n");
+    if (instance->n_field >= CELL_MAX_NUMBER) {  // TODO: realloc
+        printf("append_field_to_instance: too many fields registered\n");
         return -1;
     }
     instance->field_array[instance->n_field++] = (struct fs_field *)field;

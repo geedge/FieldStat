@@ -7,7 +7,7 @@ extern "C"
 
 #define INSTANCE_NAME_MAX_LEN 32
 #define MAX_TAG_NUM	     	32
-#define METRICS_MAX_NUMBER 1024
+#define CELL_MAX_NUMBER 1024
 
 enum field_type
 {

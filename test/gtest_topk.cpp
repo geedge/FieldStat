@@ -29,6 +29,8 @@ std::string gen_rand_string(int len)
 
 // compare merged one to source, they are equal
 
+// 简单的tag 测试：输入一个key， value 是”1“， 再输入一个value是1的tag，两次添加，只有一个tag，查阅出的tag也只有一个。 
+
 
 TEST(myczzzzzzz, FieldStatDynamicInstanceSetPara)
 {

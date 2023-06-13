@@ -11,7 +11,7 @@
 // #include "field_and_metric.h"
 
 // struct metric_hdr {
-//     struct metrics base;
+//     struct cell base;
 //     struct hdr_histogram *hdr;
 //     double *bins;
 // };
@@ -42,7 +42,7 @@
 // //     cJSON_Delete(root);
 // // }
 
-// // int metric_hdr_dump(struct metrics *pthis, struct serializer *serializer)
+// // int metric_hdr_dump(struct cell *pthis, struct serializer *serializer)
 // // {
 // //     struct metric_hdr *hdr = (struct metric_hdr *)pthis;
 
@@ -64,13 +64,13 @@
 // //     return -1;
 // // }
 
-// // void metric_hdr_refresh(struct metrics *pthis)
+// // void metric_hdr_refresh(struct cell *pthis)
 // // {
 // //     struct metric_hdr *hdr = (struct metric_hdr *)pthis;
 // //     hdr_reset(hdr->hdr);
 // // }
 
-// // void metric_hdr_del(struct metrics *pthis)
+// // void metric_hdr_del(struct cell *pthis)
 // // {
 // //     struct metric_hdr *hdr = (struct metric_hdr *)pthis;
 // //     free(pthis->name);
@@ -79,7 +79,7 @@
 // //     free(hdr);
 // // }
 
-// // int metric_hdr_merge(struct metrics *pthis, struct metrics *from)
+// // int metric_hdr_merge(struct cell *pthis, struct cell *from)
 // // {
 // //     struct metric_hdr *hdr = (struct metric_hdr *)pthis;
 // //     struct metric_hdr *hdr_from = (struct metric_hdr *)from;
@@ -153,7 +153,7 @@
 // //     hdr->bins = bin_double;
 // //     hdr->hdr = tmp_p_hdr;
 
-// //     struct metrics *base = (struct metrics *)hdr;
+// //     struct cell *base = (struct cell *)hdr;
 // //     base->type = FIELD_TYPE_HISTOGRAM;
 // //     base->name = strdup(name);
 // //     base->dump = metric_hdr_dump;

@@ -1,14 +1,6 @@
 #pragma once
 
 
-/* 
-    * metrics
-    * - metrics_func_del : free the metrics. 
-    * - metrics_func_dump : Let the metric dump a serializer. The effect is to write the metrics data to the serializer.
-    * - metrics_func_refresh : refresh the metrics. This function should not depend on the serializer anymore.
-    * 
-    * you should also write a metrics_new function to create a metrics, where realizations of the above functions are specified.
-*/
 #include "fieldstat.h"
 #include "uthash.h"
 
