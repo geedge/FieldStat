@@ -27,9 +27,11 @@ struct cell *cell_deserialize_for_topk(const char *blob, size_t blob_size);
 void cell_add_for_topk(struct cell *pthis, const char *key, size_t key_len, unsigned value);
 void cell_query_for_topk(const struct cell *pthis, char ***keys_out, long long **values_out, size_t *num_out);
 
-// struct metric_counter *metric_counter_create();
-// void metric_counter_add(struct metric_counter *counter, long long value);
-// //TODO: 各自的deserialize
+struct cell *cell_create_for_counter();
+struct cell *cell_deserialize_for_counter(const char *blob, size_t blob_size);
+void cell_add_for_counter(struct cell *pthis, long long value);
+long long cell_query_for_counter(const struct cell *pthis)
+
 
 
 // struct cell *metric_hdr_create(const char *name, size_t name_len, const char * bins, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures);

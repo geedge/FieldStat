@@ -13,7 +13,7 @@ enum field_type
 {
 	FIELD_TYPE_COUNTER,
 	FIELD_TYPE_TOPK,
-	FIELD_TYPE_HLL,
+	FIELD_TYPE_CARDINALITY,
 	FIELD_TYPE_HISTOGRAM,
     // gauge
     // summery
