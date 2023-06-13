@@ -179,10 +179,12 @@ static int add_hdr_field_set(struct metric *metric, struct hdr_histogram *h_out,
 static int add_table_row_field_set(char *column_name[], long long *row_value, int n_column, char *line_buf, int line_buf_size)
 {
 	int used_len = 0;
+	char unescape[256] = {0};
 
 	for(int i = 0; i < n_column; i++)
 	{
-		used_len += add_field_set(column_name[i], row_value[i], line_buf + used_len, line_buf_size - used_len);
+		escaping_special_chars_cpoy(unescape, column_name[i], sizeof(unescape));
+		used_len += add_field_set(unescape, row_value[i], line_buf + used_len, line_buf_size - used_len);
 		used_len += snprintf(line_buf + used_len, line_buf_size - used_len, ",");		
 	}
 
@@ -201,6 +203,7 @@ static int build_single_metric_line_buf(char *instance_name, int output_type, st
 {
 	int used_len = 0;
 	long long value = 0;
+	char unescape[256] = {0};
 
 	value = read_single_metric_value(metric, output_type);
 
@@ -209,7 +212,9 @@ static int build_single_metric_line_buf(char *instance_name, int output_type, st
 		return 0;
 	}
 
-	used_len += add_measurement(metric->field_name, line_buf, line_buf_size);
+	escaping_special_chars_cpoy(unescape, metric->field_name, sizeof(unescape));
+
+	used_len += add_measurement(unescape, line_buf, line_buf_size);
 
 	used_len += add_default_tag_set(instance_name, NULL, line_buf + used_len, line_buf_size - used_len);
 
@@ -217,7 +222,7 @@ static int build_single_metric_line_buf(char *instance_name, int output_type, st
 
 	used_len += snprintf(line_buf + used_len, line_buf_size - used_len, " ");
 
-	used_len += add_field_set(metric->field_name, value, line_buf + used_len, line_buf_size - used_len);
+	used_len += add_field_set(unescape, value, line_buf + used_len, line_buf_size - used_len);
 
 	used_len += snprintf(line_buf + used_len, line_buf_size - used_len, "\n");
 
@@ -252,6 +257,7 @@ static int build_hdr_metric_line_buf(char *instance_name, int output_type, struc
 {
 	int used_len = 0;
 	struct hdr_histogram *h_out = NULL;
+	char unescape[256] = {0};
 
 	h_out = read_hdr_metric_value(metric, output_type);
 
@@ -260,7 +266,9 @@ static int build_hdr_metric_line_buf(char *instance_name, int output_type, struc
 		return 0;
 	}
 
-	used_len += add_measurement(metric->field_name, line_buf, line_buf_size);
+	escaping_special_chars_cpoy(unescape, metric->field_name, sizeof(unescape));
+
+	used_len += add_measurement(unescape, line_buf, line_buf_size);
 
 	used_len += add_default_tag_set(instance_name, NULL, line_buf + used_len, 
 								    line_buf_size - used_len);
@@ -310,6 +318,7 @@ static int build_table_row_line_buf(char *instance_name, int output_type, struct
 	int used_len = 0;
 	struct metric *metric = NULL;
 	int n_send = 0;
+	char unescape[256] = {0};
 
 	if(table->column_cnt <= 0)
 	{
@@ -331,7 +340,8 @@ static int build_table_row_line_buf(char *instance_name, int output_type, struct
 
 	metric = row_metric[0];
 
-	used_len += add_measurement(metric->field_name, line_buf, line_buf_size);
+	escaping_special_chars_cpoy(unescape, metric->field_name, sizeof(unescape));
+	used_len += add_measurement(unescape, line_buf, line_buf_size);
 
 	used_len += add_default_tag_set(instance_name, table->name, line_buf + used_len, line_buf_size - used_len);
 

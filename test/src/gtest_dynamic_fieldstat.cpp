@@ -2630,6 +2630,113 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicTableMetricValueGet)
 	fieldstat_dynamic_instance_free(instance);
 }
 
+TEST(FeildStatDynamicAPI, TableRowMetricValueIncrby)
+{
+	int n_thread = 48;
+	int ret = 0;
+	int table_id = -1;
+	long long value = 0;
+	long long values[2] = {0, 0};
+
+	const char *column_name[] = {"packages", "bytes"};
+	enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+	unsigned int out_column_ids[2];
+
+	struct fieldstat_dynamic_instance *instance = NULL;
+
+	instance = fieldstat_dynamic_instance_new("firewall", n_thread);
+	EXPECT_NE(nullptr, instance);
+
+	table_id = fieldstat_register_dynamic_table(instance, "shaping", column_name, column_type, sizeof(column_name)/sizeof(column_name[0]), out_column_ids);
+	EXPECT_EQ(0, table_id);
+
+
+	values[0] = 1000; 
+	values[1] = 2000;
+	ret = fieldstat_dynamic_table_row_metric_values_incrby(instance, table_id, "security_rule_hits", values, 2, NULL, 0, 0); 
+	EXPECT_EQ(0, ret);
+
+	value = fieldstat_dynamic_table_metric_value_get(instance, table_id, out_column_ids[0], "security_rule_hits", NULL, 0, 0);
+	EXPECT_EQ(1000, value);
+
+	value = fieldstat_dynamic_table_metric_value_get(instance, table_id, out_column_ids[1], "security_rule_hits", NULL, 0, 0);
+	EXPECT_EQ(2000, value);
+
+	fieldstat_dynamic_instance_free(instance);
+}
+
+TEST(FeildStatDynamicAPI, TableRowMetricValueDecrby)
+{
+	int n_thread = 48;
+	int ret = 0;
+	int table_id = -1;
+	long long value = 0;
+	long long values[2] = {0, 0};
+
+	const char *column_name[] = {"packages", "bytes"};
+	enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+	unsigned int out_column_ids[2];
+
+	struct fieldstat_dynamic_instance *instance = NULL;
+
+	instance = fieldstat_dynamic_instance_new("firewall", n_thread);
+	EXPECT_NE(nullptr, instance);
+
+	table_id = fieldstat_register_dynamic_table(instance, "shaping", column_name, column_type, sizeof(column_name)/sizeof(column_name[0]), out_column_ids);
+	EXPECT_EQ(0, table_id);
+
+
+	values[0] = 1000; 
+	values[1] = 2000;
+	ret = fieldstat_dynamic_table_row_metric_values_decrby(instance, table_id, "security_rule_hits", values, 2, NULL, 0, 0); 
+	EXPECT_EQ(0, ret);
+
+	value = fieldstat_dynamic_table_metric_value_get(instance, table_id, out_column_ids[0], "security_rule_hits", NULL, 0, 0);
+	EXPECT_EQ(-1000, value);
+
+	value = fieldstat_dynamic_table_metric_value_get(instance, table_id, out_column_ids[1], "security_rule_hits", NULL, 0, 0);
+	EXPECT_EQ(-2000, value);
+
+	fieldstat_dynamic_instance_free(instance);
+}
+
+
+TEST(FeildStatDynamicAPI, TableRowMetricValueSet)
+{
+	int n_thread = 48;
+	int ret = 0;
+	int table_id = -1;
+	long long value = 0;
+	long long values[2] = {0, 0};
+
+	const char *column_name[] = {"packages", "bytes"};
+	enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+	unsigned int out_column_ids[2];
+
+	struct fieldstat_dynamic_instance *instance = NULL;
+
+	instance = fieldstat_dynamic_instance_new("firewall", n_thread);
+	EXPECT_NE(nullptr, instance);
+
+	table_id = fieldstat_register_dynamic_table(instance, "shaping", column_name, column_type, sizeof(column_name)/sizeof(column_name[0]), out_column_ids);
+	EXPECT_EQ(0, table_id);
+
+
+	values[0] = 1000; 
+	values[1] = 2000;
+	ret = fieldstat_dynamic_table_row_metric_values_set(instance, table_id, "security_rule_hits", values, 2, NULL, 0, 0); 
+	EXPECT_EQ(0, ret);
+
+	value = fieldstat_dynamic_table_metric_value_get(instance, table_id, out_column_ids[0], "security_rule_hits", NULL, 0, 0);
+	EXPECT_EQ(1000, value);
+
+	value = fieldstat_dynamic_table_metric_value_get(instance, table_id, out_column_ids[1], "security_rule_hits", NULL, 0, 0);
+	EXPECT_EQ(2000, value);
+
+	fieldstat_dynamic_instance_free(instance);
+}
+
+
 int main(int argc, char *argv[]) 
 {
 	testing::InitGoogleTest(&argc, argv);

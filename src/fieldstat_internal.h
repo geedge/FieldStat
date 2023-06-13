@@ -278,3 +278,5 @@ int enable_line_protocol_output(struct line_protocol_output *line_protocol_outpu
 void disable_line_protocol_output(struct line_protocol_output *line_protocol_output);
 
 void escaping_special_chars(char* str);
+
+int escaping_special_chars_cpoy(char *dest, char *src, size_t n);

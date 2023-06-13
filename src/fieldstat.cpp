@@ -116,6 +116,29 @@ void escaping_special_chars(char* str)
 
 }
 
+int escaping_special_chars_cpoy(char *dest, char *src, size_t n)
+{
+	size_t i;
+	int len = 0;
+
+	for(i = 0; i < n - 1 && src[i] != '\0'; i++)
+	{
+		if (src[i] == '.')
+		{
+			dest[i] = '_';
+		}
+		else
+		{
+			dest[i] = src[i];
+		}
+		len ++;
+	}
+	for ( ; i < n; i++)
+	{
+		dest[i] = '\0';
+	}
+	return len;
+}
 
 void get_current_table_line_cnt(struct fieldstat_instance *instance, int n_table, int *tables_line_cnt)
 {

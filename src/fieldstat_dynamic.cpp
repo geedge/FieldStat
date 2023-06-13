@@ -244,7 +244,7 @@ static int build_dynamic_metric_key(int table_id, const char *field_name, const 
     /* part1: field name */
     unsigned int field_name_len = strlen(field_name) + 1;
     memcpy(out_key + used_len, field_name, field_name_len);
-    escaping_special_chars(out_key);
+    //escaping_special_chars(out_key);
     used_len += field_name_len;
 
     /* part2: table id */
@@ -504,4 +504,174 @@ long long fieldstat_dynamic_table_metric_value_get(struct fieldstat_dynamic_inst
 	long long value = 0;
 	value = dynamic_metric_value_read(instance, table_id, column_id, row_name, tags, n_tags, thread_id);
 	return value;
+}
+
+static struct metric **read_dynamic_row_metrics(
+    struct fieldstat_dynamic_instance *instance, 
+    char *metric_key, 
+    size_t metric_keylen,
+    int thread_id)
+{
+    struct dynamic_metric **head = NULL; 
+    struct dynamic_metric *find = NULL;
+
+    head = &instance->n_thread_dynamic_metric[thread_id];
+
+    HASH_FIND(hh, *head, metric_key, metric_keylen, find);
+    if(find == NULL)
+    {
+        return NULL;
+    }
+
+    return find->metrics;
+}
+
+static struct metric **create_dynamic_table_row_metrics(
+    struct fieldstat_dynamic_instance *instance, 
+    int table_id,
+    const char *row_name, 
+    const struct fieldstat_tag tags[], 
+    size_t n_tags,
+    int thread_id, 
+    char *metric_key,
+    unsigned metric_keylen)
+{
+	int i = 0;
+	struct dynamic_metric **head = NULL;
+	struct dynamic_metric *value = NULL;
+	struct table_metric *table = NULL;
+	struct metric *metric = NULL;
+
+	head = &instance->n_thread_dynamic_metric[thread_id];
+
+    if(!is_valid_field_name(row_name))
+    {
+        return NULL;
+    }
+    if(0 == is_valid_tags(tags, n_tags))
+    {
+        return NULL;
+    }
+
+	value = (struct dynamic_metric *)calloc(1, sizeof(struct dynamic_metric));
+
+    value->metric_keylen = metric_keylen;
+    memcpy(value->metric_key, metric_key, metric_keylen);
+
+	table = instance->table_metrics[table_id];
+	value->metrics = (struct metric **)calloc(table->column_cnt, 
+                                              sizeof(struct metric *));
+	for(i = 0; i < table->column_cnt; i ++)
+	{
+		metric = metric_new(table->column_type[i], row_name, tags, n_tags);
+
+		switch(table->column_type[i])
+		{
+			case FIELD_TYPE_COUNTER:
+				memset(&(metric->counter), 0, sizeof(metric->counter));
+				break;
+			case FIELD_TYPE_GAUGE:
+				memset(&(metric->gauge), 0, sizeof(metric->gauge));
+				break;
+			default:
+				assert(0);
+				break;
+		}
+		metric->table = table;
+		metric->table_column_id = i;
+		value->metrics[i] = metric;
+	}
+
+    HASH_ADD_KEYPTR(hh, *head, value->metric_key, value->metric_keylen, value);
+	return value->metrics;
+}
+
+static int table_row_metric_values_operate(
+    struct fieldstat_dynamic_instance *instance,
+    int table_id,
+    const char *row_name,
+    long long values[],
+    size_t n_values,
+    const struct fieldstat_tag tags[],
+    size_t n_tags,
+    int thread_id,
+    enum field_op op)
+{
+    struct metric **metrics = NULL;
+    char metric_key[512];
+    unsigned int metric_keylen = 0;
+
+    metric_keylen = build_dynamic_metric_key(table_id, row_name, tags, n_tags, 
+                                             sizeof(metric_key), metric_key);
+
+    metrics = read_dynamic_row_metrics(instance, metric_key, metric_keylen, 
+                                       thread_id);
+    if(metrics == NULL)
+    {
+        metrics = create_dynamic_table_row_metrics(instance, table_id, row_name, 
+                                                   tags, n_tags, thread_id, 
+                                                   metric_key, metric_keylen);
+    }
+    if(metrics == NULL)
+    {
+        return -1;
+    }
+    for(int i = 0; i <(int)n_values; i++)
+    {
+        metric_value_operate(metrics[i], op, values[i]);   
+    }
+
+    //metric_value_operate(metric, FS_OP_ADD, value);
+    return 0;
+}
+
+int fieldstat_dynamic_table_row_metric_values_incrby(
+    struct fieldstat_dynamic_instance *instance,
+    int table_id,
+    const char *row_name,
+    long long values[],
+    size_t n_values,
+    const struct fieldstat_tag tags[],
+    size_t n_tags,
+    int thread_id)
+{
+    int ret = 0;
+    ret = table_row_metric_values_operate(instance, table_id, row_name, 
+                                          values, n_values, tags, n_tags,
+                                          thread_id, FS_OP_ADD);
+    return ret;
+}
+
+int fieldstat_dynamic_table_row_metric_values_decrby(
+    struct fieldstat_dynamic_instance *instance,
+    int table_id,
+    const char *row_name,
+    long long values[],
+    size_t n_values,
+    const struct fieldstat_tag tags[],
+    size_t n_tags,
+    int thread_id)
+{
+    int ret = 0;
+    ret = table_row_metric_values_operate(instance, table_id, row_name, 
+                                          values, n_values, tags, n_tags,
+                                          thread_id, FS_OP_SUB);
+    return ret;
+}
+
+int fieldstat_dynamic_table_row_metric_values_set(
+    struct fieldstat_dynamic_instance *instance,
+    int table_id,
+    const char *row_name,
+    long long values[],
+    size_t n_values,
+    const struct fieldstat_tag tags[],
+    size_t n_tags,
+    int thread_id)
+{
+    int ret = 0;
+    ret = table_row_metric_values_operate(instance, table_id, row_name, 
+                                          values, n_values, tags, n_tags,
+                                          thread_id, FS_OP_SET);
+    return ret;
 }

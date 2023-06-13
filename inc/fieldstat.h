@@ -376,6 +376,74 @@ int fieldstat_set_metric_ratio_para(struct fieldstat_instance *instance, int met
  */
 int fieldstat_set_metric_invisible_para(struct fieldstat_instance *instance, int metric_id);
 
+
+/**
+ * fieldstat dynamic instance table row metric values incrment operate.
+ * @param instance The fieldstat dynamic instance.
+ * @param table_id The table id.
+ * @param row_name The row name of table.
+ * @param values The value array.
+ * @param n_values Size of value array.
+ * @param tags The tag array.
+ * @param n_tags Size of tags[]
+ * @param thread_id The thread id of the call.
+ * @return -1 is failed. 0 is success.
+ */
+int fieldstat_dynamic_table_row_metric_values_incrby(
+    struct fieldstat_dynamic_instance *instance,
+    int table_id,
+    const char *row_name,
+    long long values[],
+    size_t n_values,
+    const struct fieldstat_tag tags[],
+    size_t n_tags,
+    int thread_id);
+
+/**
+ * fieldstat dynamic instance table row metric values decrment operate.
+ * @param instance The fieldstat dynamic instance.
+ * @param table_id The table id.
+ * @param row_name The row name of table.
+ * @param values The value array.
+ * @param n_values Size of value array.
+ * @param tags The tag array.
+ * @param n_tags Size of tags[]
+ * @param thread_id The thread id of the call.
+ * @return -1 is failed. 0 is success.
+ */
+int fieldstat_dynamic_table_row_metric_values_decrby(
+    struct fieldstat_dynamic_instance *instance,
+    int table_id,
+    const char *row_name,
+    long long values[],
+    size_t n_values,
+    const struct fieldstat_tag tags[],
+    size_t n_tags,
+    int thread_id);
+
+/**
+ * fieldstat dynamic instance table row metric values set operate.
+ * @param instance The fieldstat dynamic instance.
+ * @param table_id The table id.
+ * @param row_name The row name of table.
+ * @param values The value array.
+ * @param n_values Size of value array.
+ * @param tags The tag array.
+ * @param n_tags Size of tags[]
+ * @param thread_id The thread id of the call.
+ * @return -1 is failed. 0 is success.
+ */
+int fieldstat_dynamic_table_row_metric_values_set(
+    struct fieldstat_dynamic_instance *instance,
+    int table_id,
+    const char *row_name,
+    long long values[],
+    size_t n_values,
+    const struct fieldstat_tag tags[],
+    size_t n_tags,
+    int thread_id);
+
+
 #ifdef __cplusplus
 }
 #endif
