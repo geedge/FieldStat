@@ -8,11 +8,7 @@
 // #include "metric_type_internal.h"
 
 
-// struct metric_counter {
-//     struct cell base;
-//     long long value;
-//     // enum metric_counter_type type;
-// };
+
 
 // /*
 //     "counter": {

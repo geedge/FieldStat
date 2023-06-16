@@ -8,8 +8,8 @@
 
 #include "fieldstat.h"
 #include "heavy_keeper.h"
-#include "hdr_histogram/hdr_histogram.h"
-#include "hdr_histogram/hdr_histogram_log.h"
+#include "hdr/hdr_histogram.h"
+#include "hdr/hdr_histogram_log.h"
 #include "st_hyperloglog.h"
 #include "mpack/mpack.h"
 
@@ -405,9 +405,9 @@ struct cell *cell_deserialize_for_counter(const char *blob, size_t blob_size)
     struct cell *cell = (struct cell *)counter;
     cell_counter_scheme_init(cell);
 
-    mpack_node_t content_node;
-    mpack_tree_init_data(&content_node, mpack_node_data(content_blob), mpack_node_data_len(content_blob));
-    mpack_node_t content_root = mpack_tree_root(&content_node);
+    mpack_tree_t content_tree;
+    mpack_tree_init_data(&content_tree, mpack_node_data(content_blob), mpack_node_data_len(content_blob));
+    mpack_node_t content_root = mpack_tree_root(&content_tree);
     counter->value = mpack_node_i64(mpack_node_map_cstr(content_root, "value"));
     // TODO: gauge
 
@@ -417,7 +417,7 @@ struct cell *cell_deserialize_for_counter(const char *blob, size_t blob_size)
     cell->add_tag(cell, tag_list, tag_num);
 
     mpack_tree_destroy(&tree);
-    mpack_tree_destroy(&content_node);
+    mpack_tree_destroy(&content_tree);
     free(tag_list);
 
     return (struct cell *)counter;
@@ -434,7 +434,7 @@ struct cell *cell_create_for_counter(int K)
 }
 
 // TODO: name 应该是metric吧。说实话好想typedef一下
-void cell_add_for_counter(struct cell *pthis, unsigned value)
+void cell_add_for_counter(struct cell *pthis, long long value)
 {
     struct cell_counter *counter = (struct cell_counter *)pthis;
     counter->value += value;
@@ -701,7 +701,7 @@ struct cell *cell_create_for_histogram(long long lowest_trackable_value, long lo
     return base;
 }
 
-int cell_add_for_hdr(struct cell *pthis, long long value)
+int cell_add_for_histogram(struct cell *pthis, long long value)
 {
     struct metric_histogram *histogram = (struct metric_hdr *)pthis;
     bool ret = hdr_record_value(histogram->hdr, value);

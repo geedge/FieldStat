@@ -16,7 +16,7 @@ include(Version)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_MACOSX_RPATH 0)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -fPIC -Wall -lm")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -fPIC -Wall -lm -lz")
 set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} -Wall)
 
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
@@ -48,6 +48,8 @@ if (CMAKE_CXX_CPPCHECK)
             "--suppress=nullPointerRedundantCheck"
             "--suppress=ctunullpointer"
             "--suppress=shadowFunction"
+            "--suppress=shiftTooManyBitsSigned"
+            "--suppress=preprocessorErrorDirective"
     )
     set(CMAKE_C_CPPCHECK ${CMAKE_CXX_CPPCHECK})
 else()
@@ -72,6 +74,7 @@ elseif(ASAN_OPTION MATCHES "THREAD")
 endif()
 # end of for ASAN
 
+
 include_directories(${PROJECT_SOURCE_DIR}/vendors)
 include_directories(${PROJECT_SOURCE_DIR}/src)
 include_directories(${PROJECT_SOURCE_DIR}/include/fieldstat)
@@ -86,7 +89,7 @@ file(GLOB SRC
     "src/export/*.c"
     "src/utils/*.c"
     "vendors/cjson/*.c"
-    "vendors/hdr_histogram/*.c"
+    "vendors/hdr/*.c"
     "vendors/minheap/*.c"
     "vendors/mpack/*.c"
     "vendors/xxhash/*.c"
@@ -97,6 +100,8 @@ add_subdirectory(test/deps)
 add_subdirectory(test)
 enable_testing()
 add_subdirectory(./ctest)
+
+
 
 # Shared Library Output
 add_library(${lib_name}_shared SHARED ${SRC})

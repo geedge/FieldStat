@@ -30,7 +30,7 @@ void cell_query_for_topk(const struct cell *pthis, char ***keys_out, long long *
 struct cell *cell_create_for_counter();
 struct cell *cell_deserialize_for_counter(const char *blob, size_t blob_size);
 void cell_add_for_counter(struct cell *pthis, long long value);
-long long cell_query_for_counter(const struct cell *pthis)
+long long cell_query_for_counter(const struct cell *pthis);
 
 
 
