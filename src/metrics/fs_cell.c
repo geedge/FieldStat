@@ -19,6 +19,8 @@ struct cell_base {
     size_t tag_num;
 };
 
+#define CONTENT_BLOB_TAG "c_bin"
+
 void fieldtag_clear(struct fieldstat_tag *kv_pair)
 {
     if (kv_pair->key) {
@@ -36,10 +38,11 @@ void cell_base_clear(struct cell_base *base)
     for (int i = 0; i < base->tag_num; i++) {
         fieldtag_clear(&base->tag[i]);
     }
+    base->tag_num = 0;
     free(base->tag);
 }
 
-void fieldtag_copy(const struct fieldstat_tag *kv_pair, struct fieldstat_tag *dest)
+static void fieldtag_copy(const struct fieldstat_tag *kv_pair, struct fieldstat_tag *dest)
 {
     dest->key = strdup(kv_pair->key);
     dest->type = kv_pair->type;
@@ -66,8 +69,10 @@ static void cell_read_tag(const struct cell *pthis, struct fieldstat_tag **tag_l
 
     *tag_list = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * base->tag_num);
     for (size_t i = 0; i < base->tag_num; i++) {
+        printf("cell_read_tag enter, tag key: %s\n", base->tag[i].key);
         fieldtag_copy(&base->tag[i], &(*tag_list)[i]);
     }
+    printf("cell_read_tag enter, tag num: %zu\n", base->tag_num);
 
     *tag_count = base->tag_num;
 }
@@ -93,10 +98,13 @@ static void cell_add_tag(struct cell *pthis, const struct fieldstat_tag *tag_lis
 /*
 {
     cell bin blob: 
-    "tag_k":[<tags key string>]
+    "tags":[{
+        "key":<tag key string>
+        "type":0 1 or 2
+        "value":<tag value, can be int(0) double(1) or str(2)>
+    }]
     "tag_v":[<tags value string>]
-    "blob":<blob>
-    "blob_size":<blob_size>
+    "c_bin":<blob>
     }
 */
 // TODO：把不同tag 的类型体现出来，以及deserialize的
@@ -106,30 +114,51 @@ void cell_serialize_write_fieldtag(mpack_writer_t *writer, const struct cell *pt
     size_t tag_num;
     cell_read_tag(pthis, &tag_list, &tag_num);
 
-    mpack_start_map(writer, 5);
-    mpack_write_cstr(writer, "tag_k");
+    printf("cell_serialize_write_fieldtag, after read tag, tag num: %zu\n", tag_num);
+
+    mpack_write_cstr(writer, "tags");
     mpack_start_array(writer, tag_num);
     for (int j = 0; j < tag_num; j++) {
+        printf("serialize tag: k:%s\n", tag_list[j].key);
+        printf("serialize tag: type:%d\n", tag_list[j].type);
+        mpack_start_map(writer, 3);
+        mpack_write_cstr(writer, "key");
         mpack_write_cstr(writer, tag_list[j].key);
+        mpack_write_cstr(writer, "type");
+        mpack_write_i8(writer, tag_list[j].type);
+        mpack_write_cstr(writer, "value");
+        switch (tag_list[j].type)
+        {
+            case TAG_INTEGER:
+                printf("write value int: %lld\n", tag_list[j].value_int);
+                mpack_write_i64(writer, tag_list[j].value_int);
+                break;
+            case TAG_DOUBLE:
+                printf("write value double: %lf\n", tag_list[j].value_double);
+
+                mpack_write_double(writer, tag_list[j].value_double);
+                break;
+            case TAG_CSTRING:
+                printf("write value str: %s\n", tag_list[j].value_str);
+                mpack_write_cstr(writer, tag_list[j].value_str);
+                break;
+            default:
+                assert(0);
+                break;
+        }
+        mpack_finish_map(writer);
     }
     mpack_finish_array(writer);
 
-    // fixme: 这里可能是其他类型的tag
-    mpack_write_cstr(writer, "tag_v");
-    mpack_start_array(writer, tag_num);
     for (int j = 0; j < tag_num; j++) {
-        mpack_write_cstr(writer, tag_list[j].value_str);
+        fieldtag_clear(&tag_list[j]);
     }
-    mpack_finish_array(writer);
+    free(tag_list);
 }
 
 void cell_serialize_write_blob(mpack_writer_t *writer, const char *blob, size_t blob_size)
 {
-    mpack_write_cstr(writer, "blob");
-    mpack_write_bin(writer, blob, blob_size);
 
-    mpack_write_cstr(writer, "blob_size");
-    mpack_write_i32(writer, blob_size);
 }
 
 void fieldtag_write_value_str(struct fieldstat_tag *kv_pair, const char *key, const char *value)
@@ -139,20 +168,46 @@ void fieldtag_write_value_str(struct fieldstat_tag *kv_pair, const char *key, co
     kv_pair->value_str = strdup(value);
 }
 
+/* 
+    "tags":[{
+        "key":<tag key string>
+        "type":0 1 or 2
+        "value":<tag value, can be int(0) double(1) or str(2)>
+    }]
+*/
 void deserialize_tag(mpack_node_t *root, struct fieldstat_tag **tag_list_out, size_t *tag_num_out)
 {
-    mpack_node_t tag_k_arr = mpack_node_map_cstr(*root, "tag_k");
-    mpack_node_t tag_v_arr = mpack_node_map_cstr(*root, "tag_v");
-    size_t tag_num = mpack_node_array_length(tag_k_arr);
+    printf("deserialize_tag enter\n");
+    mpack_node_t tag_arr = mpack_node_map_cstr(*root, "tags");
+    size_t tag_num = mpack_node_array_length(tag_arr);
 
     struct fieldstat_tag *tag_list = malloc(sizeof(struct fieldstat_tag) * tag_num);
-    for (int j = 0; j < mpack_node_array_length(tag_k_arr); j++) {
-        // TODO: 同理，这里也要拓展成全部的type
-        fieldtag_write_value_str(&tag_list[j], mpack_node_str(mpack_node_array_at(tag_k_arr, j)), mpack_node_str(mpack_node_array_at(tag_v_arr, j)));
-        // TODO: 这里有两个问题，1. 同样的值，但是类型不同的tag应该算成一样的还是不一样的？tag的key起码应该不同吧，这个我直接写到接口里规定key应该互不相同
-        // TODO: 第二个问题，要确认一下tag是字符串和数字是不是在功能上（比如查找）是等价的，或者把这两种tag塞到dynamic里能不能有同样的效果。
+    for (int j = 0; j < mpack_node_array_length(tag_arr); j++) {
+        mpack_node_t tag = mpack_node_array_at(tag_arr, j);
+
+        mpack_node_t key = mpack_node_map_cstr(tag, "key");
+        tag_list[j].key = (char *)malloc(mpack_node_strlen(key) + 1);
+        mpack_node_copy_cstr(key, (char *)tag_list[j].key, mpack_node_strlen(key) + 1);
+        tag_list[j].type = mpack_node_i8(mpack_node_map_cstr(tag, "type"));
+        mpack_node_t value = mpack_node_map_cstr(tag, "value");
+        switch (tag_list[j].type)
+        {
+            case TAG_INTEGER:
+                tag_list[j].value_int = mpack_node_i64(value);
+                break;
+            case TAG_DOUBLE:
+                tag_list[j].value_double = mpack_node_double(value);
+                break;
+            case TAG_CSTRING:
+                tag_list[j].value_str = (char *)malloc(mpack_node_strlen(value) + 1);
+                mpack_node_copy_cstr(value, (char *)tag_list[j].value_str, mpack_node_strlen(value) + 1);
+                break;
+            default:
+                assert(0);
+                break;
+        }
     }
-    
+
     *tag_list_out = tag_list;
     *tag_num_out = tag_num;
 }
@@ -182,22 +237,35 @@ static void cell_topk_free(struct cell *pthis)
 
 static void cell_topk_serialize(const struct cell *pthis, char **blob, size_t *blob_size)
 {
-    char *blob_content = NULL;
-    size_t blob_size_content = 0;
+    printf("cell_topk_serialize enter\n");
+
+
     struct cell_topk *topk = (struct cell_topk *)pthis;
-    heavy_keeper_serialization(topk->hk, &blob_content, &blob_size_content);
+    // TODO: 这一段代码重复了，把4种type的提取出来
 
     mpack_writer_t writer;
     mpack_writer_init_growable(&writer, blob, blob_size);
 
     mpack_build_map(&writer);
     cell_serialize_write_fieldtag(&writer, pthis);
-    cell_serialize_write_blob(&writer, blob_content, blob_size_content);
-    mpack_finish_map(&writer);
+    printf("write fieldtag done\n");
+
+    char *blob_content = NULL;
+    size_t blob_size_content = 0;
+    heavy_keeper_serialization(topk->hk, &blob_content, &blob_size_content);
+    printf("heavy_keeper_serialization done, blob_size_content len: %zu, bin: %s\n", blob_size_content, blob_content);
+    mpack_write_cstr(&writer, CONTENT_BLOB_TAG);
+    mpack_write_bin(&writer, blob_content, blob_size_content);
+    printf("write blob done\n");
+    mpack_complete_map(&writer);
 
     if (mpack_writer_destroy(&writer) != mpack_ok) {
         fprintf(stderr, "An error occurred in cell_topk_serialize!\n");
     }
+    printf("cell_topk_serialize done, blob size: %zu\n", *blob_size);
+
+    // fixme: 这个内存泄漏其他的类型也改一下
+    free(blob_content);
 }
 
 static int cell_topk_merge(struct cell *pthis, const struct cell *from)
@@ -213,6 +281,8 @@ static struct cell * cell_topk_duplicate(const struct cell *pthis)
 {
     struct cell_topk *topk = (struct cell_topk *)pthis;
     struct cell_topk *new_topk = (struct cell_topk *)malloc(sizeof(struct cell_topk));
+    memset(new_topk, 0, sizeof(struct cell_topk));
+
     new_topk->hk = heavy_keeper_new(topk->hk->K, NULL);
     heavy_keeper_merge(new_topk->hk, topk->hk);
     cell_topk_scheme_init((struct cell *)new_topk);
@@ -237,24 +307,32 @@ static void cell_topk_scheme_init(struct cell *base)
 
 struct cell *cell_deserialize_for_topk(const char *blob, size_t blob_size) 
 {
+    printf("cell_deserialize_for_topk enter\n");
+    struct cell_topk *topk = (struct cell_topk *)malloc(sizeof(struct cell_topk));
+    memset(topk, 0, sizeof(struct cell_topk));
+    struct cell *cell = (struct cell *)topk;
+    cell_topk_scheme_init(cell);
+
     mpack_tree_t tree;
     mpack_tree_init_data(&tree, blob, blob_size);
+    mpack_tree_parse(&tree);
     mpack_node_t root = mpack_tree_root(&tree);
-
-    mpack_node_t content_blob = mpack_node_map_cstr(root, "blob");
-
-    struct heavy_keeper *hk = heavy_keeper_deserialization(mpack_node_data(content_blob), mpack_node_data_len(content_blob));
-    struct cell_topk *topk = (struct cell_topk *)malloc(sizeof(struct cell_topk));
-    struct cell *cell = (struct cell *)topk;
-    topk->hk = hk;
-    cell_topk_scheme_init(cell);
 
     struct fieldstat_tag *tag_list = NULL;
     size_t tag_num = 0;
     deserialize_tag(&root, &tag_list, &tag_num);
+    printf("cell_deserialize_for_topk, after deserialize_tag, tag num: %zu\n", tag_num);
     cell->add_tag(cell, tag_list, tag_num);
 
+    mpack_node_t content_blob = mpack_node_map_cstr(root, CONTENT_BLOB_TAG);
+    printf("content blob: %s, size: %zu\n", mpack_node_bin_data(content_blob), mpack_node_bin_size(content_blob));
+    struct heavy_keeper *hk = heavy_keeper_deserialization(mpack_node_bin_data(content_blob), mpack_node_bin_size(content_blob));
+    topk->hk = hk;
+
     mpack_tree_destroy(&tree);
+    for (int i = 0; i < tag_num; i++) {
+        fieldtag_clear(&tag_list[i]);
+    }
     free(tag_list);
 
     return (struct cell *)topk;
@@ -263,6 +341,7 @@ struct cell *cell_deserialize_for_topk(const char *blob, size_t blob_size)
 struct cell *cell_create_for_topk(int K)
 {
     struct cell_topk *topk = (struct cell_topk *)malloc(sizeof(struct cell_topk));
+    memset(topk, 0, sizeof(struct cell_topk));
     topk->hk = heavy_keeper_new(K, NULL);
 
     struct cell *base = (struct cell *)topk;
@@ -272,6 +351,7 @@ struct cell *cell_create_for_topk(int K)
 
 void cell_add_for_topk(struct cell *pthis, const char *key, size_t key_len, unsigned value)
 {
+    printf("cell_add_for_topk enter, add key: %s\n", key);
     struct cell_topk *topk = (struct cell_topk *)pthis;
     heavy_keeper_add(topk->hk, key, key_len, value);
 }
@@ -372,6 +452,7 @@ static struct cell * cell_counter_duplicate(const struct cell *pthis)
 {
     struct cell_counter *counter = (struct cell_counter *)pthis;
     struct cell_counter *new_counter = (struct cell_counter *)malloc(sizeof(struct cell_counter));
+    memset(new_counter, 0, sizeof(struct cell_counter));
     new_counter->value = counter->value;
     cell_counter_scheme_init((struct cell *)new_counter);
 
@@ -399,9 +480,10 @@ struct cell *cell_deserialize_for_counter(const char *blob, size_t blob_size)
     mpack_tree_init_data(&tree, blob, blob_size);
     mpack_node_t root = mpack_tree_root(&tree);
 
-    mpack_node_t content_blob = mpack_node_map_cstr(root, "blob");
+    mpack_node_t content_blob = mpack_node_map_cstr(root, CONTENT_BLOB_TAG);
 
     struct cell_counter *counter = (struct cell_counter *)malloc(sizeof(struct cell_counter));
+    memset(counter, 0, sizeof(struct cell_counter));
     struct cell *cell = (struct cell *)counter;
     cell_counter_scheme_init(cell);
 
@@ -423,10 +505,10 @@ struct cell *cell_deserialize_for_counter(const char *blob, size_t blob_size)
     return (struct cell *)counter;
 }
 
-struct cell *cell_create_for_counter(int K)
+struct cell *cell_create_for_counter()
 {
     struct cell_counter *counter = (struct cell_counter *)malloc(sizeof(struct cell_counter));
-    counter->value = 0;
+    memset(counter, 0, sizeof(struct cell_counter));
 
     struct cell *base = (struct cell *)counter;
     cell_counter_scheme_init(base);
@@ -500,6 +582,7 @@ static struct cell * metric_cardinality_duplicate(const struct cell *pthis)
 {
     struct metric_cardinality *cardinality = (struct metric_cardinality *)pthis;
     struct metric_cardinality *new_cardinality = (struct metric_cardinality *)malloc(sizeof(struct metric_cardinality));
+    memset(new_cardinality, 0, sizeof(struct metric_cardinality));
     new_cardinality->hll = ST_hyperloglog_new(cardinality->hll->cfg.precision);
     ST_hyperloglog_merge(new_cardinality->hll, cardinality->hll);
 
@@ -529,9 +612,10 @@ struct cell *cell_deserialize_for_cardinality(const char *blob, size_t blob_size
     mpack_tree_init_data(&tree, blob, blob_size);
     mpack_node_t root = mpack_tree_root(&tree);
 
-    mpack_node_t content_blob = mpack_node_map_cstr(root, "blob");
+    mpack_node_t content_blob = mpack_node_map_cstr(root, CONTENT_BLOB_TAG);
 
     struct metric_cardinality *cardinality = (struct metric_cardinality *)malloc(sizeof(struct metric_cardinality));
+    memset(cardinality, 0, sizeof(struct metric_cardinality));
     struct cell *cell = (struct cell *)cardinality;
     metric_cardinality_scheme_init(cell);
 
@@ -551,6 +635,7 @@ struct cell *cell_deserialize_for_cardinality(const char *blob, size_t blob_size
 struct cell *cell_create_for_cardinality(const char precision)
 {
     struct metric_cardinality *cardinality = (struct metric_cardinality *)malloc(sizeof(struct metric_cardinality));
+    memset(cardinality, 0, sizeof(struct metric_cardinality));
     cardinality->hll = ST_hyperloglog_new(precision);
 
     struct cell *base = (struct cell *)cardinality;
@@ -582,7 +667,7 @@ struct metric_histogram {
 
 static void metric_histogram_refresh(struct cell *pthis)
 {
-    struct metric_histogram *histogram = (struct metric_hdr *)pthis;
+    struct metric_histogram *histogram = (struct metric_histogram *)pthis;
     hdr_reset(histogram->hdr);
 }
 
@@ -626,8 +711,9 @@ static struct cell * metric_histogram_duplicate(const struct cell *pthis)
 {
     struct metric_histogram *histogram = (struct metric_histogram *)pthis;
     struct metric_histogram *new_histogram = (struct metric_histogram *)malloc(sizeof(struct metric_histogram));
+    memset(new_histogram, 0, sizeof(struct metric_histogram));
     hdr_alloc(histogram->hdr->highest_trackable_value, histogram->hdr->significant_figures, &new_histogram->hdr);
-    ST_hyperloglog_merge(new_histogram->hdr, histogram->hdr);
+    hdr_add(new_histogram->hdr, histogram->hdr);
     // TODO: copy bins
 
     metric_histogram_scheme_init((struct cell *)new_histogram);
@@ -656,13 +742,15 @@ struct cell *cell_deserialize_for_histogram(const char *blob, size_t blob_size)
     mpack_tree_init_data(&tree, blob, blob_size);
     mpack_node_t root = mpack_tree_root(&tree);
 
-    mpack_node_t content_blob = mpack_node_map_cstr(root, "blob");
+    mpack_node_t content_blob = mpack_node_map_cstr(root, CONTENT_BLOB_TAG);
 
     struct metric_histogram *histogram = (struct metric_histogram *)malloc(sizeof(struct metric_histogram));
+    memset(histogram, 0, sizeof(struct metric_histogram));
     struct cell *cell = (struct cell *)histogram;
     metric_histogram_scheme_init(cell);
 
-    hdr_log_decode(&histogram->hdr, mpack_node_str(content_blob), mpack_node_strlen(content_blob));
+    // TODO: 这个地方可能有问题
+    hdr_log_decode(&histogram->hdr, (char *)mpack_node_str(content_blob), mpack_node_strlen(content_blob));
     
     struct fieldstat_tag *tag_list = NULL;
     size_t tag_num = 0;
@@ -694,6 +782,7 @@ struct cell *cell_create_for_histogram(long long lowest_trackable_value, long lo
     }
 
     struct metric_histogram *histogram = (struct metric_histogram *)malloc(sizeof(struct metric_histogram));
+    memset(histogram, 0, sizeof(struct metric_histogram));
     histogram->hdr = tmp_p_hdr;
 
     struct cell *base = (struct cell *)histogram;
@@ -703,7 +792,7 @@ struct cell *cell_create_for_histogram(long long lowest_trackable_value, long lo
 
 int cell_add_for_histogram(struct cell *pthis, long long value)
 {
-    struct metric_histogram *histogram = (struct metric_hdr *)pthis;
+    struct metric_histogram *histogram = (struct metric_histogram *)pthis;
     bool ret = hdr_record_value(histogram->hdr, value);
     if (ret == false) {
         return -1;

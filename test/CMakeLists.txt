@@ -22,7 +22,11 @@ include_directories(${PROJECT_SOURCE_DIR}/include)
 
 
 # add_executable(unit_tests ${SRC} gtest_topk.cpp)
-add_executable(unit_tests ${SRC} gtest_topk.cpp)
+SET(TEST_UTILS_SRC
+  utils.cpp
+  )
+
+add_executable(unit_tests ${SRC} ${TEST_UTILS_SRC} gtest_topk.cpp)
 target_link_libraries(unit_tests gtest-static)
 
 #zlib, first install zlib from https://zlib.net/

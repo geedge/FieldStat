@@ -32,15 +32,12 @@ struct cell *cell_deserialize_for_counter(const char *blob, size_t blob_size);
 void cell_add_for_counter(struct cell *pthis, long long value);
 long long cell_query_for_counter(const struct cell *pthis);
 
+struct cell *cell_deserialize_for_cardinality(const char *blob, size_t blob_size);
+struct cell *cell_create_for_cardinality(const char precision);
+void cell_add_for_cardinality(struct cell *pthis, const char *key, size_t key_len);
+long long cell_query_for_cardinality(const struct cell *pthis);
 
-
-// struct cell *metric_hdr_create(const char *name, size_t name_len, const char * bins, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures);
-// int metric_hdr_add(struct cell *hdr, long long value);
-
-
-// struct cell *metric_unique_create(const char *name, size_t name_len, const char precision);
-// int metric_unique_add(struct cell *unique, const char *key, size_t keylen);
-
-
-
-    // TODO: metric 改名 cell
+struct cell *cell_deserialize_for_histogram(const char *blob, size_t blob_size);
+struct cell *cell_create_for_histogram(long long lowest_trackable_value, long long highest_trackable_value, int significant_figures);
+int cell_add_for_histogram(struct cell *pthis, long long value);
+long long cell_query_for_histogram(const struct cell *pthis, double percentile);

@@ -30,6 +30,7 @@ struct fieldstat *fieldstat_new(const char *symbol)
 
 void fieldstat_free(struct fieldstat *instance)
 {
+    printf("fieldstat_free, nfield: %zu\n", instance->n_field);
     for (int i = 0; i < instance->n_field; i++) { // FIXME: 当前添加都是添加到最后，所以可以直接这样循环，会不会有unregister 的需求？
         field_free(instance->field_array[i]);
     }
@@ -43,13 +44,14 @@ void fieldstat_refresh(struct fieldstat *instance)
     }
 }
 
-static int append_field_to_instance(struct fieldstat *instance, const struct fs_field *field)
+static int append_field_to_instance(struct fieldstat *instance, struct fs_field *field)
 {
     if (instance->n_field >= CELL_MAX_NUMBER) {  // TODO: realloc
         printf("append_field_to_instance: too many fields registered\n");
         return -1;
     }
     instance->field_array[instance->n_field++] = (struct fs_field *)field;
+    field_set_id(field, instance->n_field - 1);
     return instance->n_field - 1;
 }
 
@@ -63,6 +65,28 @@ int fieldstat_register_topk(struct fieldstat *instance, const char *field_name, 
     return append_field_to_instance(instance, field);
 }
 
+// // TODO: sort tags by key and value
+// int my_tag_cmp(const void *a, const void *b)
+// {
+//     struct fieldstat_tag *tag_a = (struct fieldstat_tag *)a;
+//     struct fieldstat_tag *tag_b = (struct fieldstat_tag *)b;
+//     int key_cmp = strcmp(tag_a->key, tag_b->key);
+//     if (key_cmp == 0) {
+//         switch (tag_a->type) {
+//             case TAG_INTEGER:
+//                 return tag_a->value_int - tag_b->value_int;
+//             case TAG_DOUBLE:
+//                 return (int)(tag_a->value_double - tag_b->value_double);
+//             case TAG_CSTRING:
+//                 return strcmp(tag_a->value_str, tag_b->value_str);
+//             default:
+//                 printf("ERR: unknown tag type\n");
+//                 return -1;
+//         }
+//     }
+//     return key_cmp;
+// }
+
 int fieldstat_topk_add(struct fieldstat *instance, int field_id, const char *key, size_t key_len, const struct fieldstat_tag tags[], size_t n_tag)
 {
     struct fs_field *field = (struct fs_field *)instance->field_array[field_id];
@@ -70,6 +94,7 @@ int fieldstat_topk_add(struct fieldstat *instance, int field_id, const char *key
         printf("ERR: field is not registered yet\n");
         return -1;
     }
+    // qsort(tags, n_tag, sizeof(struct fieldstat_tag), my_tag_cmp);
     field_topk_add(field, key, key_len, 1, tags, n_tag);
     return 0;
 }
@@ -86,28 +111,34 @@ int fieldstat_topk_add(struct fieldstat *instance, int field_id, const char *key
     "fields"= [<binary of fields, refer to field.c annotation for its detail>]
 }
 */
-struct fieldstat *fieldstat_deserialize_by_mpack(const char *blob, size_t blob_size)
+struct fieldstat *fieldstat_deserialize(const char *blob, size_t blob_size)
 {
     mpack_tree_t tree;
     mpack_tree_init_data(&tree, blob, blob_size);
     mpack_tree_parse(&tree);
     mpack_node_t root = mpack_tree_root(&tree);
 
-    struct fieldstat *instance = fieldstat_new(mpack_node_str(mpack_node_map_cstr(root, "name")));
+    char tmp_name[INSTANCE_NAME_MAX_LEN] = {0};
+    mpack_node_copy_cstr(mpack_node_map_cstr(root, "name"), tmp_name, sizeof(tmp_name));
+    struct fieldstat *instance = fieldstat_new(tmp_name);
 
     mpack_node_t field_arr = mpack_node_map_cstr(root, "fields");
     for (int i = 0 ; i < mpack_node_array_length(field_arr); i++) {
-        struct fs_field *tmp_field = field_new_by_deserialize(mpack_node_bin_data(field_arr), mpack_node_bin_size(field_arr));
+        mpack_node_t field_blob_bin = mpack_node_array_at(field_arr, i);
+        struct fs_field *tmp_field = field_new_by_deserialize(mpack_node_bin_data(field_blob_bin), mpack_node_bin_size(field_blob_bin));
         int field_id_tmp = field_get_id(tmp_field);
         instance->field_array[field_id_tmp] = tmp_field;
     }
+    instance->n_field = mpack_node_array_length(field_arr);
+
+    mpack_tree_destroy(&tree);
  
     return instance;
 }
 
 int fieldstat_merge_with_blob(struct fieldstat *instance, const char *blob, size_t blob_size)
 {
-    struct fieldstat *src = fieldstat_deserialize_by_mpack(blob, blob_size);
+    struct fieldstat *src = fieldstat_deserialize(blob, blob_size);
     if (src == NULL) {
         fprintf(stderr, "fieldstat_deserialize failed\n");
         return -1;
@@ -132,7 +163,31 @@ int fieldstat_merge_with_blob(struct fieldstat *instance, const char *blob, size
     return 0;
 }
 
-// todo: serialize for specific field(具体讨论接口和实现，最终是付明卫调用)
+int fieldstat_serialize(const struct fieldstat *instance, char **blob_out, size_t *blob_size_out)
+{
+    mpack_writer_t writer;
+    mpack_writer_init_growable(&writer, blob_out, blob_size_out);
+
+    mpack_start_map(&writer, 2);
+    mpack_write_cstr(&writer, "name");
+    mpack_write_cstr(&writer, instance->name);
+
+    mpack_write_cstr(&writer, "fields");
+    mpack_start_array(&writer, instance->n_field);
+    for (int i = 0; i < instance->n_field; i++) {
+        char *field_blob = NULL;
+        size_t field_blob_size = 0;
+        field_serialize(instance->field_array[i], &field_blob, &field_blob_size);
+        mpack_write_bin(&writer, field_blob, field_blob_size);
+        free(field_blob);
+    }
+    mpack_finish_array(&writer);
+
+    mpack_finish_map(&writer);
+    mpack_writer_destroy(&writer);
+
+    return 0;
+}
 
 
 /* -------------------------------------------------------------------------- */
@@ -188,7 +243,6 @@ int fieldstat_get_tag_lists(struct fieldstat *instance, int field_id, struct fie
     }
 
     field_get_tags(field, &tag_lists_out, &n_tag_lists_out);
-
     if (n_tag_lists_out > n_list) {
         printf("ERR: n_tag_lists_out > n_list\n");
         for (int i = 0; i < n_tag_lists_out; i++) {
@@ -197,11 +251,12 @@ int fieldstat_get_tag_lists(struct fieldstat *instance, int field_id, struct fie
         free(tag_lists_out);
         return -1;
     }
+
     for (int i = 0; i < n_tag_lists_out; i++) {
         lists[i] = tag_lists_out[i];
     }
-    free(tag_lists_out); // don't need to free tag_list->tag, because we just copy the pointer. User should free it.
-    return 0;
+    free(tag_lists_out); // don't need to free tag_lists_out->tag, because we just copy the pointer. User should free it.
+    return n_tag_lists_out;
 }
 
 // fieldstat_counter_get(instance, field_id[i], tag_lists[j]);

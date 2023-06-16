@@ -100,6 +100,7 @@ void heavy_keeper_result_free(struct heavy_keeper_result *stats_hd) {
 }
 
 void heavy_keeper_free(struct heavy_keeper *hk) {
+    printf("free heavy keeper enter\n");
     sorted_set_free(hk->top_K_heap);
     free(hk->sketch);
     free(hk);
@@ -362,7 +363,8 @@ int heavy_keeper_merge(struct heavy_keeper *hk, const struct heavy_keeper *src) 
     “sketch": [{"FP":<finger_print>, "C":counter}, ...]
     "ss": [
         {
-            "member": <field_string>, // note: no counter
+            "member": <field_string>,
+            "score": <score>
         },
         {(more elements in ss, the sorted set)}
         ...
@@ -377,6 +379,8 @@ int heavy_keeper_sorted_set_member_serialization(unsigned int key, const char *v
     mpack_build_map(&writer);
     mpack_write_cstr(&writer, "member");
     mpack_write_str(&writer, val, val_len - 1);
+    mpack_write_cstr(&writer, "score");
+    mpack_write_u32(&writer, key);
     mpack_complete_map(&writer);
     if (mpack_writer_destroy(&writer) != mpack_ok) {
         fprintf(stderr, "An error occurred in heavy_keeper_sorted_set_member_serialization!\n");
@@ -462,11 +466,11 @@ void heavy_keeper_serialization(const struct heavy_keeper *hk, char **blob, size
     mpack_write_cstr(&writer, "K");
     mpack_write_int(&writer, hk->K);
     heavy_keeper_param_serialization(hk, &writer);
-    // mpack_write_cstr(&writer, "sketch");
-    // size_t sketch_len = hk->params.max_bucket_num * hk->params.array_num;
-    // mpack_write_bin(&writer, (const char *)hk->sketch, sizeof(struct Bucket) * sketch_len);
+    mpack_write_cstr(&writer, "sketch");
+    size_t sketch_len = hk->params.max_bucket_num * hk->params.array_num;
+    mpack_write_bin(&writer, (const char *)hk->sketch, sizeof(struct Bucket) * sketch_len);
 
-    heavy_keeper_sketch_serialization(hk, &writer);
+    // heavy_keeper_sketch_serialization(hk, &writer);
     heavy_keeper_sorted_set_serialization(hk, &writer);
 
     mpack_complete_map(&writer);
@@ -484,13 +488,9 @@ void heavy_keeper_sorted_set_deserialization(mpack_node_t *root, struct sorted_s
         item = mpack_node_array_at(array_sorted_set, i);
         mpack_node_t flow_id_str = mpack_node_map_cstr(item, "member");
         const char *val = mpack_node_str(flow_id_str);
-        // char *val_cpy = (char *)malloc(mpack_node_strlen(flow_id_str) + 1);
-        // memcpy(val_cpy, val, mpack_node_strlen(flow_id_str));
-        // val_cpy[mpack_node_strlen(flow_id_str)] = '\0';
-        // printf("val: %s, length: %u\n", val_cpy, mpack_node_strlen(flow_id_str));
         size_t val_len = mpack_node_strlen(flow_id_str);
-        sorted_set_insert(out, val, val_len, 0);
-        // free(val_cpy);
+        unsigned int score = mpack_node_u32(mpack_node_map_cstr(item, "score"));
+        sorted_set_insert(out, val, val_len, score);
     }
 }
 
@@ -512,6 +512,7 @@ struct heavy_keeper *heavy_keeper_deserialization(const char *blob, size_t size)
     mpack_node_t root = mpack_tree_root(&tree);
 
     int K = mpack_node_int(mpack_node_map_cstr(root, "K"));
+    printf("heavy_keeper_deserialization K: %d\n", K);
     struct heavy_keeper_options params;
     heavy_keeper_param_deserialization(&root, &params);
 
@@ -519,7 +520,6 @@ struct heavy_keeper *heavy_keeper_deserialization(const char *blob, size_t size)
 
     mpack_node_t item_sketch = mpack_node_map_cstr(root, "sketch");
     size_t bin_size = mpack_node_bin_size(item_sketch);
-    hk->sketch = (struct Bucket *)malloc(bin_size);
     memcpy(hk->sketch, mpack_node_bin_data(item_sketch), bin_size);
 
     heavy_keeper_sorted_set_deserialization(&root, hk->top_K_heap);
