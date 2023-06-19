@@ -45,7 +45,7 @@ struct fieldstat *fieldstat_new(const char *symbol);
 void fieldstat_free(struct fieldstat *instance);
 int fieldstat_register_counter(struct fieldstat *instance, const char *field_name);
 int fieldstat_register_topk(struct fieldstat *instance, const char *field_name, int K);
-int fieldstat_register_hll(struct fieldstat *instance, const char *field_name);
+int fieldstat_register_cardinality(struct fieldstat *instance, const char *field_name, unsigned char precision);
 int fieldstat_register_histogram(struct fieldstat *instance, const char *field_name, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures);
 
 // operations on different type of metrics. The creation of cell is dynamic.
@@ -57,9 +57,8 @@ int fieldstat_register_histogram(struct fieldstat *instance, const char *field_n
 // @return 0 if success, -1 if failed.
 int fieldstat_counter_incrby(struct fieldstat *instance, int field_id, long long increment, const struct fieldstat_tag tags[], size_t n_tag);
 int fieldstat_topk_add(struct fieldstat *instance, int field_id, const char *key, size_t key_len, const struct fieldstat_tag tags[], size_t n_tag);
-// ToDO: 这里有sort，所以不是const的
-int fieldstat_hll_add(struct fieldstat *instance, int field_id, const char *key, size_t key_len, const struct fieldstat_tag tags[], size_t n_tag);
-int fieldstat_histogram_record(struct fieldstat *instance, int field_id, long long value, long long expected, const struct fieldstat_tag tags[], size_t n_tag);
+int fieldstat_cardinality_add(struct fieldstat *instance, int field_id, const char *key, size_t key_len, const struct fieldstat_tag tags[], size_t n_tag);
+int fieldstat_histogram_record(struct fieldstat *instance, int field_id, long long value, const struct fieldstat_tag tags[], size_t n_tag);
 
 struct fieldstat *fieldstat_deserialize(const char *blob, size_t blob_size);
 int fieldstat_merge_with_blob(struct fieldstat *instance, const char *blob, size_t blob_size);
@@ -69,10 +68,10 @@ int fieldstat_serialize(const struct fieldstat *instance, char **blob_out, size_
 /*                                    query                                   */
 /* -------------------------------------------------------------------------- */
 long long fieldstat_histogram_value_at_percentile(struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list, double percentile);
-long long fieldstat_counter_get(struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list);
-int fieldstat_get_tag_lists(struct fieldstat *instance, int field_id, struct fieldstat_tag_list *lists, size_t n_list);
+long long fieldstat_counter_get(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list);
+double fieldstat_cardinality_get(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list);
+int fieldstat_get_tag_lists(const struct fieldstat *instance, int field_id, struct fieldstat_tag_list *lists, size_t n_list);
 void fieldstat_topk_query(const struct fieldstat *instance, int id, const struct fieldstat_tag_list *tag_list , char ***keys_out, long long **count_out, size_t *n_key_out);
-int fieldstat_query(struct fieldstat *instance, int field_id);
 void tag_list_clear(struct fieldstat_tag_list *tag_list);
 #ifdef __cplusplus
 }

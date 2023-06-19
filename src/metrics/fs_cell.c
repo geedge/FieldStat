@@ -156,11 +156,6 @@ void cell_serialize_write_fieldtag(mpack_writer_t *writer, const struct cell *pt
     free(tag_list);
 }
 
-void cell_serialize_write_blob(mpack_writer_t *writer, const char *blob, size_t blob_size)
-{
-
-}
-
 void fieldtag_write_value_str(struct fieldstat_tag *kv_pair, const char *key, const char *value)
 {
     kv_pair->key = strdup(key);
@@ -177,9 +172,9 @@ void fieldtag_write_value_str(struct fieldstat_tag *kv_pair, const char *key, co
 */
 void deserialize_tag(mpack_node_t *root, struct fieldstat_tag **tag_list_out, size_t *tag_num_out)
 {
-    printf("deserialize_tag enter\n");
     mpack_node_t tag_arr = mpack_node_map_cstr(*root, "tags");
     size_t tag_num = mpack_node_array_length(tag_arr);
+    printf("deserialize_tag enter, tag num: %zu\n", tag_num);
 
     struct fieldstat_tag *tag_list = malloc(sizeof(struct fieldstat_tag) * tag_num);
     for (int j = 0; j < mpack_node_array_length(tag_arr); j++) {
@@ -264,7 +259,6 @@ static void cell_topk_serialize(const struct cell *pthis, char **blob, size_t *b
     }
     printf("cell_topk_serialize done, blob size: %zu\n", *blob_size);
 
-    // fixme: 这个内存泄漏其他的类型也改一下
     free(blob_content);
 }
 
@@ -349,9 +343,9 @@ struct cell *cell_create_for_topk(int K)
     return base;
 }
 
-void cell_add_for_topk(struct cell *pthis, const char *key, size_t key_len, unsigned value)
+void cell_oper_for_topk(struct cell *pthis, const char *key, size_t key_len, unsigned value)
 {
-    printf("cell_add_for_topk enter, add key: %s\n", key);
+    printf("cell_oper_for_topk enter, add key: %s\n", key);
     struct cell_topk *topk = (struct cell_topk *)pthis;
     heavy_keeper_add(topk->hk, key, key_len, value);
 }
@@ -408,12 +402,13 @@ static void counter_metric_serialize(struct cell_counter *counter, char **blob, 
     mpack_writer_init_growable(&writer, blob, blob_size);
     mpack_build_map(&writer);
 
-    mpack_write_cstr(&writer, "type");
-    mpack_write_i32(&writer, 0); // TODO: gauge
+    // TODO: gauge
+    // mpack_write_cstr(&writer, "type");
+    // mpack_write_i32(&writer, 0); 
     mpack_write_cstr(&writer, "value");
     mpack_write_i64(&writer, counter->value);
 
-    mpack_finish_map(&writer);
+    mpack_complete_map(&writer);
     if (mpack_writer_destroy(&writer) != mpack_ok) {
         fprintf(stderr, "An error occurred in counter_metric_serialize!\n");
     }
@@ -421,6 +416,7 @@ static void counter_metric_serialize(struct cell_counter *counter, char **blob, 
 
 static void cell_counter_serialize(const struct cell *pthis, char **blob, size_t *blob_size)
 {
+    printf("cell_counter_serialize enter\n");
     char *blob_content = NULL;
     size_t blob_size_content = 0;
     struct cell_counter *counter = (struct cell_counter *)pthis;
@@ -430,8 +426,10 @@ static void cell_counter_serialize(const struct cell *pthis, char **blob, size_t
     mpack_writer_init_growable(&writer, blob, blob_size);
     mpack_build_map(&writer);
     cell_serialize_write_fieldtag(&writer, pthis);
-    cell_serialize_write_blob(&writer, blob_content, blob_size_content);
-    mpack_finish_map(&writer);
+    mpack_write_cstr(&writer, CONTENT_BLOB_TAG);
+    mpack_write_bin(&writer, blob_content, blob_size_content);
+    mpack_complete_map(&writer);
+    free(blob_content);
 
     if (mpack_writer_destroy(&writer) != mpack_ok) {
         fprintf(stderr, "An error occurred in cell_counter_serialize!\n");
@@ -478,19 +476,21 @@ struct cell *cell_deserialize_for_counter(const char *blob, size_t blob_size)
 {
     mpack_tree_t tree;
     mpack_tree_init_data(&tree, blob, blob_size);
+    mpack_tree_parse(&tree);
     mpack_node_t root = mpack_tree_root(&tree);
-
-    mpack_node_t content_blob = mpack_node_map_cstr(root, CONTENT_BLOB_TAG);
 
     struct cell_counter *counter = (struct cell_counter *)malloc(sizeof(struct cell_counter));
     memset(counter, 0, sizeof(struct cell_counter));
     struct cell *cell = (struct cell *)counter;
     cell_counter_scheme_init(cell);
 
+    mpack_node_t content_blob = mpack_node_map_cstr(root, CONTENT_BLOB_TAG);
     mpack_tree_t content_tree;
-    mpack_tree_init_data(&content_tree, mpack_node_data(content_blob), mpack_node_data_len(content_blob));
+    mpack_tree_init_data(&content_tree, mpack_node_bin_data(content_blob), mpack_node_bin_size(content_blob));
+    mpack_tree_parse(&content_tree);
     mpack_node_t content_root = mpack_tree_root(&content_tree);
     counter->value = mpack_node_i64(mpack_node_map_cstr(content_root, "value"));
+    printf("counter->value: %lld\n", counter->value);
     // TODO: gauge
 
     struct fieldstat_tag *tag_list = NULL;
@@ -500,8 +500,10 @@ struct cell *cell_deserialize_for_counter(const char *blob, size_t blob_size)
 
     mpack_tree_destroy(&tree);
     mpack_tree_destroy(&content_tree);
+    for (int i = 0; i < tag_num; i++) {
+        fieldtag_clear(&tag_list[i]);
+    }
     free(tag_list);
-
     return (struct cell *)counter;
 }
 
@@ -516,7 +518,7 @@ struct cell *cell_create_for_counter()
 }
 
 // TODO: name 应该是metric吧。说实话好想typedef一下
-void cell_add_for_counter(struct cell *pthis, long long value)
+void cell_oper_for_counter(struct cell *pthis, long long value)
 {
     struct cell_counter *counter = (struct cell_counter *)pthis;
     counter->value += value;
@@ -561,8 +563,10 @@ static void metric_cardinality_serialize(const struct cell *pthis, char **blob, 
     mpack_writer_init_growable(&writer, blob, blob_size);
     mpack_build_map(&writer);
     cell_serialize_write_fieldtag(&writer, pthis);
-    cell_serialize_write_blob(&writer, blob_content, blob_size_content);
-    mpack_finish_map(&writer);
+    mpack_write_cstr(&writer, CONTENT_BLOB_TAG);
+    mpack_write_bin(&writer, blob_content, blob_size_content);
+    mpack_complete_map(&writer);
+    free(blob_content);
 
     if (mpack_writer_destroy(&writer) != mpack_ok) {
         fprintf(stderr, "An error occurred in metric_cardinality_serialize!\n");
@@ -610,6 +614,7 @@ struct cell *cell_deserialize_for_cardinality(const char *blob, size_t blob_size
 {
     mpack_tree_t tree;
     mpack_tree_init_data(&tree, blob, blob_size);
+    mpack_tree_parse(&tree);
     mpack_node_t root = mpack_tree_root(&tree);
 
     mpack_node_t content_blob = mpack_node_map_cstr(root, CONTENT_BLOB_TAG);
@@ -619,7 +624,7 @@ struct cell *cell_deserialize_for_cardinality(const char *blob, size_t blob_size
     struct cell *cell = (struct cell *)cardinality;
     metric_cardinality_scheme_init(cell);
 
-    cardinality->hll = ST_hyperloglog_deserialize(mpack_node_data(content_blob), mpack_node_data_len(content_blob));
+    cardinality->hll = ST_hyperloglog_deserialize(mpack_node_bin_data(content_blob), mpack_node_bin_size(content_blob));
     
     struct fieldstat_tag *tag_list = NULL;
     size_t tag_num = 0;
@@ -627,6 +632,9 @@ struct cell *cell_deserialize_for_cardinality(const char *blob, size_t blob_size
     cell->add_tag(cell, tag_list, tag_num);
 
     mpack_tree_destroy(&tree);
+    for (int i = 0; i < tag_num; i++) {
+        fieldtag_clear(&tag_list[i]);
+    }
     free(tag_list);
 
     return cell;
@@ -643,13 +651,13 @@ struct cell *cell_create_for_cardinality(const char precision)
     return base;
 }
 
-void cell_add_for_cardinality(struct cell *pthis, const char *key, size_t key_len)
+int cell_oper_for_cardinality(struct cell *pthis, const char *key, size_t key_len)
 {
     struct metric_cardinality *cardinality = (struct metric_cardinality *)pthis;
-    ST_hyperloglog_add(cardinality->hll, key, key_len);
+    return ST_hyperloglog_add(cardinality->hll, key, key_len);
 }
 
-long long cell_query_for_cardinality(const struct cell *pthis)
+double cell_query_for_cardinality(const struct cell *pthis)
 {
     struct metric_cardinality *cardinality = (struct metric_cardinality *)pthis;
     return ST_hyperloglog_count(cardinality->hll);
@@ -684,14 +692,18 @@ static void metric_histogram_serialize(const struct cell *pthis, char **blob, si
     char *blob_content = NULL;
     struct metric_histogram *histogram = (struct metric_histogram *)pthis;
     hdr_log_encode(histogram->hdr, &blob_content);
-    size_t blob_size_content = strlen(blob_content) + 1;
+    size_t blob_size_content = strlen(blob_content);
+
+    printf("metric_histogram_serialize the blob is : %s, size is %zu\n", blob_content, blob_size_content);
 
     mpack_writer_t writer;
     mpack_writer_init_growable(&writer, blob, blob_size);
     mpack_build_map(&writer);
     cell_serialize_write_fieldtag(&writer, pthis);
-    cell_serialize_write_blob(&writer, blob_content, blob_size_content);
-    mpack_finish_map(&writer);
+    mpack_write_cstr(&writer, CONTENT_BLOB_TAG);
+    mpack_write_bin(&writer, blob_content, blob_size_content);
+    free(blob_content);
+    mpack_complete_map(&writer);
 
     if (mpack_writer_destroy(&writer) != mpack_ok) {
         fprintf(stderr, "An error occurred in metric_histogram_serialize!\n");
@@ -740,6 +752,7 @@ struct cell *cell_deserialize_for_histogram(const char *blob, size_t blob_size)
 {
     mpack_tree_t tree;
     mpack_tree_init_data(&tree, blob, blob_size);
+    mpack_tree_parse(&tree);
     mpack_node_t root = mpack_tree_root(&tree);
 
     mpack_node_t content_blob = mpack_node_map_cstr(root, CONTENT_BLOB_TAG);
@@ -750,7 +763,12 @@ struct cell *cell_deserialize_for_histogram(const char *blob, size_t blob_size)
     metric_histogram_scheme_init(cell);
 
     // TODO: 这个地方可能有问题
-    hdr_log_decode(&histogram->hdr, (char *)mpack_node_str(content_blob), mpack_node_strlen(content_blob));
+    int ret = hdr_log_decode(&histogram->hdr, (char *)mpack_node_bin_data(content_blob), mpack_node_bin_size(content_blob));
+    if (ret != 0) {
+        fprintf(stderr, "hdr_log_decode failed!\n");
+        return NULL;
+    }
+    printf("cell_deserialize_for_histogram hdr->total_count: %ld\n", histogram->hdr->total_count);
     
     struct fieldstat_tag *tag_list = NULL;
     size_t tag_num = 0;
@@ -758,6 +776,9 @@ struct cell *cell_deserialize_for_histogram(const char *blob, size_t blob_size)
     cell->add_tag(cell, tag_list, tag_num);
 
     mpack_tree_destroy(&tree);
+    for (int i = 0; i < tag_num; i++) {
+        fieldtag_clear(&tag_list[i]);
+    }
     free(tag_list);
 
     return cell;
@@ -766,18 +787,10 @@ struct cell *cell_deserialize_for_histogram(const char *blob, size_t blob_size)
 struct cell *cell_create_for_histogram(long long lowest_trackable_value, long long highest_trackable_value, int significant_figures) 
 // TODO: bin
 {
-    if (lowest_trackable_value < 1 || significant_figures < 1 || 5 < significant_figures)
-	{
-		return NULL;
-	}
-
-	if (lowest_trackable_value * 2 > highest_trackable_value)
-	{
-		return NULL;
-	}
     struct hdr_histogram* tmp_p_hdr = NULL;
     int ret = hdr_init((int64_t)lowest_trackable_value, (int64_t)highest_trackable_value, significant_figures, &tmp_p_hdr);
 	if (ret != 0) {
+        fprintf(stderr, "hdr_init failed!\n");
         return NULL;
     }
 
@@ -790,7 +803,7 @@ struct cell *cell_create_for_histogram(long long lowest_trackable_value, long lo
     return base;
 }
 
-int cell_add_for_histogram(struct cell *pthis, long long value)
+int cell_oper_for_histogram(struct cell *pthis, long long value)
 {
     struct metric_histogram *histogram = (struct metric_histogram *)pthis;
     bool ret = hdr_record_value(histogram->hdr, value);

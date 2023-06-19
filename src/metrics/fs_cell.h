@@ -24,20 +24,20 @@ struct cell {
 
 struct cell *cell_create_for_topk(int K);
 struct cell *cell_deserialize_for_topk(const char *blob, size_t blob_size);
-void cell_add_for_topk(struct cell *pthis, const char *key, size_t key_len, unsigned value);
+void cell_oper_for_topk(struct cell *pthis, const char *key, size_t key_len, unsigned value);
 void cell_query_for_topk(const struct cell *pthis, char ***keys_out, long long **values_out, size_t *num_out);
 
 struct cell *cell_create_for_counter();
 struct cell *cell_deserialize_for_counter(const char *blob, size_t blob_size);
-void cell_add_for_counter(struct cell *pthis, long long value);
+void cell_oper_for_counter(struct cell *pthis, long long value);
 long long cell_query_for_counter(const struct cell *pthis);
 
 struct cell *cell_deserialize_for_cardinality(const char *blob, size_t blob_size);
 struct cell *cell_create_for_cardinality(const char precision);
-void cell_add_for_cardinality(struct cell *pthis, const char *key, size_t key_len);
-long long cell_query_for_cardinality(const struct cell *pthis);
+int cell_oper_for_cardinality(struct cell *pthis, const char *key, size_t key_len);
+double cell_query_for_cardinality(const struct cell *pthis);
 
 struct cell *cell_deserialize_for_histogram(const char *blob, size_t blob_size);
 struct cell *cell_create_for_histogram(long long lowest_trackable_value, long long highest_trackable_value, int significant_figures);
-int cell_add_for_histogram(struct cell *pthis, long long value);
+int cell_oper_for_histogram(struct cell *pthis, long long value);
 long long cell_query_for_histogram(const struct cell *pthis, double percentile);

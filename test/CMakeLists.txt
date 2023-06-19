@@ -20,16 +20,7 @@ include_directories(${PROJECT_SOURCE_DIR}/src/export)
 include_directories(${PROJECT_SOURCE_DIR}/src/metrics)
 include_directories(${PROJECT_SOURCE_DIR}/include)
 
-
-# add_executable(unit_tests ${SRC} gtest_topk.cpp)
-SET(TEST_UTILS_SRC
-  utils.cpp
-  )
-
-add_executable(unit_tests ${SRC} ${TEST_UTILS_SRC} gtest_topk.cpp)
-target_link_libraries(unit_tests gtest-static)
-
-#zlib, first install zlib from https://zlib.net/
+# zlib, first install zlib from https://zlib.net/
 SET (ZLIB_ROOT "/home/chenzizhan/zlib")
 SET (ZLIB_INCLUDE_DIR "/home/chenzizhan/zlib/include/")
 SET (ZLIB_LIBRARY "/home/chenzizhan/zlib/lib/libz.so.1.2.13")
@@ -40,11 +31,16 @@ MESSAGE (" zlib version minor is " ${ZLIB_VERSION_MINOR})
 MESSAGE (" zlib include is " ${ZLIB_INCLUDE_DIR})
 MESSAGE (" zlib libraries are " ${ZLIB_LIBRARIES})
 
-target_link_libraries(unit_tests ${ZLIB_LIBRARIES})
+SET(TEST_UTILS_SRC
+  utils.cpp
+  )
 
 
-# target_link_libraries(unit_tests
-#   PRIVATE
-#     fieldstat4-shared
-#     gtest_static
-#   )
+# add_executable(gtest_topk ${SRC} ${TEST_UTILS_SRC} gtest_topk.cpp)
+# target_link_libraries(gtest_topk gtest-static ${ZLIB_LIBRARIES})
+# add_executable(gtest_counter ${SRC} ${TEST_UTILS_SRC} gtest_counter.cpp)
+# target_link_libraries(gtest_counter gtest-static ${ZLIB_LIBRARIES})
+# add_executable(gtest_histogram ${SRC} ${TEST_UTILS_SRC} gtest_histogram.cpp)
+# target_link_libraries(gtest_histogram gtest-static ${ZLIB_LIBRARIES})
+add_executable(gtest_cardinality ${SRC} ${TEST_UTILS_SRC} gtest_cardinality.cpp)
+target_link_libraries(gtest_cardinality gtest-static ${ZLIB_LIBRARIES})

@@ -56,7 +56,7 @@ static int append_field_to_instance(struct fieldstat *instance, struct fs_field 
 }
 
 /* -------------------------------------------------------------------------- */
-/*                               field operation                              */
+/*                               field register                              */
 /* -------------------------------------------------------------------------- */
 int fieldstat_register_topk(struct fieldstat *instance, const char *field_name, int K)
 {
@@ -65,42 +65,88 @@ int fieldstat_register_topk(struct fieldstat *instance, const char *field_name, 
     return append_field_to_instance(instance, field);
 }
 
-// // TODO: sort tags by key and value
-// int my_tag_cmp(const void *a, const void *b)
-// {
-//     struct fieldstat_tag *tag_a = (struct fieldstat_tag *)a;
-//     struct fieldstat_tag *tag_b = (struct fieldstat_tag *)b;
-//     int key_cmp = strcmp(tag_a->key, tag_b->key);
-//     if (key_cmp == 0) {
-//         switch (tag_a->type) {
-//             case TAG_INTEGER:
-//                 return tag_a->value_int - tag_b->value_int;
-//             case TAG_DOUBLE:
-//                 return (int)(tag_a->value_double - tag_b->value_double);
-//             case TAG_CSTRING:
-//                 return strcmp(tag_a->value_str, tag_b->value_str);
-//             default:
-//                 printf("ERR: unknown tag type\n");
-//                 return -1;
-//         }
-//     }
-//     return key_cmp;
-// }
+int fieldstat_register_counter(struct fieldstat *instance, const char *field_name)
+{
+    struct fs_field *field = field_new_counter(field_name);
 
+    return append_field_to_instance(instance, field);
+}
+
+int fieldstat_register_histogram(struct fieldstat *instance, const char *field_name, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures)
+{
+    if (lowest_trackable_value < 1 || significant_figures < 1 || 5 < significant_figures)
+	{
+        printf("fieldstat_register_histogram: invalid params.\n");
+		return -1;
+	}
+
+	if (lowest_trackable_value * 2 > highest_trackable_value)
+	{
+        printf("fieldstat_register_histogram: invalid params.\n");
+		return -1;
+	}
+
+    struct fs_field *field = field_new_histogram(field_name, lowest_trackable_value, highest_trackable_value, significant_figures);
+
+    return append_field_to_instance(instance, field);
+}
+
+int fieldstat_register_cardinality(struct fieldstat *instance, const char *field_name, unsigned char precision)
+{
+    // Ensure the precision is somewhat sane
+    if (precision < 4 || precision > 18) {
+        printf("fieldstat_register_histogram: invalid params.\n");
+        return -1;
+    }
+
+    struct fs_field *field = field_new_cardinality(field_name, precision);
+
+    return append_field_to_instance(instance, field);
+}
+
+/* -------------------------------------------------------------------------- */
+/*                               field operation                              */
+/* -------------------------------------------------------------------------- */
 int fieldstat_topk_add(struct fieldstat *instance, int field_id, const char *key, size_t key_len, const struct fieldstat_tag tags[], size_t n_tag)
 {
     struct fs_field *field = (struct fs_field *)instance->field_array[field_id];
-    if (field == NULL) {
+    if (field == NULL || field_get_type(field) != FIELD_TYPE_TOPK) {
         printf("ERR: field is not registered yet\n");
         return -1;
     }
-    // qsort(tags, n_tag, sizeof(struct fieldstat_tag), my_tag_cmp);
     field_topk_add(field, key, key_len, 1, tags, n_tag);
     return 0;
 }
 
+int fieldstat_counter_incrby(struct fieldstat *instance, int field_id, long long increment, const struct fieldstat_tag tags[], size_t n_tag)
+{
+    struct fs_field *field = (struct fs_field *)instance->field_array[field_id];
+    if (field == NULL || field_get_type(field) != FIELD_TYPE_COUNTER) {
+        printf("ERR: field is not registered yet\n");
+        return -1;
+    }
+    return field_counter_incrby(field, increment, tags, n_tag);
+}
 
+int fieldstat_histogram_record(struct fieldstat *instance, int field_id, long long value, const struct fieldstat_tag tags[], size_t n_tag)
+{
+    struct fs_field *field = (struct fs_field *)instance->field_array[field_id];
+    if (field == NULL || field_get_type(field) != FIELD_TYPE_HISTOGRAM) {
+        printf("ERR: field is not registered yet\n");
+        return -1;
+    }
+    return field_histogram_record(field, value, tags, n_tag);
+}
 
+int fieldstat_cardinality_add(struct fieldstat *instance, int field_id, const char *key, size_t key_len, const struct fieldstat_tag tags[], size_t n_tag)
+{
+    struct fs_field *field = (struct fs_field *)instance->field_array[field_id];
+    if (field == NULL || field_get_type(field) != FIELD_TYPE_CARDINALITY) {
+        printf("ERR: field is not registered yet\n");
+        return -1;
+    }
+    return field_cardinality_add(field, key, key_len, tags, n_tag);
+}
 /* -------------------------------------------------------------------------- */
 /*                                serialization                               */
 /* -------------------------------------------------------------------------- */
@@ -208,7 +254,7 @@ enum field_type fieldstat_get_type(const struct fieldstat *instance, int id)
     return field_get_type(instance->field_array[id]);
 }
 
-void fieldstat_topk_query(const struct fieldstat *instance, int id, const struct fieldstat_tag_list *tag_list , char ***keys_out, long long **count_out, size_t *n_key_out)
+void fieldstat_topk_query(const struct fieldstat *instance, int id, const struct fieldstat_tag_list *tag_list, char ***keys_out, long long **count_out, size_t *n_key_out)
 {
     struct fs_field *field = instance->field_array[id];
     if (field == NULL || field_get_type(field) != FIELD_TYPE_TOPK) {
@@ -231,7 +277,7 @@ void tag_list_clear(struct fieldstat_tag_list *tag_list)
 }
 
 // free fieldstat_tag_list: for every tag_list in tag_lists, clear tag_list->tag, free the pointer. free tag_lists
-int fieldstat_get_tag_lists(struct fieldstat *instance, int field_id, struct fieldstat_tag_list *lists, size_t n_list)
+int fieldstat_get_tag_lists(const struct fieldstat *instance, int field_id, struct fieldstat_tag_list *lists, size_t n_list)
 {
     struct fieldstat_tag_list *tag_lists_out = NULL;
     size_t n_tag_lists_out = 0;
@@ -259,9 +305,35 @@ int fieldstat_get_tag_lists(struct fieldstat *instance, int field_id, struct fie
     return n_tag_lists_out;
 }
 
-// fieldstat_counter_get(instance, field_id[i], tag_lists[j]);
-// p50=fieldstat_histogram_value_at_percentile(instance, field_id[i], tag_lists[j], 0.5);
-//  avg=fieldstat_histogram_average(instance, field_id[i], tag_lists[j]);
-// 
+long long fieldstat_counter_get(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list)
+{
+    struct fs_field *field = instance->field_array[field_id];
+    if (field == NULL || field_get_type(field) != FIELD_TYPE_COUNTER) {
+        printf("ERR: field is not registered yet\n");
+        return -1;
+    }
+    return field_query_for_counter(field, tag_list->tag, tag_list->n_tag);
+}
 
-// 
+long long fieldstat_histogram_value_at_percentile(struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list, double percentile)
+{
+    struct fs_field *field = instance->field_array[field_id];
+    if (field == NULL || field_get_type(field) != FIELD_TYPE_HISTOGRAM) {
+        printf("ERR: field is not registered yet\n");
+        return -1;
+    }
+    return field_query_for_histogram(field, tag_list->tag, tag_list->n_tag, percentile);
+}
+
+//  avg=fieldstat_histogram_average(instance, field_id[i], tag_lists[j]); 
+// TODO: histogram 两种query
+
+double fieldstat_cardinality_get(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list)
+{
+    struct fs_field *field = instance->field_array[field_id];
+    if (field == NULL || field_get_type(field) != FIELD_TYPE_CARDINALITY) {
+        printf("ERR: field is not registered yet\n");
+        return -1;
+    }
+    return field_query_for_cardinality(field, tag_list->tag, tag_list->n_tag);
+}
