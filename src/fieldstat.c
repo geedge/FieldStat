@@ -11,8 +11,9 @@
 
 #include "uthash.h"
 
-// TODO: 序列化再加到其他blob里（exporter）
-// TODO：版本号
+// TODO: name 等输出相关量的序列化放到exporter里
+
+
 struct fieldstat {
     struct fs_field **field_array; // all the metrics are dynamic(differ from field stat 3.0)
     size_t n_field;
@@ -157,7 +158,7 @@ int fieldstat_cardinality_add(struct fieldstat *instance, int field_id, const ch
 
 /*
 {
-    name=<instance_name>,
+    "ver": <EXPORT_VER>
     "fields"= [<binary of fields, refer to field.c annotation for its detail>]
 }
 */
@@ -168,9 +169,14 @@ struct fieldstat *fieldstat_deserialize(const char *blob, size_t blob_size)
     mpack_tree_parse(&tree);
     mpack_node_t root = mpack_tree_root(&tree);
 
-    struct fieldstat *instance = fieldstat_new();
+    int ver = mpack_node_i32(mpack_node_map_cstr(root, "ver"));
+    if (ver != EXPORT_VER) {
+        printf("fieldstat_deserialize: invalid version\n");
+        mpack_tree_destroy(&tree);
+        return NULL;
+    }
 
-    printf("fieldstat_deserialize the fieldstat_new instance array pointer: %p\n", instance->field_array);
+    struct fieldstat *instance = fieldstat_new();
 
     mpack_node_t field_arr = mpack_node_map_cstr(root, "fields");
     for (int i = 0 ; i < mpack_node_array_length(field_arr); i++) {
@@ -219,7 +225,10 @@ int fieldstat_serialize(const struct fieldstat *instance, char **blob_out, size_
     mpack_writer_t writer;
     mpack_writer_init_growable(&writer, blob_out, blob_size_out);
 
-    mpack_start_map(&writer, 1); // only a single array of fields
+    mpack_start_map(&writer, 2); // version and a single array of fields
+
+    mpack_write_cstr(&writer, "ver");
+    mpack_write_i32(&writer, EXPORT_VER);
 
     mpack_write_cstr(&writer, "fields");
     mpack_start_array(&writer, instance->n_field);

@@ -5,8 +5,7 @@ extern "C"
 {
 #endif
 
-#define INSTANCE_NAME_MAX_LEN 32
-#define MAX_TAG_NUM	     	32
+#define EXPORT_VER 1 // increase by 1 when the serialization format is changed.
 
 enum field_type
 {
