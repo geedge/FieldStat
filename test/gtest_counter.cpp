@@ -75,7 +75,6 @@ TEST(metric_test_counter, serialize_and_deserialize_for_2_fields_1st_empty_2nd_a
     long long ret_int_tagged = fieldstat_counter_get(instance_from_deserialize, id2_added, &tag_list_2[1]);
     printf("query ok 2\n");
     EXPECT_EQ(ret_int_tagged, 12345);
-    printf("check finish\n");
 
     long long ret_string_tagged = fieldstat_counter_get(instance_from_deserialize, id2_added, &tag_list_2[0]);
     printf("query ok 1\n");

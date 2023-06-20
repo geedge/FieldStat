@@ -86,7 +86,6 @@ include_directories(${PROJECT_SOURCE_DIR}/src/utils)
 file(GLOB SRC
     "src/*.c"
     "src/metrics/*.c"
-    "src/export/*.c"
     "src/utils/*.c"
     "vendors/cjson/*.c"
     "vendors/hdr/*.c"

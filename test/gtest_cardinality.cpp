@@ -20,8 +20,13 @@
 
 // 简单的tag 测试：输入一个key， value 是”1“， 再输入一个value是1的tag，两次添加，只有一个tag，查阅出的tag也只有一个。 
 
-// 满规格测试，instance里增加的数量超过初始值，realloc
+// TODO: 准度测试
+
 // 性能测试
+
+
+// C++ 写： 
+// 对于每个函数，均为随机（自己写一个随机生成器）进值。 create_fuzz_tester(Rand_gen) fuzz_tester.operfunc(函数指针) . first(FIXTO, ), rangeFrom()...  
 
 TEST(metric_test_cardinality, serialize_and_deserialize_for_2_fields_1st_empty_2nd_added)
 {

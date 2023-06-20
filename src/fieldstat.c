@@ -11,12 +11,15 @@
 
 #include "uthash.h"
 
-
+// TODO: 序列化再加到其他blob里（exporter）
+// TODO：版本号
 struct fieldstat {
     char name[INSTANCE_NAME_MAX_LEN];
+    // TODO：名字其实也是只用于输出的。
 
-    struct fs_field *field_array[CELL_MAX_NUMBER]; // all the metrics are dynamic(differ from field stat 3.0) // TODO: 改成动态的
+    struct fs_field **field_array; // all the metrics are dynamic(differ from field stat 3.0) // TODO: 改成动态的
     size_t n_field;
+    size_t max_field;
 };
 
 struct fieldstat *fieldstat_new(const char *symbol)
@@ -24,6 +27,10 @@ struct fieldstat *fieldstat_new(const char *symbol)
     struct fieldstat *instance = malloc(sizeof(struct fieldstat));
     memset(instance, 0, sizeof(struct fieldstat));
     strncpy(instance->name, symbol, INSTANCE_NAME_MAX_LEN);
+
+    size_t init_array_len = 256;
+    instance->max_field = init_array_len;
+    instance->field_array = malloc(sizeof(struct fs_field *) * init_array_len);
 
     return instance;
 }
@@ -34,6 +41,7 @@ void fieldstat_free(struct fieldstat *instance)
     for (int i = 0; i < instance->n_field; i++) { // FIXME: 当前添加都是添加到最后，所以可以直接这样循环，会不会有unregister 的需求？
         field_free(instance->field_array[i]);
     }
+    free(instance->field_array);
     free(instance);
 }
 
@@ -46,9 +54,9 @@ void fieldstat_refresh(struct fieldstat *instance)
 
 static int append_field_to_instance(struct fieldstat *instance, struct fs_field *field)
 {
-    if (instance->n_field >= CELL_MAX_NUMBER) {  // TODO: realloc
-        printf("append_field_to_instance: too many fields registered\n");
-        return -1;
+    if (instance->n_field >= instance->max_field) {
+        instance->max_field *= 2;
+        instance->field_array = realloc(instance->field_array, sizeof(struct fs_field *) * instance->max_field);
     }
     instance->field_array[instance->n_field++] = (struct fs_field *)field;
     field_set_id(field, instance->n_field - 1);
@@ -168,12 +176,15 @@ struct fieldstat *fieldstat_deserialize(const char *blob, size_t blob_size)
     mpack_node_copy_cstr(mpack_node_map_cstr(root, "name"), tmp_name, sizeof(tmp_name));
     struct fieldstat *instance = fieldstat_new(tmp_name);
 
+    printf("fieldstat_deserialize the fieldstat_new instance array pointer: %p\n", instance->field_array);
+
     mpack_node_t field_arr = mpack_node_map_cstr(root, "fields");
     for (int i = 0 ; i < mpack_node_array_length(field_arr); i++) {
         mpack_node_t field_blob_bin = mpack_node_array_at(field_arr, i);
-        struct fs_field *tmp_field = field_new_by_deserialize(mpack_node_bin_data(field_blob_bin), mpack_node_bin_size(field_blob_bin));
+        struct fs_field *tmp_field = field_deserialize(mpack_node_bin_data(field_blob_bin), mpack_node_bin_size(field_blob_bin));
         int field_id_tmp = field_get_id(tmp_field);
         instance->field_array[field_id_tmp] = tmp_field;
+        printf("fieldstat_deserialize field (id:%d) add to instance, field pointer: %p \n", field_id_tmp, tmp_field);
     }
     instance->n_field = mpack_node_array_length(field_arr);
 
@@ -282,9 +293,10 @@ int fieldstat_get_tag_lists(const struct fieldstat *instance, int field_id, stru
     struct fieldstat_tag_list *tag_lists_out = NULL;
     size_t n_tag_lists_out = 0;
 
+    printf("fieldstat_get_tag_lists the array pointer is %p\n", instance->field_array);
     struct fs_field *field = instance->field_array[field_id];
     if (field == NULL) {
-        printf("ERR: field is not registered yet\n");
+        printf("ERR: field is not registered yet, field id : %d\n", field_id);
         return -1;
     }
 

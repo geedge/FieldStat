@@ -15,7 +15,7 @@ enum field_type field_get_type(const struct fs_field *field);
 int field_get_id(const struct fs_field *field);
 void field_set_id(struct fs_field *field, int id);
 
-struct fs_field *field_new_by_deserialize(const char *blob, size_t blob_size);
+struct fs_field *field_deserialize(const char *blob, size_t blob_size);
 int field_serialize(const struct fs_field *field, char **blob, size_t *blob_size);
 void field_free(struct fs_field *field);
 void field_refresh(struct fs_field *field);
@@ -40,6 +40,7 @@ void field_query_for_topk(const struct fs_field *field, const struct fieldstat_t
 long long field_query_for_counter(const struct fs_field *field, const struct fieldstat_tag *tag_list, size_t tag_num);
 long long field_query_for_histogram(const struct fs_field *field, const struct fieldstat_tag *tag_list, size_t tag_num, double percentile);
 double field_query_for_cardinality(const struct fs_field *field, const struct fieldstat_tag *tag_list, size_t tag_num);
+// TODO： 直接提供一个get cell 的接口，包括operation 等等。
 
 void field_get_tags(const struct fs_field *field, struct fieldstat_tag_list **tag_lists_out, size_t *n_tag_lists_out);
 

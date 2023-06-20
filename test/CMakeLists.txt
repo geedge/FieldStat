@@ -36,11 +36,11 @@ SET(TEST_UTILS_SRC
   )
 
 
-# add_executable(gtest_topk ${SRC} ${TEST_UTILS_SRC} gtest_topk.cpp)
-# target_link_libraries(gtest_topk gtest-static ${ZLIB_LIBRARIES})
-# add_executable(gtest_counter ${SRC} ${TEST_UTILS_SRC} gtest_counter.cpp)
-# target_link_libraries(gtest_counter gtest-static ${ZLIB_LIBRARIES})
-# add_executable(gtest_histogram ${SRC} ${TEST_UTILS_SRC} gtest_histogram.cpp)
-# target_link_libraries(gtest_histogram gtest-static ${ZLIB_LIBRARIES})
+add_executable(gtest_topk ${SRC} ${TEST_UTILS_SRC} gtest_topk.cpp)
+target_link_libraries(gtest_topk gtest-static ${ZLIB_LIBRARIES})
+add_executable(gtest_counter ${SRC} ${TEST_UTILS_SRC} gtest_counter.cpp)
+target_link_libraries(gtest_counter gtest-static ${ZLIB_LIBRARIES})
+add_executable(gtest_histogram ${SRC} ${TEST_UTILS_SRC} gtest_histogram.cpp)
+target_link_libraries(gtest_histogram gtest-static ${ZLIB_LIBRARIES})
 add_executable(gtest_cardinality ${SRC} ${TEST_UTILS_SRC} gtest_cardinality.cpp)
 target_link_libraries(gtest_cardinality gtest-static ${ZLIB_LIBRARIES})

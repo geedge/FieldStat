@@ -20,7 +20,6 @@
 
 // 简单的tag 测试：输入一个key， value 是”1“， 再输入一个value是1的tag，两次添加，只有一个tag，查阅出的tag也只有一个。 
 
-// 满规格测试，instance里增加的数量超过初始值，realloc
 // 性能测试
 
 TEST(metric_test_topk, serialize_and_deserialize_for_2_fields_1st_empty_2nd_added)
@@ -60,6 +59,7 @@ TEST(metric_test_topk, serialize_and_deserialize_for_2_fields_1st_empty_2nd_adde
     struct fieldstat_tag_list tag_list_2[2] = {{0}};
     int ret_empty_zerolength = fieldstat_get_tag_lists(instance_from_deserialize, id1_empty, tag_list_1, 0);
     int ret_2cell_2length = fieldstat_get_tag_lists(instance_from_deserialize, id2_added, tag_list_2, 2);
+    // TODO: 这个接口太烂了
     int ret_2cell_1length = fieldstat_get_tag_lists(instance_from_deserialize, id2_added, tag_list_2, 1);
     printf("query tag ok\n");
     EXPECT_EQ(ret_empty_zerolength, 0);

@@ -7,7 +7,6 @@ extern "C"
 
 #define INSTANCE_NAME_MAX_LEN 32
 #define MAX_TAG_NUM	     	32
-#define CELL_MAX_NUMBER 1024
 
 enum field_type
 {
@@ -15,8 +14,7 @@ enum field_type
 	FIELD_TYPE_TOPK,
 	FIELD_TYPE_CARDINALITY,
 	FIELD_TYPE_HISTOGRAM,
-    // gauge
-    // summery
+    // add more type here(`MUST` in the rear of the enum)
 };
 
 enum fs_tag_type
@@ -57,9 +55,11 @@ int fieldstat_register_histogram(struct fieldstat *instance, const char *field_n
 // @return 0 if success, -1 if failed.
 int fieldstat_counter_incrby(struct fieldstat *instance, int field_id, long long increment, const struct fieldstat_tag tags[], size_t n_tag);
 int fieldstat_topk_add(struct fieldstat *instance, int field_id, const char *key, size_t key_len, const struct fieldstat_tag tags[], size_t n_tag);
+// TODO: K ， width  depth 这几个参数用户确定，不用默认值
+
 int fieldstat_cardinality_add(struct fieldstat *instance, int field_id, const char *key, size_t key_len, const struct fieldstat_tag tags[], size_t n_tag);
 int fieldstat_histogram_record(struct fieldstat *instance, int field_id, long long value, const struct fieldstat_tag tags[], size_t n_tag);
-
+// TODO: 特别大的值，则使用corrected value 
 struct fieldstat *fieldstat_deserialize(const char *blob, size_t blob_size);
 int fieldstat_merge_with_blob(struct fieldstat *instance, const char *blob, size_t blob_size);
 int fieldstat_serialize(const struct fieldstat *instance, char **blob_out, size_t *blob_size_out);
