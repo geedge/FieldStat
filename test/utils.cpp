@@ -26,7 +26,7 @@ string gen_rand_string(int len)
 //     explicit Tester(string name)
 //     {
 //         string instance_name = name;
-//         instance = fieldstat_new(name.c_str());
+//         instance = fieldstat_new());
 //     }
 //     ~Tester()
 //     {

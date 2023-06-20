@@ -39,7 +39,7 @@ struct fieldstat_tag_list
     size_t n_tag;
 };
 struct fieldstat;
-struct fieldstat *fieldstat_new(const char *symbol);
+struct fieldstat *fieldstat_new();
 void fieldstat_free(struct fieldstat *instance);
 int fieldstat_register_counter(struct fieldstat *instance, const char *field_name);
 int fieldstat_register_topk(struct fieldstat *instance, const char *field_name, int K);
@@ -55,7 +55,6 @@ int fieldstat_register_histogram(struct fieldstat *instance, const char *field_n
 // @return 0 if success, -1 if failed.
 int fieldstat_counter_incrby(struct fieldstat *instance, int field_id, long long increment, const struct fieldstat_tag tags[], size_t n_tag);
 int fieldstat_topk_add(struct fieldstat *instance, int field_id, const char *key, size_t key_len, const struct fieldstat_tag tags[], size_t n_tag);
-// TODO: K ， width  depth 这几个参数用户确定，不用默认值
 
 int fieldstat_cardinality_add(struct fieldstat *instance, int field_id, const char *key, size_t key_len, const struct fieldstat_tag tags[], size_t n_tag);
 int fieldstat_histogram_record(struct fieldstat *instance, int field_id, long long value, const struct fieldstat_tag tags[], size_t n_tag);

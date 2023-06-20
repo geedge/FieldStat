@@ -324,9 +324,9 @@ struct cell *cell_create_for_topk(int K)
     return cell;
 }
 
-void cell_oper_for_topk(struct cell *pthis, const char *key, size_t key_len, unsigned value)
+void cell_topk_add(struct cell *pthis, const char *key, size_t key_len, unsigned value)
 {
-    printf("cell_oper_for_topk enter, add key: %s\n", key);
+    printf("cell_topk_add enter, add key: %s\n", key);
     struct metric_topk *topk = (struct metric_topk *)pthis->metric;
     heavy_keeper_add(topk->hk, key, key_len, value);
 }
@@ -437,13 +437,13 @@ static struct metric_counter *metric_counter_new_scheme()
 /*                                cell-counter                                */
 /* -------------------------------------------------------------------------- */
 
-void cell_oper_for_counter(struct cell *pthis, long long value)
+void cell_counter_incrby(struct cell *pthis, long long value)
 {
     struct metric_counter *counter = (struct metric_counter *)pthis->metric;
     counter->value += value;
 }
 
-long long cell_query_for_counter(const struct cell *pthis)
+long long cell_get_for_counter(const struct cell *pthis)
 {
     struct metric_counter *counter = (struct metric_counter *)pthis->metric;
     return counter->value;
@@ -536,7 +536,7 @@ struct cell *cell_create_for_cardinality(const char precision)
     return cell;
 }
 
-int cell_oper_for_cardinality(struct cell *pthis, const char *key, size_t key_len)
+int cell_cardinality_add(struct cell *pthis, const char *key, size_t key_len)
 {
     struct metric_cardinality *cardinality = (struct metric_cardinality *)pthis->metric;
     return ST_hyperloglog_add(cardinality->hll, key, key_len);
@@ -644,7 +644,7 @@ struct cell *cell_create_for_histogram(long long lowest_trackable_value, long lo
     return cell;
 }
 
-int cell_oper_for_histogram(struct cell *pthis, long long value)
+int cell_histogram_record(struct cell *pthis, long long value)
 {
     struct metric_histogram *histogram = (struct metric_histogram *)pthis->metric;
     bool ret = hdr_record_value(histogram->hdr, value);
@@ -818,6 +818,11 @@ void cell_refresh(struct cell *pthis)
 int cell_merge(struct cell *pthis, const struct cell *from)
 {
     return pthis->metric->merge(pthis->metric, from->metric);
+}
+
+int cell_copy(struct cell *pthis, const struct cell *from)
+{
+    return pthis->metric->copy(pthis->metric, from->metric);
 }
 
 struct cell *cell_duplicate(const struct cell *pthis)

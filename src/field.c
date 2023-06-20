@@ -47,195 +47,6 @@ struct fs_field {
     struct field_paras *field_paras;
 };
 
-struct field_paras *construct_parameters(enum field_type type, ...)
-{
-    struct field_paras *paras = (struct field_paras *)malloc(sizeof(struct field_paras));
-    va_list ap;
-    va_start(ap, type);
-    switch (type) {
-        case FIELD_TYPE_TOPK:
-            paras->topk.K = va_arg(ap, int);
-            break;
-        case FIELD_TYPE_CARDINALITY:
-            paras->cardinality.precision = (char)va_arg(ap, int);
-            break;
-        case FIELD_TYPE_HISTOGRAM:
-            paras->hdr.lowest_trackable_value = va_arg(ap, long long);
-            paras->hdr.highest_trackable_value = va_arg(ap, long long);
-            paras->hdr.significant_figures = va_arg(ap, int);
-            break;
-        default:
-            printf("construct_parameters: unknown type\n");
-            assert(0);
-    }
-    va_end(ap);
-    return paras;
-}
-
-struct fs_field *field_new_with_paras(enum field_type type, int field_id, const char *name, struct field_paras *paras)
-{
-    struct fs_field *field = (struct fs_field *)malloc(sizeof(struct fs_field));
-    field->type = type;
-    field->field_id = field_id;
-    field->name = strdup(name);
-    field->hash_tbl = NULL;
-    field->field_paras = paras;
-    return field;
-}
-
-static struct cell *field_find_cell_with_key(const struct fs_field *field, const char *key, size_t key_len)
-{
-    struct cell_hash_node *node;
-    HASH_FIND(hh, field->hash_tbl, key, key_len, node);
-    if (node == NULL) {
-        printf("field_find_cell_with_key: node == NULL\n");
-        return NULL;
-    }
-    return node->cell;
-}
-
-// key_len does not include '\0'
-void field_insert_cell(struct fs_field *field, struct cell *cell, const char *key, size_t key_len)
-{
-    struct cell_hash_node *node = (struct cell_hash_node *)malloc(sizeof(struct cell_hash_node));
-
-    node->key_len = key_len;
-    node->key = (char *)malloc(key_len + 1);
-    memcpy(node->key, key, key_len);
-    node->cell = cell;
-    HASH_ADD_KEYPTR(hh, field->hash_tbl, node->key, node->key_len, node);
-
-    if (field_find_cell_with_key(field, key, key_len) == NULL) {
-        printf("field_insert_cell: field_find_cell_with_key == NULL\n");
-        assert(0);
-    }
-}
-
-// TODO： generic 
-struct fs_field *field_new_common(const char *name, enum field_type type)
-{
-    struct fs_field *field = (struct fs_field *)malloc(sizeof(struct fs_field));
-    field->name = strdup(name);
-    field->hash_tbl = NULL;
-    field->type = type;
-    field->field_paras = NULL;
-    return field;
-}
-
-struct fs_field *field_new_topk(const char *name, int K)
-{
-    printf("field_new_topk enter\n");
-    struct fs_field *field = field_new_common(name, FIELD_TYPE_TOPK);
-
-    field->field_paras = (struct field_paras *)malloc(sizeof(struct field_paras));
-    field->field_paras->topk.K = K;
-    return field;
-}
-
-struct fs_field *field_new_counter(const char *name)
-{
-    return  field_new_common(name, FIELD_TYPE_COUNTER);
-}
-
-struct fs_field *field_new_cardinality(const char *name, char precision)
-{
-    struct fs_field *field = field_new_common(name, FIELD_TYPE_CARDINALITY);
-    field->field_paras = (struct field_paras *)malloc(sizeof(struct field_paras));
-    field->field_paras->cardinality.precision = precision;
-    return field;
-}
-struct fs_field *field_new_histogram(const char *name, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures)
-{
-    struct fs_field *field = field_new_common(name, FIELD_TYPE_HISTOGRAM);
-    field->field_paras = (struct field_paras *)malloc(sizeof(struct field_paras));
-    field->field_paras->hdr.lowest_trackable_value = lowest_trackable_value;
-    field->field_paras->hdr.highest_trackable_value = highest_trackable_value;
-    field->field_paras->hdr.significant_figures = significant_figures;
-    return field;
-}
-
-void field_free(struct fs_field *field)
-{
-    struct cell_hash_node *node, *tmp;
-    HASH_ITER(hh, field->hash_tbl, node, tmp) {
-        struct cell *cell = node->cell;
-        cell_free(cell);
-        HASH_DEL(field->hash_tbl, node);
-        free(node->key);
-        free(node);
-    }
-    free(field->field_paras);
-    free(field->name);
-    free(field);
-}
-
-void field_refresh(struct fs_field *field)
-{
-    struct cell_hash_node *node, *tmp;
-    HASH_ITER(hh, field->hash_tbl, node, tmp) {
-        struct cell *cell = node->cell;
-        cell_refresh(cell);
-    }
-}
-
-struct fs_field *field_dup(const struct fs_field *src)
-{
-    struct fs_field *dst = (struct fs_field *)malloc(sizeof(struct fs_field));
-    dst->name = strdup(src->name);
-    dst->hash_tbl = NULL;
-    dst->type = src->type;
-    dst->field_paras = (struct field_paras *)malloc(sizeof(struct field_paras));
-    memcpy(dst->field_paras, src->field_paras, sizeof(struct field_paras));
-    struct cell_hash_node *node, *tmp;
-    HASH_ITER(hh, src->hash_tbl, node, tmp) {
-        struct cell *cell = node->cell;
-        struct cell *new_cell = cell_duplicate(cell);
-        field_insert_cell(dst, new_cell, node->key, node->key_len);
-    }
-    return dst;
-}
-
-int field_merge(struct fs_field *dst, const struct fs_field *src)
-{
-    if (dst->type != src->type) {
-        printf("field_merge:field type not match\n");
-        return -1;
-    }
-    struct cell_hash_node *node, *tmp;
-    HASH_ITER(hh, src->hash_tbl, node, tmp) {
-        struct cell *cell = node->cell;
-        struct cell *dst_cell = field_find_cell_with_key(dst, node->key, node->key_len);
-        if (dst_cell == NULL) {
-            struct cell *new_cell = cell_duplicate(cell);
-            field_insert_cell(dst, new_cell, node->key, node->key_len);
-        } else {
-            if (cell_merge(dst_cell, cell) != 0) {
-                printf("field_merge:cell merge failed\n");
-                return -1;
-            }
-        }
-    }
-    return 0;
-}
-
-void field_get_tags(const struct fs_field *field, struct fieldstat_tag_list **tag_lists_out, size_t *n_tag_lists_out)
-{
-    *tag_lists_out = (struct fieldstat_tag_list *)malloc(sizeof(struct fieldstat_tag_list) * HASH_COUNT(field->hash_tbl));
-    *n_tag_lists_out = HASH_COUNT(field->hash_tbl);
-
-    struct cell_hash_node *node, *tmp;
-    int i = 0;
-    HASH_ITER(hh, field->hash_tbl, node, tmp) {
-        struct cell *cell = node->cell;
-        struct fieldstat_tag *tags = NULL;
-        size_t n_tags = 0;
-        cell_read_tag(cell, &tags, &n_tags);
-        (*tag_lists_out)[i].tag = tags;
-        (*tag_lists_out)[i].n_tag = n_tags;
-        i++;
-    }
-}
-
 static void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_tags, char **out_key, size_t *out_key_size)
 {
 	int i = 0;
@@ -285,96 +96,313 @@ static void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_t
     free(dynamic_mem);
 }
 
+struct cell *field_spawn_cell(const struct fs_field *field)
+{
+    struct cell *cell = NULL;
+    switch (field->type) {
+        case FIELD_TYPE_COUNTER: {
+            cell = cell_create_for_counter();
+        }
+        break;
+        case FIELD_TYPE_TOPK:{
+            cell = cell_create_for_topk(field->field_paras->topk.K);
+        }
+        break;
+        case FIELD_TYPE_HISTOGRAM:{
+            struct para_hdr *tmp_paras = &field->field_paras->hdr;
+            cell = cell_create_for_histogram(tmp_paras->lowest_trackable_value, tmp_paras->highest_trackable_value, tmp_paras->significant_figures);
+        }
+        break;
+        case FIELD_TYPE_CARDINALITY:{
+            cell = cell_create_for_cardinality(field->field_paras->cardinality.precision);
+        }
+        break;
+        default:
+            printf("field_spawn_cell:unknown field type\n");
+            return NULL;
+    }
+    return cell;
+}
+
+struct field_paras *construct_parameters(enum field_type type, ...)
+{
+    struct field_paras *paras = (struct field_paras *)malloc(sizeof(struct field_paras));
+    va_list ap;
+    va_start(ap, type);
+    switch (type) {
+        case FIELD_TYPE_TOPK:
+            paras->topk.K = va_arg(ap, int);
+            break;
+        case FIELD_TYPE_CARDINALITY:
+            paras->cardinality.precision = (char)va_arg(ap, int);
+            break;
+        case FIELD_TYPE_HISTOGRAM:
+            paras->hdr.lowest_trackable_value = va_arg(ap, long long);
+            paras->hdr.highest_trackable_value = va_arg(ap, long long);
+            paras->hdr.significant_figures = va_arg(ap, int);
+            break;
+        default:
+            printf("construct_parameters: unknown type\n");
+            assert(0);
+    }
+    va_end(ap);
+    return paras;
+}
+
+// TODO: deserialize parameters, 要有新的好结构，而不是简单一个数组
+
+struct fs_field *field_new(enum field_type type, const char *name, struct field_paras *paras)
+{
+    struct fs_field *field = (struct fs_field *)malloc(sizeof(struct fs_field));
+    field->type = type;
+    field->field_id = -1;
+    field->name = strdup(name);
+    field->hash_tbl = NULL;
+    field->field_paras = paras;
+    return field;
+}
+
+static struct cell *field_find_cell_with_key(const struct fs_field *field, const char *key, size_t key_len)
+{
+    struct cell_hash_node *node;
+    HASH_FIND(hh, field->hash_tbl, key, key_len, node);
+    if (node == NULL) {
+        printf("field_find_cell_with_key: node == NULL\n");
+        return NULL;
+    }
+    return node->cell;
+}
+
+static struct cell *field_find_cell(const struct fs_field *field, const struct fieldstat_tag tag_list[], size_t tag_num)
+{
+    char *dynamic_cell_key = NULL;
+    size_t dynamic_key_size = 0;
+    build_dynamic_cell_key(tag_list, tag_num, &dynamic_cell_key, &dynamic_key_size);
+    struct cell *cell = field_find_cell_with_key(field, dynamic_cell_key, dynamic_key_size);
+    free(dynamic_cell_key);
+    return cell;
+}
+// key_len does not include '\0'
+static void field_insert_cell_with_key(struct fs_field *field, struct cell *cell, const char *key, size_t key_len)
+{
+    struct cell_hash_node *node = (struct cell_hash_node *)malloc(sizeof(struct cell_hash_node));
+
+    node->key_len = key_len;
+    node->key = (char *)malloc(key_len + 1);
+    memcpy(node->key, key, key_len);
+    node->cell = cell;
+    HASH_ADD_KEYPTR(hh, field->hash_tbl, node->key, node->key_len, node);
+}
+
+void field_insert_cell(struct fs_field *field, struct cell *cell, const struct fieldstat_tag tag_list[], size_t tag_num)
+{
+    char *dynamic_cell_key = NULL;
+    size_t dynamic_key_size = 0;
+    build_dynamic_cell_key(tag_list, tag_num, &dynamic_cell_key, &dynamic_key_size);
+    field_insert_cell_with_key(field, cell, dynamic_cell_key, dynamic_key_size);
+    free(dynamic_cell_key);
+}
+
+struct cell *field_find_or_create_cell(struct fs_field *field, const struct fieldstat_tag tag_list[], size_t tag_num)
+{
+    char *dynamic_cell_key = NULL;
+    size_t dynamic_key_size = 0;
+    build_dynamic_cell_key(tag_list, tag_num, &dynamic_cell_key, &dynamic_key_size);
+    struct cell *cell = field_find_cell_with_key(field, dynamic_cell_key, dynamic_key_size);
+    if (cell == NULL) {
+        printf("cell is null, going to create one\n");
+        cell = field_spawn_cell(field);
+        cell_add_tag(cell, tag_list, tag_num);
+        field_insert_cell_with_key(field, cell, dynamic_cell_key, dynamic_key_size);
+    }
+    free(dynamic_cell_key);
+
+    return cell;
+}
+
+struct fs_field *field_new_topk(const char *name, int K)
+{
+    printf("field_new_topk enter\n");
+    struct field_paras *paras = construct_parameters(FIELD_TYPE_TOPK, K);
+
+    struct fs_field *field = field_new(FIELD_TYPE_TOPK, name, paras);
+
+    return field;
+}
+
+struct fs_field *field_new_counter(const char *name)
+{
+    return  field_new(FIELD_TYPE_COUNTER, name, NULL);
+}
+
+struct fs_field *field_new_cardinality(const char *name, char precision)
+{
+    struct field_paras *paras = construct_parameters(FIELD_TYPE_CARDINALITY, precision);
+    struct fs_field *field = field_new(FIELD_TYPE_CARDINALITY, name, paras);
+    return field;
+}
+struct fs_field *field_new_histogram(const char *name, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures)
+{
+    struct field_paras *paras = construct_parameters(FIELD_TYPE_HISTOGRAM, lowest_trackable_value, highest_trackable_value, significant_figures);
+    struct fs_field *field = field_new(FIELD_TYPE_HISTOGRAM, name, paras);
+    return field;
+}
+
+void field_free(struct fs_field *field)
+{
+    struct cell_hash_node *node, *tmp;
+    HASH_ITER(hh, field->hash_tbl, node, tmp) {
+        struct cell *cell = node->cell;
+        cell_free(cell);
+        HASH_DEL(field->hash_tbl, node);
+        free(node->key);
+        free(node);
+    }
+    free(field->field_paras);
+    free(field->name);
+    free(field);
+}
+
+void field_refresh(struct fs_field *field)
+{
+    struct cell_hash_node *node, *tmp;
+    HASH_ITER(hh, field->hash_tbl, node, tmp) {
+        struct cell *cell = node->cell;
+        cell_refresh(cell);
+    }
+}
+
+struct fs_field *field_dup(const struct fs_field *src)
+{
+    struct field_paras *params = NULL;
+    if (src->field_paras != NULL) {
+        params = (struct field_paras *)malloc(sizeof(struct field_paras));
+        memcpy(params, src->field_paras, sizeof(struct field_paras));
+    }
+
+    struct fs_field *dst = field_new(src->type, src->name, params);
+    field_set_id(dst, src->field_id);
+    struct cell_hash_node *node, *tmp;
+    HASH_ITER(hh, src->hash_tbl, node, tmp) {
+        struct cell *new_cell = cell_duplicate(node->cell);
+        field_insert_cell_with_key(dst, new_cell, node->key, node->key_len);
+    }
+    return dst;
+}
+
+int field_merge(struct fs_field *dst, const struct fs_field *src)
+{
+    if (dst->type != src->type) {
+        printf("field_merge:field type not match\n");
+        return -1;
+    }
+    struct cell_hash_node *node, *tmp;
+    HASH_ITER(hh, src->hash_tbl, node, tmp) {
+        struct cell *cell = node->cell;
+        struct cell *dst_cell = field_find_cell_with_key(dst, node->key, node->key_len);
+        if (dst_cell == NULL) {
+            struct cell *new_cell = cell_duplicate(cell);
+            field_insert_cell_with_key(dst, new_cell, node->key, node->key_len);
+        } else {
+            if (cell_merge(dst_cell, cell) != 0) {
+                printf("field_merge:cell merge failed\n");
+                return -1;
+            }
+        }
+    }
+    return 0;
+}
+
+void field_get_tags(const struct fs_field *field, struct fieldstat_tag_list **tag_lists_out, size_t *n_tag_lists_out)
+{
+    *tag_lists_out = (struct fieldstat_tag_list *)malloc(sizeof(struct fieldstat_tag_list) * HASH_COUNT(field->hash_tbl));
+    *n_tag_lists_out = HASH_COUNT(field->hash_tbl);
+
+    struct cell_hash_node *node, *tmp;
+    int i = 0;
+    HASH_ITER(hh, field->hash_tbl, node, tmp) {
+        struct cell *cell = node->cell;
+        struct fieldstat_tag *tags = NULL;
+        size_t n_tags = 0;
+        cell_read_tag(cell, &tags, &n_tags);
+        (*tag_lists_out)[i].tag = tags;
+        (*tag_lists_out)[i].n_tag = n_tags;
+        i++;
+    }
+}
+
 int field_topk_add(struct fs_field *field, const char *key, size_t key_len, unsigned int score, const struct fieldstat_tag tag_list[], size_t tag_num)
 {
     printf("field_topk_add enter :key: %s\n", key);
 
-    char *dynamic_cell_key = NULL;
-    size_t dynamic_key_size = 0;
-    build_dynamic_cell_key(tag_list, tag_num, &dynamic_cell_key, &dynamic_key_size);
-    printf("dynamic key: %s\n", dynamic_cell_key);
+    struct cell *cell = field_find_or_create_cell(field, tag_list, tag_num);
+    cell_topk_add(cell, key, key_len, score);
 
-    struct cell *cell = field_find_cell_with_key(field, dynamic_cell_key, dynamic_key_size);
-    if (cell == NULL) {
-        printf("cell is null, going to create one\n");
-        cell = cell_create_for_topk(field->field_paras->topk.K);
-        cell_add_tag(cell, tag_list, tag_num);
-        field_insert_cell(field, cell, dynamic_cell_key, dynamic_key_size);
-    }
-
-    cell_oper_for_topk(cell, key, key_len, score);
-    // 改名字
-
-    free(dynamic_cell_key);
     return 0;
 }
 
 int field_counter_incrby(struct fs_field *field, long long score, const struct fieldstat_tag tags[], size_t n_tag)
 {
     printf("field_counter_incrby enter\n");
-    char *dynamic_cell_key = NULL;
-    size_t dynamic_key_size = 0;
-    build_dynamic_cell_key(tags, n_tag, &dynamic_cell_key, &dynamic_key_size);
-    printf("dynamic key: %s\n", dynamic_cell_key);
+    
+    struct cell *cell = field_find_or_create_cell(field, tags, n_tag);
 
-    struct cell *cell = field_find_cell_with_key(field, dynamic_cell_key, dynamic_key_size);
-    if (cell == NULL) {
-        printf("field_counter_incrby cell is null, going to create one\n");
-        cell = cell_create_for_counter();
-        cell_add_tag(cell, tags, n_tag);
-        field_insert_cell(field, cell, dynamic_cell_key, dynamic_key_size);
-    }
+    cell_counter_incrby(cell, score);
 
-    cell_oper_for_counter(cell, score);
-
-    free(dynamic_cell_key);
     return 0;
 }
 
 int field_histogram_record(struct fs_field *field, long long value, const struct fieldstat_tag tags[], size_t n_tag)
 {
     printf("field_histogram_record enter\n");
-    char *dynamic_cell_key = NULL;
-    size_t dynamic_key_size = 0;
-    build_dynamic_cell_key(tags, n_tag, &dynamic_cell_key, &dynamic_key_size);
-    printf("dynamic key: %s\n", dynamic_cell_key);
 
-    struct cell *cell = field_find_cell_with_key(field, dynamic_cell_key, dynamic_key_size);
-    if (cell == NULL) {
-        printf("field_histogram_record cell is null, going to create one\n");
-        struct para_hdr *tmp_paras = &field->field_paras->hdr;
-        cell = cell_create_for_histogram(tmp_paras->lowest_trackable_value, tmp_paras->highest_trackable_value, tmp_paras->significant_figures);
-        cell_add_tag(cell, tags, n_tag);
-        field_insert_cell(field, cell, dynamic_cell_key, dynamic_key_size);
-    }
+    struct cell *cell = field_find_or_create_cell(field, tags, n_tag);
 
-    cell_oper_for_histogram(cell, value);
-
-    free(dynamic_cell_key);
-    return 0;
+    return cell_histogram_record(cell, value);
 }
 
 int field_cardinality_add(struct fs_field *field, const char *key, size_t key_len, const struct fieldstat_tag tags[], size_t n_tag)
 {
     printf("field_cardinality_add enter\n");
-    char *dynamic_cell_key = NULL;
-    size_t dynamic_key_size = 0;
-    build_dynamic_cell_key(tags, n_tag, &dynamic_cell_key, &dynamic_key_size);
-    printf("dynamic key: %s\n", dynamic_cell_key);
 
-    struct cell *cell = field_find_cell_with_key(field, dynamic_cell_key, dynamic_key_size);
-    if (cell == NULL) {
-        printf("field_cardinality_add cell is null, going to create one\n");
-        cell = cell_create_for_cardinality(field->field_paras->cardinality.precision);
-        cell_add_tag(cell, tags, n_tag);
-        field_insert_cell(field, cell, dynamic_cell_key, dynamic_key_size);
-    }
+    struct cell *cell = field_find_or_create_cell(field, tags, n_tag);
 
-    cell_oper_for_cardinality(cell, key, key_len);
-
-    free(dynamic_cell_key);
-    return 0;
+    return cell_cardinality_add(cell, key, key_len);
 }
+
+struct field_paras *deserialize_parameters(mpack_node_t *root, enum field_type type)
+{
+    mpack_node_t field_paras_arr = mpack_node_map_cstr(*root, "para");
+    struct field_paras *field_para = NULL;
+    switch (type) {
+        case FIELD_TYPE_TOPK:{
+            int K = mpack_node_i32(mpack_node_array_at(field_paras_arr, 0));
+            field_para = construct_parameters(type, K);
+        }
+        break;
+        case FIELD_TYPE_COUNTER: {
+            // para is null
+        }
+        break;
+        case FIELD_TYPE_CARDINALITY: {
+            int precision = mpack_node_i32(mpack_node_array_at(field_paras_arr, 0));
+            field_para = construct_parameters(type, precision);
+        }
+        break;
+        case FIELD_TYPE_HISTOGRAM: {
+            int lowest_trackable_value = mpack_node_i32(mpack_node_array_at(field_paras_arr, 0));
+            int highest_trackable_value = mpack_node_i32(mpack_node_array_at(field_paras_arr, 1));
+            int significant_figures = mpack_node_i32(mpack_node_array_at(field_paras_arr, 2));
+            field_para = construct_parameters(type, lowest_trackable_value, highest_trackable_value, significant_figures);
+        }
+        break;
+        default:
+            assert(0);
+            break;
+    }
+    return field_para;
+}
+
 /*
 {
     name=<instance_name>,
@@ -390,6 +418,20 @@ int field_cardinality_add(struct fs_field *field, const char *key, size_t key_le
         }
 }
 */
+static void my_tag_list_free(struct fieldstat_tag *tag_list, size_t tag_num) {
+    for (int i = 0; i < tag_num; i++) {
+        if (tag_list->key) {
+            free((char *)tag_list->key);
+            tag_list->key = NULL;
+        }
+        if (tag_list->type == TAG_CSTRING && tag_list->value_str) {
+            free((char *)tag_list->value_str);
+            tag_list->value_str = NULL;
+        }
+    }
+    free(tag_list);
+}
+
 struct fs_field *field_deserialize(const char *blob, size_t blob_size)
 {
     printf("field_deserialize enter, blob size:: %zu\n", blob_size);
@@ -398,50 +440,15 @@ struct fs_field *field_deserialize(const char *blob, size_t blob_size)
     mpack_tree_parse(&tree);
     mpack_node_t root = mpack_tree_root(&tree);
 
-    mpack_node_t field_name_str_node = mpack_node_map_cstr(root, "name");
-    char *field_name = mpack_node_cstr_alloc(field_name_str_node, 0xFFFF); // 0xFFFF: a very large number
+    char *field_name = mpack_node_cstr_alloc(mpack_node_map_cstr(root, "name"), 0xFFFF); // 0xFFFF: a very large number
     enum field_type type = mpack_node_i32(mpack_node_map_cstr(root, "type"));
-    // TODO: 这个type 其实也是param
     int id = mpack_node_i32(mpack_node_map_cstr(root, "id"));
-
-    // TODO: 封装：parameter deserialize
-    // TODO: new_field(parameter)
-    mpack_node_t field_paras_arr = mpack_node_map_cstr(root, "para");
-    struct fs_field *field_out = NULL;
+    struct field_paras *field_para = deserialize_parameters(&root, type);
     printf("field_deserialize name is: %s, id is : %d, type is: %d\n", field_name, id, type);
-    switch (type) {
-        case FIELD_TYPE_TOPK:{
-            int K = mpack_node_i32(mpack_node_array_at(field_paras_arr, 0));
-            printf("para for topk: K: %d\n", K);
-            field_out = field_new_topk(field_name, K);
-        }
-        break;
-        case FIELD_TYPE_COUNTER: {
-            field_out = field_new_counter(field_name);
-        }
-        break;
-        case FIELD_TYPE_CARDINALITY: {
-            field_out = field_new_cardinality(field_name, mpack_node_i32(mpack_node_array_at(field_paras_arr, 0)));
-        }
-        break;
-        case FIELD_TYPE_HISTOGRAM: {
-            field_out = field_new_histogram(field_name, mpack_node_i32(mpack_node_array_at(field_paras_arr, 0)),
-                mpack_node_i32(mpack_node_array_at(field_paras_arr, 1)), mpack_node_i32(mpack_node_array_at(field_paras_arr, 2)));
-        }
-        break;
-        default:
-            assert(0);
-            break;
-    }
 
-    printf("field_deserialize new field done: field_name: %s, type: %d, id: %d\n", field_name, type, id);
-    if (field_out == NULL) {
-        fprintf(stderr, "field_new failed, field name: %s\n", field_name);
-        free(field_name);
-        return NULL;
-    }
+    struct fs_field *field_out = field_new(type, field_name, field_para);
+    field_set_id(field_out, id);
     free(field_name);
-    field_out->field_id = id;
 
     mpack_node_t cells_arr = mpack_node_map_cstr(root, "cells");
     if (mpack_node_is_nil(cells_arr)) {
@@ -462,27 +469,9 @@ struct fs_field *field_deserialize(const char *blob, size_t blob_size)
         struct fieldstat_tag *tag_list = NULL;
         size_t tag_num = 0;
         cell_read_tag(cell, &tag_list, &tag_num);
+        field_insert_cell(field_out, cell, tag_list, tag_num);
 
-        char *dynamic_cell_key = NULL;
-        size_t dynamic_key_size = 0;
-        build_dynamic_cell_key(tag_list, tag_num, &dynamic_cell_key, &dynamic_key_size);
-        field_insert_cell(field_out, cell, dynamic_cell_key, dynamic_key_size); // dynamic_cell_key is add to hashtable, so no need to free
-        printf("field deserialize insert cell, key: %s, length: %zu\n", dynamic_cell_key, dynamic_key_size);
-
-        field_find_cell_with_key(field_out, dynamic_cell_key, dynamic_key_size);
-
-        free(dynamic_cell_key);
-        for (int i = 0; i < tag_num; i++) {
-            if (tag_list->key) {
-                free((char *)tag_list->key);
-                tag_list->key = NULL;
-            }
-            if (tag_list->type == TAG_CSTRING && tag_list->value_str) {
-                free((char *)tag_list->value_str);
-                tag_list->value_str = NULL;
-            }
-        }
-        free(tag_list);
+        my_tag_list_free(tag_list, tag_num);
     }
     printf("debug, the field has %u cells\n", HASH_COUNT(field_out->hash_tbl));
     mpack_tree_destroy(&tree);
@@ -571,12 +560,7 @@ int field_serialize(const struct fs_field *field, char **blob, size_t *blob_size
         fprintf(stderr, "field_serialize failed\n");
         return -1;
     }
-    // debug print blob
-    printf("field_serialize done, field name: %s, id is: %d, type is: %d, blob: \n", field->name, field->field_id, field->type);
-    for (int i = 0; i < *blob_size; i++) {
-        printf("%c", (*blob)[i]);
-    }
-    printf("\n-------------------------------------------------\n");
+
     return 0;
 }
 
@@ -598,11 +582,7 @@ enum field_type field_get_type(const struct fs_field *field)
 void field_query_for_topk(const struct fs_field *field, const struct fieldstat_tag *tag_list, size_t tag_num,
     char ***keys_out, long long **values_out, size_t *num_out)
 {
-    char *dynamic_cell_key = NULL;
-    size_t dynamic_key_size = 0;
-    build_dynamic_cell_key(tag_list, tag_num, &dynamic_cell_key, &dynamic_key_size);
-    struct cell *cell = field_find_cell_with_key(field, dynamic_cell_key, dynamic_key_size);
-    free(dynamic_cell_key);
+    struct cell *cell = field_find_cell(field, tag_list, tag_num);
     if (cell == NULL) {
         *num_out = 0;
         *keys_out = NULL;
@@ -616,26 +596,18 @@ void field_query_for_topk(const struct fs_field *field, const struct fieldstat_t
 
 long long field_query_for_counter(const struct fs_field *field, const struct fieldstat_tag *tag_list, size_t tag_num)
 {
-    char *dynamic_cell_key = NULL;
-    size_t dynamic_key_size = 0;
-    build_dynamic_cell_key(tag_list, tag_num, &dynamic_cell_key, &dynamic_key_size);
-    struct cell *cell = field_find_cell_with_key(field, dynamic_cell_key, dynamic_key_size);
-    free(dynamic_cell_key);
+    struct cell *cell = field_find_cell(field, tag_list, tag_num);
     if (cell == NULL) {
         return 0;
     }
 
-    long long ret = cell_query_for_counter(cell);
+    long long ret = cell_get_for_counter(cell);
     return ret;
 }
 
 long long field_query_for_histogram(const struct fs_field *field, const struct fieldstat_tag *tag_list, size_t tag_num, double percentile)
 {
-    char *dynamic_cell_key = NULL;
-    size_t dynamic_key_size = 0;
-    build_dynamic_cell_key(tag_list, tag_num, &dynamic_cell_key, &dynamic_key_size);
-    struct cell *cell = field_find_cell_with_key(field, dynamic_cell_key, dynamic_key_size);
-    free(dynamic_cell_key);
+    struct cell *cell = field_find_cell(field, tag_list, tag_num);
     if (cell == NULL) {
         return 0;
     }
@@ -646,11 +618,7 @@ long long field_query_for_histogram(const struct fs_field *field, const struct f
 
 double field_query_for_cardinality(const struct fs_field *field, const struct fieldstat_tag *tag_list, size_t tag_num)
 {
-    char *dynamic_cell_key = NULL;
-    size_t dynamic_key_size = 0;
-    build_dynamic_cell_key(tag_list, tag_num, &dynamic_cell_key, &dynamic_key_size);
-    struct cell *cell = field_find_cell_with_key(field, dynamic_cell_key, dynamic_key_size);
-    free(dynamic_cell_key);
+    struct cell *cell = field_find_cell(field, tag_list, tag_num);
     if (cell == NULL) {
         return 0;
     }

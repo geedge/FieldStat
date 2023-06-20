@@ -14,6 +14,7 @@ struct fs_field;
 enum field_type field_get_type(const struct fs_field *field);
 int field_get_id(const struct fs_field *field);
 void field_set_id(struct fs_field *field, int id);
+const char *field_get_name(const struct fs_field *field); // don't free the return value
 
 struct fs_field *field_deserialize(const char *blob, size_t blob_size);
 int field_serialize(const struct fs_field *field, char **blob, size_t *blob_size);

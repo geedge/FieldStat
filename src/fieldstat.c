@@ -14,19 +14,15 @@
 // TODO: 序列化再加到其他blob里（exporter）
 // TODO：版本号
 struct fieldstat {
-    char name[INSTANCE_NAME_MAX_LEN];
-    // TODO：名字其实也是只用于输出的。
-
     struct fs_field **field_array; // all the metrics are dynamic(differ from field stat 3.0) // TODO: 改成动态的
     size_t n_field;
     size_t max_field;
 };
 
-struct fieldstat *fieldstat_new(const char *symbol)
+struct fieldstat *fieldstat_new()
 {
     struct fieldstat *instance = malloc(sizeof(struct fieldstat));
     memset(instance, 0, sizeof(struct fieldstat));
-    strncpy(instance->name, symbol, INSTANCE_NAME_MAX_LEN);
 
     size_t init_array_len = 256;
     instance->max_field = init_array_len;
@@ -172,9 +168,7 @@ struct fieldstat *fieldstat_deserialize(const char *blob, size_t blob_size)
     mpack_tree_parse(&tree);
     mpack_node_t root = mpack_tree_root(&tree);
 
-    char tmp_name[INSTANCE_NAME_MAX_LEN] = {0};
-    mpack_node_copy_cstr(mpack_node_map_cstr(root, "name"), tmp_name, sizeof(tmp_name));
-    struct fieldstat *instance = fieldstat_new(tmp_name);
+    struct fieldstat *instance = fieldstat_new();
 
     printf("fieldstat_deserialize the fieldstat_new instance array pointer: %p\n", instance->field_array);
 
@@ -225,9 +219,7 @@ int fieldstat_serialize(const struct fieldstat *instance, char **blob_out, size_
     mpack_writer_t writer;
     mpack_writer_init_growable(&writer, blob_out, blob_size_out);
 
-    mpack_start_map(&writer, 2);
-    mpack_write_cstr(&writer, "name");
-    mpack_write_cstr(&writer, instance->name);
+    mpack_start_map(&writer, 1); // only a single array of fields
 
     mpack_write_cstr(&writer, "fields");
     mpack_start_array(&writer, instance->n_field);

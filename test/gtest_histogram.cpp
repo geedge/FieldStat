@@ -25,7 +25,7 @@
 
 TEST(metric_test_histogram, serialize_and_deserialize_for_2_fields_1st_empty_2nd_added)
 {
-    struct fieldstat *instance = fieldstat_new("czz_hdr_instance");
+    struct fieldstat *instance = fieldstat_new();
     printf("new ok\n");
 
     int id1_empty = fieldstat_register_histogram(instance, "empty", 1, 60000000, 3);

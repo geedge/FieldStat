@@ -25,7 +25,7 @@
 
 TEST(metric_test_counter, serialize_and_deserialize_for_2_fields_1st_empty_2nd_added)
 {
-    struct fieldstat *instance = fieldstat_new("czz_counter_instance");
+    struct fieldstat *instance = fieldstat_new();
     printf("new ok\n");
 
     int id1_empty = fieldstat_register_counter(instance, "empty");
