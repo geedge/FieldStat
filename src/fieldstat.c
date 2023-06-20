@@ -14,7 +14,7 @@
 // TODO: 序列化再加到其他blob里（exporter）
 // TODO：版本号
 struct fieldstat {
-    struct fs_field **field_array; // all the metrics are dynamic(differ from field stat 3.0) // TODO: 改成动态的
+    struct fs_field **field_array; // all the metrics are dynamic(differ from field stat 3.0)
     size_t n_field;
     size_t max_field;
 };
@@ -326,7 +326,7 @@ long long fieldstat_histogram_value_at_percentile(struct fieldstat *instance, in
         printf("ERR: field is not registered yet\n");
         return -1;
     }
-    return field_query_for_histogram(field, tag_list->tag, tag_list->n_tag, percentile);
+    return field_histogram_value_at_percentile(field, tag_list->tag, tag_list->n_tag, percentile);
 }
 
 //  avg=fieldstat_histogram_average(instance, field_id[i], tag_lists[j]); 
@@ -339,5 +339,5 @@ double fieldstat_cardinality_get(const struct fieldstat *instance, int field_id,
         printf("ERR: field is not registered yet\n");
         return -1;
     }
-    return field_query_for_cardinality(field, tag_list->tag, tag_list->n_tag);
+    return field_cardinality_get(field, tag_list->tag, tag_list->n_tag);
 }

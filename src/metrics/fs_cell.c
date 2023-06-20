@@ -266,7 +266,7 @@ static int metric_topk_copy(struct metrics *pthis, const struct metrics *from)
     if (topk->hk) {
         heavy_keeper_free(topk->hk);
     }
-    topk->hk = heavy_keeper_new(topk->hk->K, NULL); //TODO: 这里的参数要直接规定好参数
+    topk->hk = heavy_keeper_new(topk->hk->K, NULL);
 
     return heavy_keeper_merge(topk->hk, from_topk->hk);
 }
@@ -319,7 +319,7 @@ struct cell *cell_create_for_topk(int K)
     struct metric_topk *topk = metric_topk_new_scheme();
     cell->metric = (struct metrics *)topk;
 
-    topk->hk = heavy_keeper_new(K, NULL); //TODO: 这里的参数要直接规定好参数
+    topk->hk = heavy_keeper_new(K, NULL);
 
     return cell;
 }
@@ -333,7 +333,7 @@ void cell_topk_add(struct cell *pthis, const char *key, size_t key_len, unsigned
 
 // (*values_out)[i] is the value of cstring (*keys_out)[i]
 typedef char * cstring;
-void cell_query_for_topk(const struct cell *pthis, cstring **keys_out, long long **values_out, size_t *num_out)
+void cell_topk_query(const struct cell *pthis, cstring **keys_out, long long **values_out, size_t *num_out)
 {
     struct metric_topk *topk = (struct metric_topk *)pthis->metric;
 
@@ -443,7 +443,7 @@ void cell_counter_incrby(struct cell *pthis, long long value)
     counter->value += value;
 }
 
-long long cell_get_for_counter(const struct cell *pthis)
+long long cell_counter_get(const struct cell *pthis)
 {
     struct metric_counter *counter = (struct metric_counter *)pthis->metric;
     return counter->value;
@@ -542,7 +542,7 @@ int cell_cardinality_add(struct cell *pthis, const char *key, size_t key_len)
     return ST_hyperloglog_add(cardinality->hll, key, key_len);
 }
 
-double cell_query_for_cardinality(const struct cell *pthis)
+double cell_cardinality_get(const struct cell *pthis)
 {
     struct metric_cardinality *cardinality = (struct metric_cardinality *)pthis->metric;
     return ST_hyperloglog_count(cardinality->hll);
@@ -654,12 +654,12 @@ int cell_histogram_record(struct cell *pthis, long long value)
     return 0;
 }
 
-long long cell_query_for_histogram(const struct cell *pthis, double percentile)
+long long cell_histogram_value_at_percentile(const struct cell *pthis, double percentile)
 {
     struct metric_histogram *histogram = (struct metric_histogram *)pthis->metric;
 
     if (histogram->hdr == NULL) {
-        printf("cell_query_for_histogram hdr is null\n");
+        printf("cell_histogram_value_at_percentile hdr is null\n");
     }
     return hdr_value_at_percentile(histogram->hdr, percentile);
 }

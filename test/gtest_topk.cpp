@@ -59,7 +59,6 @@ TEST(metric_test_topk, serialize_and_deserialize_for_2_fields_1st_empty_2nd_adde
     struct fieldstat_tag_list tag_list_2[2] = {{0}};
     int ret_empty_zerolength = fieldstat_get_tag_lists(instance_from_deserialize, id1_empty, tag_list_1, 0);
     int ret_2cell_2length = fieldstat_get_tag_lists(instance_from_deserialize, id2_added, tag_list_2, 2);
-    // TODO: 这个接口太烂了
     int ret_2cell_1length = fieldstat_get_tag_lists(instance_from_deserialize, id2_added, tag_list_2, 1);
     printf("query tag ok\n");
     EXPECT_EQ(ret_empty_zerolength, 0);

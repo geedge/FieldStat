@@ -30,7 +30,6 @@ extern "C"
 
 #define REGISTER_SIZE(precision) INT_WIDTH*INT_CEIL(NUM_REG(precision), REG_PER_WORD)
 
-// TODO: 直接用库吧，不要time_windows_s
 struct ST_HLL_configuration
 {
     unsigned char precision;

@@ -476,29 +476,3 @@ double ST_hyperloglog_error_for_precision(unsigned char precision)
 
     return 1.04 / sqrt(NUM_REG(precision));
 }
-
-
-void ST_hyperloglog_serialization(const struct ST_hyperloglog *h, char **blob, size_t *blob_sz)
-{
-    // size_t num_reg = NUM_REG(h->cfg.precision);
-    // size_t words = INT_CEIL(num_reg, REG_PER_WORD);
-
-    // cJSON *root = cJSON_CreateObject();
-    // cJSON_AddStringToObject(root, "type", "cardinality");
-    // cJSON_AddNumberToObject(root, "precision", h->cfg.precision);
-
-    // cJSON *reg = cJSON_CreateArray();
-    // for (int i = 0; i < words; i++) {
-    //     cJSON *y_json = cJSON_CreateNumber(h->registers[i]);
-    //     cJSON_AddItemToArray(reg, y_json);
-    // }
-    // cJSON_AddItemToObject(root, "reg", reg);
-
-    // char *out = cJSON_PrintUnformatted(root);
-    // *blob = out;
-    // *blob_sz = strlen(out) + 1;
-    // cJSON_Delete(root);
-
-    // TODO: mpack
-    return;
-}

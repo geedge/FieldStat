@@ -149,8 +149,6 @@ struct field_paras *construct_parameters(enum field_type type, ...)
     return paras;
 }
 
-// TODO: deserialize parameters, 要有新的好结构，而不是简单一个数组
-
 struct fs_field *field_new(enum field_type type, const char *name, struct field_paras *paras)
 {
     struct fs_field *field = (struct fs_field *)malloc(sizeof(struct fs_field));
@@ -370,13 +368,81 @@ int field_cardinality_add(struct fs_field *field, const char *key, size_t key_le
     return cell_cardinality_add(cell, key, key_len);
 }
 
-struct field_paras *deserialize_parameters(mpack_node_t *root, enum field_type type)
+/*
+---------------------------------- topk ---------------------------------- 
 {
-    mpack_node_t field_paras_arr = mpack_node_map_cstr(*root, "para");
+    "type": 1
+    "K": <k value>
+}
+
+---------------------------------- counter ---------------------------------- 
+{
+    "type": 0
+}
+
+---------------------------------- cardinality ---------------------------------- 
+{
+    "type": 2,
+    "prec": <precision value>
+}
+
+---------------------------------- histogram ---------------------------------- 
+{
+    "type": 3,
+    "min": <lowest_trackable_value>
+    "max": <highest_trackable_value>
+    "prec": <significant_figures>
+}
+*/
+void serialize_field_parameters(const struct fs_field *field, char **blob, size_t *blob_size)
+{
+    struct field_paras *para = field->field_paras;
+    mpack_writer_t writer;
+    mpack_writer_init_growable(&writer, blob, blob_size);
+    mpack_build_map(&writer);
+
+    mpack_write_cstr(&writer, "type");
+    mpack_write_i32(&writer, field->type);
+
+    switch (field->type)
+    {
+    case FIELD_TYPE_TOPK:
+        mpack_write_cstr(&writer, "K");
+        mpack_write_i32(&writer, para->topk.K);
+        break;
+    case FIELD_TYPE_CARDINALITY:
+        mpack_write_cstr(&writer, "prec");
+        mpack_write_i32(&writer, para->cardinality.precision);
+        break;
+    case FIELD_TYPE_HISTOGRAM:
+        mpack_write_cstr(&writer, "min");
+        mpack_write_i64(&writer, para->hdr.lowest_trackable_value);
+        mpack_write_cstr(&writer, "max");
+        mpack_write_i64(&writer, para->hdr.highest_trackable_value);
+        mpack_write_cstr(&writer, "prec");
+        mpack_write_i8(&writer, para->hdr.significant_figures);
+        break;
+    default:
+        break;
+    }
+    mpack_complete_map(&writer);
+
+    mpack_writer_destroy(&writer);
+}
+
+struct field_paras *deserialize_parameters(const char *blob, size_t blob_size)
+{
+    mpack_tree_t tree;
+    mpack_tree_init_data(&tree, blob, blob_size);
+    mpack_tree_parse(&tree);
+    mpack_node_t root = mpack_tree_root(&tree);
+
+    mpack_node_t type_obj = mpack_node_map_cstr(root, "type");
+    enum field_type type = mpack_node_i32(type_obj);
     struct field_paras *field_para = NULL;
     switch (type) {
         case FIELD_TYPE_TOPK:{
-            int K = mpack_node_i32(mpack_node_array_at(field_paras_arr, 0));
+            int K = mpack_node_i32(mpack_node_map_cstr(root, "K"));
             field_para = construct_parameters(type, K);
         }
         break;
@@ -385,21 +451,21 @@ struct field_paras *deserialize_parameters(mpack_node_t *root, enum field_type t
         }
         break;
         case FIELD_TYPE_CARDINALITY: {
-            int precision = mpack_node_i32(mpack_node_array_at(field_paras_arr, 0));
+            int precision = mpack_node_i32(mpack_node_map_cstr(root, "prec"));
             field_para = construct_parameters(type, precision);
         }
         break;
         case FIELD_TYPE_HISTOGRAM: {
-            int lowest_trackable_value = mpack_node_i32(mpack_node_array_at(field_paras_arr, 0));
-            int highest_trackable_value = mpack_node_i32(mpack_node_array_at(field_paras_arr, 1));
-            int significant_figures = mpack_node_i32(mpack_node_array_at(field_paras_arr, 2));
-            field_para = construct_parameters(type, lowest_trackable_value, highest_trackable_value, significant_figures);
+            int64_t min = mpack_node_i64(mpack_node_map_cstr(root, "min"));
+            int64_t max = mpack_node_i64(mpack_node_map_cstr(root, "max"));
+            int8_t prec = mpack_node_i8(mpack_node_map_cstr(root, "prec"));
+            field_para = construct_parameters(type, min, max, prec);
         }
         break;
         default:
-            assert(0);
             break;
     }
+    mpack_tree_destroy(&tree);
     return field_para;
 }
 
@@ -443,7 +509,9 @@ struct fs_field *field_deserialize(const char *blob, size_t blob_size)
     char *field_name = mpack_node_cstr_alloc(mpack_node_map_cstr(root, "name"), 0xFFFF); // 0xFFFF: a very large number
     enum field_type type = mpack_node_i32(mpack_node_map_cstr(root, "type"));
     int id = mpack_node_i32(mpack_node_map_cstr(root, "id"));
-    struct field_paras *field_para = deserialize_parameters(&root, type);
+    mpack_node_t para_obj = mpack_node_map_cstr(root, "para");
+    struct field_paras *field_para = deserialize_parameters(mpack_node_bin_data(para_obj), mpack_node_bin_size(para_obj));
+
     printf("field_deserialize name is: %s, id is : %d, type is: %d\n", field_name, id, type);
 
     struct fs_field *field_out = field_new(type, field_name, field_para);
@@ -478,39 +546,6 @@ struct fs_field *field_deserialize(const char *blob, size_t blob_size)
     return field_out;
 }
 
-void serialize_and_write_field_parameters(mpack_writer_t *writer, const struct fs_field *field)
-{
-    if (field->field_paras == NULL) {
-        mpack_write_nil(writer);
-        return;
-    }
-    switch (field->type) {
-        case FIELD_TYPE_TOPK: {
-
-            mpack_build_array(writer);
-            mpack_write_i32(writer, field->field_paras->topk.K);
-            mpack_complete_array(writer);
-        }
-            break;
-        case FIELD_TYPE_CARDINALITY: {
-            mpack_build_array(writer);
-            mpack_write_i32(writer, field->field_paras->cardinality.precision);
-            mpack_complete_array(writer);
-        }
-            break;
-        case FIELD_TYPE_HISTOGRAM: {
-            mpack_build_array(writer);
-            mpack_write_int(writer, field->field_paras->hdr.lowest_trackable_value);
-            mpack_write_int(writer, field->field_paras->hdr.highest_trackable_value);
-            mpack_write_i32(writer, field->field_paras->hdr.significant_figures);
-            mpack_complete_array(writer);
-        }
-            break;
-        default:
-            assert(0);
-            break;
-    }
-}
 
 /*
     field blob:
@@ -523,6 +558,11 @@ void serialize_and_write_field_parameters(mpack_writer_t *writer, const struct f
         }*/
 int field_serialize(const struct fs_field *field, char **blob, size_t *blob_size)
 {
+    char *para_blob = NULL;
+    size_t para_blob_size = 0;
+    char *cell_blob = NULL;
+    size_t cell_blob_size = 0;
+
     printf("field_serialize enter, field name: %s\n", field->name);
     mpack_writer_t writer;
     mpack_writer_init_growable(&writer, blob, blob_size);
@@ -534,18 +574,20 @@ int field_serialize(const struct fs_field *field, char **blob, size_t *blob_size
     mpack_write_i32(&writer, field->type);
     mpack_write_cstr(&writer, "id");
     mpack_write_i32(&writer, field->field_id);
-    mpack_write_cstr(&writer, "para");
-    serialize_and_write_field_parameters(&writer, field);
-    mpack_write_cstr(&writer, "cells");
 
+    mpack_write_cstr(&writer, "para");
+
+    serialize_field_parameters(field, &para_blob, &para_blob_size);
+    mpack_write_bin(&writer, para_blob, para_blob_size);
+    free(para_blob);
+
+    mpack_write_cstr(&writer, "cells");
     if (HASH_COUNT(field->hash_tbl) == 0) {
         mpack_write_nil(&writer);
     } else {
         printf("serialize cells\n");
         struct cell_hash_node *node, *tmp;
         mpack_build_array(&writer);
-        char *cell_blob;
-        size_t cell_blob_size;
         HASH_ITER(hh, field->hash_tbl, node, tmp) {
             struct cell *cell = node->cell;
             cell_serialize(cell, &cell_blob, &cell_blob_size);
@@ -591,7 +633,7 @@ void field_query_for_topk(const struct fs_field *field, const struct fieldstat_t
         return;
     }
 
-    cell_query_for_topk(cell, keys_out, values_out, num_out);
+    cell_topk_query(cell, keys_out, values_out, num_out);
 }
 
 long long field_query_for_counter(const struct fs_field *field, const struct fieldstat_tag *tag_list, size_t tag_num)
@@ -601,28 +643,28 @@ long long field_query_for_counter(const struct fs_field *field, const struct fie
         return 0;
     }
 
-    long long ret = cell_get_for_counter(cell);
+    long long ret = cell_counter_get(cell);
     return ret;
 }
 
-long long field_query_for_histogram(const struct fs_field *field, const struct fieldstat_tag *tag_list, size_t tag_num, double percentile)
+long long field_histogram_value_at_percentile(const struct fs_field *field, const struct fieldstat_tag *tag_list, size_t tag_num, double percentile)
 {
     struct cell *cell = field_find_cell(field, tag_list, tag_num);
     if (cell == NULL) {
         return 0;
     }
 
-    long long ret = cell_query_for_histogram(cell, percentile);
+    long long ret = cell_histogram_value_at_percentile(cell, percentile);
     return ret;
 }
 
-double field_query_for_cardinality(const struct fs_field *field, const struct fieldstat_tag *tag_list, size_t tag_num)
+double field_cardinality_get(const struct fs_field *field, const struct fieldstat_tag *tag_list, size_t tag_num)
 {
     struct cell *cell = field_find_cell(field, tag_list, tag_num);
     if (cell == NULL) {
         return 0;
     }
 
-    double ret = cell_query_for_cardinality(cell);
+    double ret = cell_cardinality_get(cell);
     return ret;
 }
