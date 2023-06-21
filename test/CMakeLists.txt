@@ -11,7 +11,7 @@
 
 cmake_minimum_required(VERSION 2.8)
 
-# add_definitions(-std=c++11)
+
 
 include_directories(${PROJECT_SOURCE_DIR}/test)
 include_directories(${PROJECT_SOURCE_DIR}/src)
@@ -35,12 +35,14 @@ SET(TEST_UTILS_SRC
   utils.cpp
   )
 
+function (add_unit_test file_name)
+    add_executable(${file_name} ${SRC} ${TEST_UTILS_SRC} ${file_name}.cpp)
+    target_link_libraries(${file_name} gtest-static ${ZLIB_LIBRARIES})
+    set_property(TARGET ${file_name} PROPERTY CXX_STANDARD 17)
+    # add_test(NAME ${file_name} COMMAND ${file_name})
+endfunction()
 
-add_executable(gtest_topk ${SRC} ${TEST_UTILS_SRC} gtest_topk.cpp)
-target_link_libraries(gtest_topk gtest-static ${ZLIB_LIBRARIES})
-add_executable(gtest_counter ${SRC} ${TEST_UTILS_SRC} gtest_counter.cpp)
-target_link_libraries(gtest_counter gtest-static ${ZLIB_LIBRARIES})
-add_executable(gtest_histogram ${SRC} ${TEST_UTILS_SRC} gtest_histogram.cpp)
-target_link_libraries(gtest_histogram gtest-static ${ZLIB_LIBRARIES})
-add_executable(gtest_cardinality ${SRC} ${TEST_UTILS_SRC} gtest_cardinality.cpp)
-target_link_libraries(gtest_cardinality gtest-static ${ZLIB_LIBRARIES})
+add_unit_test(gtest_cardinality)
+add_unit_test(gtest_counter)
+add_unit_test(gtest_histogram)
+add_unit_test(gtest_topk)

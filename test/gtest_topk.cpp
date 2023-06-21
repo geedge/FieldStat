@@ -22,6 +22,43 @@
 
 // 性能测试
 
+using namespace std;
+
+const int K = 10;
+
+class Query_ret {
+public:
+    string key_result[K];
+    unsigned int count_result[K];
+    int n_result;
+
+    explicit Query_ret(char **keys, unsigned int *counts, int n)
+    {
+        n_result = n;
+        for (int i = 0; i < n; i++)
+        {
+            key_result[i] = keys[i];
+            count_result[i] = counts[i];
+        }
+    }
+    
+    bool operator==(const Query_ret& other) const
+    {
+        if (n_result != other.n_result)
+        {
+            return false;
+        }
+        for (int i = 0; i < n_result; i++)
+        {
+            if (key_result[i] != other.key_result[i] || count_result[i] != other.count_result[i])
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+};
+
 TEST(metric_test_topk, serialize_and_deserialize_for_2_fields_1st_empty_2nd_added)
 {
     struct fieldstat *instance = fieldstat_new();
