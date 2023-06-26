@@ -33,15 +33,10 @@ extern "C"
 struct ST_HLL_configuration
 {
     unsigned char precision;
-    unsigned char pad;
-    unsigned short time_window_s;
-    struct timeval timestamp;
 };
 struct ST_hyperloglog
 {
     struct ST_HLL_configuration cfg;
-    int reset_idx;
-    struct timeval reset_time;
     uint32_t *registers;
 };
 

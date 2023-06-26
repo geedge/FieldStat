@@ -36,7 +36,6 @@ struct ST_hyperloglog *ST_hyperloglog_new(unsigned char precision)
 }
 void ST_hyperloglog_configure(struct ST_hyperloglog *h, unsigned char precision, int time_window_seconds, const struct timeval now)
 {
-    h->cfg.time_window_s=time_window_seconds;
     if(h->cfg.precision != precision)
     {
         free(h->registers);
@@ -50,7 +49,6 @@ void ST_hyperloglog_configure(struct ST_hyperloglog *h, unsigned char precision,
         h->registers = ALLOC(uint32_t, words);
         h->cfg.precision=precision;
     }
-    memcpy(&h->cfg.timestamp, &now, sizeof(h->cfg.timestamp));
     return;
 }
 void ST_hyperloglog_free(struct ST_hyperloglog *h)
@@ -304,29 +302,7 @@ static double linear_count(const struct ST_hyperloglog *h, int num_zero)
     return registers *
         log((double)registers / (double)num_zero);
 }
-static double linear_count2(const struct ST_hyperloglog *h, int num_zero)
-{
-    int m = NUM_REG(h->cfg.precision);
-    int n_calc=0, n_zero=0;
 
-    double Mi=0, Wi=0;
-    for (int i=0; i < m; i++) 
-    {
-        Wi=(i>=h->reset_idx)?(m+h->reset_idx-i):(h->reset_idx-i)+1;
-        Mi = get_register(h, i);
-        if(Wi>m/8)
-        {
-            n_calc++;
-            if(Mi==0)
-            {
-                n_zero++;
-            }
-        }
-
-    }
-    double est=m* log((double)n_calc / (double)n_zero);
-    return est;
-}
 /**
  * Binary searches for the nearest matching index
  * @return The matching index, or closest match
@@ -379,34 +355,6 @@ static double bias_estimate(const struct ST_hyperloglog *h, double raw_est) {
     else
         return (biases[idx] + biases[idx-1]) / 2;
 }
-static double raw_estimate2(const struct ST_hyperloglog *h, int *num_zero)
-{
-    unsigned char precision = h->cfg.precision;
-    int m = NUM_REG(precision);
-    int n_calc=0;
-
-    double Mi=0, Wi=0;
-    double lambda=0;
-    double harmonic_mean=0;
-    for (int i=0; i < m; i++) 
-    {
-        Wi=(i>=h->reset_idx)?(m+h->reset_idx-i):(h->reset_idx-i)+1;
-        Mi = get_register(h, i);
-        if(!Mi)
-            *num_zero += 1;
-        //if (!Mi) *num_zero += 1;
-        if( Wi < m/8 && h->cfg.time_window_s)
-        {
-            continue;
-        }
-        
-        lambda=pow(2.0, Mi-1)*m*m/Wi;
-        harmonic_mean += 1/lambda;        
-        n_calc++;
-    }
-    harmonic_mean=n_calc/harmonic_mean;
-    return harmonic_mean;
-}
  __attribute__ ((unused)) static double ST_HLL_count_no_sliding(const struct ST_hyperloglog *h)
 {
     int num_zero = 0;
@@ -437,7 +385,7 @@ static double raw_estimate2(const struct ST_hyperloglog *h, int *num_zero)
 double ST_hyperloglog_count(const struct ST_hyperloglog *h)
 {
     int num_zero=0;
-    double raw_est=raw_estimate2(h, &num_zero);
+    double raw_est=raw_estimate(h, &num_zero);
     raw_est*=alpha(h->cfg.precision);
 
     double num_reg=NUM_REG(h->cfg.precision);
@@ -447,7 +395,7 @@ double ST_hyperloglog_count(const struct ST_hyperloglog *h)
     if(raw_est<=5*num_reg/2)
     {
         if(num_zero)
-            return linear_count2(h, num_zero);
+            return linear_count(h, num_zero);
     }
     if(raw_est>INT32_MAX/30)
     {
