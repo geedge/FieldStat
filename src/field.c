@@ -171,7 +171,7 @@ static struct cell *field_find_cell_with_key(const struct fs_field *field, const
     return node->cell;
 }
 
-static struct cell *field_find_cell(const struct fs_field *field, const struct fieldstat_tag tag_list[], size_t tag_num)
+struct cell *field_find_cell(const struct fs_field *field, const struct fieldstat_tag tag_list[], size_t tag_num)
 {
     char *dynamic_cell_key = NULL;
     size_t dynamic_key_size = 0;
@@ -313,8 +313,9 @@ int field_merge(struct fs_field *dst, const struct fs_field *src)
 
 void field_get_tags(const struct fs_field *field, struct fieldstat_tag_list **tag_lists_out, size_t *n_tag_lists_out)
 {
-    *tag_lists_out = (struct fieldstat_tag_list *)malloc(sizeof(struct fieldstat_tag_list) * HASH_COUNT(field->hash_tbl));
     *n_tag_lists_out = HASH_COUNT(field->hash_tbl);
+    *tag_lists_out = (struct fieldstat_tag_list *)malloc(sizeof(struct fieldstat_tag_list) * *n_tag_lists_out);
+
 
     struct cell_hash_node *node, *tmp;
     int i = 0;
@@ -327,45 +328,6 @@ void field_get_tags(const struct fs_field *field, struct fieldstat_tag_list **ta
         (*tag_lists_out)[i].n_tag = n_tags;
         i++;
     }
-}
-
-int field_topk_add(struct fs_field *field, const char *key, size_t key_len, unsigned int score, const struct fieldstat_tag tag_list[], size_t tag_num)
-{
-    printf("field_topk_add enter :key: %s\n", key);
-
-    struct cell *cell = field_find_or_create_cell(field, tag_list, tag_num);
-    cell_topk_add(cell, key, key_len, score);
-
-    return 0;
-}
-
-int field_counter_incrby(struct fs_field *field, long long score, const struct fieldstat_tag tags[], size_t n_tag)
-{
-    printf("field_counter_incrby enter\n");
-    
-    struct cell *cell = field_find_or_create_cell(field, tags, n_tag);
-
-    cell_counter_incrby(cell, score);
-
-    return 0;
-}
-
-int field_histogram_record(struct fs_field *field, long long value, const struct fieldstat_tag tags[], size_t n_tag)
-{
-    printf("field_histogram_record enter\n");
-
-    struct cell *cell = field_find_or_create_cell(field, tags, n_tag);
-
-    return cell_histogram_record(cell, value);
-}
-
-int field_cardinality_add(struct fs_field *field, const char *key, size_t key_len, const struct fieldstat_tag tags[], size_t n_tag)
-{
-    printf("field_cardinality_add enter\n");
-
-    struct cell *cell = field_find_or_create_cell(field, tags, n_tag);
-
-    return cell_cardinality_add(cell, key, key_len);
 }
 
 /*
@@ -619,52 +581,4 @@ void field_set_id(struct fs_field *field, int id)
 enum field_type field_get_type(const struct fs_field *field)
 {
     return field->type;
-}
-
-void field_query_for_topk(const struct fs_field *field, const struct fieldstat_tag *tag_list, size_t tag_num,
-    char ***keys_out, long long **values_out, size_t *num_out)
-{
-    struct cell *cell = field_find_cell(field, tag_list, tag_num);
-    if (cell == NULL) {
-        *num_out = 0;
-        *keys_out = NULL;
-        *values_out = NULL;
-
-        return;
-    }
-
-    cell_topk_query(cell, keys_out, values_out, num_out);
-}
-
-long long field_query_for_counter(const struct fs_field *field, const struct fieldstat_tag *tag_list, size_t tag_num)
-{
-    struct cell *cell = field_find_cell(field, tag_list, tag_num);
-    if (cell == NULL) {
-        return 0;
-    }
-
-    long long ret = cell_counter_get(cell);
-    return ret;
-}
-
-long long field_histogram_value_at_percentile(const struct fs_field *field, const struct fieldstat_tag *tag_list, size_t tag_num, double percentile)
-{
-    struct cell *cell = field_find_cell(field, tag_list, tag_num);
-    if (cell == NULL) {
-        return 0;
-    }
-
-    long long ret = cell_histogram_value_at_percentile(cell, percentile);
-    return ret;
-}
-
-double field_cardinality_get(const struct fs_field *field, const struct fieldstat_tag *tag_list, size_t tag_num)
-{
-    struct cell *cell = field_find_cell(field, tag_list, tag_num);
-    if (cell == NULL) {
-        return 0;
-    }
-
-    double ret = cell_cardinality_get(cell);
-    return ret;
 }

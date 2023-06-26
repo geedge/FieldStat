@@ -68,7 +68,7 @@ int fieldstat_serialize(const struct fieldstat *instance, char **blob_out, size_
 long long fieldstat_histogram_value_at_percentile(struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list, double percentile);
 long long fieldstat_counter_get(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list);
 double fieldstat_cardinality_get(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list);
-int fieldstat_get_tag_lists(const struct fieldstat *instance, int field_id, struct fieldstat_tag_list *lists, size_t n_list);
+void fieldstat_get_tag_lists(const struct fieldstat *instance, int field_id, struct fieldstat_tag_list **lists, size_t *n_list);
 void fieldstat_topk_query(const struct fieldstat *instance, int id, const struct fieldstat_tag_list *tag_list , char ***keys_out, long long **count_out, size_t *n_key_out);
 void tag_list_clear(struct fieldstat_tag_list *tag_list);
 #ifdef __cplusplus

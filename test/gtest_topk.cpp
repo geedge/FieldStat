@@ -92,15 +92,13 @@ TEST(metric_test_topk, serialize_and_deserialize_for_2_fields_1st_empty_2nd_adde
     free(blob);
 
     // query, tag
-    struct fieldstat_tag_list tag_list_1[1] = {{0}};
-    struct fieldstat_tag_list tag_list_2[2] = {{0}};
-    int ret_empty_zerolength = fieldstat_get_tag_lists(instance_from_deserialize, id1_empty, tag_list_1, 0);
-    int ret_2cell_2length = fieldstat_get_tag_lists(instance_from_deserialize, id2_added, tag_list_2, 2);
-    int ret_2cell_1length = fieldstat_get_tag_lists(instance_from_deserialize, id2_added, tag_list_2, 1);
+    struct fieldstat_tag_list *tag_list_1, *tag_list_2;
+    size_t ret_empty_zerolength, ret_2cell_2length;
+    fieldstat_get_tag_lists(instance_from_deserialize, id1_empty, &tag_list_1, &ret_empty_zerolength);
+    fieldstat_get_tag_lists(instance_from_deserialize, id2_added, &tag_list_2, &ret_2cell_2length);
     printf("query tag ok\n");
     EXPECT_EQ(ret_empty_zerolength, 0);
     EXPECT_EQ(ret_2cell_2length, 2);
-    EXPECT_EQ(ret_2cell_1length, -1);
 
     EXPECT_EQ(tag_list_2[0].n_tag, 1);
     EXPECT_EQ(tag_list_2[1].n_tag, 1);
@@ -134,6 +132,8 @@ TEST(metric_test_topk, serialize_and_deserialize_for_2_fields_1st_empty_2nd_adde
     for (int i = 0; i < ret_2cell_2length; i++) {
         tag_list_clear(&tag_list_2[i]);
     }
+    free(tag_list_2);
+    free(tag_list_1);
     printf("clear tag list ok\n");
 
     fieldstat_free(instance);

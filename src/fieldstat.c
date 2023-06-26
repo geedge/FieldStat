@@ -8,6 +8,7 @@
 #include "mpack/mpack.h"
 #include "fieldstat.h"
 #include "field.h"
+#include "fs_cell.h"
 
 #include "uthash.h"
 
@@ -119,7 +120,8 @@ int fieldstat_topk_add(struct fieldstat *instance, int field_id, const char *key
         printf("ERR: field is not registered yet\n");
         return -1;
     }
-    field_topk_add(field, key, key_len, 1, tags, n_tag);
+    struct cell *cell = field_find_or_create_cell(field, tags, n_tag);
+    cell_topk_add(cell, key, key_len, 1);
     return 0;
 }
 
@@ -130,7 +132,9 @@ int fieldstat_counter_incrby(struct fieldstat *instance, int field_id, long long
         printf("ERR: field is not registered yet\n");
         return -1;
     }
-    return field_counter_incrby(field, increment, tags, n_tag);
+    struct cell *cell = field_find_or_create_cell(field, tags, n_tag);
+    cell_counter_incrby(cell, increment);
+    return 0;
 }
 
 int fieldstat_histogram_record(struct fieldstat *instance, int field_id, long long value, const struct fieldstat_tag tags[], size_t n_tag)
@@ -140,7 +144,8 @@ int fieldstat_histogram_record(struct fieldstat *instance, int field_id, long lo
         printf("ERR: field is not registered yet\n");
         return -1;
     }
-    return field_histogram_record(field, value, tags, n_tag);
+    struct cell *cell = field_find_or_create_cell(field, tags, n_tag);
+    return cell_histogram_record(cell, value);
 }
 
 int fieldstat_cardinality_add(struct fieldstat *instance, int field_id, const char *key, size_t key_len, const struct fieldstat_tag tags[], size_t n_tag)
@@ -150,7 +155,8 @@ int fieldstat_cardinality_add(struct fieldstat *instance, int field_id, const ch
         printf("ERR: field is not registered yet\n");
         return -1;
     }
-    return field_cardinality_add(field, key, key_len, tags, n_tag);
+    struct cell *cell = field_find_or_create_cell(field, tags, n_tag);
+    return cell_cardinality_add(cell, key, key_len);
 }
 /* -------------------------------------------------------------------------- */
 /*                                serialization                               */
@@ -273,7 +279,16 @@ void fieldstat_topk_query(const struct fieldstat *instance, int id, const struct
         printf("ERR: field is not registered yet\n");
         return;
     }
-    field_query_for_topk(field, tag_list->tag, tag_list->n_tag, keys_out, count_out, n_key_out);
+    struct cell *cell = field_find_cell(field, tag_list->tag, tag_list->n_tag);
+    if (cell == NULL) {
+        *n_key_out = 0;
+        *keys_out = NULL;
+        *count_out = NULL;
+
+        return;
+    }
+
+    cell_topk_query(cell, keys_out, count_out, n_key_out);
 }
 
 void tag_list_clear(struct fieldstat_tag_list *tag_list)
@@ -288,34 +303,16 @@ void tag_list_clear(struct fieldstat_tag_list *tag_list)
     free(tag_list->tag);
 }
 
-// free fieldstat_tag_list: for every tag_list in tag_lists, clear tag_list->tag, free the pointer. free tag_lists
-int fieldstat_get_tag_lists(const struct fieldstat *instance, int field_id, struct fieldstat_tag_list *lists, size_t n_list)
+// TODO: 这个改成直接生成数组
+void fieldstat_get_tag_lists(const struct fieldstat *instance, int field_id, struct fieldstat_tag_list **lists, size_t *n_list)
 {
-    struct fieldstat_tag_list *tag_lists_out = NULL;
-    size_t n_tag_lists_out = 0;
-
-    printf("fieldstat_get_tag_lists the array pointer is %p\n", instance->field_array);
     struct fs_field *field = instance->field_array[field_id];
     if (field == NULL) {
         printf("ERR: field is not registered yet, field id : %d\n", field_id);
         return -1;
     }
 
-    field_get_tags(field, &tag_lists_out, &n_tag_lists_out);
-    if (n_tag_lists_out > n_list) {
-        printf("ERR: n_tag_lists_out > n_list\n");
-        for (int i = 0; i < n_tag_lists_out; i++) {
-            tag_list_clear(&tag_lists_out[i]);
-        }
-        free(tag_lists_out);
-        return -1;
-    }
-
-    for (int i = 0; i < n_tag_lists_out; i++) {
-        lists[i] = tag_lists_out[i];
-    }
-    free(tag_lists_out); // don't need to free tag_lists_out->tag, because we just copy the pointer. User should free it.
-    return n_tag_lists_out;
+    field_get_tags(field, lists, n_list);
 }
 
 long long fieldstat_counter_get(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list)
@@ -325,7 +322,12 @@ long long fieldstat_counter_get(const struct fieldstat *instance, int field_id, 
         printf("ERR: field is not registered yet\n");
         return -1;
     }
-    return field_query_for_counter(field, tag_list->tag, tag_list->n_tag);
+    struct cell *cell = field_find_cell(field, tag_list->tag, tag_list->n_tag);
+    if (cell == NULL) {
+        return 0;
+    }
+
+    return cell_counter_get(cell);
 }
 
 long long fieldstat_histogram_value_at_percentile(struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list, double percentile)
@@ -335,7 +337,12 @@ long long fieldstat_histogram_value_at_percentile(struct fieldstat *instance, in
         printf("ERR: field is not registered yet\n");
         return -1;
     }
-    return field_histogram_value_at_percentile(field, tag_list->tag, tag_list->n_tag, percentile);
+    struct cell *cell = field_find_cell(field, tag_list->tag, tag_list->n_tag);
+    if (cell == NULL) {
+        return 0;
+    }
+
+    return cell_histogram_value_at_percentile(cell, percentile);
 }
 
 //  avg=fieldstat_histogram_average(instance, field_id[i], tag_lists[j]); 
@@ -348,5 +355,10 @@ double fieldstat_cardinality_get(const struct fieldstat *instance, int field_id,
         printf("ERR: field is not registered yet\n");
         return -1;
     }
-    return field_cardinality_get(field, tag_list->tag, tag_list->n_tag);
+    struct cell *cell = field_find_cell(field, tag_list->tag, tag_list->n_tag);
+    if (cell == NULL) {
+        return 0;
+    }
+
+    return cell_cardinality_get(cell);
 }

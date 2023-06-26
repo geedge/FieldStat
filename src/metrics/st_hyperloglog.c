@@ -156,7 +156,7 @@ void ST_hyperloglog_serialize(const struct ST_hyperloglog *h, char **blob, size_
     size_t words = INT_CEIL(num_reg, REG_PER_WORD);
 
     sz = ST_hyperloglog_serialized_size(h);
-    
+
     char *buffer = ALLOC(char, sz);
     memcpy(buffer+offset, h, BLOB_HDR_SIZE);
     offset += BLOB_HDR_SIZE;
