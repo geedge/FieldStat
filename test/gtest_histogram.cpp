@@ -84,7 +84,7 @@ TEST(metric_test_histogram, serialize_and_deserialize_for_2_fields_1st_empty_2nd
     EXPECT_EQ(ret_int_tagged, value_add_to_new_metric);
     printf("check finish\n");
 
-    for (int i = 0; i < ret_2cell_2length; i++) {
+    for (size_t i = 0; i < ret_2cell_2length; i++) {
         tag_list_clear(&tag_list_2[i]);
     }
     free(tag_list_2);

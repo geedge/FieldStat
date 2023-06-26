@@ -13,6 +13,7 @@ struct cell *cell_duplicate(const struct cell *pthis);
 void cell_serialize(const struct cell *pthis, char **blob, size_t *blob_size);
 struct cell *cell_deserialize(const char *blob, size_t blob_size);
 int cell_merge(struct cell *pthis, const struct cell *from);
+void cell_get_plain_blob(const struct cell *pthis, char **blob, size_t *blob_size);
 
 struct cell *cell_create_for_topk(int K);
 void cell_topk_add(struct cell *pthis, const char *key, size_t key_len, unsigned value);

@@ -810,6 +810,11 @@ void cell_free(struct cell *pthis)
     free(pthis);
 }
 
+void cell_get_plain_blob(const struct cell *pthis, char **blob, size_t *blob_size) 
+{
+    pthis->metric->serialize(pthis->metric, blob, blob_size);
+}
+
 void cell_refresh(struct cell *pthis)
 {
     pthis->metric->refresh(pthis->metric);

@@ -518,6 +518,7 @@ struct fs_field *field_deserialize(const char *blob, size_t blob_size)
             "para":[may be null, one number, or a double array]
             "cells":[<bin_blob>]
         }*/
+// TODO: 这个ID没有了
 int field_serialize(const struct fs_field *field, char **blob, size_t *blob_size)
 {
     char *para_blob = NULL;
@@ -581,4 +582,9 @@ void field_set_id(struct fs_field *field, int id)
 enum field_type field_get_type(const struct fs_field *field)
 {
     return field->type;
+}
+
+const char *field_get_name(const struct fs_field *field)
+{
+    return field->name;
 }

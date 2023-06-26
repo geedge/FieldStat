@@ -189,6 +189,7 @@ struct fieldstat *fieldstat_deserialize(const char *blob, size_t blob_size)
         mpack_node_t field_blob_bin = mpack_node_array_at(field_arr, i);
         struct fs_field *tmp_field = field_deserialize(mpack_node_bin_data(field_blob_bin), mpack_node_bin_size(field_blob_bin));
         int field_id_tmp = field_get_id(tmp_field);
+        // TODO: 应该是用名字来做key，而不是id
         instance->field_array[field_id_tmp] = tmp_field;
         printf("fieldstat_deserialize field (id:%d) add to instance, field pointer: %p \n", field_id_tmp, tmp_field);
     }
@@ -214,6 +215,7 @@ int fieldstat_merge_with_blob(struct fieldstat *instance, const char *blob, size
     for (int i = 0; i < src->n_field; i++) {
         struct fs_field *tmp_field = src->field_array[i];
         int field_id_tmp = field_get_id(tmp_field);
+        // TODO: 不用id，用name
        
         if (instance->field_array[field_id_tmp] == NULL) {
             instance->field_array[field_id_tmp] = field_dup(tmp_field);
@@ -257,19 +259,30 @@ int fieldstat_serialize(const struct fieldstat *instance, char **blob_out, size_
 /* -------------------------------------------------------------------------- */
 /*                                    query                                   */
 /* -------------------------------------------------------------------------- */
-// user should free the returned pointer field_id_out
-int fieldstat_get_field_id(const struct fieldstat *instance, int **field_id_out)
+int fieldstat_get_max_field_id(const struct fieldstat *instance)
 {
-    *field_id_out = malloc(sizeof(int) * instance->n_field);
-    for (int i = 0; i < instance->n_field; i++) {
-        (*field_id_out)[i] = i;
-    }
-    return instance->n_field;
+    return instance->n_field - 1;
 }
 
-enum field_type fieldstat_get_type(const struct fieldstat *instance, int id)
+const char *fieldstat_get_field_name(const struct fieldstat *instance, int field_id)
 {
-    return field_get_type(instance->field_array[id]);
+    struct fs_field *field = instance->field_array[field_id];
+    if (field == NULL) {
+        printf("ERR: field is not registered yet\n");
+        return NULL;
+    }
+    return field_get_name(field);
+}
+
+
+enum field_type fieldstat_get_field_type(const struct fieldstat *instance, int field_id)
+{
+    struct fs_field *field = instance->field_array[field_id];
+    if (field == NULL) {
+        printf("ERR: field is not registered yet\n");
+        return (enum field_type)0xFFFFFFFF;
+    }
+    return field_get_type(instance->field_array[field_id]);
 }
 
 void fieldstat_topk_query(const struct fieldstat *instance, int id, const struct fieldstat_tag_list *tag_list, char ***keys_out, long long **count_out, size_t *n_key_out)
@@ -309,7 +322,9 @@ void fieldstat_get_tag_lists(const struct fieldstat *instance, int field_id, str
     struct fs_field *field = instance->field_array[field_id];
     if (field == NULL) {
         printf("ERR: field is not registered yet, field id : %d\n", field_id);
-        return -1;
+        *lists = NULL;
+        *n_list = 0;
+        return;
     }
 
     field_get_tags(field, lists, n_list);
@@ -361,4 +376,21 @@ double fieldstat_cardinality_get(const struct fieldstat *instance, int field_id,
     }
 
     return cell_cardinality_get(cell);
+}
+
+void fieldstat_get_serialized_blob(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list, char **blob, size_t *blob_size)
+{
+    struct fs_field *field = instance->field_array[field_id];
+    if (field == NULL) {
+        printf("ERR: field is not registered yet\n");
+        return;
+    }
+    struct cell *cell = field_find_cell(field, tag_list->tag, tag_list->n_tag);
+    if (cell == NULL) {
+        *blob = NULL;
+        *blob_size = 0;
+        return;
+    }
+
+    cell_get_plain_blob(cell, blob, blob_size);
 }

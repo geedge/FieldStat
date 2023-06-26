@@ -1,5 +1,6 @@
 #pragma once
 #include <stdio.h>
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -60,6 +61,9 @@ int fieldstat_disable_background_thread(struct fieldstat_instance *instance);
  * @return -1 is failed. 0 is success.
  */
 int fieldstat_set_output_interval(struct fieldstat_instance *instance, int milliseconds);
+
+void fieldstat_export_to_json_arr(struct fieldstat *instance, char ***out, size_t *n_out);
+
 
 #ifdef __cplusplus
 }
