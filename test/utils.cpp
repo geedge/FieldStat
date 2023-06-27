@@ -86,7 +86,7 @@ Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(std::uniform_int_distribu
         else if (rand_ret == 1)
         {
             tag_list_c.tag[i].type = TAG_DOUBLE;
-            tag_list_c.tag[i].value_double = static_cast<double>(dist(rng));
+            tag_list_c.tag[i].value_double = static_cast<double>(dist(rng)) + 0.5;
         }
         else
         {

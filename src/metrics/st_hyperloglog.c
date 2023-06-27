@@ -13,8 +13,7 @@
 #include <assert.h>
 #include "base64/b64.h"
 
-// const size_t BLOB_HDR_SIZE= offsetof(struct ST_hyperloglog, registers);
-const size_t BLOB_HDR_SIZE= 1;
+const size_t BLOB_HDR_SIZE= offsetof(struct ST_hyperloglog, registers);
 
 
 struct ST_hyperloglog *ST_hyperloglog_new(unsigned char precision)
@@ -162,8 +161,7 @@ void ST_hyperloglog_serialize(const struct ST_hyperloglog *h, char **blob, size_
     sz = ST_hyperloglog_serialized_size(h);
 
     char *buffer = ALLOC(char, sz);
-    unsigned char precision = h->cfg.precision;
-    memcpy(buffer+offset, &precision, BLOB_HDR_SIZE);
+    memcpy(buffer+offset, h, BLOB_HDR_SIZE);
     offset += BLOB_HDR_SIZE;
     
     memcpy(buffer+offset, h->registers,  words*sizeof(int32_t));
@@ -177,8 +175,7 @@ struct ST_hyperloglog *ST_hyperloglog_deserialize(const char *blob, size_t blob_
 {
     struct ST_hyperloglog *h=ALLOC(struct ST_hyperloglog, 1);
     size_t offset=0;
-    unsigned char precision = 0;
-    memcpy(&precision, blob+offset, BLOB_HDR_SIZE);
+    memcpy(h, blob, BLOB_HDR_SIZE);
     offset += BLOB_HDR_SIZE;
 
     size_t num_reg = NUM_REG(h->cfg.precision);
