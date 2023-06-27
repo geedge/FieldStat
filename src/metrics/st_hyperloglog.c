@@ -11,8 +11,11 @@
 #include <stdint.h>
 #include <math.h>
 #include <assert.h>
+#include "base64/b64.h"
 
-const size_t BLOB_HDR_SIZE= offsetof(struct ST_hyperloglog, registers);
+// const size_t BLOB_HDR_SIZE= offsetof(struct ST_hyperloglog, registers);
+const size_t BLOB_HDR_SIZE= 1;
+
 
 struct ST_hyperloglog *ST_hyperloglog_new(unsigned char precision)
 {
@@ -149,6 +152,7 @@ size_t ST_hyperloglog_serialized_size(const struct ST_hyperloglog *h)
     sz += words*sizeof(int32_t);
     return sz;
 }
+
 void ST_hyperloglog_serialize(const struct ST_hyperloglog *h, char **blob, size_t *blob_sz)
 {
     size_t sz=0, offset=0;
@@ -158,7 +162,8 @@ void ST_hyperloglog_serialize(const struct ST_hyperloglog *h, char **blob, size_
     sz = ST_hyperloglog_serialized_size(h);
 
     char *buffer = ALLOC(char, sz);
-    memcpy(buffer+offset, h, BLOB_HDR_SIZE);
+    unsigned char precision = h->cfg.precision;
+    memcpy(buffer+offset, &precision, BLOB_HDR_SIZE);
     offset += BLOB_HDR_SIZE;
     
     memcpy(buffer+offset, h->registers,  words*sizeof(int32_t));
@@ -167,11 +172,13 @@ void ST_hyperloglog_serialize(const struct ST_hyperloglog *h, char **blob, size_
     *blob=buffer;
     return;
 }
+
 struct ST_hyperloglog *ST_hyperloglog_deserialize(const char *blob, size_t blob_sz)
 {
     struct ST_hyperloglog *h=ALLOC(struct ST_hyperloglog, 1);
     size_t offset=0;
-    memcpy(h, blob, BLOB_HDR_SIZE);
+    unsigned char precision = 0;
+    memcpy(&precision, blob+offset, BLOB_HDR_SIZE);
     offset += BLOB_HDR_SIZE;
 
     size_t num_reg = NUM_REG(h->cfg.precision);
@@ -181,6 +188,39 @@ struct ST_hyperloglog *ST_hyperloglog_deserialize(const char *blob, size_t blob_
     memcpy(h->registers, blob+offset, words*sizeof(int32_t));
     return h;
 }
+
+void ST_hyperloglog_serialize_for_networking(const struct ST_hyperloglog *h, char **blob, size_t *blob_sz)
+{
+    size_t sz=0, offset=0;
+    size_t num_reg = NUM_REG(h->cfg.precision);
+    size_t words = INT_CEIL(num_reg, REG_PER_WORD);
+
+    sz = ST_hyperloglog_serialized_size(h) + 1; // [precision][version][data...
+    unsigned char *buffer = ALLOC(unsigned char, sz);
+
+    const unsigned char version = 1;
+    memcpy(buffer+offset, &version, 1);
+    offset += 1;
+
+    unsigned char precision = h->cfg.precision;
+    memcpy(buffer+offset, &precision, 1);
+    offset += 1;
+
+    for (int i = 0; i < words; i++) {
+        uint32_t word = h->registers[i];
+        buffer[offset++] = word >> 24;
+        buffer[offset++] = word >> 16;
+        buffer[offset++] = word >> 8;
+        buffer[offset++] = word;
+    }
+
+    char *enc = b64_encode(buffer, sz);
+    free(buffer);
+    *blob_sz = strlen(enc);
+    *blob = enc;
+    return;
+}
+
 void ST_hyperloglog_merge_blob(struct ST_hyperloglog *dst, const char *blob, size_t blob_sz)
 {
     struct ST_hyperloglog *src=ST_hyperloglog_deserialize(blob, blob_sz);

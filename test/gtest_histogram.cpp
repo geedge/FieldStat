@@ -4,6 +4,7 @@
 #include "utils.hpp"
 
 #include "fieldstat.h"
+#include "base64/b64.h"
 
 
 // serialize and merge by blob(empty dest), then create a new instance by the same register order, merge by blob(non-empty dest). query result on the merged one. Benchmark: tag, heavykeeper result.
@@ -93,6 +94,61 @@ TEST(metric_test_histogram, serialize_and_deserialize_for_2_fields_1st_empty_2nd
 
     fieldstat_free(instance);
     fieldstat_free(instance_from_deserialize);
+}
+
+TEST(metric_test_histogram, encode_and_decode_cell_with_base64)
+{
+    struct fieldstat *instance = fieldstat_new();
+    const int precision_benchmark = 3;
+
+    int id = fieldstat_register_histogram(instance, "test", 1, 60000000, precision_benchmark);
+
+    // metric add
+    int added_num = 10000;
+    long long values[] = {1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 4, 5, 6};
+    size_t values_len = sizeof(values) / sizeof(values[0]);
+    for (int i = 0; i < added_num; i++) {
+        fieldstat_histogram_record(instance, id, values[rand() % values_len], &TEST_TAG_INT, 1);
+    }
+
+    // query, tag
+    struct fieldstat_tag_list tag_list = {.tag = (struct fieldstat_tag *)&TEST_TAG_INT, .n_tag = 1};
+    struct fieldstat_tag_list tag_list2 = {.tag = (struct fieldstat_tag *)&TEST_TAG_INT_collided, .n_tag = 1};
+
+    char *blob = NULL;
+    size_t blob_size = 0;
+    fieldstat_get_serialized_blob(instance, id, &tag_list, &blob, &blob_size);
+    printf("base 64 result: size: %zu \n%s\n", blob_size, blob);
+    printf("\n------------------------------------------------\n");
+
+    long long ret50 = fieldstat_histogram_value_at_percentile(instance, id, &tag_list, 50.0);
+    long long ret90 = fieldstat_histogram_value_at_percentile(instance, id, &tag_list, 90.0);
+    printf("fieldstat_histogram_value_at_percentile ret(50): %lld, ret(90) %lld\n", ret50, ret90);
+
+    size_t dec_size = 0;
+    unsigned char *dec = b64_decode_ex(blob, blob_size, &dec_size);
+    printf("base 64 decode result:, size: %zu\n", dec_size);
+    for (size_t i = 0; i < dec_size; i++) {
+        printf("%02x ", dec[i]);
+    }
+    printf("\n------------------------------------------------\n");
+
+    for (int i = 0; i < added_num; i++) {
+        fieldstat_histogram_record(instance, id, rand() % 6, &TEST_TAG_INT_collided, 1);
+    }
+    char *blob2 = NULL;
+    size_t blob_size2 = 0;
+    fieldstat_get_serialized_blob(instance, id, &tag_list2, &blob2, &blob_size2);
+    printf("base 64 result blob2: size: %zu \n%s\n", blob_size2, blob2);
+
+    char *blob3 = NULL;
+    size_t blob_size3 = 0;
+    fieldstat_serialize(instance, &blob3, &blob_size3);
+    fieldstat_merge_with_blob()
+
+    fieldstat_free(instance);
+    free(blob);
+    free(blob2);
 }
 
 int main(int argc, char *argv[]) 

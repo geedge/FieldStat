@@ -101,9 +101,31 @@ Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper() {
     tag_list_c.n_tag = 0;
 }
 
-Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(const Fieldstat_tag_list_wrapper &tag_list_wrapper) : Fieldstat_tag_list_wrapper(tag_list_wrapper.get_c_struct()) {
+Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(const Fieldstat_tag_list_wrapper &tag_list_wrapper){
+    const struct fieldstat_tag_list *tag_list = tag_list_wrapper.get_c_struct();
+    tag_list_c.tag = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * tag_list->n_tag);
+    tag_list_c.n_tag = tag_list->n_tag;
+    for (size_t i = 0; i < tag_list->n_tag; i++)
+    {
+        // copy the tag_list
+        tag_list_c.tag[i].key = strdup(tag_list->tag[i].key);
+        tag_list_c.tag[i].type = tag_list->tag[i].type;
+        switch (tag_list->tag[i].type)
+        {
+            case TAG_INTEGER:
+                tag_list_c.tag[i].value_int = tag_list->tag[i].value_int;
+                break;
+            case TAG_DOUBLE:
+                tag_list_c.tag[i].value_double = tag_list->tag[i].value_double;
+                break;
+            case TAG_CSTRING:
+                tag_list_c.tag[i].value_str = strdup(tag_list->tag[i].value_str);
+                break;
+            default:
+                break;
+        }
+    }
 }
-
 
 const struct fieldstat_tag *Fieldstat_tag_list_wrapper::get_tag() const
 {
@@ -118,6 +140,31 @@ size_t Fieldstat_tag_list_wrapper::get_tag_count() const
 const struct fieldstat_tag_list *Fieldstat_tag_list_wrapper::get_c_struct() const
 {
     return &tag_list_c;
+}
+
+void Fieldstat_tag_list_wrapper::print_tag_list() const
+{
+    printf("tag_list_c.n_tag: %zu\n", tag_list_c.n_tag);
+    for (size_t i = 0; i < tag_list_c.n_tag; i++)
+    {
+        printf("tag_list_c.tag[%zu].key: %s\n", i, tag_list_c.tag[i].key);
+        printf("tag_list_c.tag[%zu].type: %d\n", i, (int)tag_list_c.tag[i].type);
+        switch (tag_list_c.tag[i].type)
+        {
+            case TAG_INTEGER:
+                printf("tag_list_c.tag[%zu].value_int: %lld\n", i, tag_list_c.tag[i].value_int);
+                break;
+            case TAG_DOUBLE:
+                printf("tag_list_c.tag[%zu].value_double: %lf\n", i, tag_list_c.tag[i].value_double);
+                break;
+            case TAG_CSTRING:
+                printf("tag_list_c.tag[%zu].value_str: %s\n", i, tag_list_c.tag[i].value_str);
+                break;
+            default:
+                break;
+        }
+    }
+    printf("print end\n");
 }
 
 

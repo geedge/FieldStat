@@ -385,6 +385,12 @@ void fieldstat_get_serialized_blob(const struct fieldstat *instance, int field_i
         printf("ERR: field is not registered yet\n");
         return;
     }
+    enum field_type type = field_get_type(field);
+    if (!(type == FIELD_TYPE_CARDINALITY || type == FIELD_TYPE_HISTOGRAM)) {
+        printf("ERR: Only metric of cardinality and histogram support get serialized blob\n");
+        return;
+    }
+
     struct cell *cell = field_find_cell(field, tag_list->tag, tag_list->n_tag);
     if (cell == NULL) {
         *blob = NULL;

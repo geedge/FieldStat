@@ -44,7 +44,7 @@ public:
     const struct fieldstat_tag *get_tag() const;
     size_t get_tag_count() const;
     const struct fieldstat_tag_list *get_c_struct() const;
-
+    void print_tag_list() const;
 private:
     struct fieldstat_tag_list tag_list_c;
 };

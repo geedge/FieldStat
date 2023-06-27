@@ -812,6 +812,12 @@ void cell_free(struct cell *pthis)
 
 void cell_get_plain_blob(const struct cell *pthis, char **blob, size_t *blob_size) 
 {
+    if (pthis->metric->type == FIELD_TYPE_CARDINALITY) {
+        struct metric_cardinality *card = (struct metric_cardinality *)pthis->metric;
+        ST_hyperloglog_serialize_for_networking(card->hll, blob, blob_size);
+        return;
+    }
+
     pthis->metric->serialize(pthis->metric, blob, blob_size);
 }
 

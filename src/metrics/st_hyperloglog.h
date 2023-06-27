@@ -48,6 +48,7 @@ void ST_hyperloglog_reset(struct ST_hyperloglog *h);
 double ST_hyperloglog_count(const struct ST_hyperloglog *h);
 size_t ST_hyperloglog_serialized_size(const struct ST_hyperloglog *h);
 void ST_hyperloglog_serialize(const struct ST_hyperloglog *h, char **blob, size_t *blob_sz);
+void ST_hyperloglog_serialize_for_networking(const struct ST_hyperloglog *h, char **blob, size_t *blob_sz);
 struct ST_hyperloglog *ST_hyperloglog_deserialize(const char *blob, size_t blob_sz);
 int ST_hyperloglog_merge(struct ST_hyperloglog *dst, const struct ST_hyperloglog *src);
 void ST_hyperloglog_merge_blob(struct ST_hyperloglog *dst, const char *blob, size_t blob_sz);

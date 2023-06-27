@@ -27,6 +27,16 @@ struct cell_iter {
     struct fieldstat *instance;
 };
 
+struct cjson_map {
+    char *key; // use cjson string as key
+    size_t key_len;
+
+    cJSON *cjson_tags;
+    cJSON *cjson_fields;
+
+    UT_hash_handle hh;
+};
+
 
 void kv_pair_free(Export_kv_pair *pair) {
     if (pair->type == TAG_CSTRING) {
@@ -36,7 +46,7 @@ void kv_pair_free(Export_kv_pair *pair) {
     free(pair);
 }
 
-int my_cmp(const void *a, const void *b)
+int my_cmp_kv_pair(const void *a, const void *b)
 {
     Export_kv_pair *aa = (Export_kv_pair *)a;
     Export_kv_pair *bb = (Export_kv_pair *)b;
@@ -60,7 +70,7 @@ int my_cmp(const void *a, const void *b)
 
 void kv_pair_sort(Export_kv_pair *tag_list, size_t arr_length)
 {
-    qsort(tag_list, arr_length, sizeof(Export_kv_pair), my_cmp);
+    qsort(tag_list, arr_length, sizeof(Export_kv_pair), my_cmp_kv_pair);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -99,7 +109,7 @@ int cell_iter_next(struct cell_iter *iter) {
         return 1;
     }
 
-    if (iter->tag_idx < iter->tag_num) {
+    if (iter->tag_idx < iter->tag_num - 1) {
         iter->tag_idx++;
         return 1;
     }
@@ -107,12 +117,12 @@ int cell_iter_next(struct cell_iter *iter) {
     if (iter->curr_id == iter->max_id) { // iter end
         return 0;
     }
-
+    printf("cell_iter_next new field: %d\n", iter->curr_id + 1);
     // next field
     iter->curr_id++;
     cell_iter_free_tag_list(iter);
+    printf("cell_iter_free_tag_list done\n");
     fieldstat_get_tag_lists(iter->instance, iter->curr_id, &iter->tag_list, &iter->tag_num);
-    kv_pair_sort(iter->tag_list->tag, iter->tag_num);
 
     iter->tag_idx = 0;
     return 1;
@@ -146,15 +156,19 @@ Export_kv_pair *cell_query_with_iter(struct cell_iter *iter) {
 
     ret->key = strdup(cell_iter_get_name(iter));
 
+    printf("cell_query_with_iter enter, type: %d, key: %s \n", cell_iter_get_type(iter), ret->key);
+
     switch (cell_iter_get_type(iter)) {
         case FIELD_TYPE_COUNTER:
             ret->type = TAG_INTEGER;
             ret->value_int = fieldstat_counter_get(iter->instance, cell_iter_get_id(iter), cell_iter_get_tag_list(iter));
+            printf("cell_query_with_iter counter value: %lld\n", ret->value_int);
             break;
         case FIELD_TYPE_CARDINALITY:
         case FIELD_TYPE_HISTOGRAM:
             ret->type = TAG_CSTRING;
             fieldstat_get_serialized_blob(iter->instance, cell_iter_get_id(iter), cell_iter_get_tag_list(iter), (char **)&ret->value_str, &len_dummy);
+            printf("cell_query_with_iter blob: %s\n", ret->value_str);
             break;
         default:
             assert(0);
@@ -167,28 +181,21 @@ void kv_pair_add_to_cjson(Export_kv_pair *pairs, cJSON *cjson_pair)
     switch (pairs->type)
     {
         case TAG_INTEGER:
+            printf("kv_pair_add_to_cjson, int: key: %s, value: %lld\n", pairs->key, pairs->value_int);
             cJSON_AddNumberToObject(cjson_pair, pairs->key, pairs->value_int);
             break;
         case TAG_DOUBLE:
             cJSON_AddNumberToObject(cjson_pair, pairs->key, pairs->value_double);
             break;
         case TAG_CSTRING:
+            printf("kv_pair_add_to_cjson, string: key: %s, value: %s\n", pairs->key, pairs->value_str);
+
             cJSON_AddStringToObject(cjson_pair, pairs->key, pairs->value_str);
             break;
         default:
             break;
     }
 }
-
-struct cjson_map {
-    char *key; // use cjson string as key
-    size_t key_len;
-
-    cJSON *cjson_tags;
-    cJSON *cjson_fields;
-
-    UT_hash_handle hh;
-};
 
 struct cjson_map *cjson_map_find(struct cjson_map *head, char *key, size_t key_len)
 {
@@ -197,27 +204,39 @@ struct cjson_map *cjson_map_find(struct cjson_map *head, char *key, size_t key_l
     return s;
 }
 
-void cjson_map_add_new_pair_for_one_loop(struct cjson_map *map_head, struct cell_iter *iter)
+cJSON *tag_list_to_tag_object(const struct fieldstat_tag_list *tag_list)
 {
-    struct fieldstat_tag_list *tag_list = cell_iter_get_tag_list(iter);
+    cJSON *cjson_tags = cJSON_CreateObject();
     size_t tag_list_len = tag_list->n_tag;
 
-    // parse tags to get a key
     // different tag order will cause different cjson string, so sort it first.
     // Because the key in fieldstat is ordered, sorting in the origin place will change the key we use to query.
     // In order to avoid this, we copy the tag list before sorting. Note that such copy is shallow copy for strings.
-    cJSON *cjson_tags = cJSON_CreateObject();
     Export_kv_pair *tag_list_copy = malloc(sizeof(Export_kv_pair) * tag_list_len);
     memcpy(tag_list_copy, tag_list->tag, sizeof(Export_kv_pair) * tag_list_len);
     kv_pair_sort(tag_list_copy, tag_list_len);
 
-    // add tags to cjson
     for (int i = 0; i < tag_list_len; i++) {
         kv_pair_add_to_cjson(&tag_list_copy[i], cjson_tags);
     }
 
+    free(tag_list_copy); // shallow copy, so we only need to free the pointer itself
+
+    return cjson_tags;
+}
+
+void cjson_map_add_new_pair_for_one_loop(struct cjson_map **map_head_in, struct cell_iter *iter)
+{
+    struct cjson_map *map_head = *map_head_in;
+    printf("cjson_map_add_new_pair_for_one_loop enter\n");
+    struct fieldstat_tag_list *tag_list = cell_iter_get_tag_list(iter);
+
+    cJSON *cjson_tags = tag_list_to_tag_object(tag_list);
+
     char *key = cJSON_PrintUnformatted(cjson_tags);
+    printf("tagkey: %s\n", key);
     size_t key_len = strlen(key);
+
     struct cjson_map *map = cjson_map_find(map_head, key, key_len);
     if (map == NULL) {
         map = malloc(sizeof(struct cjson_map));
@@ -227,7 +246,7 @@ void cjson_map_add_new_pair_for_one_loop(struct cjson_map *map_head, struct cell
         map->cjson_fields = cJSON_CreateObject();
         HASH_ADD_KEYPTR(hh, map_head, map->key, map->key_len, map);
 
-        // the key will be freed when the map is freed
+        // the key and cjson_tags will be freed when the map is freed
     } else {
         cJSON_Delete(cjson_tags);
         free(key);
@@ -235,21 +254,25 @@ void cjson_map_add_new_pair_for_one_loop(struct cjson_map *map_head, struct cell
 
     Export_kv_pair *field = cell_query_with_iter(iter);
     kv_pair_add_to_cjson(field, map->cjson_fields);
-
     kv_pair_free(field);
-    free(tag_list_copy); // shallow copy, so we only need to free the pointer itself
+
+    *map_head_in = map_head;
+    printf("cjson_map_add_new_pair_for_one_loop end\n");
 }
 
-void cjson_map_free(struct cjson_map *head)
+struct cjson_map *fieldstat_hash_tag_fields_to_map(struct fieldstat *instance)
 {
-    struct cjson_map *current, *tmp;
-    HASH_ITER(hh, head, current, tmp) {
-        HASH_DEL(head, current);
-        cJSON_Delete(current->cjson_tags);
-        cJSON_Delete(current->cjson_fields);
-        free(current->key);
-        free(current);
+    printf("fieldstat_export_instance_to_cjson enter\n");
+    struct cjson_map *map_head = NULL; // new a hash head
+    struct cell_iter *iter = cell_iter_new(instance);
+    printf("cell_iter_new done\n");
+    while (cell_iter_next(iter)) {
+        cjson_map_add_new_pair_for_one_loop(&map_head, iter);
     }
+    printf("cell_iter done\n");
+    cell_iter_free(iter);
+
+    return map_head;
 }
 
 /*
@@ -267,18 +290,17 @@ void cjson_map_free(struct cjson_map *head)
         "timestamp":<timestamp long unsigned>
     }
 */
-cJSON *fieldstat_export_instance_to_cjson(struct fieldstat *instance)
+void fieldstat_export_to_json_arr(struct fieldstat *instance, char ***out, size_t *n_out)
 {
-    struct cjson_map *map_head = NULL; // new a hash head
-    struct cell_iter *iter = cell_iter_new(instance);
-    while (cell_iter_next(iter)) {
-        cjson_map_add_new_pair_for_one_loop(map_head, iter);
-    }
-    cell_iter_free(iter);
+    struct cjson_map *map_head = fieldstat_hash_tag_fields_to_map(instance);
 
-    cJSON *out_array = cJSON_CreateArray();
+    int n = HASH_COUNT(map_head);
+    *out = malloc(sizeof(char *) * n);
+    *n_out = n;
+
     cJSON *cjson_root;
     struct cjson_map *current, *tmp;
+    size_t i = 0;
     HASH_ITER(hh, map_head, current, tmp) {
         cjson_root = cJSON_CreateObject();
 
@@ -287,26 +309,17 @@ cJSON *fieldstat_export_instance_to_cjson(struct fieldstat *instance)
         cJSON_AddItemToObject(cjson_root, "fields", current->cjson_fields);
         // FIXME: 实际上没有name这一项，name 就是field 的key
         // TODO: timestamp
-
-        cJSON_AddItemToArray(out_array, cjson_root);
+        char *cjson_str = cJSON_PrintUnformatted(cjson_root);
+        (*out)[i++] = cjson_str;
+        cJSON_Delete(cjson_root);
     }
+    printf("fieldstat_export_to_json_arr done\n");
 
-    cjson_map_free(map_head);
+    HASH_ITER(hh, map_head, current, tmp) {
+        HASH_DEL(map_head, current);
+        free(current->key);
+        free(current);
 
-    return out_array;
-}
-
-void fieldstat_export_to_json_arr(struct fieldstat *instance, char ***out, size_t *n_out)
-{
-    cJSON *cjson = Export_instance_with_cjson(instance);
-    // parse every cjson object
-    int n = cJSON_GetArraySize(cjson);
-    *out = malloc(sizeof(char *) * n);
-    for (int i = 0; i < n; i++) {
-        cJSON *cjson_obj = cJSON_GetArrayItem(cjson, i);
-        (*out)[i] = cJSON_PrintUnformatted(cjson_obj);
+        // cjson object will be freed with cjson root
     }
-
-    *n_out = n;
-    cJSON_Delete(cjson);
 }
