@@ -63,12 +63,21 @@ int fieldstat_disable_background_thread(struct fieldstat *instance);
  */
 int fieldstat_set_output_interval(struct fieldstat *instance, int milliseconds);
 
-/**
- * Output the fieldstat instance to json string array arranging with tags.
- * @param out The output json string array. Every element is a json string converted from cell. User should free the memory of every element and the array.
- * @param n_out The output json string array size.
- */
-void fieldstat_export_to_json_arr(struct fieldstat *instance, char ***out, size_t *n_out);
+
+/* -------------------------------------------------------------------------- */
+/*                           fieldstat_json_exporter                          */
+/* -------------------------------------------------------------------------- */
+struct fieldstat_json_exporter;
+
+struct fieldstat_json_exporter *fieldstat_json_exporter_new(const struct fieldstat *instance);
+void fieldstat_json_exporter_set_global_tag(struct fieldstat_json_exporter *exporter, const struct fieldstat_tag tag_list[], size_t n_tag);
+void fieldstat_json_exporter_set_name(struct fieldstat_json_exporter *exporter, const char *name);
+void fieldstat_json_exporter_free(struct fieldstat_json_exporter *exporter);
+
+/*
+    Output the fieldstat instance to json string array. User must free the output string.
+*/
+char *fieldstat_json_exporter_export(const struct fieldstat_json_exporter *exporter);
 
 
 #ifdef __cplusplus

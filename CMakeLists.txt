@@ -86,6 +86,7 @@ file(GLOB SRC
     "src/*.c"
     "src/metrics/*.c"
     "src/utils/*.c"
+    "src/exporter/*.c"
     "vendors/cjson/*.c"
     "vendors/hdr/*.c"
     "vendors/minheap/*.c"

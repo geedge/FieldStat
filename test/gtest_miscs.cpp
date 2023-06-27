@@ -70,19 +70,17 @@ TEST(export_test, cjson_export_with_fixed_tag_and_many_metrics)
     }
 
     // export
-    char **blob_arr = NULL;
-    size_t arr_num = 0;
-    fieldstat_export_to_json_arr(instance, &blob_arr, &arr_num);
-
-    // expect result: 
+    struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new(instance);
+    char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter);
+    cJSON *root_arr = cJSON_Parse(json_string);
+    printf("test, fieldstat_json_exporter_export json_string: %s\n", json_string);
+    free(json_string);
+    int arr_num = cJSON_GetArraySize(root_arr);
     EXPECT_EQ(arr_num, 3);
-    printf("arr print, arr_num: %zu\n", arr_num);
-    for (int i = 0; i < 3; i++)
+
+    for (int i = 0; i < arr_num; i++)
     {
-        // TODO: check if every blob is cor
-        printf("%s\n-----------------------------------\n", blob_arr[i]);
-        cJSON *root = cJSON_Parse(blob_arr[i]);
-        EXPECT_NE(root, nullptr);
+        cJSON *root = cJSON_GetArrayItem(root_arr, i);
 
         // check tag
         cJSON *tag = cJSON_GetObjectItem(root, "tags");
@@ -111,21 +109,16 @@ TEST(export_test, cjson_export_with_fixed_tag_and_many_metrics)
         EXPECT_STREQ(gauge->valuestring, blob_gauge);
         cJSON *histogram = cJSON_GetObjectItem(metrics, "histogram");
         EXPECT_STREQ(histogram->valuestring, blob_histogram);
-
-        cJSON_Delete(root);
     }
 
     for (int i = 0; i < 3; i++) {
         delete tags[i];
     }
-    for (size_t i = 0; i < arr_num; i++)
-    {
-        free(blob_arr[i]);
-    }
-    free(blob_arr);
+
     fieldstat_free(instance);
     free(blob_gauge);
     free(blob_histogram);
+    cJSON_Delete(root_arr);
 }
 
 TEST(export_test, network_blob_test_for_histogram)

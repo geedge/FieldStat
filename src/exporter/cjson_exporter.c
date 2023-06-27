@@ -3,20 +3,64 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <assert.h>
+#include <sys/time.h>
+#include <time.h>
 
 #include "cjson/cJSON.h"
 #include "uthash.h"
 #include "fieldstat.h"
 #include "fieldstat_exporter.h"
 
+/*
+    Author : Chenzizhan 
+    Date   : 2023-06-27
+    Implement struct fieldstat_json_exporter
+    An example: 
+    [
+       {
+        "name":"exporter_name",
+        "tags":[
+            {"device ID":123},
+            {"CLIENT IP":"123.1.1.1"}
+        ],
+        "fields":[
+            {"in_bytes":1024},
+            {"in_pkts":123},
+            {"sessions":<hll blob base64-encoded string>}
+        ]
+        "timestamp":123456789
+       }.
+      {
+        "name":"exporter_name",
+        "tags":[
+            {"device ID":123},
+            {"CLIENT IP":"1.2.3.4"}
+        ],
+        "fields":[
+            {"in_bytes":1},
+            {"in_pkts":2},
+        ]
+        "timestamp":123456789
+       }
+    ]
+*/
+
 typedef struct fieldstat_tag Export_kv_pair;
 
-// struct topk_cell_iter {
-//     int result_n;
-//     int curr_idx;
-//     char **result_key;
-//     unsigned int *result_count;
-// };
+struct fieldstat_json_exporter{
+    const struct fieldstat *instance;
+    char *name;
+    Export_kv_pair *global_tag;
+    size_t n_global_tag;
+};
+
+
+struct topk_iter {
+    size_t result_n;
+    int curr_idx;
+    char **result_key;
+    unsigned int *result_count;
+};
 
 struct cell_iter {
     int max_id;
@@ -24,7 +68,9 @@ struct cell_iter {
     struct fieldstat_tag_list *tag_list;
     size_t tag_num;
     size_t tag_idx;
-    struct fieldstat *instance;
+    const struct fieldstat *instance;
+    bool topk_mode;
+    struct topk_iter *topk_iter;
 };
 
 struct cjson_map {
@@ -44,6 +90,78 @@ void kv_pair_free(Export_kv_pair *pair) {
     }
     free((char *)pair->key);
     free(pair);
+}
+
+long get_current_time()
+{
+	struct timespec this_output_time;
+
+	clock_gettime(CLOCK_MONOTONIC ,&this_output_time);
+
+    return this_output_time.tv_sec;
+}
+
+
+struct fieldstat_json_exporter *fieldstat_json_exporter_new(const struct fieldstat *instance)
+{
+    struct fieldstat_json_exporter *exporter = (struct fieldstat_json_exporter *)malloc(sizeof(struct fieldstat_json_exporter));
+    exporter->instance = instance;
+    exporter->name = NULL;
+    exporter->global_tag = NULL;
+    exporter->n_global_tag = 0;
+    return exporter;
+}
+
+void fieldstat_json_exporter_set_global_tag(struct fieldstat_json_exporter *exporter, const struct fieldstat_tag tag_list[], size_t n_tag)
+{
+    if (exporter->global_tag != NULL) {
+        for (size_t i = 0; i < exporter->n_global_tag; i++) {
+            kv_pair_free(&exporter->global_tag[i]);
+        }
+        free(exporter->global_tag);
+    }
+
+    exporter->global_tag = (Export_kv_pair *)malloc(sizeof(Export_kv_pair) * n_tag);
+    exporter->n_global_tag = n_tag;
+    for (size_t i = 0; i < n_tag; i++) {
+        exporter->global_tag[i].key = strdup(tag_list[i].key);
+        exporter->global_tag[i].type = tag_list[i].type;
+        switch (tag_list[i].type) {
+            case TAG_INTEGER:
+                exporter->global_tag[i].value_int = tag_list[i].value_int;
+                break;
+            case TAG_DOUBLE:
+                exporter->global_tag[i].value_double = tag_list[i].value_double;
+                break;
+            case TAG_CSTRING:
+                exporter->global_tag[i].value_str = strdup(tag_list[i].value_str);
+                break;
+            default:
+                assert(0);
+        }
+    }
+}
+
+void fieldstat_json_exporter_set_name(struct fieldstat_json_exporter *exporter, const char *name)
+{
+    if (exporter->name != NULL) {
+        free(exporter->name);
+    }
+    exporter->name = strdup(name);
+}
+
+void fieldstat_json_exporter_free(struct fieldstat_json_exporter *exporter)
+{
+    if (exporter->name != NULL) {
+        free(exporter->name);
+    }
+    if (exporter->global_tag != NULL) {
+        for (size_t i = 0; i < exporter->n_global_tag; i++) {
+            kv_pair_free(&exporter->global_tag[i]);
+        }
+        free(exporter->global_tag);
+    }
+    free(exporter);
 }
 
 int my_cmp_kv_pair(const void *a, const void *b)
@@ -76,7 +194,7 @@ void kv_pair_sort(Export_kv_pair *tag_list, size_t arr_length)
 /* -------------------------------------------------------------------------- */
 /*                                    iter                                    */
 /* -------------------------------------------------------------------------- */
-struct cell_iter *cell_iter_new(struct fieldstat *instance) {
+struct cell_iter *cell_iter_new(const struct fieldstat *instance) {
     struct cell_iter *iter = malloc(sizeof(struct cell_iter));
     iter->max_id = fieldstat_get_max_field_id(instance);
     iter->curr_id = 0;
@@ -103,7 +221,106 @@ void cell_iter_free(struct cell_iter *iter) {
     free(iter);
 }
 
+int cell_iter_find_next_field(struct cell_iter *iter)
+{
+    if (iter->tag_list == NULL) { // first time
+        return 0;
+    }
+    if (iter->tag_idx < iter->tag_num - 1) {
+        return iter->curr_id;
+    }
+
+    // next field
+    return iter->curr_id + 1;
+}
+
+void iter_point_to_topk(struct cell_iter *iter)
+{
+    iter->topk_iter = (struct topk_iter *)malloc(sizeof(struct topk_iter));
+    memset(iter->topk_iter, 0, sizeof(struct topk_iter));
+
+    if (iter->tag_list == NULL) {
+        fieldstat_get_tag_lists(iter->instance, iter->curr_id, &iter->tag_list, &iter->tag_num);
+    }
+    fieldstat_topk_query(iter->instance, iter->curr_id, iter->tag_list, &iter->topk_iter->result_key, &iter->topk_iter->result_count, &iter->topk_iter->result_n);
+    
+}
+
+void iter_leave_topk(struct cell_iter *iter)
+{
+    topk_iter_free(iter->topk_iter);
+    free(iter->topk_iter);
+    iter->topk_iter = NULL;
+}
+
+int cell_iter_next_for_topk(struct cell_iter *iter)
+{
+    if (!iter->topk_mode) {
+        iter->curr_id++;
+        iter_point_to_topk(iter);
+        return 1;
+    }
+    if (iter->topk_iter->curr_idx == iter->topk_iter->result_n - 1) {
+        iter_leave_topk(iter);
+        iter->curr_id++;
+        iter_point_to_topk(iter);
+        return 1;
+    }
+    iter->topk_iter->curr_idx++;
+    return 1;
+}
+
+bool cell_iter_check_if_next_is_topk(struct cell_iter *iter, int next_id)
+{
+    if (iter->topk_mode) {
+        if (iter->topk_iter->curr_idx < iter->topk_iter->result_n - 1) {
+            return true;
+        }
+    }
+
+    if (fieldstat_get_field_type(iter->instance, next_id) == FIELD_TYPE_TOPK) {
+        return true;
+    }
+    return false;
+}
+
 int cell_iter_next(struct cell_iter *iter) {
+    int next_id = cell_iter_find_next_field(iter);
+    if (next_id > iter->max_id) {
+        return 0;
+    }
+
+    if (cell_iter_check_if_next_is_topk(iter, next_id)) {
+        printf("cell_iter_next new field: %d is topk\n", iter->curr_id);
+        return cell_iter_next_for_topk(iter);
+    }
+
+
+    /* ------------------------ types other than topk ------------------------ */
+    if (iter->tag_list == NULL) { // first time
+        fieldstat_get_tag_lists(iter->instance, iter->curr_id, &iter->tag_list, &iter->tag_num);
+        return 1;
+    }
+
+    if (next_id == iter->curr_id) {
+        iter->tag_idx++;
+        return 1;
+    }
+
+    // next field
+    iter->curr_id++;
+    cell_iter_free_tag_list(iter);
+
+    fieldstat_get_tag_lists(iter->instance, iter->curr_id, &iter->tag_list, &iter->tag_num);
+
+    iter->tag_idx = 0;
+    return 1;
+}
+
+int cell_iter_next(struct cell_iter *iter) {
+    if (iter->topk_mode) {
+        return cell_iter_next(iter);
+    }
     if (iter->tag_list == NULL) { // first time
         fieldstat_get_tag_lists(iter->instance, iter->curr_id, &iter->tag_list, &iter->tag_num);
         return 1;
@@ -121,7 +338,12 @@ int cell_iter_next(struct cell_iter *iter) {
     // next field
     iter->curr_id++;
     cell_iter_free_tag_list(iter);
-    printf("cell_iter_free_tag_list done\n");
+
+    if (fieldstat_get_field_type(iter->instance, iter->curr_id) == FIELD_TYPE_TOPK) {
+        printf("cell_iter_next new field: %d is topk\n", iter->curr_id);
+        return cell_iter_next(iter);
+    }
+
     fieldstat_get_tag_lists(iter->instance, iter->curr_id, &iter->tag_list, &iter->tag_num);
 
     iter->tag_idx = 0;
@@ -260,7 +482,7 @@ void cjson_map_add_new_pair_for_one_loop(struct cjson_map **map_head_in, struct 
     printf("cjson_map_add_new_pair_for_one_loop end\n");
 }
 
-struct cjson_map *fieldstat_hash_tag_fields_to_map(struct fieldstat *instance)
+struct cjson_map *fieldstat_hash_tag_fields_to_map(const struct fieldstat *instance)
 {
     printf("fieldstat_export_instance_to_cjson enter\n");
     struct cjson_map *map_head = NULL; // new a hash head
@@ -277,6 +499,7 @@ struct cjson_map *fieldstat_hash_tag_fields_to_map(struct fieldstat *instance)
 
 /*
     {
+        "name":<exporter name>
         "tags": {
             "device_id":<>
             "IP":<>
@@ -287,39 +510,40 @@ struct cjson_map *fieldstat_hash_tag_fields_to_map(struct fieldstat *instance)
             "in_lantency":<blob of histogram>
             "client_ip_sketch":<blob of hyperloglog>
         }
-        "timestamp":<timestamp long unsigned>
+        "timestamp":<timestamp long>
     }
 */
-void fieldstat_export_to_json_arr(struct fieldstat *instance, char ***out, size_t *n_out)
+/*
+    Output the fieldstat instance to json string array. User must free the output string.
+*/
+char *fieldstat_json_exporter_export(const struct fieldstat_json_exporter *exporter)
 {
+    const struct fieldstat *instance = exporter->instance;
     struct cjson_map *map_head = fieldstat_hash_tag_fields_to_map(instance);
 
-    int n = HASH_COUNT(map_head);
-    *out = malloc(sizeof(char *) * n);
-    *n_out = n;
+    cJSON *cjson_root_arr = cJSON_CreateArray();
 
     cJSON *cjson_root;
     struct cjson_map *current, *tmp;
-    size_t i = 0;
     HASH_ITER(hh, map_head, current, tmp) {
         cjson_root = cJSON_CreateObject();
 
-        // TODO: more tags
+        cJSON_AddStringToObject(cjson_root, "name", exporter->name ? exporter->name : "-");
         cJSON_AddItemToObject(cjson_root, "tags", current->cjson_tags);
         cJSON_AddItemToObject(cjson_root, "fields", current->cjson_fields);
-        // FIXME: 实际上没有name这一项，name 就是field 的key
-        // TODO: timestamp
-        char *cjson_str = cJSON_PrintUnformatted(cjson_root);
-        (*out)[i++] = cjson_str;
-        cJSON_Delete(cjson_root);
+        cJSON_AddNumberToObject(cjson_root, "timestamp", get_current_time());
+
+        cJSON_AddItemToArray(cjson_root_arr, cjson_root);
     }
-    printf("fieldstat_export_to_json_arr done\n");
+    char *out_cjson = cJSON_PrintUnformatted(cjson_root_arr);
 
     HASH_ITER(hh, map_head, current, tmp) {
         HASH_DEL(map_head, current);
         free(current->key);
         free(current);
-
         // cjson object will be freed with cjson root
     }
+    cJSON_Delete(cjson_root_arr);
+
+    return out_cjson;
 }
