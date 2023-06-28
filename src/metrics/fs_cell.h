@@ -17,7 +17,7 @@ void cell_get_plain_blob(const struct cell *pthis, char **blob, size_t *blob_siz
 
 struct cell *cell_create_for_topk(int K);
 void cell_topk_add(struct cell *pthis, const char *key, size_t key_len, unsigned value);
-void cell_topk_query(const struct cell *pthis, char ***keys_out, long long **values_out, size_t *num_out);
+void cell_topk_query(const struct cell *pthis, char ***keys_out, unsigned int **values_out, size_t *num_out);
 
 struct cell *cell_create_for_counter();
 void cell_counter_incrby(struct cell *pthis, long long value);

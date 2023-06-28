@@ -113,7 +113,7 @@ int fieldstat_register_cardinality(struct fieldstat *instance, const char *field
 /* -------------------------------------------------------------------------- */
 /*                               field operation                              */
 /* -------------------------------------------------------------------------- */
-int fieldstat_topk_add(struct fieldstat *instance, int field_id, const char *key, size_t key_len, const struct fieldstat_tag tags[], size_t n_tag)
+int fieldstat_topk_add(struct fieldstat *instance, int field_id, const char *key, size_t key_len, unsigned int count, const struct fieldstat_tag tags[], size_t n_tag)
 {
     struct fs_field *field = (struct fs_field *)instance->field_array[field_id];
     if (field == NULL || field_get_type(field) != FIELD_TYPE_TOPK) {
@@ -121,7 +121,7 @@ int fieldstat_topk_add(struct fieldstat *instance, int field_id, const char *key
         return -1;
     }
     struct cell *cell = field_find_or_create_cell(field, tags, n_tag);
-    cell_topk_add(cell, key, key_len, 1);
+    cell_topk_add(cell, key, key_len, count);
     return 0;
 }
 

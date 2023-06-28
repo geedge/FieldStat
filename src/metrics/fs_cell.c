@@ -326,21 +326,20 @@ struct cell *cell_create_for_topk(int K)
 
 void cell_topk_add(struct cell *pthis, const char *key, size_t key_len, unsigned value)
 {
-    printf("cell_topk_add enter, add key: %s\n", key);
     struct metric_topk *topk = (struct metric_topk *)pthis->metric;
     heavy_keeper_add(topk->hk, key, key_len, value);
 }
 
 // (*values_out)[i] is the value of cstring (*keys_out)[i]
 typedef char * cstring;
-void cell_topk_query(const struct cell *pthis, cstring **keys_out, long long **values_out, size_t *num_out)
+void cell_topk_query(const struct cell *pthis, cstring **keys_out, unsigned int **values_out, size_t *num_out)
 {
     struct metric_topk *topk = (struct metric_topk *)pthis->metric;
 
     struct heavy_keeper_result *result = heavy_keeper_query(topk->hk);
     *num_out = result->n_key;
     *keys_out = (cstring *)malloc(sizeof(cstring) * result->n_key);
-    *values_out = (long long *)malloc(sizeof(long long) * result->n_key);
+    *values_out = (unsigned int *)malloc(sizeof(unsigned int) * result->n_key);
     for (int i = 0; i < result->n_key; i++) {
         (*keys_out)[i] = (cstring)strdup(result->key[i]);
         (*values_out)[i] = result->count[i];

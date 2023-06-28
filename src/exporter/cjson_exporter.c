@@ -224,6 +224,9 @@ void cell_iter_free_tag_list(struct cell_iter *iter) {
 
 void cell_iter_free_topk_iter(struct cell_iter *iter)
 {
+    if (iter->topk_iter == NULL) {
+        return;
+    }
     for (int i = 0; i < iter->topk_iter->result_n; i++) {
         free(iter->topk_iter->result_key[i]);        
     }
@@ -238,9 +241,8 @@ void cell_iter_free(struct cell_iter *iter) {
     if (iter->tag_list) {
         cell_iter_free_tag_list(iter);
     }
-    if (iter->topk_iter) {
-        cell_iter_free_topk_iter(iter);
-    }
+    cell_iter_free_topk_iter(iter);
+
     free(iter);
 }
 
@@ -256,9 +258,8 @@ void cell_iter_step_into_topk(struct cell_iter *iter) {
     iter->state = ITER_STATE_TOPK_MOVING;
 }
 
-// concrete state is : ITER_STATE_TAG_MOVING or ITER_STATE_TOPK_MOVING
 // return 0 if iter reaches end, 1 if not
-int cell_iter_move_until_reach_concrete_state(struct cell_iter *iter) {
+int cell_iter_next_nonempty_field(struct cell_iter *iter) {
     while (iter->curr_id < iter->field_num - 1) {
         iter->curr_id++;
 
@@ -288,37 +289,50 @@ int cell_iter_move_until_reach_concrete_state(struct cell_iter *iter) {
     return 0;
 }
 
-void cell_iter_clear_current_state(struct cell_iter *iter) {
-    cell_iter_free_tag_list(iter);
-    if (iter->topk_iter) {
-        cell_iter_free_topk_iter(iter);
+int cell_iter_next_tag(struct cell_iter *iter) {
+    if (iter->tag_idx < iter->tag_num - 1) {
+        iter->tag_idx++;
+        printf("cell_iter_next move to new tag, key: %s\n", iter->tag_list[iter->tag_idx].tag->key);
+        return 1;
     }
+    return 0;
+}
+
+int cell_iter_next_topk(struct cell_iter *iter) {
+    if (iter->topk_iter->curr_idx < iter->topk_iter->result_n - 1) {
+        iter->topk_iter->curr_idx++;
+        return 1;
+    }
+    return 0;
 }
 
 int cell_iter_next(struct cell_iter *iter) {
     printf("cell_iter_next enter, current id: %d, current tag id: %zu\n", iter->curr_id, iter->tag_idx);
     if (iter->state == ITER_STATE_INIT) {
         iter->curr_id = -1;
-        return cell_iter_move_until_reach_concrete_state(iter);
+        return cell_iter_next_nonempty_field(iter);
     }
 
     if (iter->state == ITER_STATE_TAG_MOVING) {
-        if (iter->tag_idx < iter->tag_num - 1) {
-            iter->tag_idx++;
-            printf("cell_iter_next move to new tag, key: %s\n", iter->tag_list[iter->tag_idx].tag->key);
+        if (cell_iter_next_tag(iter)) {
             return 1;
         }
     } else if (iter->state == ITER_STATE_TOPK_MOVING) {
-        if (iter->topk_iter->curr_idx < iter->topk_iter->result_n - 1) {
-            iter->topk_iter->curr_idx++;
+        if (cell_iter_next_topk(iter)) {
+            return 1;
+        }
+        if (cell_iter_next_tag(iter)) {
+            cell_iter_free_topk_iter(iter);
+            cell_iter_step_into_topk(iter);
             return 1;
         }
     } else {
         assert(0);
     }
 
-    cell_iter_clear_current_state(iter);
-    return cell_iter_move_until_reach_concrete_state(iter);
+    cell_iter_free_tag_list(iter);
+    cell_iter_free_topk_iter(iter);
+    return cell_iter_next_nonempty_field(iter);
 }
 
 enum field_type cell_iter_get_type(struct cell_iter *iter) {
@@ -412,7 +426,7 @@ cJSON *tag_list_to_tag_object(const struct fieldstat_tag_list *tag_list)
 
 void cell_iter_get_topk_result_entry(struct cell_iter *iter, Export_kv_pair *pairs)
 {
-    pairs->key = strdup("topk_dimension_name"); // TODO: 应该是一个输出的时候设置的名字，比如统计client IP 的income byte，topk的名字是income byte，每个输入的键值的key是client IP
+    pairs->key = strdup(JSON_EXPORTER_TOPK_DEMENSION); // TODO: 应该是一个输出的时候设置的名字，比如统计client IP 的income byte，topk的名字是income byte，每个输入的键值的key是client IP
     pairs->type = TAG_CSTRING;
     pairs->value_str = iter->topk_iter->result_key[iter->topk_iter->curr_idx];
 }

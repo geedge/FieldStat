@@ -67,6 +67,7 @@ int fieldstat_set_output_interval(struct fieldstat *instance, int milliseconds);
 /* -------------------------------------------------------------------------- */
 /*                           fieldstat_json_exporter                          */
 /* -------------------------------------------------------------------------- */
+#define JSON_EXPORTER_TOPK_DEMENSION "topk_dimension_name" // TODO
 struct fieldstat_json_exporter;
 
 struct fieldstat_json_exporter *fieldstat_json_exporter_new(const struct fieldstat *instance);

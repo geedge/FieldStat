@@ -70,13 +70,13 @@ TEST(metric_test_topk, serialize_and_deserialize_for_2_fields_1st_empty_2nd_adde
     // register metric 
     std::string value_string_2_1_1 = gen_rand_string(10);
     printf("going to add\n");
-    fieldstat_topk_add(instance, id2_added, value_string_2_1_1.c_str(), value_string_2_1_1.length(), &TEST_TAG_STRING, 1);
+    fieldstat_topk_add(instance, id2_added, value_string_2_1_1.c_str(), value_string_2_1_1.length(), 1, &TEST_TAG_STRING, 1);
     printf("add ok0\n");
 
-    fieldstat_topk_add(instance, id2_added, value_string_2_1_1.c_str(), value_string_2_1_1.length(), &TEST_TAG_STRING, 1);
+    fieldstat_topk_add(instance, id2_added, value_string_2_1_1.c_str(), value_string_2_1_1.length(), 1, &TEST_TAG_STRING, 1);
     printf("add ok1\n");
     std::string value_string_2_1_2 = gen_rand_string(10);
-    fieldstat_topk_add(instance, id2_added, value_string_2_1_2.c_str(), value_string_2_1_2.length(), &TEST_TAG_INT, 1);
+    fieldstat_topk_add(instance, id2_added, value_string_2_1_2.c_str(), value_string_2_1_2.length(), 1, &TEST_TAG_INT, 1);
     printf("add ok2\n");
 
     // serialize 
