@@ -314,8 +314,11 @@ int field_merge(struct fs_field *dst, const struct fs_field *src)
 void field_get_tags(const struct fs_field *field, struct fieldstat_tag_list **tag_lists_out, size_t *n_tag_lists_out)
 {
     *n_tag_lists_out = HASH_COUNT(field->hash_tbl);
-    *tag_lists_out = (struct fieldstat_tag_list *)malloc(sizeof(struct fieldstat_tag_list) * *n_tag_lists_out);
-
+    if (*n_tag_lists_out == 0) {
+        *tag_lists_out = NULL;
+        return;
+    }
+    *tag_lists_out = (struct fieldstat_tag_list *)malloc(sizeof(struct fieldstat_tag_list) * (*n_tag_lists_out));
 
     struct cell_hash_node *node, *tmp;
     int i = 0;

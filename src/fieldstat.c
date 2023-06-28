@@ -285,7 +285,7 @@ enum field_type fieldstat_get_field_type(const struct fieldstat *instance, int f
     return field_get_type(instance->field_array[field_id]);
 }
 
-void fieldstat_topk_query(const struct fieldstat *instance, int id, const struct fieldstat_tag_list *tag_list, char ***keys_out, long long **count_out, size_t *n_key_out)
+void fieldstat_topk_query(const struct fieldstat *instance, int id, const struct fieldstat_tag_list *tag_list, char ***keys_out, unsigned int **count_out, size_t *n_key_out)
 {
     struct fs_field *field = instance->field_array[id];
     if (field == NULL || field_get_type(field) != FIELD_TYPE_TOPK) {

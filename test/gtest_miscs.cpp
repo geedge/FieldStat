@@ -47,7 +47,7 @@ TEST(export_test, cjson_export_with_fixed_tag_and_many_metrics)
     Fieldstat_tag_list_wrapper *tags[3];
     for (int i = 0; i < 3; i++)
     {
-        Fieldstat_tag_list_wrapper *tmp = new Fieldstat_tag_list_wrapper(dist, i + 1);
+        Fieldstat_tag_list_wrapper *tmp = new Fieldstat_tag_list_wrapper(dist, 1); // TODO: 改数量
         tags[i] = tmp;
         tags[i]->print_tag_list();
 

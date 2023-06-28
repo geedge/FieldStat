@@ -690,10 +690,8 @@ void cell_read_tag(const struct cell *pthis, struct fieldstat_tag **tag_list, si
 {
     *tag_list = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * pthis->tag_num);
     for (size_t i = 0; i < pthis->tag_num; i++) {
-        printf("cell_read_tag enter, tag key: %s\n", pthis->tag[i].key);
         fieldtag_copy(&pthis->tag[i], &(*tag_list)[i]);
     }
-    printf("cell_read_tag enter, tag num: %zu\n", pthis->tag_num);
 
     *tag_count = pthis->tag_num;
 }

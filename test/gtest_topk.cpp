@@ -110,7 +110,7 @@ TEST(metric_test_topk, serialize_and_deserialize_for_2_fields_1st_empty_2nd_adde
 
     // query topk result
     char **key_result = NULL;
-    long long *count_result = NULL;
+    unsigned int *count_result = NULL;
     size_t n_result = 0;
     fieldstat_topk_query(instance_from_deserialize, id2_added, &tag_list_2[0], &key_result, &count_result, &n_result);
     printf("query topk ok\n");
