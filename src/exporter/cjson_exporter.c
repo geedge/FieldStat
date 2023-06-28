@@ -546,13 +546,17 @@ char *fieldstat_json_exporter_export(const struct fieldstat_json_exporter *expor
 
         cJSON_AddItemToArray(cjson_root_arr, cjson_root);
     }
-    char *out_cjson = cJSON_PrintUnformatted(cjson_root_arr);
 
     HASH_ITER(hh, map_head, current, tmp) {
         HASH_DEL(map_head, current);
         free(current->key);
         free(current);
         // cjson object will be freed with cjson root
+    }
+
+    char *out_cjson = NULL;
+    if (cJSON_GetArraySize(cjson_root_arr) != 0) {
+        out_cjson = cJSON_PrintUnformatted(cjson_root_arr);
     }
     cJSON_Delete(cjson_root_arr);
 
