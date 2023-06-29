@@ -48,7 +48,15 @@ struct heavy_keeper_result {
     size_t n_key; // number of result
     char **key; // key[i] is the flow id, i < n_key
     size_t *key_len; // key_len[i] is the length flow id string, i < n_key
-    unsigned *count; // count[i] is the count of the corresponding flow id
+    
+    size_t primary_metric_id; // the name of the primary metric
+    unsigned *count; // count[i] is the metric count of the corresponding flow id
+
+    char **metric_name; // metric_name[i] is the name of the metric
+    size_t n_metric;
+    unsigned int **metric_value_arr; // metric_value[i] is the value of the corresponding key[i]. 
+                                 // Every key has n_metric_name metrics.
+                                 // primary count is also added to this array. So metric_value_arr[i][primary_metric_id] is equal to count[i]
 };
 
 // Parameters used in algorithm
@@ -62,17 +70,7 @@ struct heavy_keeper_options{
                            //  Must bigger than 1. Better not bigger than 1.3, otherwise some elephant flow will be missed.
 };
 
-struct Bucket {
-    unsigned int finger_print;
-    unsigned count; // the actual count, sum of all uuid_hash_node->count
-};
-
-struct heavy_keeper {
-    int K;
-    struct sorted_set *top_K_heap;
-    struct heavy_keeper_options params;
-    struct Bucket *sketch;
-};
+struct heavy_keeper;
 
 /**
  * @brief   Create a heavy keeper.
@@ -91,6 +89,8 @@ struct heavy_keeper *heavy_keeper_new(int max_query_num, struct heavy_keeper_opt
  */
 struct heavy_keeper *heavy_keeper_new_with_uuid(int max_query_num, struct heavy_keeper_options *params, uuid_t uuid);
 
+
+struct heavy_keeper *heavy_keeper_with_metrics_new(int max_query_num, const char *metric_name[], size_t n_metric, size_t primary_metric);
 /**
  * @brief   free a heavy keeper.
  * @param   hk            the pointer to the heavy keeper.
@@ -111,6 +111,18 @@ void heavy_keeper_clear(struct heavy_keeper *hk);
  * @param   count         the count of the flow or its traffic volume in bytes.
  */
 void heavy_keeper_add(struct heavy_keeper *hk, const char *key, size_t key_len, unsigned int count);
+
+/*
+    * @brief   Add a flow to the heavy keeper, with many other metrics for the flow.
+    * @param   hk            the pointer to the heavy keeper.
+    * @param   key           the flow id string.
+    * @param   key_len       the length of the flow id string.
+    * @param   count         the count of the flow volume, packet numbers, etc. 
+    *       Length should be equal to the length of metrics initalized in heavy_keeper_with_metrics_new(). 
+    *       The count[primary_metric] will be used to rank the flow.
+    * @return  0 if success, -1 if metric list is not initialized.
+*/
+int heavy_keeper_with_metrics_add(struct heavy_keeper *hk, const char *key, size_t key_len, unsigned int count[]);
 
 /**
  * @brief   Query the top-K flows.The flow id with bigger count ranks at smaller index.
@@ -155,6 +167,11 @@ void heavy_keeper_serialization(const struct heavy_keeper *hk, char **blob, size
 */
 struct heavy_keeper *heavy_keeper_deserialization(const char *blob, size_t size);
 
+/**
+ * @brief   Get the "K" parameter of the heavy keeper.
+*/
+int heavy_keeper_get_config_K(struct heavy_keeper *hk);
+
 // TODO: 
 /*
 支持多个数据一起塞进来，其中一个作为键值，其他的跟随记录
@@ -185,7 +202,6 @@ heavy_keeper_add_list(hk, "1.2.3.4", {1000, 112, 12});
 heavy_keeper_query(hk) -> 
     struct heavy_keeper_result_list {
         char *key[];
-        struct list_entry *list[];
         size_t result_num; // 最大K个
     };
 

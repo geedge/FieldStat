@@ -5,6 +5,7 @@
 #include <assert.h>
 #include <sys/time.h>
 #include <time.h>
+#include <stddef.h>
 
 #include "cjson/cJSON.h"
 #include "uthash.h"
@@ -65,7 +66,10 @@ struct topk_iter {
     size_t result_n;
     int curr_idx;
     char **result_key;
-    unsigned int *result_count;
+
+    char **metric_names;
+    size_t n_metric;
+    unsigned int **metric_values;
 };
 
 struct cell_iter {
@@ -160,14 +164,20 @@ void cell_iter_free_tag_list(struct cell_iter *iter) {
 
 void cell_iter_free_topk_iter(struct cell_iter *iter)
 {
-    if (iter->topk_iter == NULL) {
+    struct topk_iter *it = iter->topk_iter;
+    if (it == NULL) {
         return;
     }
-    for (int i = 0; i < iter->topk_iter->result_n; i++) {
-        free(iter->topk_iter->result_key[i]);        
+    for (int i = 0; i < it->result_n; i++) {
+        free(it->result_key[i]);
+        free(it->metric_values[i]);
     }
-    free(iter->topk_iter->result_key);
-    free(iter->topk_iter->result_count);
+    for (int j = 0; j < it->n_metric; j++) {
+        free(it->metric_names[j]);
+    }
+    free(it->result_key);
+    free(it->metric_names);
+    free(it->metric_values);
 
     free(iter->topk_iter);
     iter->topk_iter = NULL;
@@ -185,7 +195,11 @@ void cell_iter_free(struct cell_iter *iter) {
 void cell_iter_step_into_topk(struct cell_iter *iter) {
     iter->topk_iter = (struct topk_iter *)malloc(sizeof(struct topk_iter));
     memset(iter->topk_iter, 0, sizeof(struct topk_iter));
-    fieldstat_topk_query(iter->instance, iter->curr_id, iter->tag_list, &iter->topk_iter->result_key, &iter->topk_iter->result_count, &iter->topk_iter->result_n);
+    size_t primary_metric_id_dummy;
+    fieldstat_topk_query(iter->instance, iter->curr_id, iter->tag_list,
+        &iter->topk_iter->result_key, &iter->topk_iter->result_n,
+        &iter->topk_iter->metric_names, &iter->topk_iter->n_metric, &primary_metric_id_dummy,
+        &iter->topk_iter->metric_values);
 
     if (iter->tag_list == NULL) {
         fieldstat_get_tag_lists(iter->instance, iter->curr_id, &iter->tag_list, &iter->tag_num);
@@ -310,10 +324,7 @@ Export_kv_pair *cell_query_with_iter(struct cell_iter *iter) {
             ret->type = TAG_CSTRING;
             fieldstat_get_serialized_blob(iter->instance, cell_iter_get_id(iter), cell_iter_get_tag_list(iter), (char **)&ret->value_str, &len_dummy);
             break;
-        case FIELD_TYPE_TOPK: // topk is special, its value is only an entry from its query result
-            ret->type = TAG_INTEGER;
-            ret->value_int = iter->topk_iter->result_count[iter->topk_iter->curr_idx];
-            break;
+
         default:
             assert(0);
     }
@@ -362,7 +373,7 @@ cJSON *tag_list_to_tag_object(const struct fieldstat_tag_list *tag_list)
 
 void cell_iter_get_topk_result_entry(struct cell_iter *iter, Export_kv_pair *pairs)
 {
-    pairs->key = strdup(JSON_EXPORTER_TOPK_DEMENSION); // TODO: 应该是一个输出的时候设置的名字，比如统计client IP 的income byte，topk的名字是income byte，每个输入的键值的key是client IP
+    pairs->key = strdup(JSON_EXPORTER_TOPK_DEMENSION); // TODO: 这里应该是field的名字
     pairs->type = TAG_CSTRING;
     pairs->value_str = iter->topk_iter->result_key[iter->topk_iter->curr_idx];
 }
@@ -385,11 +396,37 @@ void cell_iter_shallow_copy_tag_list(struct cell_iter *iter, struct fieldstat_ta
     }
 }
 
+Export_kv_pair *cell_topk_query_with_iter_at_index(struct topk_iter *iter, size_t field_id)
+{
+    Export_kv_pair *ret = malloc(sizeof(Export_kv_pair));
+
+    ret->key = strdup(iter->metric_names[field_id]);
+    ret->type = TAG_INTEGER;
+    ret->value_int = iter->metric_values[iter->curr_idx][field_id];
+
+    return ret;
+}
+
+void cell_iter_add_field_to_field_object(const struct cell_iter *iter, cJSON *obj)
+{
+    if (cell_iter_get_type(iter) == FIELD_TYPE_TOPK) {
+        for (int i = 0; i < iter->topk_iter->n_metric; i++) {
+            Export_kv_pair *field = cell_topk_query_with_iter_at_index(iter->topk_iter, i);
+            kv_pair_add_to_cjson(field, obj);
+            kv_pair_free(field);
+        }
+        return;
+    }
+
+    Export_kv_pair *field = cell_query_with_iter(iter);
+    kv_pair_add_to_cjson(field, obj);
+    kv_pair_free(field);
+}
+
 void cjson_map_add_new_pair_for_one_loop(struct cjson_map **map_head_in, struct cell_iter *iter)
 {
     struct cjson_map *map_head = *map_head_in;
     printf("cjson_map_add_new_pair_for_one_loop enter\n");
-
     struct fieldstat_tag_list tag_list;
 
     cell_iter_shallow_copy_tag_list(iter, &tag_list); // copy the tag because we need to sort it
@@ -417,9 +454,7 @@ void cjson_map_add_new_pair_for_one_loop(struct cjson_map **map_head_in, struct 
         free(key);
     }
 
-    Export_kv_pair *field = cell_query_with_iter(iter);
-    kv_pair_add_to_cjson(field, map->cjson_fields);
-    kv_pair_free(field);
+    cell_iter_add_field_to_field_object(iter, map->cjson_fields);
 
     *map_head_in = map_head;
     printf("cjson_map_add_new_pair_for_one_loop end\n");

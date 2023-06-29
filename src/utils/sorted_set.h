@@ -21,14 +21,20 @@ struct sorted_set *sorted_set_new(int set_size);
 */
 void sorted_set_free(struct sorted_set *ss);
 
+/*
+    * @brief Define the method to free the user data. If the user data is not NULL, the free_method will be called when the entry is popped out.
+*/
+void sorted_set_hook_function_of_free_user_data(struct sorted_set *ss, void (*free_method)(void *));
+
 /** 
  * @brief insert a new entry into the sorted set. The minimum entry will be popped if the list is full.
  * @param ss the sorted set
  * @param member the key of the entry, a string of flow id.
  * @param member_size the length of the key, not including the '\0' terminator.
  * @param cnt The initial score for the member inserted.
+ * @return 0 if the entry is not inserted because the sorted set is full and the score of the entry is less than the minimum score in the sorted set. Otherwise, return 1.
 */
-void sorted_set_insert(struct sorted_set *ss, const char *member, size_t member_size, unsigned cnt);
+int sorted_set_insert(struct sorted_set *ss, const char *member, size_t member_size, unsigned cnt);
 
 /**
  * @brief pop out the minumum-score entry from the sorted set.
@@ -37,6 +43,22 @@ void sorted_set_insert(struct sorted_set *ss, const char *member, size_t member_
 */
 unsigned sorted_set_pop(struct sorted_set *ss);
 
+/**
+    * @brief record the user data to the sorted set. The user data will be freed when the entry is popped out, if the free_method is defined by sorted_set_hook_function_of_free_user_data().
+    * @param member the key of the entry, a string of flow id.
+    * @param member_size the length of the key, not including the '\0' terminator.
+    * @param user_data the pointer to the user data.
+    * @return 0 if success, -1 if the member is not in the sorted set.
+*/
+int sorted_set_insert_user_data(struct sorted_set *ss, const char *member, size_t member_size, void *user_data);
+
+/*
+    * @brief get the pointer to the user data of the given member. So that the user can modify the user data.
+    * @param member the key of the entry, a string of flow id.
+    * @param member_size the length of the key, not including the '\0' terminator.
+    * @return the pointer to the user data. return NULL if the member is not in the sorted set.
+*/
+void **sorted_set_get_pointer_to_user_data(struct sorted_set *ss, const char *member, size_t member_size);
 /**
  * @brief Increase the score of the given member.
  * @param ss the sorted set
@@ -73,8 +95,9 @@ unsigned sorted_set_get_member_score(const struct sorted_set *ss, const char *me
  * @param scores_out the scores of the entries. User should alloc it and make sure the buffer is long enough.
  * @param members_out the member name strings of the entries. User should alloc it and make sure the buffer is long enough. Its content is the pointer to the member name string in the sorted set. Don't free the content.
  * @param members_len_out the length of the member name strings. User should alloc it and make sure the buffer is long enough. Including the '\0' terminator.
+ * @param user_data_out the user data of the entries. User should alloc it and make sure the buffer is long enough. Its content is the pointer to the user data in the sorted set. Don't free the content.
 */
-void sorted_set_dump(const struct sorted_set *ss, unsigned *scores_out, char **members_out, size_t *members_len_out);
+void sorted_set_dump(const struct sorted_set *ss, unsigned *scores_out, char **members_out, size_t *members_len_out, void **user_data_out);
 
 /*
     * @brief Get the total memory usage of the sorted set.

@@ -266,7 +266,8 @@ static int metric_topk_copy(struct metrics *pthis, const struct metrics *from)
     if (topk->hk) {
         heavy_keeper_free(topk->hk);
     }
-    topk->hk = heavy_keeper_new(topk->hk->K, NULL);
+
+    topk->hk = heavy_keeper_new(heavy_keeper_get_config_K(from_topk->hk), NULL);
 
     return heavy_keeper_merge(topk->hk, from_topk->hk);
 }
@@ -324,26 +325,52 @@ struct cell *cell_create_for_topk(int K)
     return cell;
 }
 
-void cell_topk_add(struct cell *pthis, const char *key, size_t key_len, unsigned value)
+void cell_topk_add(struct cell *pthis, const char *key, size_t key_len, unsigned int value[])
 {
     struct metric_topk *topk = (struct metric_topk *)pthis->metric;
-    heavy_keeper_add(topk->hk, key, key_len, value);
+    heavy_keeper_with_metrics_add(topk->hk, key, key_len, value);
 }
 
-// (*values_out)[i] is the value of cstring (*keys_out)[i]
-typedef char * cstring;
-void cell_topk_query(const struct cell *pthis, cstring **keys_out, unsigned int **values_out, size_t *num_out)
+
+// (*values_out)[i] is the value of cstring_t (*keys_out)[i]
+// sub_metric_value_out: pointer to a 2-d array. sub_metric_value_out[i][j] is the value of (keys_out[i], sub_metric_name[j]), where i < num_out, j < num_metric_out
+
+typedef char * cstring_t;
+void cell_topk_query(const struct cell *pthis,
+    cstring_t **keys_out, size_t *num_out, // row
+    cstring_t **sub_metric_name_out, size_t *num_metric_out, size_t *primary_metric_id_out, // column
+    unsigned int ***sub_metric_value_out)
 {
     struct metric_topk *topk = (struct metric_topk *)pthis->metric;
-
     struct heavy_keeper_result *result = heavy_keeper_query(topk->hk);
+
+    // row
     *num_out = result->n_key;
-    *keys_out = (cstring *)malloc(sizeof(cstring) * result->n_key);
-    *values_out = (unsigned int *)malloc(sizeof(unsigned int) * result->n_key);
+    *keys_out = (cstring_t *)malloc(sizeof(cstring_t) * result->n_key);
     for (int i = 0; i < result->n_key; i++) {
-        (*keys_out)[i] = (cstring)strdup(result->key[i]);
-        (*values_out)[i] = result->count[i];
+        char *key_to_write = (char *)malloc(sizeof(char) * (result->key_len[i] + 1));
+        memcpy(key_to_write, result->key[i], result->key_len[i]);
+        key_to_write[result->key_len[i]] = '\0';
+        (*keys_out)[i] = key_to_write;
     }
+
+    // column
+    *sub_metric_name_out = (cstring_t *)malloc(sizeof(cstring_t) * result->n_metric);
+    for (int j = 0; j < result->n_metric; j++) {
+        (*sub_metric_name_out)[j] = strdup(result->metric_name[j]);
+    }
+    *num_metric_out = result->n_metric;
+    *primary_metric_id_out = result->primary_metric_id;
+
+    // value
+    *sub_metric_value_out = (unsigned int **)malloc(sizeof(unsigned int *) * result->n_key);
+    for (int i = 0; i < result->n_key; i++) {
+        (*sub_metric_value_out)[i] = (unsigned int *)malloc(sizeof(unsigned int) * result->n_metric);
+        for (int j = 0; j < result->n_metric; j++) {
+            (*sub_metric_value_out)[i][j] = result->metric_value_arr[i][j];
+        }
+    }
+    
     heavy_keeper_result_free(result);
 }
 
@@ -824,11 +851,6 @@ void cell_refresh(struct cell *pthis)
 int cell_merge(struct cell *pthis, const struct cell *from)
 {
     return pthis->metric->merge(pthis->metric, from->metric);
-}
-
-int cell_copy(struct cell *pthis, const struct cell *from)
-{
-    return pthis->metric->copy(pthis->metric, from->metric);
 }
 
 struct cell *cell_duplicate(const struct cell *pthis)

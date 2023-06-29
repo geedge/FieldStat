@@ -13,11 +13,16 @@
 struct entry_data {
     char *str;
     size_t len;
+
+    void *user_data;
 };
 
+typedef void (*free_method)(void *);
 struct sorted_set {
     heap *heap;
     struct hash_node *hash_tbl;
+
+    free_method free_user_data_func;
 };
 
 struct hash_node {
@@ -28,22 +33,26 @@ struct hash_node {
 
 struct entry_data *entry_data_construct(const char *member, size_t len)
 {
-    struct entry_data *id = (struct entry_data *)malloc(sizeof(struct entry_data));
+    struct entry_data *entry_data = (struct entry_data *)malloc(sizeof(struct entry_data));
 
-    id->str = (char *)malloc(len + 1);
-    memcpy(id->str, member, len);
-    id->str[len] = '\0';
-    id->len = len + 1;
-    return id;
+    entry_data->str = (char *)malloc(len + 1);
+    memcpy(entry_data->str, member, len);
+    entry_data->str[len] = '\0';
+    entry_data->len = len + 1;
+    entry_data->user_data = NULL;
+    return entry_data;
 }
 
-void entry_data_destroy(struct entry_data *id)
+void entry_data_destroy(struct entry_data *entry_data, void (*free_method)(void *))
 {
-    if (id == NULL) {
+    if (entry_data == NULL) {
         return;
     }
-    free(id->str);
-    free(id);
+    free(entry_data->str);
+    if (entry_data->user_data != NULL && free_method != NULL) {
+        free_method(entry_data->user_data);
+    }
+    free(entry_data);
 }
 
 unsigned sorted_set_entry_get_key(heap_entry *entry)
@@ -82,6 +91,7 @@ struct sorted_set *sorted_set_new(int set_size)
     init_heap(h, set_size, cmp_int, my_entry_get_index, my_entry_set_index);
 
     ret->heap = h;
+    ret->free_user_data_func = NULL;
     return ret;
 }
 
@@ -98,7 +108,7 @@ void sorted_set_free(struct sorted_set *ss)
     heap_entry *node;
     for (int i = 0; i < heap->cur_size; i++) {
         node = (heap_entry *)heap->nodes[i];
-        entry_data_destroy(node->value);
+        entry_data_destroy(node->value, ss->free_user_data_func);
         free(node->key);
         free(node);
     }
@@ -140,7 +150,7 @@ unsigned sorted_set_pop(struct sorted_set *ss)
     free(s);
     ss->hash_tbl = hash_tbl;
 
-    entry_data_destroy(tmp_data);
+    entry_data_destroy(tmp_data, ss->free_user_data_func);
     free(entry->key);
     free(entry);
 
@@ -152,11 +162,11 @@ bool sorted_set_check_is_full(const struct sorted_set *ss)
     return ss->heap->cur_size >= ss->heap->max_size;
 }
 
-void sorted_set_insert(struct sorted_set *ss, const char *member, size_t member_size, unsigned cnt)
+int sorted_set_insert(struct sorted_set *ss, const char *member, size_t member_size, unsigned cnt)
 {
     if (sorted_set_check_is_full(ss)) {
         if (cnt <= sorted_set_get_min_score(ss)) {
-            return;
+            return 0;
         }
         sorted_set_pop(ss);
     }
@@ -175,6 +185,7 @@ void sorted_set_insert(struct sorted_set *ss, const char *member, size_t member_
     s->val = (node == NULL) ? NULL : node;
     HASH_ADD_KEYPTR(hh, hash_tbl, s->member, member_size, s);
     ss->hash_tbl = hash_tbl;
+    return 1;
 }
 
 unsigned sorted_set_get_min_score(const struct sorted_set *ss)
@@ -224,10 +235,27 @@ void sorted_set_incrby(struct sorted_set *ss, const char *member, size_t member_
     sorted_set_entry_set_key(ss, entry, sorted_set_entry_get_key(entry) + score);
 }
 
+void sorted_set_hook_function_of_free_user_data(struct sorted_set *ss, void (*free_method)(void *))
+{
+    ss->free_user_data_func = free_method;
+}
+
+void **sorted_set_get_pointer_to_user_data(struct sorted_set *ss, const char *member, size_t member_size)
+{
+    heap_entry *entry = sorted_set_find_entry_with_member(ss, member, member_size);
+    if (entry == NULL) {
+        return NULL;
+    }
+    struct entry_data *heap_data = sorted_set_entry_get_val(entry);
+
+    return &(heap_data->user_data);
+}
+
 typedef struct {
     unsigned key;
     struct entry_data *val;
 } tmp_heap_node;
+
 int cmp_tmp_heap_node(const void *a, const void *b)
 {
     tmp_heap_node *aa = (tmp_heap_node *)a;
@@ -242,7 +270,7 @@ int cmp_tmp_heap_node(const void *a, const void *b)
     }
 }
 
-void sorted_set_dump(const struct sorted_set *ss, unsigned *scores_out, char **members_out, size_t *members_len_out)
+void sorted_set_dump(const struct sorted_set *ss, unsigned *scores_out, char **members_out, size_t *members_len_out, void **user_data_out)
 {
     struct minheap *h = ss->heap;
     tmp_heap_node *tmp_nodes = (tmp_heap_node *)malloc(sizeof(tmp_heap_node) * h->cur_size);
@@ -256,6 +284,7 @@ void sorted_set_dump(const struct sorted_set *ss, unsigned *scores_out, char **m
         scores_out[i] = tmp_nodes[i].key;
         members_out[i] = tmp_nodes[i].val->str;
         members_len_out[i] = tmp_nodes[i].val->len;
+        user_data_out[i] = tmp_nodes[i].val->user_data;
     }
     free(tmp_nodes);
 }

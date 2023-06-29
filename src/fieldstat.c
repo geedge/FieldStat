@@ -105,7 +105,8 @@ static int append_field_to_instance(struct fieldstat *instance, struct fs_field 
 /* -------------------------------------------------------------------------- */
 /*                               field register                              */
 /* -------------------------------------------------------------------------- */
-int fieldstat_register_topk(struct fieldstat *instance, const char *field_name, int K)
+int fieldstat_register_topk(struct fieldstat *instance, const char *field_name, int K,
+    const char *metric_name[], size_t n_metric, int primary_metric)
 {
     struct fs_field *field = field_new_topk(field_name, K);
 
@@ -154,7 +155,7 @@ int fieldstat_register_hll(struct fieldstat *instance, const char *field_name, u
 /* -------------------------------------------------------------------------- */
 /*                               field operation                              */
 /* -------------------------------------------------------------------------- */
-int fieldstat_topk_add(struct fieldstat *instance, int field_id, const char *key, size_t key_len, unsigned int count, const struct fieldstat_tag tags[], size_t n_tag)
+int fieldstat_topk_add(struct fieldstat *instance, int field_id, const char *key, size_t key_len, unsigned int count[], const struct fieldstat_tag tags[], size_t n_tag)
 {
     struct fs_field *field = (struct fs_field *)instance->field_array[field_id];
     if (field == NULL || field_get_type(field) != FIELD_TYPE_TOPK) {
@@ -163,6 +164,8 @@ int fieldstat_topk_add(struct fieldstat *instance, int field_id, const char *key
     }
     struct cell *cell = field_find_or_create_cell(field, tags, n_tag);
     cell_topk_add(cell, key, key_len, count);
+
+    // TODO count multiple
     return 0;
 }
 
@@ -325,7 +328,10 @@ enum field_type fieldstat_get_field_type(const struct fieldstat *instance, int f
     return field_get_type(instance->field_array[field_id]);
 }
 
-void fieldstat_topk_query(const struct fieldstat *instance, int id, const struct fieldstat_tag_list *tag_list, char ***keys_out, unsigned int **count_out, size_t *n_key_out)
+void fieldstat_topk_query(const struct fieldstat *instance, int id, const struct fieldstat_tag_list *tag_list,
+    char ***keys_out, size_t *n_key_out,
+    char ***metric_name_out, size_t *n_metric_out, size_t *primary_metric_id_out,
+    unsigned int ***metric_value_out)
 {
     struct fs_field *field = instance->field_array[id];
     if (field == NULL || field_get_type(field) != FIELD_TYPE_TOPK) {
@@ -336,12 +342,16 @@ void fieldstat_topk_query(const struct fieldstat *instance, int id, const struct
     if (cell == NULL) {
         *n_key_out = 0;
         *keys_out = NULL;
-        *count_out = NULL;
+        *n_metric_out = 0;
+        *metric_name_out = NULL;
+        *metric_value_out = NULL;
 
         return;
     }
 
-    cell_topk_query(cell, keys_out, count_out, n_key_out);
+    cell_topk_query(cell, keys_out, n_key_out,
+        metric_name_out, n_metric_out, primary_metric_id_out,
+        metric_value_out);
 }
 
 void tag_list_clear(struct fieldstat_tag_list *tag_list)

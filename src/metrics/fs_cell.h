@@ -16,8 +16,11 @@ int cell_merge(struct cell *pthis, const struct cell *from);
 void cell_get_plain_blob(const struct cell *pthis, char **blob, size_t *blob_size);
 
 struct cell *cell_create_for_topk(int K);
-void cell_topk_add(struct cell *pthis, const char *key, size_t key_len, unsigned value);
-void cell_topk_query(const struct cell *pthis, char ***keys_out, unsigned int **values_out, size_t *num_out);
+void cell_topk_add(struct cell *pthis, const char *key, size_t key_len, unsigned value[]);
+void cell_topk_query(const struct cell *pthis,
+    char ***keys_out, size_t *num_out, // row
+    char ***sub_metric_name_out, size_t *num_metric_out, size_t *primary_metric_id_out, // column
+    unsigned int ***sub_metric_value_out);
 
 struct cell *cell_create_for_counter();
 void cell_counter_incrby(struct cell *pthis, long long value);

@@ -54,10 +54,9 @@ int fieldstat_register_histogram(struct fieldstat *instance, const char *field_n
 // @return 0 if success, -1 if failed.
 int fieldstat_counter_incrby(struct fieldstat *instance, int field_id, long long increment, const struct fieldstat_tag tags[], size_t n_tag);
 int fieldstat_topk_add(struct fieldstat *instance, int field_id, 
-const char *key, size_t key_len, unsigned int count[], 
-const struct fieldstat_tag tags[], size_t n_tag);
+    const char *key, size_t key_len, unsigned int count[], 
+    const struct fieldstat_tag tags[], size_t n_tag);
 
-// TODO: cardi->hll
 int fieldstat_hll_add(struct fieldstat *instance, int field_id, const char *key, size_t key_len, const struct fieldstat_tag tags[], size_t n_tag);
 int fieldstat_histogram_record(struct fieldstat *instance, int field_id, long long value, const struct fieldstat_tag tags[], size_t n_tag);
 struct fieldstat *fieldstat_deserialize(const char *blob, size_t blob_size);
@@ -71,7 +70,10 @@ long long fieldstat_histogram_value_at_percentile(struct fieldstat *instance, in
 long long fieldstat_counter_get(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list);
 double fieldstat_hll_get(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list);
 void fieldstat_get_tag_lists(const struct fieldstat *instance, int field_id, struct fieldstat_tag_list **lists, size_t *n_list);
-void fieldstat_topk_query(const struct fieldstat *instance, int id, const struct fieldstat_tag_list *tag_list , char ***keys_out, unsigned int **count_out, size_t *n_key_out);
+void fieldstat_topk_query(const struct fieldstat *instance, int id, const struct fieldstat_tag_list *tag_list, // infos
+    char ***keys_out, size_t *n_key_out, // row info
+    char ***metric_name_out, size_t *n_metric_out, size_t *primary_metric_id_out, // column info
+    unsigned int ***metric_value_out); // values
 void fieldstat_get_serialized_blob(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list, char **blob, size_t *blob_size);
 
 void tag_list_clear(struct fieldstat_tag_list *tag_list);

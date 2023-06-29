@@ -25,7 +25,6 @@ std::string g_hll_standard_oper[OPER_NUM];
 long long g_histogram_standard_oper[OPER_NUM];
 struct ST_hyperloglog *g_hll_standard;
 struct hdr_histogram *g_histogram_standard;
-struct heavy_keeper *g_topk_standard;
 #define TEST_TOPK_STANDARD_K 3
 #define TEST_TOPK_EXPECTED_BIG_COUNT 1000
 
