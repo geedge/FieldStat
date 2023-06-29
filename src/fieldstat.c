@@ -12,8 +12,6 @@
 
 #include "uthash.h"
 
-// TODO: name 等输出相关量的序列化放到exporter里
-
 // ut hash list with field name as key
 struct field_name_id_map {
     char *field_name;
@@ -140,7 +138,7 @@ int fieldstat_register_histogram(struct fieldstat *instance, const char *field_n
     return append_field_to_instance(instance, field);
 }
 
-int fieldstat_register_cardinality(struct fieldstat *instance, const char *field_name, unsigned char precision)
+int fieldstat_register_hll(struct fieldstat *instance, const char *field_name, unsigned char precision)
 {
     // Ensure the precision is somewhat sane
     if (precision < 4 || precision > 18) {
@@ -148,7 +146,7 @@ int fieldstat_register_cardinality(struct fieldstat *instance, const char *field
         return -1;
     }
 
-    struct fs_field *field = field_new_cardinality(field_name, precision);
+    struct fs_field *field = field_new_hll(field_name, precision);
 
     return append_field_to_instance(instance, field);
 }
@@ -191,15 +189,15 @@ int fieldstat_histogram_record(struct fieldstat *instance, int field_id, long lo
     return cell_histogram_record(cell, value);
 }
 
-int fieldstat_cardinality_add(struct fieldstat *instance, int field_id, const char *key, size_t key_len, const struct fieldstat_tag tags[], size_t n_tag)
+int fieldstat_hll_add(struct fieldstat *instance, int field_id, const char *key, size_t key_len, const struct fieldstat_tag tags[], size_t n_tag)
 {
     struct fs_field *field = (struct fs_field *)instance->field_array[field_id];
-    if (field == NULL || field_get_type(field) != FIELD_TYPE_CARDINALITY) {
+    if (field == NULL || field_get_type(field) != FIELD_TYPE_hll) {
         printf("ERR: field is not registered yet\n");
         return -1;
     }
     struct cell *cell = field_find_or_create_cell(field, tags, n_tag);
-    return cell_cardinality_add(cell, key, key_len);
+    return cell_hll_add(cell, key, key_len);
 }
 /* -------------------------------------------------------------------------- */
 /*                                serialization                               */
@@ -405,10 +403,10 @@ long long fieldstat_histogram_value_at_percentile(struct fieldstat *instance, in
 //  avg=fieldstat_histogram_average(instance, field_id[i], tag_lists[j]); 
 // TODO: histogram 两种query
 
-double fieldstat_cardinality_get(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list)
+double fieldstat_hll_get(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list)
 {
     struct fs_field *field = instance->field_array[field_id];
-    if (field == NULL || field_get_type(field) != FIELD_TYPE_CARDINALITY) {
+    if (field == NULL || field_get_type(field) != FIELD_TYPE_hll) {
         printf("ERR: field is not registered yet\n");
         return -1;
     }
@@ -417,7 +415,7 @@ double fieldstat_cardinality_get(const struct fieldstat *instance, int field_id,
         return 0;
     }
 
-    return cell_cardinality_get(cell);
+    return cell_hll_get(cell);
 }
 
 void fieldstat_get_serialized_blob(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list, char **blob, size_t *blob_size)
@@ -428,8 +426,8 @@ void fieldstat_get_serialized_blob(const struct fieldstat *instance, int field_i
         return;
     }
     enum field_type type = field_get_type(field);
-    if (!(type == FIELD_TYPE_CARDINALITY || type == FIELD_TYPE_HISTOGRAM)) {
-        printf("ERR: Only metric of cardinality and histogram support get serialized blob\n");
+    if (!(type == FIELD_TYPE_hll || type == FIELD_TYPE_HISTOGRAM)) {
+        printf("ERR: Only metric of hll and histogram support get serialized blob\n");
         return;
     }
 

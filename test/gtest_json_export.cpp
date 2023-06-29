@@ -21,9 +21,9 @@
 #include "heavy_keeper.h"
 
 const size_t OPER_NUM = 10000;
-std::string g_cardinality_standard_oper[OPER_NUM];
+std::string g_hll_standard_oper[OPER_NUM];
 long long g_histogram_standard_oper[OPER_NUM];
-struct ST_hyperloglog *g_cardinality_standard;
+struct ST_hyperloglog *g_hll_standard;
 struct hdr_histogram *g_histogram_standard;
 struct heavy_keeper *g_topk_standard;
 #define TEST_TOPK_STANDARD_K 3
@@ -61,14 +61,14 @@ struct heavy_keeper *g_topk_standard;
 //                                                        (((uint32_t)(A) & 0x00ff0000) >> 8) | \
 //                                                        (((uint32_t)(A) & 0x0000ff00) << 8) | \
 //                                                        (((uint32_t)(A) & 0x000000ff) << 24))
-// TEST(export_test, network_blob_test_for_cardinality)
+// TEST(export_test, network_blob_test_for_hll)
 // {
 //     struct fieldstat *instance = fieldstat_new();
 
-//     int id = fieldstat_register_cardinality(instance, "test_cardinality", g_cardinality_standard->cfg.precision);
+//     int id = fieldstat_register_hll(instance, "test_hll", g_hll_standard->cfg.precision);
 
 //     for (size_t i = 0; i < OPER_NUM; i++) {
-//         fieldstat_cardinality_add(instance, id, g_cardinality_standard_oper[i].c_str(), g_cardinality_standard_oper[i].length(), &TEST_TAG_INT, 1);
+//         fieldstat_hll_add(instance, id, g_hll_standard_oper[i].c_str(), g_hll_standard_oper[i].length(), &TEST_TAG_INT, 1);
 //     }
 //     struct fieldstat_tag_list tag_list = {.tag = (struct fieldstat_tag *)&TEST_TAG_INT, .n_tag = 1};
 //     char *blob = NULL;
@@ -83,7 +83,7 @@ struct heavy_keeper *g_topk_standard;
 //     EXPECT_EQ(version, 1);
 //     unsigned char precision;
 //     memcpy(&precision, dec + sizeof(unsigned char), sizeof(unsigned char));
-//     EXPECT_EQ(precision, g_cardinality_standard->cfg.precision);
+//     EXPECT_EQ(precision, g_hll_standard->cfg.precision);
 
 //     int num_reg = NUM_REG(precision);
 //     // Get the full words required
@@ -94,7 +94,7 @@ struct heavy_keeper *g_topk_standard;
 //     memcpy(recovered_reg, dec + 2, reg_size);
 //     for (int i = 0; i < words; i++) {
 //         uint32_t tmp = BigLittleSwap32(recovered_reg[i]);
-//         EXPECT_EQ(tmp, g_cardinality_standard->registers[i]);
+//         EXPECT_EQ(tmp, g_hll_standard->registers[i]);
 //     }
 
 //     free(dec);
@@ -139,7 +139,7 @@ void test_check_if_metric_gauge_correct(cJSON *metric_obj, const char *name)
 {
     char *blob_gauge_benchmark = NULL;
     size_t size_dummy = 0;
-    ST_hyperloglog_serialize_for_networking(g_cardinality_standard, &blob_gauge_benchmark, &size_dummy);
+    ST_hyperloglog_serialize_for_networking(g_hll_standard, &blob_gauge_benchmark, &size_dummy);
 
     cJSON *gauge_obj = cJSON_GetObjectItem(metric_obj, name);
     EXPECT_NE(gauge_obj, nullptr);
@@ -228,7 +228,7 @@ TEST(export_test, cjson_export_with_fixed_tag_and_many_metrics)
     struct fieldstat *instance = fieldstat_new();
     // register 4 metrics
     int id_counter = fieldstat_register_counter(instance, "counter");
-    int id_gauge = fieldstat_register_cardinality(instance, "gauge", g_cardinality_standard->cfg.precision);
+    int id_gauge = fieldstat_register_hll(instance, "gauge", g_hll_standard->cfg.precision);
     int id_histogram = fieldstat_register_histogram(instance, "histogram",
         g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
 
@@ -241,7 +241,7 @@ TEST(export_test, cjson_export_with_fixed_tag_and_many_metrics)
         size_t tag_count = tags[j]->get_tag_count();
         fieldstat_counter_incrby(instance, id_counter, 1, tag_tmp, tag_count);
         for (size_t i = 0; i < OPER_NUM; i++){
-            fieldstat_cardinality_add(instance, id_gauge, g_cardinality_standard_oper[i].c_str(), g_cardinality_standard_oper[i].length(), tag_tmp, tag_count);
+            fieldstat_hll_add(instance, id_gauge, g_hll_standard_oper[i].c_str(), g_hll_standard_oper[i].length(), tag_tmp, tag_count);
             fieldstat_histogram_record(instance, id_histogram, g_histogram_standard_oper[i], tag_tmp, tag_count);
         }
     }
@@ -322,7 +322,7 @@ TEST(export_test, only_registered_but_not_added_export_null)
     struct fieldstat *instance = fieldstat_new();
     (void)fieldstat_register_topk(instance, "topk", TEST_TOPK_STANDARD_K);
     (void)fieldstat_register_counter(instance, "counter");
-    (void)fieldstat_register_cardinality(instance, "gauge", g_cardinality_standard->cfg.precision);
+    (void)fieldstat_register_hll(instance, "gauge", g_hll_standard->cfg.precision);
     (void)fieldstat_register_histogram(instance, "histogram",
         g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
 
@@ -337,7 +337,7 @@ TEST(export_test, only_registered_but_not_added_export_null)
 TEST(export_test, skip_three_empty_field_and_export_last_two)
 {
     struct fieldstat *instance = fieldstat_new();
-    (void)fieldstat_register_cardinality(instance, "gauge", g_cardinality_standard->cfg.precision);
+    (void)fieldstat_register_hll(instance, "gauge", g_hll_standard->cfg.precision);
     (void)fieldstat_register_counter(instance, "counter");
     int id_topk = fieldstat_register_topk(instance, "topk", TEST_TOPK_STANDARD_K);
     int id_histogram = fieldstat_register_histogram(instance, "histogram",
@@ -381,13 +381,13 @@ TEST(export_test, skip_three_empty_field_and_export_last_two)
     cJSON_Delete(root_arr);
 }
 
-void init_cardinality_standard_oper()
+void init_hll_standard_oper()
 {
-    g_cardinality_standard = ST_hyperloglog_new(12);
+    g_hll_standard = ST_hyperloglog_new(12);
     for (size_t i = 0; i < OPER_NUM; i++) {
         std::string added_tmp = std::to_string(i);
-        g_cardinality_standard_oper[i] = added_tmp;
-        ST_hyperloglog_add(g_cardinality_standard, added_tmp.c_str(), added_tmp.size());
+        g_hll_standard_oper[i] = added_tmp;
+        ST_hyperloglog_add(g_hll_standard, added_tmp.c_str(), added_tmp.size());
     }
 }
 
@@ -402,12 +402,12 @@ void init_histogram_standard_oper()
 
 int main(int argc, char *argv[]) 
 {
-    init_cardinality_standard_oper();
+    init_hll_standard_oper();
     init_histogram_standard_oper();
 	testing::InitGoogleTest(&argc, argv);
 	int ret = RUN_ALL_TESTS();
 
-    ST_hyperloglog_free(g_cardinality_standard);
+    ST_hyperloglog_free(g_hll_standard);
     hdr_close(g_histogram_standard);
     return ret;
 }

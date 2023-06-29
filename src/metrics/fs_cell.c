@@ -42,7 +42,7 @@ struct metric_counter {
     long long value;
 };
 
-struct metric_cardinality {
+struct metric_hll {
     struct metrics base;
     struct ST_hyperloglog *hll;
 };
@@ -458,93 +458,93 @@ struct cell *cell_create_for_counter()
 }
 
 /* -------------------------------------------------------------------------- */
-/*                                 metric-cardinality                         */
+/*                                 metric-hll                         */
 /* -------------------------------------------------------------------------- */
 
-static int metric_cardinality_copy(struct metrics *pthis, const struct metrics *from)
+static int metric_hll_copy(struct metrics *pthis, const struct metrics *from)
 {
-    struct metric_cardinality *cardinality = (struct metric_cardinality *)pthis;
-    struct metric_cardinality *cardinality_from = (struct metric_cardinality *)from;
-    cardinality->hll = ST_hyperloglog_new(cardinality_from->hll->cfg.precision);
-    return ST_hyperloglog_merge(cardinality->hll, cardinality_from->hll);
+    struct metric_hll *hll = (struct metric_hll *)pthis;
+    struct metric_hll *hll_from = (struct metric_hll *)from;
+    hll->hll = ST_hyperloglog_new(hll_from->hll->cfg.precision);
+    return ST_hyperloglog_merge(hll->hll, hll_from->hll);
 }
 
-int metric_cardinality_deserialize(struct metrics *pthis, const char *blob, size_t blob_size) 
+int metric_hll_deserialize(struct metrics *pthis, const char *blob, size_t blob_size) 
 {
-    struct metric_cardinality *cardinality = (struct metric_cardinality *)pthis;
-    cardinality->hll = ST_hyperloglog_deserialize(blob, blob_size);
+    struct metric_hll *hll = (struct metric_hll *)pthis;
+    hll->hll = ST_hyperloglog_deserialize(blob, blob_size);
 
     return 0;
 }
 
-static void metric_cardinality_refresh(struct metrics *pthis)
+static void metric_hll_refresh(struct metrics *pthis)
 {
-    struct metric_cardinality *cardinality = (struct metric_cardinality *)pthis;
-    ST_hyperloglog_reset(cardinality->hll);
+    struct metric_hll *hll = (struct metric_hll *)pthis;
+    ST_hyperloglog_reset(hll->hll);
 }
 
-static void metric_cardinality_free(struct metrics *pthis)
+static void metric_hll_free(struct metrics *pthis)
 {
-    struct metric_cardinality *cardinality = (struct metric_cardinality *)pthis;
-    ST_hyperloglog_free(cardinality->hll);
-    free(cardinality);
+    struct metric_hll *hll = (struct metric_hll *)pthis;
+    ST_hyperloglog_free(hll->hll);
+    free(hll);
 }
 
-static void metric_cardinality_serialize(const struct metrics *pthis, char **blob, size_t *blob_size)
+static void metric_hll_serialize(const struct metrics *pthis, char **blob, size_t *blob_size)
 {
-    struct metric_cardinality *cardinality = (struct metric_cardinality *)pthis;
-    ST_hyperloglog_serialize(cardinality->hll, blob, blob_size);
+    struct metric_hll *hll = (struct metric_hll *)pthis;
+    ST_hyperloglog_serialize(hll->hll, blob, blob_size);
 }
 
-static int metric_cardinality_merge(struct metrics *pthis, const struct metrics *from)
+static int metric_hll_merge(struct metrics *pthis, const struct metrics *from)
 {
-    struct metric_cardinality *cardinality = (struct metric_cardinality *)pthis;
-    struct metric_cardinality *from_cardinality = (struct metric_cardinality *)from;
-    return ST_hyperloglog_merge(cardinality->hll, from_cardinality->hll);
+    struct metric_hll *hll = (struct metric_hll *)pthis;
+    struct metric_hll *from_hll = (struct metric_hll *)from;
+    return ST_hyperloglog_merge(hll->hll, from_hll->hll);
 }
 
-static struct metric_cardinality *metric_cardinality_new_scheme()
+static struct metric_hll *metric_hll_new_scheme()
 {
-    struct metric_cardinality *cardinality = malloc(sizeof(struct metric_cardinality));
-    struct metrics *base = &cardinality->base;
-    base->del = metric_cardinality_free;
-    base->refresh = metric_cardinality_refresh;
-    base->merge = metric_cardinality_merge;
-    base->copy = metric_cardinality_copy;
-    base->serialize = metric_cardinality_serialize;
-    base->deserialize = metric_cardinality_deserialize;
-    base->type = FIELD_TYPE_CARDINALITY;
+    struct metric_hll *hll = malloc(sizeof(struct metric_hll));
+    struct metrics *base = &hll->base;
+    base->del = metric_hll_free;
+    base->refresh = metric_hll_refresh;
+    base->merge = metric_hll_merge;
+    base->copy = metric_hll_copy;
+    base->serialize = metric_hll_serialize;
+    base->deserialize = metric_hll_deserialize;
+    base->type = FIELD_TYPE_hll;
 
-    return cardinality;
+    return hll;
 }
 
 /* -------------------------------------------------------------------------- */
-/*                              cell-cardinality                              */
+/*                              cell-hll                              */
 /* -------------------------------------------------------------------------- */
 
-struct cell *cell_create_for_cardinality(const char precision)
+struct cell *cell_create_for_hll(const char precision)
 {
     struct cell *cell = (struct cell *)malloc(sizeof(struct cell));
     memset(cell, 0, sizeof(struct cell));
 
-    struct metric_cardinality *cardinality = metric_cardinality_new_scheme();
-    cardinality->hll = ST_hyperloglog_new(precision);
+    struct metric_hll *hll = metric_hll_new_scheme();
+    hll->hll = ST_hyperloglog_new(precision);
 
-    cell->metric = (struct metrics *)cardinality;
+    cell->metric = (struct metrics *)hll;
 
     return cell;
 }
 
-int cell_cardinality_add(struct cell *pthis, const char *key, size_t key_len)
+int cell_hll_add(struct cell *pthis, const char *key, size_t key_len)
 {
-    struct metric_cardinality *cardinality = (struct metric_cardinality *)pthis->metric;
-    return ST_hyperloglog_add(cardinality->hll, key, key_len);
+    struct metric_hll *hll = (struct metric_hll *)pthis->metric;
+    return ST_hyperloglog_add(hll->hll, key, key_len);
 }
 
-double cell_cardinality_get(const struct cell *pthis)
+double cell_hll_get(const struct cell *pthis)
 {
-    struct metric_cardinality *cardinality = (struct metric_cardinality *)pthis->metric;
-    return ST_hyperloglog_count(cardinality->hll);
+    struct metric_hll *hll = (struct metric_hll *)pthis->metric;
+    return ST_hyperloglog_count(hll->hll);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -677,8 +677,8 @@ static struct metrics *metric_scheme_new(enum field_type type)
             return (struct metrics *)metric_histogram_new_scheme();
         case FIELD_TYPE_COUNTER:
             return (struct metrics *)metric_counter_new_scheme();
-        case FIELD_TYPE_CARDINALITY:
-            return (struct metrics *)metric_cardinality_new_scheme();
+        case FIELD_TYPE_hll:
+            return (struct metrics *)metric_hll_new_scheme();
         default:
             assert(0);
             return NULL;
@@ -807,8 +807,8 @@ void cell_free(struct cell *pthis)
 
 void cell_get_plain_blob(const struct cell *pthis, char **blob, size_t *blob_size) 
 {
-    if (pthis->metric->type == FIELD_TYPE_CARDINALITY) {
-        struct metric_cardinality *card = (struct metric_cardinality *)pthis->metric;
+    if (pthis->metric->type == FIELD_TYPE_hll) {
+        struct metric_hll *card = (struct metric_hll *)pthis->metric;
         ST_hyperloglog_serialize_for_networking(card->hll, blob, blob_size);
         return;
     }

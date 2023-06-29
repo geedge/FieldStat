@@ -98,14 +98,12 @@ void kv_pair_free(Export_kv_pair *pair) {
     free(pair);
 }
 
-// fixme: 改成计时时间
 long get_current_time()
 {
-	struct timespec this_output_time;
+    time_t currentTime;
+    time(&currentTime);
 
-	clock_gettime(CLOCK_MONOTONIC ,&this_output_time);
-
-    return this_output_time.tv_sec;
+    return currentTime;
 }
 
 int my_cmp_kv_pair(const void *a, const void *b)
@@ -307,7 +305,7 @@ Export_kv_pair *cell_query_with_iter(struct cell_iter *iter) {
             ret->type = TAG_INTEGER;
             ret->value_int = fieldstat_counter_get(iter->instance, cell_iter_get_id(iter), cell_iter_get_tag_list(iter));
             break;
-        case FIELD_TYPE_CARDINALITY:
+        case FIELD_TYPE_hll:
         case FIELD_TYPE_HISTOGRAM:
             ret->type = TAG_CSTRING;
             fieldstat_get_serialized_blob(iter->instance, cell_iter_get_id(iter), cell_iter_get_tag_list(iter), (char **)&ret->value_str, &len_dummy);

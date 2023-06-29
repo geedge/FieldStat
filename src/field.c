@@ -26,7 +26,7 @@ struct para_topk {
     int K;
 };
 
-struct para_cardinality {
+struct para_hll {
     char precision;
 };
 
@@ -35,7 +35,7 @@ struct field_paras {
         // struct para_hdr hdr;
         struct para_topk topk;
         struct para_hdr hdr;
-        struct para_cardinality cardinality;
+        struct para_hll hll;
     };
 };
 
@@ -113,8 +113,8 @@ struct cell *field_spawn_cell(const struct fs_field *field)
             cell = cell_create_for_histogram(tmp_paras->lowest_trackable_value, tmp_paras->highest_trackable_value, tmp_paras->significant_figures);
         }
         break;
-        case FIELD_TYPE_CARDINALITY:{
-            cell = cell_create_for_cardinality(field->field_paras->cardinality.precision);
+        case FIELD_TYPE_hll:{
+            cell = cell_create_for_hll(field->field_paras->hll.precision);
         }
         break;
         default:
@@ -133,8 +133,8 @@ struct field_paras *construct_parameters(enum field_type type, ...)
         case FIELD_TYPE_TOPK:
             paras->topk.K = va_arg(ap, int);
             break;
-        case FIELD_TYPE_CARDINALITY:
-            paras->cardinality.precision = (char)va_arg(ap, int);
+        case FIELD_TYPE_hll:
+            paras->hll.precision = (char)va_arg(ap, int);
             break;
         case FIELD_TYPE_HISTOGRAM:
             paras->hdr.lowest_trackable_value = va_arg(ap, long long);
@@ -233,10 +233,10 @@ struct fs_field *field_new_counter(const char *name)
     return  field_new(FIELD_TYPE_COUNTER, name, NULL);
 }
 
-struct fs_field *field_new_cardinality(const char *name, char precision)
+struct fs_field *field_new_hll(const char *name, char precision)
 {
-    struct field_paras *paras = construct_parameters(FIELD_TYPE_CARDINALITY, precision);
-    struct fs_field *field = field_new(FIELD_TYPE_CARDINALITY, name, paras);
+    struct field_paras *paras = construct_parameters(FIELD_TYPE_hll, precision);
+    struct fs_field *field = field_new(FIELD_TYPE_hll, name, paras);
     return field;
 }
 struct fs_field *field_new_histogram(const char *name, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures)
@@ -345,7 +345,7 @@ void field_get_tags(const struct fs_field *field, struct fieldstat_tag_list **ta
     "type": 0
 }
 
----------------------------------- cardinality ---------------------------------- 
+---------------------------------- hll ---------------------------------- 
 {
     "type": 2,
     "prec": <precision value>
@@ -375,9 +375,9 @@ void serialize_field_parameters(const struct fs_field *field, char **blob, size_
         mpack_write_cstr(&writer, "K");
         mpack_write_i32(&writer, para->topk.K);
         break;
-    case FIELD_TYPE_CARDINALITY:
+    case FIELD_TYPE_hll:
         mpack_write_cstr(&writer, "prec");
-        mpack_write_i32(&writer, para->cardinality.precision);
+        mpack_write_i32(&writer, para->hll.precision);
         break;
     case FIELD_TYPE_HISTOGRAM:
         mpack_write_cstr(&writer, "min");
@@ -415,7 +415,7 @@ struct field_paras *deserialize_parameters(const char *blob, size_t blob_size)
             // para is null
         }
         break;
-        case FIELD_TYPE_CARDINALITY: {
+        case FIELD_TYPE_hll: {
             int precision = mpack_node_i32(mpack_node_map_cstr(root, "prec"));
             field_para = construct_parameters(type, precision);
         }

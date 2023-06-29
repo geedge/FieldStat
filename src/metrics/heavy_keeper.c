@@ -211,7 +211,7 @@ void heavy_keeper_add(struct heavy_keeper *heavy_keeper, const char *key, size_t
 
     unsigned int tmp_cnt = sorted_set_get_member_score(summary, key, key_len);
     if (tmp_cnt == 0) {  // the flow is not in sorted set
-        if ((maxv - nMin <= count && maxv != nMin) || sorted_set_cardinality(summary) != heavy_keeper->K) {
+        if ((maxv - nMin <= count && maxv != nMin) || sorted_set_hll(summary) != heavy_keeper->K) {
             sorted_set_insert(summary, key, key_len, maxv);
         }
     } else {
@@ -223,7 +223,7 @@ void heavy_keeper_add(struct heavy_keeper *heavy_keeper, const char *key, size_t
 
 struct heavy_keeper_result *heavy_keeper_query(struct heavy_keeper *hk) {
     struct heavy_keeper_result *stats  = heavy_keeper_result_new(hk);
-    int heap_entry_num = sorted_set_cardinality(hk->top_K_heap);
+    int heap_entry_num = sorted_set_hll(hk->top_K_heap);
 
     unsigned *keys = (unsigned *)malloc(heap_entry_num * sizeof(unsigned));
     char **vals = (char **)malloc(heap_entry_num * sizeof(char *));
@@ -291,8 +291,8 @@ unsigned find_maxv_in_sketch(struct heavy_keeper *hk, const char *flow_id, int f
 void heavy_keeper_merge_minheap(struct heavy_keeper *dest, const struct heavy_keeper *src) {
     struct sorted_set *new_rec = sorted_set_new(dest->K);
 
-    int size_dest = sorted_set_cardinality(dest->top_K_heap);
-    int size_src = sorted_set_cardinality(src->top_K_heap);
+    int size_dest = sorted_set_hll(dest->top_K_heap);
+    int size_src = sorted_set_hll(src->top_K_heap);
     int max_size = size_dest > size_src ? size_dest : size_src;
     unsigned *keys = (unsigned *)malloc(max_size * sizeof(unsigned));
     char **vals = (char **)malloc(max_size * sizeof(char *));
@@ -438,7 +438,7 @@ void heavy_keeper_sorted_set_serialization(const struct heavy_keeper *hk, mpack_
     size_t element_mpack_size = 0;
     char *element_mpack_buff = NULL;
     mpack_write_cstr(writer, "ss");
-    int heap_entry_num = sorted_set_cardinality(hk->top_K_heap);
+    int heap_entry_num = sorted_set_hll(hk->top_K_heap);
     unsigned *keys = (unsigned *)malloc(heap_entry_num * sizeof(unsigned));
     char **vals = (char **)malloc(heap_entry_num * sizeof(char *));
     size_t *val_lens = (size_t *)malloc(heap_entry_num * sizeof(size_t));

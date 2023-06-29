@@ -30,13 +30,13 @@
 // C++ 写： 
 // 对于每个函数，均为随机（自己写一个随机生成器）进值。 create_fuzz_tester(Rand_gen) fuzz_tester.operfunc(函数指针) . first(FIXTO, ), rangeFrom()...  
 
-TEST(metric_test_cardinality, serialize_and_deserialize_for_2_fields_1st_empty_2nd_added)
+TEST(metric_test_hll, serialize_and_deserialize_for_2_fields_1st_empty_2nd_added)
 {
     struct fieldstat *instance = fieldstat_new();
     printf("new ok\n");
 
-    int id1_empty = fieldstat_register_cardinality(instance, "empty", 10);
-    int id2_added = fieldstat_register_cardinality(instance, "add", 10);
+    int id1_empty = fieldstat_register_hll(instance, "empty", 10);
+    int id2_added = fieldstat_register_hll(instance, "add", 10);
     printf("register OK\n");
 
     // metric add
@@ -45,11 +45,11 @@ TEST(metric_test_cardinality, serialize_and_deserialize_for_2_fields_1st_empty_2
     std::string add_to_1_3 = gen_rand_string(10);
     std::string add_to_2_1 = gen_rand_string(10);
     // add 3 elements to 1st field
-    fieldstat_cardinality_add(instance, id2_added, add_to_1_1.c_str(), add_to_1_1.size(), &TEST_TAG_INT, 1);
-    fieldstat_cardinality_add(instance, id2_added, add_to_1_2.c_str(), add_to_1_2.size(), &TEST_TAG_INT, 1);
-    fieldstat_cardinality_add(instance, id2_added, add_to_1_3.c_str(), add_to_1_3.size(), &TEST_TAG_INT, 1);
+    fieldstat_hll_add(instance, id2_added, add_to_1_1.c_str(), add_to_1_1.size(), &TEST_TAG_INT, 1);
+    fieldstat_hll_add(instance, id2_added, add_to_1_2.c_str(), add_to_1_2.size(), &TEST_TAG_INT, 1);
+    fieldstat_hll_add(instance, id2_added, add_to_1_3.c_str(), add_to_1_3.size(), &TEST_TAG_INT, 1);
     // add 1 elements to 2st field
-    fieldstat_cardinality_add(instance, id2_added, add_to_2_1.c_str(), add_to_2_1.size(), &TEST_TAG_INT_collided, 1);
+    fieldstat_hll_add(instance, id2_added, add_to_2_1.c_str(), add_to_2_1.size(), &TEST_TAG_INT_collided, 1);
     printf("add ok\n");
 
     // serialize 
@@ -83,11 +83,11 @@ TEST(metric_test_cardinality, serialize_and_deserialize_for_2_fields_1st_empty_2
     printf("test tag done\n");
 
     // query metric 
-    double ret1 = fieldstat_cardinality_get(instance_from_deserialize, id2_added, &tag_list_2[0]);
+    double ret1 = fieldstat_hll_get(instance_from_deserialize, id2_added, &tag_list_2[0]);
     printf("query ok 1\n");
     EXPECT_NEAR(ret1, 3, 0.5);
 
-    double ret2 = fieldstat_cardinality_get(instance_from_deserialize, id2_added, &tag_list_2[1]);
+    double ret2 = fieldstat_hll_get(instance_from_deserialize, id2_added, &tag_list_2[1]);
     printf("query ok 2\n");
     EXPECT_NEAR(ret2, 1, 0.5);
 

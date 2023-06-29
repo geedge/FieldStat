@@ -23,9 +23,9 @@ struct cell *cell_create_for_counter();
 void cell_counter_incrby(struct cell *pthis, long long value);
 long long cell_counter_get(const struct cell *pthis);
 
-struct cell *cell_create_for_cardinality(const char precision);
-int cell_cardinality_add(struct cell *pthis, const char *key, size_t key_len);
-double cell_cardinality_get(const struct cell *pthis);
+struct cell *cell_create_for_hll(const char precision);
+int cell_hll_add(struct cell *pthis, const char *key, size_t key_len);
+double cell_hll_get(const struct cell *pthis);
 
 struct cell *cell_create_for_histogram(long long lowest_trackable_value, long long highest_trackable_value, int significant_figures);
 int cell_histogram_record(struct cell *pthis, long long value);
