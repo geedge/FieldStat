@@ -712,8 +712,6 @@ void cell_add_tag(struct cell *pthis, const struct fieldstat_tag *tag_list, size
     }
 }
 
-
-// TODO: 和 olap 的对齐，我估计最后就只提供一个content_blob了，这里要有什么东西？
 /*
 {
     cell bin blob: 

@@ -14,12 +14,54 @@
 
 // TODO: name 等输出相关量的序列化放到exporter里
 
+// ut hash list with field name as key
+struct field_name_id_map {
+    char *field_name;
+    int field_id;
+    UT_hash_handle hh;
+};
 
 struct fieldstat {
     struct fs_field **field_array; // all the metrics are dynamic(differ from field stat 3.0)
     size_t n_field;
     size_t max_field;
+
+    struct field_name_id_map *field_name_id_map; // for fast field id lookup, update only when deserializing.
 };
+
+
+int name_id_map_find_a_field_name(struct fieldstat *instance, const char *field_name)
+{
+    if (instance->field_name_id_map == NULL) {
+        return -1;
+    }
+    // find the name in hash
+    struct field_name_id_map *entry = NULL;
+    HASH_FIND_STR(instance->field_name_id_map, field_name, entry);
+    if (entry == NULL) {
+        return -1;
+    }
+    return entry->field_id;
+}
+
+void name_id_map_add_a_field_name(struct fieldstat *instance, const char *field_name, int field_id)
+{
+    struct field_name_id_map *entry = malloc(sizeof(struct field_name_id_map));
+    entry->field_id = field_id;
+    entry->field_name = strdup(field_name);
+    HASH_ADD_KEYPTR(hh, instance->field_name_id_map, entry->field_name, strlen(entry->field_name), entry);
+}
+
+void name_id_map_free(struct fieldstat *instance)
+{
+    struct field_name_id_map *map = instance->field_name_id_map;
+    struct field_name_id_map *entry, *tmp;
+    HASH_ITER(hh, map, entry, tmp) {
+        HASH_DEL(map, entry);
+        free(entry->field_name);
+        free(entry);
+    }
+}
 
 struct fieldstat *fieldstat_new()
 {
@@ -39,6 +81,7 @@ void fieldstat_free(struct fieldstat *instance)
     for (int i = 0; i < instance->n_field; i++) { // FIXME: 当前添加都是添加到最后，所以可以直接这样循环，会不会有unregister 的需求？
         field_free(instance->field_array[i]);
     }
+    name_id_map_free(instance);
     free(instance->field_array);
     free(instance);
 }
@@ -168,6 +211,7 @@ int fieldstat_cardinality_add(struct fieldstat *instance, int field_id, const ch
     "fields"= [<binary of fields, refer to field.c annotation for its detail>]
 }
 */
+
 struct fieldstat *fieldstat_deserialize(const char *blob, size_t blob_size)
 {
     mpack_tree_t tree;
@@ -188,10 +232,7 @@ struct fieldstat *fieldstat_deserialize(const char *blob, size_t blob_size)
     for (int i = 0 ; i < mpack_node_array_length(field_arr); i++) {
         mpack_node_t field_blob_bin = mpack_node_array_at(field_arr, i);
         struct fs_field *tmp_field = field_deserialize(mpack_node_bin_data(field_blob_bin), mpack_node_bin_size(field_blob_bin));
-        int field_id_tmp = field_get_id(tmp_field);
-        // TODO: 应该是用名字来做key，而不是id
-        instance->field_array[field_id_tmp] = tmp_field;
-        printf("fieldstat_deserialize field (id:%d) add to instance, field pointer: %p \n", field_id_tmp, tmp_field);
+        append_field_to_instance(instance, tmp_field);
     }
     instance->n_field = mpack_node_array_length(field_arr);
 
@@ -214,11 +255,12 @@ int fieldstat_merge_with_blob(struct fieldstat *instance, const char *blob, size
 
     for (int i = 0; i < src->n_field; i++) {
         struct fs_field *tmp_field = src->field_array[i];
-        int field_id_tmp = field_get_id(tmp_field);
-        // TODO: 不用id，用name
-       
-        if (instance->field_array[field_id_tmp] == NULL) {
-            instance->field_array[field_id_tmp] = field_dup(tmp_field);
+        int field_id_tmp = name_id_map_find_a_field_name(instance, field_get_name(tmp_field));
+
+        if (field_id_tmp == -1) {
+            struct fs_field *copied_field = field_dup(tmp_field);
+            int alloced_id = append_field_to_instance(instance, copied_field);
+            name_id_map_add_a_field_name(instance, field_get_name(copied_field), alloced_id);
         } else {
             field_merge(instance->field_array[field_id_tmp], tmp_field);
         }

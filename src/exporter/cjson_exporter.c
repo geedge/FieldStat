@@ -98,6 +98,7 @@ void kv_pair_free(Export_kv_pair *pair) {
     free(pair);
 }
 
+// fixme: 改成计时时间
 long get_current_time()
 {
 	struct timespec this_output_time;
@@ -105,69 +106,6 @@ long get_current_time()
 	clock_gettime(CLOCK_MONOTONIC ,&this_output_time);
 
     return this_output_time.tv_sec;
-}
-
-
-struct fieldstat_json_exporter *fieldstat_json_exporter_new(const struct fieldstat *instance)
-{
-    struct fieldstat_json_exporter *exporter = (struct fieldstat_json_exporter *)malloc(sizeof(struct fieldstat_json_exporter));
-    exporter->instance = instance;
-    exporter->name = NULL;
-    exporter->global_tag = NULL;
-    exporter->n_global_tag = 0;
-    return exporter;
-}
-
-void fieldstat_json_exporter_set_global_tag(struct fieldstat_json_exporter *exporter, const struct fieldstat_tag tag_list[], size_t n_tag)
-{
-    if (exporter->global_tag != NULL) {
-        for (size_t i = 0; i < exporter->n_global_tag; i++) {
-            kv_pair_free(&exporter->global_tag[i]);
-        }
-        free(exporter->global_tag);
-    }
-
-    exporter->global_tag = (Export_kv_pair *)malloc(sizeof(Export_kv_pair) * n_tag);
-    exporter->n_global_tag = n_tag;
-    for (size_t i = 0; i < n_tag; i++) {
-        exporter->global_tag[i].key = strdup(tag_list[i].key);
-        exporter->global_tag[i].type = tag_list[i].type;
-        switch (tag_list[i].type) {
-            case TAG_INTEGER:
-                exporter->global_tag[i].value_int = tag_list[i].value_int;
-                break;
-            case TAG_DOUBLE:
-                exporter->global_tag[i].value_double = tag_list[i].value_double;
-                break;
-            case TAG_CSTRING:
-                exporter->global_tag[i].value_str = strdup(tag_list[i].value_str);
-                break;
-            default:
-                assert(0);
-        }
-    }
-}
-
-void fieldstat_json_exporter_set_name(struct fieldstat_json_exporter *exporter, const char *name)
-{
-    if (exporter->name != NULL) {
-        free(exporter->name);
-    }
-    exporter->name = strdup(name);
-}
-
-void fieldstat_json_exporter_free(struct fieldstat_json_exporter *exporter)
-{
-    if (exporter->name != NULL) {
-        free(exporter->name);
-    }
-    if (exporter->global_tag != NULL) {
-        for (size_t i = 0; i < exporter->n_global_tag; i++) {
-            kv_pair_free(&exporter->global_tag[i]);
-        }
-        free(exporter->global_tag);
-    }
-    free(exporter);
 }
 
 int my_cmp_kv_pair(const void *a, const void *b)
@@ -489,9 +427,9 @@ void cjson_map_add_new_pair_for_one_loop(struct cjson_map **map_head_in, struct 
     printf("cjson_map_add_new_pair_for_one_loop end\n");
 }
 
-struct cjson_map *fieldstat_hash_tag_fields_to_map(const struct fieldstat *instance)
+struct cjson_map *hash_map_read_tag_and_field(const struct fieldstat *instance)
 {
-    printf("fieldstat_export_instance_to_cjson enter\n");
+    printf("hash_map_read_tag_and_field enter\n");
     struct cjson_map *map_head = NULL; // new a hash head
     struct cell_iter *iter = cell_iter_new(instance);
     printf("cell_iter_new done\n");
@@ -531,7 +469,7 @@ char *fieldstat_json_exporter_export(const struct fieldstat_json_exporter *expor
         return NULL;
     }
 
-    struct cjson_map *map_head = fieldstat_hash_tag_fields_to_map(instance);
+    struct cjson_map *map_head = hash_map_read_tag_and_field(instance);
 
     cJSON *cjson_root_arr = cJSON_CreateArray();
     cJSON *cjson_root;
@@ -561,4 +499,66 @@ char *fieldstat_json_exporter_export(const struct fieldstat_json_exporter *expor
     cJSON_Delete(cjson_root_arr);
 
     return out_cjson;
+}
+
+struct fieldstat_json_exporter *fieldstat_json_exporter_new(const struct fieldstat *instance)
+{
+    struct fieldstat_json_exporter *exporter = (struct fieldstat_json_exporter *)malloc(sizeof(struct fieldstat_json_exporter));
+    exporter->instance = instance;
+    exporter->name = NULL;
+    exporter->global_tag = NULL;
+    exporter->n_global_tag = 0;
+    return exporter;
+}
+
+void fieldstat_json_exporter_set_global_tag(struct fieldstat_json_exporter *exporter, const struct fieldstat_tag tag_list[], size_t n_tag)
+{
+    if (exporter->global_tag != NULL) {
+        for (size_t i = 0; i < exporter->n_global_tag; i++) {
+            kv_pair_free(&exporter->global_tag[i]);
+        }
+        free(exporter->global_tag);
+    }
+
+    exporter->global_tag = (Export_kv_pair *)malloc(sizeof(Export_kv_pair) * n_tag);
+    exporter->n_global_tag = n_tag;
+    for (size_t i = 0; i < n_tag; i++) {
+        exporter->global_tag[i].key = strdup(tag_list[i].key);
+        exporter->global_tag[i].type = tag_list[i].type;
+        switch (tag_list[i].type) {
+            case TAG_INTEGER:
+                exporter->global_tag[i].value_int = tag_list[i].value_int;
+                break;
+            case TAG_DOUBLE:
+                exporter->global_tag[i].value_double = tag_list[i].value_double;
+                break;
+            case TAG_CSTRING:
+                exporter->global_tag[i].value_str = strdup(tag_list[i].value_str);
+                break;
+            default:
+                assert(0);
+        }
+    }
+}
+
+void fieldstat_json_exporter_set_name(struct fieldstat_json_exporter *exporter, const char *name)
+{
+    if (exporter->name != NULL) {
+        free(exporter->name);
+    }
+    exporter->name = strdup(name);
+}
+
+void fieldstat_json_exporter_free(struct fieldstat_json_exporter *exporter)
+{
+    if (exporter->name != NULL) {
+        free(exporter->name);
+    }
+    if (exporter->global_tag != NULL) {
+        for (size_t i = 0; i < exporter->n_global_tag; i++) {
+            kv_pair_free(&exporter->global_tag[i]);
+        }
+        free(exporter->global_tag);
+    }
+    free(exporter);
 }

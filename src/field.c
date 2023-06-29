@@ -443,7 +443,6 @@ struct field_paras *deserialize_parameters(const char *blob, size_t blob_size)
             "type":<field_type>
             "id":<field_id>
             "para":[may be null, one number, or a array]
-            // todo: 不要光是一个array，"type": , 等等
             "cells":<bin_blob>
             ]
         }
@@ -473,14 +472,12 @@ struct fs_field *field_deserialize(const char *blob, size_t blob_size)
 
     char *field_name = mpack_node_cstr_alloc(mpack_node_map_cstr(root, "name"), 0xFFFF); // 0xFFFF: a very large number
     enum field_type type = mpack_node_i32(mpack_node_map_cstr(root, "type"));
-    int id = mpack_node_i32(mpack_node_map_cstr(root, "id"));
     mpack_node_t para_obj = mpack_node_map_cstr(root, "para");
     struct field_paras *field_para = deserialize_parameters(mpack_node_bin_data(para_obj), mpack_node_bin_size(para_obj));
 
-    printf("field_deserialize name is: %s, id is : %d, type is: %d\n", field_name, id, type);
+    printf("field_deserialize name is: %s, type is: %d\n", field_name, type);
 
     struct fs_field *field_out = field_new(type, field_name, field_para);
-    field_set_id(field_out, id);
     free(field_name);
 
     mpack_node_t cells_arr = mpack_node_map_cstr(root, "cells");
@@ -538,11 +535,8 @@ int field_serialize(const struct fs_field *field, char **blob, size_t *blob_size
     mpack_write_str(&writer, field->name, strlen(field->name));
     mpack_write_cstr(&writer, "type");
     mpack_write_i32(&writer, field->type);
-    mpack_write_cstr(&writer, "id");
-    mpack_write_i32(&writer, field->field_id);
 
     mpack_write_cstr(&writer, "para");
-
     serialize_field_parameters(field, &para_blob, &para_blob_size);
     mpack_write_bin(&writer, para_blob, para_blob_size);
     free(para_blob);

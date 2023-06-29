@@ -155,6 +155,50 @@ void heavy_keeper_serialization(const struct heavy_keeper *hk, char **blob, size
 */
 struct heavy_keeper *heavy_keeper_deserialization(const char *blob, size_t size);
 
+// TODO: 
+/*
+支持多个数据一起塞进来，其中一个作为键值，其他的跟随记录
+例子：
+list: key: "1.2.3.4"
+
+name              count
+"byte":           1000  [**primary**]
+"packet":112
+"out bype":12
+
+struct list_entry {
+    char *name;
+    unsigned int count;
+}
+
+
+hk = heavy_keeper_new(K, "byte", "packet", "out byte")
+heavy_keeper_add(hk, "1,2,3,4", 1000, 112, 12)
+
+struct heavy_keeper *heavy_keeper_new(int K, ...);
+int heavy_keeper_add(struct heavy_keeper *hk, const char *key, ...)
+
+
+// heavy_keeper_add_list(hk, "1.2.3.4", {{"byte", 1000}, {"packet", 112}, {"out byte", 12}})
+heavy_keeper_add_list(hk, "1.2.3.4", {1000, 112, 12});
+
+heavy_keeper_query(hk) -> 
+    struct heavy_keeper_result_list {
+        char *key[];
+        struct list_entry *list[];
+        size_t result_num; // 最大K个
+    };
+
+result 举例：
+result_num = 2
+key: "1.2.3.4", "123.123.123.123"
+list[1]: {{"byte", 1000}, {"packet", 112}, {"out byte", 12}}
+list[2]: {{"byte", 12}, {"packet", 1}, {"out byte", 0}
+
+*/
+
+
+
 
 #ifdef __cplusplus
 }
