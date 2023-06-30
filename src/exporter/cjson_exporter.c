@@ -58,8 +58,7 @@ typedef struct fieldstat_tag Export_kv_pair;
 struct fieldstat_json_exporter{
     const struct fieldstat *instance;
     char *name;
-    Export_kv_pair *global_tag;
-    size_t n_global_tag;
+    struct fieldstat_tag_list *global_tag_list;
 };
 
 struct topk_iter {
@@ -359,9 +358,8 @@ struct cjson_map *cjson_map_find(struct cjson_map *head, char *key, size_t key_l
     return s;
 }
 
-cJSON *tag_list_to_tag_object(const struct fieldstat_tag_list *tag_list)
+void tag_list_append_to_tag_object(const struct fieldstat_tag_list *tag_list, cJSON *cjson_tags)
 {
-    cJSON *cjson_tags = cJSON_CreateObject();
     size_t tag_list_len = tag_list->n_tag;
 
     for (int i = 0; i < tag_list_len; i++) {
@@ -432,10 +430,11 @@ void cjson_map_add_new_pair_for_one_loop(struct cjson_map **map_head_in, struct 
     cell_iter_shallow_copy_tag_list(iter, &tag_list); // copy the tag because we need to sort it
     // different tag order will cause different cjson string, so sort it first.
     kv_pair_sort(tag_list.tag, tag_list.n_tag);
-    cJSON *cjson_tags = tag_list_to_tag_object(&tag_list);
+    cJSON *cjson_tags = cJSON_CreateObject(); // when this cjson_tags is added to a new map entry, it is freed when the map is freed
+    tag_list_append_to_tag_object(&tag_list, cjson_tags);
     free(tag_list.tag); // shallow copy, so we only need to free the pointer itself
 
-    char *key = cJSON_PrintUnformatted(cjson_tags);
+    char *key = cJSON_PrintUnformatted(cjson_tags);  // when this key is added to a new map entry, it is freed when the map is freed
     printf("tagkey: %s\n", key);
     size_t key_len = strlen(key);
 
@@ -447,8 +446,6 @@ void cjson_map_add_new_pair_for_one_loop(struct cjson_map **map_head_in, struct 
         map->cjson_tags = cjson_tags;
         map->cjson_fields = cJSON_CreateObject();
         HASH_ADD_KEYPTR(hh, map_head, map->key, map->key_len, map);
-
-        // the key and cjson_tags will be freed when the map is freed
     } else {
         cJSON_Delete(cjson_tags);
         free(key);
@@ -474,6 +471,17 @@ struct cjson_map *hash_map_read_tag_and_field(const struct fieldstat *instance)
     cell_iter_free(iter);
 
     return map_head;
+}
+
+void fieldstat_json_exporter_write_global_tags(const struct fieldstat_json_exporter *exporter, struct cjson_map *map_head)
+{
+    if (exporter->global_tag_list == NULL) {
+        return;
+    }
+    struct cjson_map *current, *tmp;
+    HASH_ITER(hh, map_head, current, tmp) {
+        tag_list_append_to_tag_object(exporter->global_tag_list, current->cjson_tags);
+    }
 }
 
 /*
@@ -503,6 +511,11 @@ char *fieldstat_json_exporter_export(const struct fieldstat_json_exporter *expor
     }
 
     struct cjson_map *map_head = hash_map_read_tag_and_field(instance);
+    if (map_head == NULL) {
+        return NULL;
+    }
+
+    fieldstat_json_exporter_write_global_tags(exporter, map_head);
 
     cJSON *cjson_root_arr = cJSON_CreateArray();
     cJSON *cjson_root;
@@ -539,37 +552,38 @@ struct fieldstat_json_exporter *fieldstat_json_exporter_new(const struct fieldst
     struct fieldstat_json_exporter *exporter = (struct fieldstat_json_exporter *)malloc(sizeof(struct fieldstat_json_exporter));
     exporter->instance = instance;
     exporter->name = NULL;
-    exporter->global_tag = NULL;
-    exporter->n_global_tag = 0;
+    exporter->global_tag_list = NULL;
     return exporter;
 }
 
 void fieldstat_json_exporter_set_global_tag(struct fieldstat_json_exporter *exporter, const struct fieldstat_tag tag_list[], size_t n_tag)
 {
-    if (exporter->global_tag != NULL) {
-        for (size_t i = 0; i < exporter->n_global_tag; i++) {
-            kv_pair_free(&exporter->global_tag[i]);
-        }
-        free(exporter->global_tag);
+    if (exporter->global_tag_list != NULL) {
+        tag_list_clear(exporter->global_tag_list);
+        free(exporter->global_tag_list);
     }
 
-    exporter->global_tag = (Export_kv_pair *)malloc(sizeof(Export_kv_pair) * n_tag);
-    exporter->n_global_tag = n_tag;
+    exporter->global_tag_list = malloc(sizeof(struct fieldstat_tag_list));
+    exporter->global_tag_list->n_tag = n_tag;
+    exporter->global_tag_list->tag = malloc(sizeof(struct fieldstat_tag) * n_tag);
     for (size_t i = 0; i < n_tag; i++) {
-        exporter->global_tag[i].key = strdup(tag_list[i].key);
-        exporter->global_tag[i].type = tag_list[i].type;
-        switch (tag_list[i].type) {
-            case TAG_INTEGER:
-                exporter->global_tag[i].value_int = tag_list[i].value_int;
-                break;
-            case TAG_DOUBLE:
-                exporter->global_tag[i].value_double = tag_list[i].value_double;
-                break;
-            case TAG_CSTRING:
-                exporter->global_tag[i].value_str = strdup(tag_list[i].value_str);
-                break;
-            default:
-                assert(0);
+        struct fieldstat_tag *tag = &exporter->global_tag_list->tag[i];
+        tag->key = strdup(tag_list[i].key);
+        tag->type = tag_list[i].type;
+        switch (tag->type)
+        {
+        case TAG_INTEGER:
+            tag->value_int = tag_list[i].value_int;
+            break;
+        case TAG_CSTRING:
+            tag->value_str = strdup(tag_list[i].value_str);
+            break;
+        case TAG_DOUBLE:
+            tag->value_double = tag_list[i].value_double;
+            break;
+        
+        default:
+            break;
         }
     }
 }
