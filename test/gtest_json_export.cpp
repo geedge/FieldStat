@@ -20,13 +20,16 @@
 #include "st_hyperloglog.h"
 #include "heavy_keeper.h"
 
-const size_t OPER_NUM = 100;
+const size_t OPER_NUM = 10000;
 std::string g_hll_standard_oper[OPER_NUM];
 long long g_histogram_standard_oper[OPER_NUM];
 struct ST_hyperloglog *g_hll_standard;
 struct hdr_histogram *g_histogram_standard;
 #define TEST_TOPK_STANDARD_K 3
-#define TEST_TOPK_EXPECTED_BIG_COUNT 1000
+const struct fieldstat_tag TEST_TAG_GLOBAL[3] = {
+    {.key = "test_tag_global 1", .type = TAG_INTEGER, .value_int = 1},
+    {.key = "test_tag_global 2", .type = TAG_DOUBLE, .value_double = 2.2},
+    {.key = "test_tag_global 3", .type = TAG_CSTRING, .value_str = "string 3"}};
 
 // TEST(export_test, network_blob_test_for_histogram)
 // {
@@ -114,10 +117,17 @@ void test_check_if_tag_list_is_in_json(cJSON *tag_obj, const Fieldstat_tag_list_
             if (benchmark->get_tag()[tag_id].type == TAG_INTEGER) {
                 EXPECT_EQ(tag_val->valueint, benchmark->get_tag()[tag_id].value_int);
             } else {
-                EXPECT_EQ(tag_val->valuedouble, benchmark->get_tag()[tag_id].value_double);
+                EXPECT_NEAR(tag_val->valuedouble, benchmark->get_tag()[tag_id].value_double, 0.0001);
             }
         }
     }
+}
+
+void test_check_if_global_tag_is_in_json(cJSON *tag_obj)
+{
+    struct fieldstat_tag_list tag_list = {.tag = (struct fieldstat_tag *)TEST_TAG_GLOBAL, .n_tag = 3};
+    const Fieldstat_tag_list_wrapper *benchmark = new Fieldstat_tag_list_wrapper(&tag_list);
+    test_check_if_tag_list_is_in_json(tag_obj, benchmark);
 }
 
 void test_check_if_metric_histogram_correct(cJSON *metric_obj, const char *name)
@@ -163,7 +173,8 @@ void test_check_if_topk_tag_in_json(cJSON *tag_obj, const char *name)
     EXPECT_NE(topk_dimension, nullptr);
     bool match = false;
     for (int i = 0; i < TEST_TOPK_STANDARD_K; i ++) {
-        if (strcmp(topk_dimension->valuestring, std::to_string(i).c_str()) == 0) {
+        std::string standard_flow = "flow id: " + std::to_string(i);
+        if (strcmp(topk_dimension->valuestring, standard_flow.c_str()) == 0) {
             match = true;
             break;
         }
@@ -184,9 +195,11 @@ void fill_random_tag(Fieldstat_tag_list_wrapper *tags[], int tag_list_num)
     }
 }
 
-cJSON *test_exporter_extract_results(struct fieldstat *instance)
+cJSON *test_exporter_extract_results_with_standard_global(struct fieldstat *instance)
 {
     struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new(instance);
+    fieldstat_json_exporter_set_global_tag(fieldstat_json_exporter, TEST_TAG_GLOBAL, 3);
+
     char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter);
     cJSON *root_arr = cJSON_Parse(json_string);
     printf("test, fieldstat_json_exporter_export json_string: %s\n", json_string);
@@ -196,7 +209,20 @@ cJSON *test_exporter_extract_results(struct fieldstat *instance)
     return root_arr;
 }
 
-void topk_standard_oper(std::function<void(const char *, size_t, unsigned int *)> &topk_add, size_t metric_arr_num, int test_expected_big_count)
+cJSON *test_exporter_extract_results(struct fieldstat *instance)
+{
+    struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new(instance);
+
+    char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter);
+    cJSON *root_arr = cJSON_Parse(json_string);
+    printf("test, fieldstat_json_exporter_export json_string: %s\n", json_string);
+    free(json_string);
+    fieldstat_json_exporter_free(fieldstat_json_exporter);
+
+    return root_arr;
+}
+
+void topk_standard_oper(std::function<void(const char *, size_t, unsigned int *)> &topk_add, size_t metric_arr_num, unsigned int test_expected_big_count)
 {
     for (size_t i = 0; i < OPER_NUM; i++) {
         int tmp;
@@ -205,18 +231,17 @@ void topk_standard_oper(std::function<void(const char *, size_t, unsigned int *)
         } else {
             tmp = rand() % 100 + TEST_TOPK_STANDARD_K + 1; // the rest is randomly generated, plus TEST_TOPK_STANDARD_K so that its count is larger than TEST_TOPK_STANDARD_K
         }
-        std::string added_tmp = std::to_string(tmp);
+        std::string added_tmp = std::string("flow id: ") + std::to_string(tmp);
         unsigned int counts[metric_arr_num];
         for (size_t j = 0; j < metric_arr_num; j++) {
             counts[j] = 1 + j;
         }
         topk_add(added_tmp.c_str(), added_tmp.size(), counts);
 
-        printf("topk_standard_oper, added_tmp: %s\n", added_tmp.c_str());
     }
 }
 
-void topk_init(struct fieldstat *instance, Fieldstat_tag_list_wrapper *tags[], size_t tags_count, const char *topk_metric_name[], size_t arr_num, int test_expected_big_count[])
+void topk_init(struct fieldstat *instance, Fieldstat_tag_list_wrapper *tags[], size_t tags_count, const char *topk_metric_name[], size_t arr_num, unsigned int test_expected_big_count[])
 {
     int id_topk = fieldstat_register_topk(instance, "topk", TEST_TOPK_STANDARD_K, topk_metric_name, arr_num, 0);
 
@@ -295,7 +320,7 @@ TEST(export_test, cjson_export_with_fixed_tag_only_one_topk)
 
     struct fieldstat *instance = fieldstat_new();
     const char *topk_metric_name[] = {"metric_name1"};
-    int test_expected_big_count[tags_count] = {10, 12};
+    unsigned int test_expected_big_count[tags_count] = {1000, 1200};
     topk_init(instance, tags, tags_count, topk_metric_name, 1, test_expected_big_count);
     printf("init done\n");
 
@@ -330,82 +355,85 @@ TEST(export_test, cjson_export_with_fixed_tag_only_one_topk)
     cJSON_Delete(root_arr);
 }
 
-// TEST(export_test, only_registered_but_not_added_export_null_with_global_tag)
-// {
-//     struct fieldstat *instance = fieldstat_new();
-//     const char *topk_metric_name[] = {"topk_income_bytes"};
-//     (void)fieldstat_register_topk(instance, "topk", TEST_TOPK_STANDARD_K, topk_metric_name, 1, 0);
-//     (void)fieldstat_register_counter(instance, "counter");
-//     (void)fieldstat_register_hll(instance, "gauge", g_hll_standard->cfg.precision);
-//     (void)fieldstat_register_histogram(instance, "histogram",
-//         g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
+TEST(export_test, empty_fieldstat_export_null) {
+    struct fieldstat *instance = fieldstat_new();
+    cJSON *root_arr = test_exporter_extract_results_with_standard_global(instance);
+    EXPECT_EQ(root_arr, nullptr);
+    fieldstat_free(instance);
+}
 
-//     // export test
-//     cJSON *root_arr = test_exporter_extract_results(instance);
-//     EXPECT_EQ(root_arr, nullptr);
+TEST(export_test, only_registered_but_not_added_export_null_with_global_tag)
+{
+    struct fieldstat *instance = fieldstat_new();
+    const char *topk_metric_name[] = {"topk_income_bytes"};
+    (void)fieldstat_register_topk(instance, "topk", TEST_TOPK_STANDARD_K, topk_metric_name, 1, 0);
+    (void)fieldstat_register_counter(instance, "counter");
+    (void)fieldstat_register_hll(instance, "gauge", g_hll_standard->cfg.precision);
+    (void)fieldstat_register_histogram(instance, "histogram",
+        g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
 
-//     fieldstat_free(instance);
-//     cJSON_Delete(root_arr);
-// }
+    // add global tag
+    cJSON *root_arr = test_exporter_extract_results_with_standard_global(instance);
+    EXPECT_EQ(root_arr, nullptr);
 
-// TEST(export_test, skip_two_empty_field_and_export_last_two_with_global_tag_given_topk_of_2_metrics)
-// {
-//     struct fieldstat *instance = fieldstat_new();
-//     (void)fieldstat_register_hll(instance, "gauge", g_hll_standard->cfg.precision);
-//     (void)fieldstat_register_counter(instance, "counter");
-//     int id_histogram = fieldstat_register_histogram(instance, "histogram",
-//         g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
+    fieldstat_free(instance);
+}
 
-//     Fieldstat_tag_list_wrapper *tags[1];
-//     fill_random_tag(tags, 1);
-//     const char *topk_metric_name[] = {"metric_name1", "metric_name2"};
-//     int test_expected_big_count[1] = {1000};
-//     topk_init(instance, tags, 1, topk_metric_name, 2, test_expected_big_count);
-//     for (size_t i = 0; i < OPER_NUM; i++){
-//         fieldstat_histogram_record(instance, id_histogram, g_histogram_standard_oper[i], tags[0]->get_tag(), tags[0]->get_tag_count());
-//     }
+TEST(export_test, skip_two_empty_field_and_export_last_two_with_global_tag_given_topk_of_2_metrics)
+{
+    struct fieldstat *instance = fieldstat_new();
+    (void)fieldstat_register_hll(instance, "gauge", g_hll_standard->cfg.precision);
+    (void)fieldstat_register_counter(instance, "counter");
+    int id_histogram = fieldstat_register_histogram(instance, "histogram",
+        g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
 
-//     // export test
-//     cJSON *root_arr = test_exporter_extract_results(instance);
-//     int arr_num = cJSON_GetArraySize(root_arr);
-//     EXPECT_EQ(arr_num, 1 * (1 + TEST_TOPK_STANDARD_K)); // 1 histogram, 1 topk with K = 3
+    const int tag_num = 1;
+    Fieldstat_tag_list_wrapper *tags[tag_num];
+    fill_random_tag(tags, tag_num);
+    int topk_metric_num = 2;
+    const char *topk_metric_name[topk_metric_num] = {"metric_name1", "metric_name2"};
+    unsigned int test_expected_big_count[tag_num] = {1000};
+    topk_init(instance, tags, 1, topk_metric_name, 2, test_expected_big_count);
+    for (size_t i = 0; i < OPER_NUM; i++){
+        fieldstat_histogram_record(instance, id_histogram, g_histogram_standard_oper[i], tags[0]->get_tag(), tags[0]->get_tag_count());
+    }
 
-//     for (int i = 0; i < arr_num; i++)
-//     {
-//         cJSON *root = cJSON_GetArrayItem(root_arr, i);
+    // export test
+    cJSON *root_arr = test_exporter_extract_results_with_standard_global(instance);
+    int arr_num = cJSON_GetArraySize(root_arr);
+    EXPECT_EQ(arr_num, 1 * (1 + TEST_TOPK_STANDARD_K)); // 1 histogram, 1 topk with K = 3
 
-//         // check tag
-//         cJSON *tag = cJSON_GetObjectItem(root, "tags");
-//         test_check_if_tag_list_is_in_json(tag, tags[0]);
-//         // todo: 这里检查一下global tag
+    for (int i = 0; i < arr_num; i++)
+    {
+        cJSON *root = cJSON_GetArrayItem(root_arr, i);
 
-//         cJSON *metrics = cJSON_GetObjectItem(root, "fields");
-//         EXPECT_NE(metrics, nullptr);
-//         if (i == 0) {
-//             test_check_if_metric_histogram_correct(metrics, "histogram");
-//             continue;
-//         }
+        // check tag
+        cJSON *tag = cJSON_GetObjectItem(root, "tags");
+        test_check_if_tag_list_is_in_json(tag, tags[0]);
+        test_check_if_global_tag_is_in_json(tag);
 
-//         test_check_if_metric_topk_correct(metrics, topk_metric_name, test_expected_big_count[0], 2);
+        cJSON *metrics = cJSON_GetObjectItem(root, "fields");
+        EXPECT_NE(metrics, nullptr);
+        if (i == 0) {
+            test_check_if_metric_histogram_correct(metrics, "histogram");
+            continue;
+        }
 
-//         test_check_if_topk_tag_in_json(tag, "topk");
-//     }
+        test_check_if_metric_topk_correct(metrics, topk_metric_name, test_expected_big_count[0], 2);
 
-//     delete tags[0];
+        test_check_if_topk_tag_in_json(tag, "topk");
+    }
 
-//     fieldstat_free(instance);
-//     cJSON_Delete(root_arr);
-// }
+    delete tags[0];
+
+    fieldstat_free(instance);
+    cJSON_Delete(root_arr);
+}
 
 // TODO: 检查没有globaltag，且有写入的metric
 TEST(export_test, export_and_then_skip_when_4_topk_field_registered_given_global_tags) {
 
 }
-
-TEST(export_test, empty_fieldstat_with_global_tag) {
-
-}
-
 
 
 void init_hll_standard_oper()

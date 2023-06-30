@@ -321,7 +321,6 @@ int heavy_keeper_with_metrics_add(struct heavy_keeper *hk, const char *key, size
         printf("ERR: metric_header is NULL, please call heavy_keeper_new_list instead of heavy_keeper_new.\n");
         return -1;
     }
-    printf("heavy_keeper_with_metrics_add enter\n");
     size_t primary_id = hk->metric_header->primary_metric_index;
     heavy_keeper_add(hk, key, key_len, count[primary_id]);
 
@@ -334,12 +333,9 @@ int heavy_keeper_with_metrics_add(struct heavy_keeper *hk, const char *key, size
     size_t metric_num = hk->metric_header->n_metric;
     unsigned int *count_to_add = (unsigned int *)malloc(metric_num * sizeof(unsigned int));
     memcpy(count_to_add, count, metric_num * sizeof(unsigned int));
-    printf("going to get pointer to user data\n");
     if (*pst_other_count_in_rec == NULL) {
-        printf("change pointer\n");
         *pst_other_count_in_rec = count_to_add;
     } else {
-        printf("rewrite pointer\n");
         for (int i = 0; i < metric_num; i++) {
             (*pst_other_count_in_rec)[i] = count_add((*pst_other_count_in_rec)[i], count_to_add[i]);
         }
