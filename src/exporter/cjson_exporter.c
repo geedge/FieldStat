@@ -371,7 +371,7 @@ void tag_list_append_to_tag_object(const struct fieldstat_tag_list *tag_list, cJ
 
 void cell_iter_get_topk_result_entry(struct cell_iter *iter, Export_kv_pair *pairs)
 {
-    pairs->key = strdup(JSON_EXPORTER_TOPK_DEMENSION); // TODO: 这里应该是field的名字
+    pairs->key = strdup(cell_iter_get_name(iter));
     pairs->type = TAG_CSTRING;
     pairs->value_str = iter->topk_iter->result_key[iter->topk_iter->curr_idx];
 }

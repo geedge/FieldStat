@@ -155,9 +155,9 @@ void test_check_if_metric_topk_correct(cJSON *metric_obj, const char *name)
     EXPECT_NEAR(topk->valueint, TEST_TOPK_EXPECTED_BIG_COUNT, TEST_TOPK_EXPECTED_BIG_COUNT * 0.01);
 }
 
-void test_check_if_topk_tag_in_json(cJSON *tag_obj)
+void test_check_if_topk_tag_in_json(cJSON *tag_obj, const char *name)
 {
-    cJSON *topk_dimension = cJSON_GetObjectItem(tag_obj, JSON_EXPORTER_TOPK_DEMENSION);
+    cJSON *topk_dimension = cJSON_GetObjectItem(tag_obj, name);
     EXPECT_NE(topk_dimension, nullptr);
     bool match = false;
     for (int i = 0; i < TEST_TOPK_STANDARD_K; i ++) {
@@ -300,7 +300,7 @@ TEST(export_test, cjson_export_with_fixed_tag_only_topk)
         EXPECT_NE(tag, nullptr);
         
         test_check_if_tag_list_is_in_json(tag, tags[i / TEST_TOPK_STANDARD_K]);
-        test_check_if_topk_tag_in_json(tag);
+        test_check_if_topk_tag_in_json(tag, "topk");
 
         // check metrics
         cJSON *metrics = cJSON_GetObjectItem(root, "fields");
@@ -371,7 +371,7 @@ TEST(export_test, skip_three_empty_field_and_export_last_two)
         }
 
         test_check_if_metric_topk_correct(metrics, "topk");
-        test_check_if_topk_tag_in_json(tag);
+        test_check_if_topk_tag_in_json(tag, "topk");
     }
 
     delete tags[0];
