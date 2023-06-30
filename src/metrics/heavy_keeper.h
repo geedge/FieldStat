@@ -72,24 +72,6 @@ struct heavy_keeper_options{
 
 struct heavy_keeper;
 
-/**
- * @brief   Create a heavy keeper.
- * @param   max_query_num            you want to get a summery of top-max_query_num flows.
- * @param   params                   parameters used in algorithm. If NULL, default params will be used.
- * @returns a pointer to the heavy keeper.
- */
-struct heavy_keeper *heavy_keeper_new(int max_query_num, struct heavy_keeper_options *params);
-
-/**
- * @brief   Create a heavy keeper.
- * @param   max_query_num            you want to get a summery of top-max_query_num flows.
- * @param   params                   parameters used in algorithm. If NULL, default params will be used.
- * @param   uuid                     any uuid_t typed unsigned char[16] you want to use to identify a heavykeeper uniquely.
- * @returns a pointer to the heavy keeper.
- */
-struct heavy_keeper *heavy_keeper_new_with_uuid(int max_query_num, struct heavy_keeper_options *params, uuid_t uuid);
-
-
 struct heavy_keeper *heavy_keeper_with_metrics_new(int max_query_num, const char *metric_name[], size_t n_metric, size_t primary_metric);
 /**
  * @brief   free a heavy keeper.
@@ -172,48 +154,7 @@ struct heavy_keeper *heavy_keeper_deserialization(const char *blob, size_t size)
 */
 int heavy_keeper_get_config_K(struct heavy_keeper *hk);
 
-// TODO: 
-/*
-支持多个数据一起塞进来，其中一个作为键值，其他的跟随记录
-例子：
-list: key: "1.2.3.4"
-
-name              count
-"byte":           1000  [**primary**]
-"packet":112
-"out bype":12
-
-struct list_entry {
-    char *name;
-    unsigned int count;
-}
-
-
-hk = heavy_keeper_new(K, "byte", "packet", "out byte")
-heavy_keeper_add(hk, "1,2,3,4", 1000, 112, 12)
-
-struct heavy_keeper *heavy_keeper_new(int K, ...);
-int heavy_keeper_add(struct heavy_keeper *hk, const char *key, ...)
-
-
-// heavy_keeper_add_list(hk, "1.2.3.4", {{"byte", 1000}, {"packet", 112}, {"out byte", 12}})
-heavy_keeper_add_list(hk, "1.2.3.4", {1000, 112, 12});
-
-heavy_keeper_query(hk) -> 
-    struct heavy_keeper_result_list {
-        char *key[];
-        size_t result_num; // 最大K个
-    };
-
-result 举例：
-result_num = 2
-key: "1.2.3.4", "123.123.123.123"
-list[1]: {{"byte", 1000}, {"packet", 112}, {"out byte", 12}}
-list[2]: {{"byte", 12}, {"packet", 1}, {"out byte", 0}
-
-*/
-
-
+void heavy_keeper_get_config_metric_header(struct heavy_keeper *hk, char **metric_names, size_t *n_metric, size_t *primary_metric_index);
 
 
 #ifdef __cplusplus

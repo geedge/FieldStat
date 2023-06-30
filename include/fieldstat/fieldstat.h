@@ -11,7 +11,7 @@ enum field_type
 {
 	FIELD_TYPE_COUNTER,
 	FIELD_TYPE_TOPK,
-	FIELD_TYPE_hll,
+	FIELD_TYPE_HLL,
 	FIELD_TYPE_HISTOGRAM,
     // add more type here(`MUST` in the rear of the enum)
 };
@@ -41,7 +41,7 @@ struct fieldstat;
 struct fieldstat *fieldstat_new();
 void fieldstat_free(struct fieldstat *instance);
 int fieldstat_register_counter(struct fieldstat *instance, const char *field_name);
-int fieldstat_register_topk(struct fieldstat *instance, const char *field_name, int K, const char *metric_name[], size_t n_metric, int primary_metric); // TODO: 加参数，一共有多少个metric，哪一个用来sort的，{name}
+int fieldstat_register_topk(struct fieldstat *instance, const char *field_name, int K, const char *metric_name[], size_t n_metric, int primary_metric);
 int fieldstat_register_hll(struct fieldstat *instance, const char *field_name, unsigned char precision);
 int fieldstat_register_histogram(struct fieldstat *instance, const char *field_name, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures);
 
@@ -70,7 +70,7 @@ long long fieldstat_histogram_value_at_percentile(struct fieldstat *instance, in
 long long fieldstat_counter_get(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list);
 double fieldstat_hll_get(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list);
 void fieldstat_get_tag_lists(const struct fieldstat *instance, int field_id, struct fieldstat_tag_list **lists, size_t *n_list);
-void fieldstat_topk_query(const struct fieldstat *instance, int id, const struct fieldstat_tag_list *tag_list, // infos
+int fieldstat_topk_query(const struct fieldstat *instance, int id, const struct fieldstat_tag_list *tag_list, // infos
     char ***keys_out, size_t *n_key_out, // row info
     char ***metric_name_out, size_t *n_metric_out, size_t *primary_metric_id_out, // column info
     unsigned int ***metric_value_out); // values

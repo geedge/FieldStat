@@ -108,7 +108,7 @@ static int append_field_to_instance(struct fieldstat *instance, struct fs_field 
 int fieldstat_register_topk(struct fieldstat *instance, const char *field_name, int K,
     const char *metric_name[], size_t n_metric, int primary_metric)
 {
-    struct fs_field *field = field_new_topk(field_name, K);
+    struct fs_field *field = field_new_topk(field_name, K, metric_name, n_metric, primary_metric);
 
     return append_field_to_instance(instance, field);
 }
@@ -165,7 +165,6 @@ int fieldstat_topk_add(struct fieldstat *instance, int field_id, const char *key
     struct cell *cell = field_find_or_create_cell(field, tags, n_tag);
     cell_topk_add(cell, key, key_len, count);
 
-    // TODO count multiple
     return 0;
 }
 
@@ -195,7 +194,7 @@ int fieldstat_histogram_record(struct fieldstat *instance, int field_id, long lo
 int fieldstat_hll_add(struct fieldstat *instance, int field_id, const char *key, size_t key_len, const struct fieldstat_tag tags[], size_t n_tag)
 {
     struct fs_field *field = (struct fs_field *)instance->field_array[field_id];
-    if (field == NULL || field_get_type(field) != FIELD_TYPE_hll) {
+    if (field == NULL || field_get_type(field) != FIELD_TYPE_HLL) {
         printf("ERR: field is not registered yet\n");
         return -1;
     }
@@ -317,7 +316,6 @@ const char *fieldstat_get_field_name(const struct fieldstat *instance, int field
     return field_get_name(field);
 }
 
-
 enum field_type fieldstat_get_field_type(const struct fieldstat *instance, int field_id)
 {
     struct fs_field *field = instance->field_array[field_id];
@@ -328,30 +326,17 @@ enum field_type fieldstat_get_field_type(const struct fieldstat *instance, int f
     return field_get_type(instance->field_array[field_id]);
 }
 
-void fieldstat_topk_query(const struct fieldstat *instance, int id, const struct fieldstat_tag_list *tag_list,
-    char ***keys_out, size_t *n_key_out,
-    char ***metric_name_out, size_t *n_metric_out, size_t *primary_metric_id_out,
-    unsigned int ***metric_value_out)
+static bool fieldstat_check_field(struct fs_field *field, enum field_type type)
 {
-    struct fs_field *field = instance->field_array[id];
-    if (field == NULL || field_get_type(field) != FIELD_TYPE_TOPK) {
+    if (field == NULL) {
         printf("ERR: field is not registered yet\n");
-        return;
+        return false;
     }
-    struct cell *cell = field_find_cell(field, tag_list->tag, tag_list->n_tag);
-    if (cell == NULL) {
-        *n_key_out = 0;
-        *keys_out = NULL;
-        *n_metric_out = 0;
-        *metric_name_out = NULL;
-        *metric_value_out = NULL;
-
-        return;
+    if (field_get_type(field) != type) {
+        printf("ERR: field type is not matched\n");
+        return false;
     }
-
-    cell_topk_query(cell, keys_out, n_key_out,
-        metric_name_out, n_metric_out, primary_metric_id_out,
-        metric_value_out);
+    return true;
 }
 
 void tag_list_clear(struct fieldstat_tag_list *tag_list)
@@ -366,7 +351,6 @@ void tag_list_clear(struct fieldstat_tag_list *tag_list)
     free(tag_list->tag);
 }
 
-// TODO: 这个改成直接生成数组
 void fieldstat_get_tag_lists(const struct fieldstat *instance, int field_id, struct fieldstat_tag_list **lists, size_t *n_list)
 {
     struct fs_field *field = instance->field_array[field_id];
@@ -380,13 +364,45 @@ void fieldstat_get_tag_lists(const struct fieldstat *instance, int field_id, str
     field_get_tags(field, lists, n_list);
 }
 
+int fieldstat_topk_query(const struct fieldstat *instance, int id, const struct fieldstat_tag_list *tag_list,
+    char ***keys_out, size_t *n_key_out,
+    char ***metric_name_out, size_t *n_metric_out, size_t *primary_metric_id_out,
+    unsigned int ***metric_value_out)
+{
+    struct fs_field *field = instance->field_array[id];
+    if (!fieldstat_check_field(field, FIELD_TYPE_TOPK)) {
+        *n_key_out = 0;
+        *keys_out = NULL;
+        *n_metric_out = 0;
+        *metric_name_out = NULL;
+        *metric_value_out = NULL;
+        return -1;
+    }
+
+    struct cell *cell = field_find_cell(field, tag_list->tag, tag_list->n_tag);
+    if (cell == NULL) {
+        *n_key_out = 0;
+        *keys_out = NULL;
+        *n_metric_out = 0;
+        *metric_name_out = NULL;
+        *metric_value_out = NULL;
+
+        return 0;
+    }
+
+    cell_topk_query(cell, keys_out, n_key_out,
+        metric_name_out, n_metric_out, primary_metric_id_out,
+        metric_value_out);
+    return 0;
+}
+
 long long fieldstat_counter_get(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list)
 {
     struct fs_field *field = instance->field_array[field_id];
-    if (field == NULL || field_get_type(field) != FIELD_TYPE_COUNTER) {
-        printf("ERR: field is not registered yet\n");
+    if (!fieldstat_check_field(field, FIELD_TYPE_COUNTER)) {
         return -1;
     }
+
     struct cell *cell = field_find_cell(field, tag_list->tag, tag_list->n_tag);
     if (cell == NULL) {
         return 0;
@@ -398,10 +414,10 @@ long long fieldstat_counter_get(const struct fieldstat *instance, int field_id, 
 long long fieldstat_histogram_value_at_percentile(struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list, double percentile)
 {
     struct fs_field *field = instance->field_array[field_id];
-    if (field == NULL || field_get_type(field) != FIELD_TYPE_HISTOGRAM) {
-        printf("ERR: field is not registered yet\n");
+    if (!fieldstat_check_field(field, FIELD_TYPE_HISTOGRAM)) {
         return -1;
     }
+
     struct cell *cell = field_find_cell(field, tag_list->tag, tag_list->n_tag);
     if (cell == NULL) {
         return 0;
@@ -410,16 +426,28 @@ long long fieldstat_histogram_value_at_percentile(struct fieldstat *instance, in
     return cell_histogram_value_at_percentile(cell, percentile);
 }
 
-//  avg=fieldstat_histogram_average(instance, field_id[i], tag_lists[j]); 
-// TODO: histogram 两种query
+long long fieldstat_histogram_count_le_value(struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list, long long value)
+{
+    struct fs_field *field = instance->field_array[field_id];
+    if (!fieldstat_check_field(field, FIELD_TYPE_HISTOGRAM)) {
+        return -1;
+    }
+
+    struct cell *cell = field_find_cell(field, tag_list->tag, tag_list->n_tag);
+    if (cell == NULL) {
+        return 0;
+    }
+
+    return cell_histogram_count_le_value(cell, value);
+}
 
 double fieldstat_hll_get(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list)
 {
     struct fs_field *field = instance->field_array[field_id];
-    if (field == NULL || field_get_type(field) != FIELD_TYPE_hll) {
-        printf("ERR: field is not registered yet\n");
+    if (!fieldstat_check_field(field, FIELD_TYPE_HLL)) {
         return -1;
     }
+
     struct cell *cell = field_find_cell(field, tag_list->tag, tag_list->n_tag);
     if (cell == NULL) {
         return 0;
@@ -436,7 +464,7 @@ void fieldstat_get_serialized_blob(const struct fieldstat *instance, int field_i
         return;
     }
     enum field_type type = field_get_type(field);
-    if (!(type == FIELD_TYPE_hll || type == FIELD_TYPE_HISTOGRAM)) {
+    if (!(type == FIELD_TYPE_HLL || type == FIELD_TYPE_HISTOGRAM)) {
         printf("ERR: Only metric of hll and histogram support get serialized blob\n");
         return;
     }

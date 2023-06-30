@@ -24,6 +24,9 @@ struct para_hdr{
 
 struct para_topk {
     int K;
+    char **metric_names;
+    size_t num_metric;
+    size_t primary_metric_id;
 };
 
 struct para_hll {
@@ -105,7 +108,7 @@ struct cell *field_spawn_cell(const struct fs_field *field)
         }
         break;
         case FIELD_TYPE_TOPK:{
-            cell = cell_create_for_topk(field->field_paras->topk.K);
+            cell = cell_create_for_topk(field->field_paras->topk.K, (const char **)field->field_paras->topk.metric_names, field->field_paras->topk.num_metric, field->field_paras->topk.primary_metric_id);
         }
         break;
         case FIELD_TYPE_HISTOGRAM:{
@@ -113,7 +116,7 @@ struct cell *field_spawn_cell(const struct fs_field *field)
             cell = cell_create_for_histogram(tmp_paras->lowest_trackable_value, tmp_paras->highest_trackable_value, tmp_paras->significant_figures);
         }
         break;
-        case FIELD_TYPE_hll:{
+        case FIELD_TYPE_HLL:{
             cell = cell_create_for_hll(field->field_paras->hll.precision);
         }
         break;
@@ -132,8 +135,11 @@ struct field_paras *construct_parameters(enum field_type type, ...)
     switch (type) {
         case FIELD_TYPE_TOPK:
             paras->topk.K = va_arg(ap, int);
+            paras->topk.metric_names = va_arg(ap, char **);
+            paras->topk.num_metric = va_arg(ap, size_t);
+            paras->topk.primary_metric_id = va_arg(ap, size_t);
             break;
-        case FIELD_TYPE_hll:
+        case FIELD_TYPE_HLL:
             paras->hll.precision = (char)va_arg(ap, int);
             break;
         case FIELD_TYPE_HISTOGRAM:
@@ -210,6 +216,7 @@ struct cell *field_find_or_create_cell(struct fs_field *field, const struct fiel
     if (cell == NULL) {
         printf("cell is null, going to create one\n");
         cell = field_spawn_cell(field);
+        printf("cell is created\n");
         cell_add_tag(cell, tag_list, tag_num);
         field_insert_cell_with_key(field, cell, dynamic_cell_key, dynamic_key_size);
     }
@@ -218,10 +225,9 @@ struct cell *field_find_or_create_cell(struct fs_field *field, const struct fiel
     return cell;
 }
 
-struct fs_field *field_new_topk(const char *name, int K)
+struct fs_field *field_new_topk(const char *name, int K, const char **metric_names, size_t num_metric, size_t primary_metric_id)
 {
-    printf("field_new_topk enter\n");
-    struct field_paras *paras = construct_parameters(FIELD_TYPE_TOPK, K);
+    struct field_paras *paras = construct_parameters(FIELD_TYPE_TOPK, K, metric_names, num_metric, primary_metric_id);
 
     struct fs_field *field = field_new(FIELD_TYPE_TOPK, name, paras);
 
@@ -235,8 +241,8 @@ struct fs_field *field_new_counter(const char *name)
 
 struct fs_field *field_new_hll(const char *name, char precision)
 {
-    struct field_paras *paras = construct_parameters(FIELD_TYPE_hll, precision);
-    struct fs_field *field = field_new(FIELD_TYPE_hll, name, paras);
+    struct field_paras *paras = construct_parameters(FIELD_TYPE_HLL, precision);
+    struct fs_field *field = field_new(FIELD_TYPE_HLL, name, paras);
     return field;
 }
 struct fs_field *field_new_histogram(const char *name, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures)
@@ -375,7 +381,7 @@ void serialize_field_parameters(const struct fs_field *field, char **blob, size_
         mpack_write_cstr(&writer, "K");
         mpack_write_i32(&writer, para->topk.K);
         break;
-    case FIELD_TYPE_hll:
+    case FIELD_TYPE_HLL:
         mpack_write_cstr(&writer, "prec");
         mpack_write_i32(&writer, para->hll.precision);
         break;
@@ -415,7 +421,7 @@ struct field_paras *deserialize_parameters(const char *blob, size_t blob_size)
             // para is null
         }
         break;
-        case FIELD_TYPE_hll: {
+        case FIELD_TYPE_HLL: {
             int precision = mpack_node_i32(mpack_node_map_cstr(root, "prec"));
             field_para = construct_parameters(type, precision);
         }
@@ -518,7 +524,6 @@ struct fs_field *field_deserialize(const char *blob, size_t blob_size)
             "para":[may be null, one number, or a double array]
             "cells":[<bin_blob>]
         }*/
-// TODO: 这个ID没有了
 int field_serialize(const struct fs_field *field, char **blob, size_t *blob_size)
 {
     char *para_blob = NULL;

@@ -23,7 +23,7 @@ void field_free(struct fs_field *field);
 void field_refresh(struct fs_field *field);
 struct fs_field *field_dup(const struct fs_field *src);
 int field_merge(struct fs_field *dst, const struct fs_field *src);
-struct fs_field *field_new_topk(const char *name, int K);
+struct fs_field *field_new_topk(const char *name, int K, const char **metric_names, size_t num_metric, size_t primary_metric_id);
 struct fs_field *field_new_counter(const char *name);
 struct fs_field *field_new_hll(const char *name, char precision);
 struct fs_field *field_new_histogram(const char *name, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures);

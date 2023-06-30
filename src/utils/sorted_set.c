@@ -251,6 +251,17 @@ void **sorted_set_get_pointer_to_user_data(struct sorted_set *ss, const char *me
     return &(heap_data->user_data);
 }
 
+int sorted_set_insert_user_data(struct sorted_set *ss, const char *member, size_t member_size, void *user_data)
+{
+    heap_entry *entry = sorted_set_find_entry_with_member(ss, member, member_size);
+    if (entry == NULL) {
+        return -1;
+    }
+    struct entry_data *heap_data = sorted_set_entry_get_val(entry);
+    heap_data->user_data = user_data;
+    return 0;
+}
+
 typedef struct {
     unsigned key;
     struct entry_data *val;

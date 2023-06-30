@@ -64,11 +64,11 @@ TEST(metric_test_topk, serialize_and_deserialize_for_2_fields_1st_empty_2nd_adde
     struct fieldstat *instance = fieldstat_new();
     printf("new ok\n");
 
-    const char *metric_name[] = {"test_bytes"};
-    unsigned int added_value[] = {1};
+    const char *metric_name[] = {"test_bytes", "test_packet_num"};
+    unsigned int added_value[] = {1, 10000};
 
-    int id1_empty = fieldstat_register_topk(instance, "topk_empty", 10, metric_name, 1, 0);
-    int id2_added = fieldstat_register_topk(instance, "topk_add", 10, metric_name, 1, 0);
+    int id1_empty = fieldstat_register_topk(instance, "topk_empty", 10, metric_name, 2, 1);
+    int id2_added = fieldstat_register_topk(instance, "topk_add", 10, metric_name, 2, 1);
     printf("register OK\n");
     // register metric 
     std::string value_string_2_1_1 = gen_rand_string(10);
@@ -119,28 +119,51 @@ TEST(metric_test_topk, serialize_and_deserialize_for_2_fields_1st_empty_2nd_adde
     size_t primary_key_id;
     unsigned int **count_result = NULL;
 
-
-    // todo: 补这里的测试用例
     fieldstat_topk_query(instance_from_deserialize, id2_added, &tag_list_2[0],
-                            &key_result, &n_result, &metric_name_result, &n_metric, &primary_key_id, &count_result);
+                         &key_result, &n_result, &metric_name_result, &n_metric, &primary_key_id, &count_result);
 
     printf("query topk ok\n");
     EXPECT_EQ(n_result, 1);
     EXPECT_STREQ(key_result[0], value_string_2_1_1.c_str());
-    EXPECT_EQ(count_result[0], 2);
+    EXPECT_EQ(n_metric, 2);
+    EXPECT_EQ(count_result[0][0], 2);
+    EXPECT_EQ(count_result[0][1], 20000);
+    EXPECT_STREQ(metric_name_result[0], metric_name[0]);
+    EXPECT_STREQ(metric_name_result[1], metric_name[1]);
+    EXPECT_EQ(primary_key_id, 1);
+
     free(key_result[0]);
     free(key_result);
+    for (size_t i = 0; i < n_metric; i++) {
+        free(metric_name_result[i]);
+    }
+    free(metric_name_result);
+    for (size_t i = 0; i < n_result; i++) {
+        free(count_result[i]);
+    }
     free(count_result);
 
     fieldstat_topk_query(instance_from_deserialize, id2_added, &tag_list_2[1],
                             &key_result, &n_result, &metric_name_result, &n_metric, &primary_key_id, &count_result);
     EXPECT_EQ(n_result, 1);
     EXPECT_STREQ(key_result[0], value_string_2_1_2.c_str());
-    EXPECT_EQ(count_result[0], 1);
+    EXPECT_EQ(n_metric, 2);
+    EXPECT_EQ(count_result[0][0], 1);
+    EXPECT_EQ(count_result[0][1], 10000);
+    EXPECT_STREQ(metric_name_result[0], metric_name[0]);
+    EXPECT_STREQ(metric_name_result[1], metric_name[1]);
+    EXPECT_EQ(primary_key_id, 1);
+
     printf("check finish\n");
     free(key_result[0]);
     free(key_result);
+    for (size_t i = 0; i < n_metric; i++) {
+        free(metric_name_result[i]);
+    }
+    free(metric_name_result);
+    free(count_result[0]);
     free(count_result);
+    
     printf("clear query result ok\n");
     for (size_t i = 0; i < ret_2cell_2length; i++) {
         tag_list_clear(&tag_list_2[i]);
@@ -152,6 +175,12 @@ TEST(metric_test_topk, serialize_and_deserialize_for_2_fields_1st_empty_2nd_adde
     fieldstat_free(instance);
     fieldstat_free(instance_from_deserialize);
 }
+
+//TODO: 不同的metric个数，再来一遍
+
+// TODO：性能测试等
+
+
 
 int main(int argc, char *argv[]) 
 {

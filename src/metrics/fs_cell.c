@@ -186,41 +186,27 @@ void deserialize_tag(mpack_node_t *root, struct fieldstat_tag **tag_list_out, si
 {
     mpack_node_t tag_arr = mpack_node_map_cstr(*root, "tags");
     size_t tag_num = mpack_node_array_length(tag_arr);
-    printf("deserialize_tag enter, tag num: %zu\n", tag_num);
 
     struct fieldstat_tag *tag_list = malloc(sizeof(struct fieldstat_tag) * tag_num);
     for (int j = 0; j < tag_num; j++) {
-        printf("deserialize tag loop %d  1\n", j);
         mpack_node_t tag = mpack_node_array_at(tag_arr, j);
-        printf("deserialize tag loop %d  1.000\n", j);
 
         mpack_node_t key = mpack_node_map_cstr(tag, "key");
-        printf("deserialize tag loop %d  1.0\n", j);
         tag_list[j].key = (char *)malloc(mpack_node_strlen(key) + 1);
-        printf("deserialize tag loop %d  1.1\n", j);
         mpack_node_copy_cstr(key, (char *)tag_list[j].key, mpack_node_strlen(key) + 1);
-        printf("deserialize tag loop %d  1.2\n", j);
         tag_list[j].type = mpack_node_i8(mpack_node_map_cstr(tag, "type"));
-        printf("deserialize tag loop %d  1.3\n", j);
 
         mpack_node_t value = mpack_node_map_cstr(tag, "value");
-        printf("deserialize tag loop %d  2\n", j);
 
         switch (tag_list[j].type)
         {
             case TAG_INTEGER:
-                printf("deserialize tag loop %d  3\n", j);
-
                 tag_list[j].value_int = mpack_node_i64(value);
                 break;
             case TAG_DOUBLE:
-                printf("deserialize tag loop %d  4\n", j);
-
                 tag_list[j].value_double = mpack_node_double(value);
                 break;
             case TAG_CSTRING:
-                printf("deserialize tag loop %d  5\n", j);
-
                 tag_list[j].value_str = (char *)malloc(mpack_node_strlen(value) + 1);
                 mpack_node_copy_cstr(value, (char *)tag_list[j].value_str, mpack_node_strlen(value) + 1);
                 break;
@@ -267,7 +253,10 @@ static int metric_topk_copy(struct metrics *pthis, const struct metrics *from)
         heavy_keeper_free(topk->hk);
     }
 
-    topk->hk = heavy_keeper_new(heavy_keeper_get_config_K(from_topk->hk), NULL);
+    struct heavy_keeper_result *result = heavy_keeper_query(from_topk->hk);
+    topk->hk = heavy_keeper_with_metrics_new(heavy_keeper_get_config_K(from_topk->hk),
+        (const char **)result->metric_name, result->n_metric, result->primary_metric_id);
+    heavy_keeper_result_free(result);
 
     return heavy_keeper_merge(topk->hk, from_topk->hk);
 }
@@ -313,14 +302,14 @@ static struct metric_topk *metric_topk_new_scheme()
 /*                                    cell-topk                               */
 /* -------------------------------------------------------------------------- */
 
-struct cell *cell_create_for_topk(int K)
+struct cell *cell_create_for_topk(int K, const char **metric_names, size_t metric_num, size_t primary_metric_index)
 {
     struct cell *cell = (struct cell *)malloc(sizeof(struct cell));
     memset(cell, 0, sizeof(struct cell));
     struct metric_topk *topk = metric_topk_new_scheme();
     cell->metric = (struct metrics *)topk;
 
-    topk->hk = heavy_keeper_new(K, NULL);
+    topk->hk = heavy_keeper_with_metrics_new(K, metric_names, metric_num, primary_metric_index);
 
     return cell;
 }
@@ -331,15 +320,14 @@ void cell_topk_add(struct cell *pthis, const char *key, size_t key_len, unsigned
     heavy_keeper_with_metrics_add(topk->hk, key, key_len, value);
 }
 
-
 // (*values_out)[i] is the value of cstring_t (*keys_out)[i]
 // sub_metric_value_out: pointer to a 2-d array. sub_metric_value_out[i][j] is the value of (keys_out[i], sub_metric_name[j]), where i < num_out, j < num_metric_out
 
 typedef char * cstring_t;
 void cell_topk_query(const struct cell *pthis,
     cstring_t **keys_out, size_t *num_out, // row
-    cstring_t **sub_metric_name_out, size_t *num_metric_out, size_t *primary_metric_id_out, // column
-    unsigned int ***sub_metric_value_out)
+    cstring_t **metric_name_out, size_t *num_metric_out, size_t *primary_metric_id_out, // column
+    unsigned int ***metric_value_out)
 {
     struct metric_topk *topk = (struct metric_topk *)pthis->metric;
     struct heavy_keeper_result *result = heavy_keeper_query(topk->hk);
@@ -355,19 +343,19 @@ void cell_topk_query(const struct cell *pthis,
     }
 
     // column
-    *sub_metric_name_out = (cstring_t *)malloc(sizeof(cstring_t) * result->n_metric);
+    *metric_name_out = (cstring_t *)malloc(sizeof(cstring_t) * result->n_metric);
     for (int j = 0; j < result->n_metric; j++) {
-        (*sub_metric_name_out)[j] = strdup(result->metric_name[j]);
+        (*metric_name_out)[j] = strdup(result->metric_name[j]);
     }
     *num_metric_out = result->n_metric;
     *primary_metric_id_out = result->primary_metric_id;
 
     // value
-    *sub_metric_value_out = (unsigned int **)malloc(sizeof(unsigned int *) * result->n_key);
+    *metric_value_out = (unsigned int **)malloc(sizeof(unsigned int *) * result->n_key);
     for (int i = 0; i < result->n_key; i++) {
-        (*sub_metric_value_out)[i] = (unsigned int *)malloc(sizeof(unsigned int) * result->n_metric);
+        (*metric_value_out)[i] = (unsigned int *)malloc(sizeof(unsigned int) * result->n_metric);
         for (int j = 0; j < result->n_metric; j++) {
-            (*sub_metric_value_out)[i][j] = result->metric_value_arr[i][j];
+            (*metric_value_out)[i][j] = result->metric_value_arr[i][j];
         }
     }
     
@@ -540,7 +528,7 @@ static struct metric_hll *metric_hll_new_scheme()
     base->copy = metric_hll_copy;
     base->serialize = metric_hll_serialize;
     base->deserialize = metric_hll_deserialize;
-    base->type = FIELD_TYPE_hll;
+    base->type = FIELD_TYPE_HLL;
 
     return hll;
 }
@@ -684,10 +672,26 @@ long long cell_histogram_value_at_percentile(const struct cell *pthis, double pe
 {
     struct metric_histogram *histogram = (struct metric_histogram *)pthis->metric;
 
-    if (histogram->hdr == NULL) {
-        printf("cell_histogram_value_at_percentile hdr is null\n");
-    }
     return hdr_value_at_percentile(histogram->hdr, percentile);
+}
+
+static long long hdr_count_le_value(const struct hdr_histogram* h, long long value)
+{
+	struct hdr_iter iter;
+	long long count = 0;
+	hdr_iter_recorded_init(&iter, h);
+	while (hdr_iter_next(&iter))
+	{
+		if((long long)iter.value <= value)
+			count ++;
+	}
+	return count;
+}
+
+long long cell_histogram_count_le_value(const struct cell *pthis, long long value)
+{
+    struct metric_histogram *histogram = (struct metric_histogram *)pthis->metric;
+    return hdr_count_le_value(histogram->hdr, value);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -704,7 +708,7 @@ static struct metrics *metric_scheme_new(enum field_type type)
             return (struct metrics *)metric_histogram_new_scheme();
         case FIELD_TYPE_COUNTER:
             return (struct metrics *)metric_counter_new_scheme();
-        case FIELD_TYPE_hll:
+        case FIELD_TYPE_HLL:
             return (struct metrics *)metric_hll_new_scheme();
         default:
             assert(0);
@@ -834,7 +838,7 @@ void cell_free(struct cell *pthis)
 
 void cell_get_plain_blob(const struct cell *pthis, char **blob, size_t *blob_size) 
 {
-    if (pthis->metric->type == FIELD_TYPE_hll) {
+    if (pthis->metric->type == FIELD_TYPE_HLL) {
         struct metric_hll *card = (struct metric_hll *)pthis->metric;
         ST_hyperloglog_serialize_for_networking(card->hll, blob, blob_size);
         return;

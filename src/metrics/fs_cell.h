@@ -15,12 +15,12 @@ struct cell *cell_deserialize(const char *blob, size_t blob_size);
 int cell_merge(struct cell *pthis, const struct cell *from);
 void cell_get_plain_blob(const struct cell *pthis, char **blob, size_t *blob_size);
 
-struct cell *cell_create_for_topk(int K);
+struct cell *cell_create_for_topk(int K, const char **metric_names, size_t metric_num, size_t primary_metric_index);
 void cell_topk_add(struct cell *pthis, const char *key, size_t key_len, unsigned value[]);
 void cell_topk_query(const struct cell *pthis,
     char ***keys_out, size_t *num_out, // row
-    char ***sub_metric_name_out, size_t *num_metric_out, size_t *primary_metric_id_out, // column
-    unsigned int ***sub_metric_value_out);
+    char ***metric_name_out, size_t *num_metric_out, size_t *primary_metric_id_out, // column
+    unsigned int ***metric_value_out); // value, num_out * num_metric_out 2-d array of unsigned int
 
 struct cell *cell_create_for_counter();
 void cell_counter_incrby(struct cell *pthis, long long value);
@@ -32,4 +32,6 @@ double cell_hll_get(const struct cell *pthis);
 
 struct cell *cell_create_for_histogram(long long lowest_trackable_value, long long highest_trackable_value, int significant_figures);
 int cell_histogram_record(struct cell *pthis, long long value);
+// for the meaning of these two query method, refer to https://prometheus.io/docs/concepts/metric_types/, and search for "histogram" and "summary"
 long long cell_histogram_value_at_percentile(const struct cell *pthis, double percentile);
+long long cell_histogram_count_le_value(const struct cell *pthis, long long value);

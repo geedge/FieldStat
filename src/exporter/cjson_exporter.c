@@ -191,18 +191,32 @@ void cell_iter_free(struct cell_iter *iter) {
     free(iter);
 }
 
+enum field_type cell_iter_get_type(const struct cell_iter *iter) {
+    return fieldstat_get_field_type(iter->instance, iter->curr_id);
+}
+
+const char *cell_iter_get_name(const struct cell_iter *iter) {
+    return fieldstat_get_field_name(iter->instance, iter->curr_id);
+}
+
+struct fieldstat_tag_list *cell_iter_get_tag_list(const struct cell_iter *iter) {
+    return &iter->tag_list[iter->tag_idx];
+}
+
 void cell_iter_step_into_topk(struct cell_iter *iter) {
     iter->topk_iter = (struct topk_iter *)malloc(sizeof(struct topk_iter));
     memset(iter->topk_iter, 0, sizeof(struct topk_iter));
     size_t primary_metric_id_dummy;
-    fieldstat_topk_query(iter->instance, iter->curr_id, iter->tag_list,
-        &iter->topk_iter->result_key, &iter->topk_iter->result_n,
-        &iter->topk_iter->metric_names, &iter->topk_iter->n_metric, &primary_metric_id_dummy,
-        &iter->topk_iter->metric_values);
 
     if (iter->tag_list == NULL) {
         fieldstat_get_tag_lists(iter->instance, iter->curr_id, &iter->tag_list, &iter->tag_num);
+        iter->tag_idx = 0;
     }
+
+    fieldstat_topk_query(iter->instance, iter->curr_id, cell_iter_get_tag_list(iter), 
+        &iter->topk_iter->result_key, &iter->topk_iter->result_n,
+        &iter->topk_iter->metric_names, &iter->topk_iter->n_metric, &primary_metric_id_dummy,
+        &iter->topk_iter->metric_values);
 
     iter->state = ITER_STATE_TOPK_MOVING;
 }
@@ -213,14 +227,11 @@ int cell_iter_next_nonempty_field(struct cell_iter *iter) {
         iter->curr_id++;
 
         fieldstat_get_tag_lists(iter->instance, iter->curr_id, &iter->tag_list, &iter->tag_num);
-        printf("cell_iter_next tag list new, keys:\n");
-        for (int i = 0; i < iter->tag_num; i++) {
-            printf("%s\n", iter->tag_list[i].tag->key);
-        }
-        printf("----------------------\n");
         if (iter->tag_list == NULL) {
             continue;
         }
+        iter->tag_idx = 0;
+
         if (fieldstat_get_field_type(iter->instance, iter->curr_id) == FIELD_TYPE_TOPK) {
             // here we do not need to worry if topk is empty, because when we find tag, it is ensured that topk_add occurred at least once
             cell_iter_step_into_topk(iter);
@@ -229,7 +240,6 @@ int cell_iter_next_nonempty_field(struct cell_iter *iter) {
             return 1;
         }
         iter->state = ITER_STATE_TAG_MOVING;
-        iter->tag_idx = 0;
         printf("cell_iter_next new field: %d\n", iter->curr_id);
 
         return 1;
@@ -284,28 +294,11 @@ int cell_iter_next(struct cell_iter *iter) {
     return cell_iter_next_nonempty_field(iter);
 }
 
-enum field_type cell_iter_get_type(struct cell_iter *iter) {
-    return fieldstat_get_field_type(iter->instance, iter->curr_id);
-}
-
-int cell_iter_get_id(struct cell_iter *iter) {
-    return iter->curr_id;
-}
-
-const char *cell_iter_get_name(struct cell_iter *iter) {
-    return fieldstat_get_field_name(iter->instance, iter->curr_id);
-}
-
-struct fieldstat_tag_list *cell_iter_get_tag_list(struct cell_iter *iter) {
-    return &iter->tag_list[iter->tag_idx];
-}
-
-
 /* -------------------------------------------------------------------------- */
 /*                                   export                                   */
 /* -------------------------------------------------------------------------- */
 
-Export_kv_pair *cell_query_with_iter(struct cell_iter *iter) {
+Export_kv_pair *cell_query_with_iter(const struct cell_iter *iter) {
     Export_kv_pair *ret = malloc(sizeof(Export_kv_pair));
     size_t len_dummy;
 
@@ -316,12 +309,12 @@ Export_kv_pair *cell_query_with_iter(struct cell_iter *iter) {
     switch (cell_iter_get_type(iter)) {
         case FIELD_TYPE_COUNTER:
             ret->type = TAG_INTEGER;
-            ret->value_int = fieldstat_counter_get(iter->instance, cell_iter_get_id(iter), cell_iter_get_tag_list(iter));
+            ret->value_int = fieldstat_counter_get(iter->instance, iter->curr_id, cell_iter_get_tag_list(iter));
             break;
-        case FIELD_TYPE_hll:
+        case FIELD_TYPE_HLL:
         case FIELD_TYPE_HISTOGRAM:
             ret->type = TAG_CSTRING;
-            fieldstat_get_serialized_blob(iter->instance, cell_iter_get_id(iter), cell_iter_get_tag_list(iter), (char **)&ret->value_str, &len_dummy);
+            fieldstat_get_serialized_blob(iter->instance, iter->curr_id, cell_iter_get_tag_list(iter), (char **)&ret->value_str, &len_dummy);
             break;
 
         default:
@@ -365,13 +358,11 @@ void tag_list_append_to_tag_object(const struct fieldstat_tag_list *tag_list, cJ
     for (int i = 0; i < tag_list_len; i++) {
         kv_pair_add_to_cjson(&tag_list->tag[i], cjson_tags);
     }
-
-    return cjson_tags;
 }
 
 void cell_iter_get_topk_result_entry(struct cell_iter *iter, Export_kv_pair *pairs)
 {
-    pairs->key = strdup(cell_iter_get_name(iter));
+    pairs->key = cell_iter_get_name(iter);
     pairs->type = TAG_CSTRING;
     pairs->value_str = iter->topk_iter->result_key[iter->topk_iter->curr_idx];
 }
@@ -394,7 +385,7 @@ void cell_iter_shallow_copy_tag_list(struct cell_iter *iter, struct fieldstat_ta
     }
 }
 
-Export_kv_pair *cell_topk_query_with_iter_at_index(struct topk_iter *iter, size_t field_id)
+Export_kv_pair *cell_topk_query_with_iter_at_index(const struct topk_iter *iter, size_t field_id)
 {
     Export_kv_pair *ret = malloc(sizeof(Export_kv_pair));
 
@@ -601,11 +592,9 @@ void fieldstat_json_exporter_free(struct fieldstat_json_exporter *exporter)
     if (exporter->name != NULL) {
         free(exporter->name);
     }
-    if (exporter->global_tag != NULL) {
-        for (size_t i = 0; i < exporter->n_global_tag; i++) {
-            kv_pair_free(&exporter->global_tag[i]);
-        }
-        free(exporter->global_tag);
+    if (exporter->global_tag_list != NULL) {
+        tag_list_clear(exporter->global_tag_list);
+        free(exporter->global_tag_list);
     }
     free(exporter);
 }
