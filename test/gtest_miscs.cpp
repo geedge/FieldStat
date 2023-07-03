@@ -3,7 +3,9 @@
 // 空的instance
 // realloc for field
 //  超长tag，测试动态key的realloc
+// 超多metric，直到realloc
 
+// name map id
 
 #include <gtest/gtest.h>
 

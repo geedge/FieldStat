@@ -392,10 +392,8 @@ static void heavy_keeper_merge_sketch(struct heavy_keeper *dest, const struct he
             struct Bucket *bucket_src = &(src->sketch[array_id * w + bucket_id]);
 
             if (bucket_dest->finger_print == bucket_src->finger_print) {
-                printf("bucket count add: %u + %u\n", bucket_dest->count, bucket_src->count);
                 bucket_dest->count += bucket_src->count;
             } else {
-                printf("fp not equal: %u, %u\n", bucket_dest->finger_print, bucket_src->finger_print);
                 if (bucket_dest->count < bucket_src->count) {  // bucket_src stores the elephant flow.
                     // printf("write bucket_src: FP = %u, C = %llu to bucket 1. position: %d,%d\n", bucket_src->finger_print, bucket_src->count,array_id, bucket_id);
                     bucket_dest->count = bucket_src->count;

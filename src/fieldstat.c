@@ -89,6 +89,7 @@ void fieldstat_refresh(struct fieldstat *instance)
     for (int i = 0; i < instance->n_field; i++) {
         field_refresh(instance->field_array[i]);
     }
+    // TODO: 回收不活跃的
 }
 
 static int append_field_to_instance(struct fieldstat *instance, struct fs_field *field)
@@ -109,6 +110,14 @@ static int append_field_to_instance(struct fieldstat *instance, struct fs_field 
 int fieldstat_register_topk(struct fieldstat *instance, const char *field_name, int K,
     const char *metric_name[], size_t n_metric, int primary_metric)
 {
+    if (primary_metric < 0 || primary_metric >= n_metric) {
+        printf("fieldstat_register_topk: invalid primary_metric.\n");
+        return -1;
+    }
+    if (n_metric == 0) {
+        printf("fieldstat_register_topk: n_metric must be at lease one(primary metric).\n");
+        return -1;
+    }
     struct fs_field *field = field_new_topk(field_name, K, metric_name, n_metric, primary_metric);
 
     return append_field_to_instance(instance, field);
@@ -401,7 +410,7 @@ long long fieldstat_counter_get(const struct fieldstat *instance, int field_id, 
     return cell_counter_get(cell);
 }
 
-long long fieldstat_histogram_value_at_percentile(struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list, double percentile)
+long long fieldstat_histogram_value_at_percentile(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list, double percentile)
 {
     struct fs_field *field = instance->field_array[field_id];
     if (!fieldstat_check_field(field, FIELD_TYPE_HISTOGRAM)) {

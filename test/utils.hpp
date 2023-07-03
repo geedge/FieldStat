@@ -50,8 +50,11 @@ private:
 };
 
 struct fieldstat *test_serialize_and_deserialize(struct fieldstat *instance);
+void test_merge_with_blob(struct fieldstat *dest, const struct fieldstat *src);
+void test_merge_with_blob_twice(struct fieldstat *dest, const struct fieldstat *src);
+
 template <typename Query_ret>
-std::vector<Query_ret> test_get_query_result(Query_ret (*query)(struct fieldstat *, int field_id, const struct fieldstat_tag_list *),
+std::vector<Query_ret> test_get_query_result(Query_ret (*query)(const struct fieldstat *, int field_id, const struct fieldstat_tag_list *),
     struct fieldstat *instance, int queried_field_id)
 {
     size_t cell_num;

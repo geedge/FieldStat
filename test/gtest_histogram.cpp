@@ -6,94 +6,114 @@
 #include "fieldstat.h"
 #include "base64/b64.h"
 
-
-// serialize and merge by blob(empty dest), then create a new instance by the same register order, merge by blob(non-empty dest). query result on the merged one. Benchmark: tag, heavykeeper result.
-
-// serialize and merge by blob(empty dest), then create a new instance by the same register order, refresh, merge by blob(non-empty dest). query result on the merged one. Benchmark: tag, heavykeeper result.
-
-// multi field, same tag, add several times. 
-
-// register and merge empty to empty
-
-// register and merge empty to non-empty
-
-// compare merged one to source, they are equal
-
-// 简单的tag 测试：输入一个key， value 是”1“， 再输入一个value是1的tag，两次添加，只有一个tag，查阅出的tag也只有一个。 
-
-// 满规格测试，instance里增加的数量超过初始值，realloc
-// 性能测试
+long long histogram_query(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list)
+{
+    long long ret = fieldstat_histogram_value_at_percentile(instance, field_id, tag_list, 50.0);
+    return ret;
+}
 
 TEST(metric_test_histogram, serialize_and_deserialize_for_2_fields_1st_empty_2nd_added)
 {
     struct fieldstat *instance = fieldstat_new();
-    printf("new ok\n");
 
-    int id1_empty = fieldstat_register_histogram(instance, "empty", 1, 60000000, 3);
-    int id2_added = fieldstat_register_histogram(instance, "add", 1, 60000000, 3);
-    printf("register OK\n");
-
+    int id1_empty = fieldstat_register_histogram(instance, "empty", 1, 600000, 3);
+    int id2_added = fieldstat_register_histogram(instance, "add", 1, 600000, 3);
     // metric add
     long long value_add_twice = 1234;
     long long value_add_once = 123;
     fieldstat_histogram_record(instance, id2_added, value_add_twice, &TEST_TAG_DOUBLE, 1);
     fieldstat_histogram_record(instance, id2_added, value_add_twice, &TEST_TAG_DOUBLE, 1);
-    printf("add ok0\n");
     fieldstat_histogram_record(instance, id2_added, value_add_once, &TEST_TAG_DOUBLE, 1);
-
-    printf("add ok1\n");
     long long value_add_to_new_metric = 1;
     fieldstat_histogram_record(instance, id2_added, value_add_to_new_metric, &TEST_TAG_INT, 1);
-    printf("add ok2\n");
 
-    // serialize 
-    char *blob = NULL;
-    size_t blob_size = 0;
-    fieldstat_serialize(instance, &blob, &blob_size);
-    printf("blob_size: %zu\n", blob_size);
-    printf("blob content: %s\n", blob);
+    struct fieldstat *instance_from_deserialize = test_serialize_and_deserialize(instance);
 
-    // deserialize
-    struct fieldstat *instance_from_deserialize = fieldstat_deserialize(blob, blob_size);
-    printf("deserialize ok\n");
-    free(blob);
+    auto q_rets = test_get_query_result<long long>(histogram_query, instance_from_deserialize, id2_added);
+    EXPECT_EQ(q_rets.size(), 2);
+    EXPECT_EQ(q_rets[0], value_add_twice);
+    EXPECT_EQ(q_rets[1], value_add_to_new_metric);
 
-    // query, tag
-    struct fieldstat_tag_list *tag_list_1, *tag_list_2;
-    size_t ret_empty_zerolength, ret_2cell_2length;
-    fieldstat_get_tag_lists(instance_from_deserialize, id1_empty, &tag_list_1, &ret_empty_zerolength);
-    fieldstat_get_tag_lists(instance_from_deserialize, id2_added, &tag_list_2, &ret_2cell_2length);
-    printf("query tag ok\n");
-    EXPECT_EQ(ret_empty_zerolength, 0);
-    EXPECT_EQ(ret_2cell_2length, 2);
-
-    EXPECT_EQ(tag_list_2[0].n_tag, 1);
-    EXPECT_EQ(tag_list_2[1].n_tag, 1);
-    EXPECT_STREQ(tag_list_2[0].tag[0].key, TEST_TAG_DOUBLE.key);
-    EXPECT_EQ(tag_list_2[0].tag[0].value_double, TEST_TAG_DOUBLE.value_double);
-    EXPECT_STREQ(tag_list_2[1].tag[0].key, TEST_TAG_INT.key);
-    EXPECT_EQ(tag_list_2[1].tag[0].value_int, TEST_TAG_INT.value_int);
-    printf("test tag done\n");
-
-    // query metric 
-    long long ret_double_tagged = fieldstat_histogram_value_at_percentile(instance_from_deserialize, id2_added, &tag_list_2[0], 50.0);
-    printf("query ok 1\n");
-    EXPECT_EQ(ret_double_tagged, value_add_twice);
-
-    long long ret_int_tagged = fieldstat_histogram_value_at_percentile(instance_from_deserialize, id2_added, &tag_list_2[1], 50.0);
-    printf("query ok 2\n");
-    EXPECT_EQ(ret_int_tagged, value_add_to_new_metric);
-    printf("check finish\n");
-
-    for (size_t i = 0; i < ret_2cell_2length; i++) {
-        fieldstat_clear_tag_list(&tag_list_2[i]);
-    }
-    free(tag_list_2);
-    free(tag_list_1);
-    printf("clear tag list ok\n");
+    auto q_rets_empty = test_get_query_result<long long>(histogram_query, instance_from_deserialize, id1_empty);
+    EXPECT_EQ(q_rets_empty.size(), 0);
 
     fieldstat_free(instance);
     fieldstat_free(instance_from_deserialize);
+}
+
+TEST(metric_test_histogram, serialize_and_merge_by_blob_twice_expecting_double_result)
+{
+    struct fieldstat *instance = fieldstat_new();
+    struct fieldstat *instance2 = fieldstat_new();
+
+    int id1_empty = fieldstat_register_histogram(instance, "empty", 1, 600000, 3);
+    int id2_added = fieldstat_register_histogram(instance, "add", 1, 600000, 3);
+    // metric add
+    long long value_add_twice = 1234;
+    long long value_add_once = 123;
+    fieldstat_histogram_record(instance, id2_added, value_add_twice, &TEST_TAG_DOUBLE, 1);
+    fieldstat_histogram_record(instance, id2_added, value_add_twice, &TEST_TAG_DOUBLE, 1);
+    fieldstat_histogram_record(instance, id2_added, value_add_once, &TEST_TAG_DOUBLE, 1);
+    long long value_add_to_new_metric = 1;
+    fieldstat_histogram_record(instance, id2_added, value_add_to_new_metric, &TEST_TAG_INT, 1);
+
+    test_merge_with_blob(instance2, instance);
+
+    auto q_rets = test_get_query_result<long long>(histogram_query, instance2, id2_added);
+    EXPECT_EQ(q_rets.size(), 2);
+    EXPECT_EQ(q_rets[0], value_add_twice);
+    EXPECT_EQ(q_rets[1], value_add_to_new_metric);
+
+    auto q_rets_empty = test_get_query_result<long long>(histogram_query, instance2, id1_empty);
+    EXPECT_EQ(q_rets_empty.size(), 0);
+
+    fieldstat_free(instance);
+    fieldstat_free(instance2);
+}
+
+TEST(metric_test_histogram, serialize_and_merge_empty_register_to_total_empty)
+{
+    struct fieldstat *instance = fieldstat_new();
+    struct fieldstat *instance2 = fieldstat_new();
+
+    (void)fieldstat_register_histogram(instance, "empty", 1, 600000, 3);
+
+    test_merge_with_blob(instance2, instance);
+
+    auto q_rets = test_get_query_result<long long>(histogram_query, instance2, 0);
+    EXPECT_EQ(q_rets.size(), 0);
+
+    EXPECT_EQ(fieldstat_get_max_field_id(instance2), 0); // 1 empty
+
+    fieldstat_free(instance);
+    fieldstat_free(instance2);
+}
+
+TEST(metric_test_histogram, serialize_and_merge_empty_to_nonempty)
+{
+    struct fieldstat *instance_empty = fieldstat_new();
+    struct fieldstat *instance_added = fieldstat_new();
+
+    (void)fieldstat_register_histogram(instance_empty, "empty", 1, 600000, 3);
+    int id_added = fieldstat_register_histogram(instance_added, "add", 1, 600000, 3);
+    // metric add
+    long long value_add_twice = 1234;
+    long long value_add_once = 123;
+    fieldstat_histogram_record(instance_added, id_added, value_add_twice, &TEST_TAG_DOUBLE, 1);
+    fieldstat_histogram_record(instance_added, id_added, value_add_twice, &TEST_TAG_DOUBLE, 1);
+    fieldstat_histogram_record(instance_added, id_added, value_add_once, &TEST_TAG_DOUBLE, 1);
+
+    test_merge_with_blob(instance_added, instance_empty);
+
+    auto q_rets = test_get_query_result<long long>(histogram_query, instance_added, id_added);
+    EXPECT_EQ(q_rets.size(), 1);
+    EXPECT_EQ(q_rets[0], value_add_twice);
+
+    int all_field_num = fieldstat_get_max_field_id(instance_added) + 1;
+    EXPECT_EQ(all_field_num, 2); // one original, one empty(from merge)
+
+    fieldstat_free(instance_empty);
+    fieldstat_free(instance_added);
 }
 
 int main(int argc, char *argv[]) 

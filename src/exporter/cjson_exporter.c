@@ -524,6 +524,7 @@ struct cjson_map *hash_map_read_tag_and_field(const struct fieldstat *instance)
     return map_head;
 }
 
+// TODO:  instance name 和 field name 一定有
 void fieldstat_json_exporter_write_global_tags(const struct fieldstat_json_exporter *exporter, struct cjson_map *map_head)
 {
     if (exporter->global_tag_list == NULL) {

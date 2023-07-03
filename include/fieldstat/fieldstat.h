@@ -69,7 +69,7 @@ void fieldstat_refresh(struct fieldstat *instance);
 /* -------------------------------------------------------------------------- */
 /*                                    query                                   */
 /* -------------------------------------------------------------------------- */
-long long fieldstat_histogram_value_at_percentile(struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list, double percentile);
+long long fieldstat_histogram_value_at_percentile(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list, double percentile);
 long long fieldstat_counter_get(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list);
 double fieldstat_hll_get(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list);
 void fieldstat_get_tag_lists(const struct fieldstat *instance, int field_id, struct fieldstat_tag_list **lists, size_t *n_list);
@@ -82,6 +82,10 @@ void fieldstat_get_serialized_blob(const struct fieldstat *instance, int field_i
 int fieldstat_get_max_field_id(const struct fieldstat *instance);
 const char *fieldstat_get_field_name(const struct fieldstat *instance, int field_id);
 enum field_type fieldstat_get_field_type(const struct fieldstat *instance, int field_id);
+
+
+// TODO: 通过name查询id
+
 
 #ifdef __cplusplus
 }

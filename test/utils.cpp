@@ -171,3 +171,22 @@ struct fieldstat *test_serialize_and_deserialize(struct fieldstat *instance)
     free(blob);
     return instance_from_deserialize;
 }
+
+void test_merge_with_blob(struct fieldstat *dest, const struct fieldstat *src)
+{
+    char *blob = NULL;
+    size_t blob_size = 0;
+    fieldstat_serialize(src, &blob, &blob_size);
+    fieldstat_merge_with_blob(dest, blob, blob_size);
+    free(blob);
+}
+
+void test_merge_with_blob_twice(struct fieldstat *dest, const struct fieldstat *src)
+{
+    char *blob = NULL;
+    size_t blob_size = 0;
+    fieldstat_serialize(src, &blob, &blob_size);
+    fieldstat_merge_with_blob(dest, blob, blob_size);
+    fieldstat_merge_with_blob(dest, blob, blob_size);
+    free(blob);
+}
