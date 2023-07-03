@@ -469,8 +469,10 @@ void heavy_keeper_merge_sorted_set(struct heavy_keeper *dest, const struct heavy
         flow_id_len = val_lens[i] - 1;
 
         unsigned int **pst_count_in_new_rec = (unsigned int **)sorted_set_get_pointer_to_user_data(new_rec, flow_id_str, flow_id_len);
-        if (pst_count_in_new_rec != NULL) {  // flows that are in dest sketch has been processed in the previous loop
-            // pst_count_in_new_rec and *pst_count_in_new_rec must be find as long as the dest is a heavy keeper with metric, because the flow is definitely added to new_rec in the previous loop,
+        if (pst_count_in_new_rec != NULL) {
+            // pst_count_in_new_rec and *pst_count_in_new_rec must not be NULL as long as the dest is added the same flow, because insert_to_sorted_set must created a new user data
+            //    so pst_count_in_new_rec is not NULL if and only if flows that are in dest sketch has been processed in the previous loop, in which case continue to the next flow not in dest
+
             for (int j = 0; j < metric_num; j++) {
                 (*pst_count_in_new_rec)[j] = count_add((*pst_count_in_new_rec)[j], (*user_datas)[j]);
             }

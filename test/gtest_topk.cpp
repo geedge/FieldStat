@@ -6,22 +6,6 @@
 #include "fieldstat.h"
 
 
-// serialize and merge by blob(empty dest), then create a new instance by the same register order, merge by blob(non-empty dest). query result on the merged one. Benchmark: tag, heavykeeper result.
-
-// serialize and merge by blob(empty dest), then create a new instance by the same register order, refresh, merge by blob(non-empty dest). query result on the merged one. Benchmark: tag, heavykeeper result.
-
-// multi field, same tag, add several times. 
-
-// register and merge empty to empty
-
-// register and merge empty to non-empty
-
-// compare merged one to source, they are equal
-
-// 简单的tag 测试：输入一个key， value 是”1“， 再输入一个value是1的tag，两次添加，只有一个tag，查阅出的tag也只有一个。 
-
-// 性能测试
-
 using namespace std;
 
 const int K = 10;
@@ -89,51 +73,51 @@ Query_ret topk_query(struct fieldstat *instance, int field_id, const struct fiel
     return ret;
 }
 
-// TEST(metric_test_topk, serialize_and_deserialize_for_2_fields_1st_empty_2nd_added)
-// {
-//     struct fieldstat *instance = fieldstat_new();
+TEST(metric_test_topk, serialize_and_deserialize_for_2_fields_1st_empty_2nd_added)
+{
+    struct fieldstat *instance = fieldstat_new();
 
-//     const char *metric_name[] = {"test_bytes", "test_packet_num"};
-//     unsigned int added_value[] = {1, 10000};
-//     std::string value_string_2_1_2 = gen_rand_string(10);
-//     std::string value_string_2_1_1 = gen_rand_string(10);
+    const char *metric_name[] = {"test_bytes", "test_packet_num"};
+    unsigned int added_value[] = {1, 10000};
+    std::string value_string_2_1_2 = gen_rand_string(10);
+    std::string value_string_2_1_1 = gen_rand_string(10);
 
-//     int id1_empty = fieldstat_register_topk(instance, "topk_empty", 10, metric_name, 2, 1);
-//     int id2_added = fieldstat_register_topk(instance, "topk_add", 10, metric_name, 2, 1);
-//     // register metric 
-//     fieldstat_topk_add(instance, id2_added, value_string_2_1_1.c_str(), value_string_2_1_1.length(), added_value, &TEST_TAG_STRING, 1);
-//     fieldstat_topk_add(instance, id2_added, value_string_2_1_1.c_str(), value_string_2_1_1.length(), added_value, &TEST_TAG_STRING, 1);
-//     fieldstat_topk_add(instance, id2_added, value_string_2_1_2.c_str(), value_string_2_1_2.length(), added_value, &TEST_TAG_INT, 1);
+    int id1_empty = fieldstat_register_topk(instance, "topk_empty", 10, metric_name, 2, 1);
+    int id2_added = fieldstat_register_topk(instance, "topk_add", 10, metric_name, 2, 1);
+    // register metric 
+    fieldstat_topk_add(instance, id2_added, value_string_2_1_1.c_str(), value_string_2_1_1.length(), added_value, &TEST_TAG_STRING, 1);
+    fieldstat_topk_add(instance, id2_added, value_string_2_1_1.c_str(), value_string_2_1_1.length(), added_value, &TEST_TAG_STRING, 1);
+    fieldstat_topk_add(instance, id2_added, value_string_2_1_2.c_str(), value_string_2_1_2.length(), added_value, &TEST_TAG_INT, 1);
 
-//     struct fieldstat *instance_from_deserialize = test_serialize_and_deserialize(instance);
+    struct fieldstat *instance_from_deserialize = test_serialize_and_deserialize(instance);
 
-//     // query, tag
-//     auto ret_added = test_get_query_result<Query_ret>(topk_query, instance_from_deserialize, id2_added);
-//     auto ret_empty = test_get_query_result<Query_ret>(topk_query, instance_from_deserialize, id1_empty);
-//     EXPECT_TRUE(ret_added.size() == 2);
-//     EXPECT_TRUE(ret_empty.size() == 0);
+    // query and test
+    auto ret_added = test_get_query_result<Query_ret>(topk_query, instance_from_deserialize, id2_added);
+    auto ret_empty = test_get_query_result<Query_ret>(topk_query, instance_from_deserialize, id1_empty);
+    EXPECT_TRUE(ret_added.size() == 2);
+    EXPECT_TRUE(ret_empty.size() == 0);
 
-//     EXPECT_EQ(ret_added[0].n_result, 1);
-//     EXPECT_STREQ(ret_added[0].key_result[0].c_str(), value_string_2_1_1.c_str());
-//     EXPECT_EQ(ret_added[0].n_metric, 2);
-//     EXPECT_EQ(ret_added[0].count_result[0][0], 2);
-//     EXPECT_EQ(ret_added[0].count_result[0][1], 20000);
-//     EXPECT_STREQ(ret_added[0].metric_name[0].c_str(), metric_name[0]);
-//     EXPECT_STREQ(ret_added[0].metric_name[1].c_str(), metric_name[1]);
-//     EXPECT_EQ(ret_added[0].primary_metric_id, 1);
+    EXPECT_EQ(ret_added[0].n_result, 1);
+    EXPECT_STREQ(ret_added[0].key_result[0].c_str(), value_string_2_1_1.c_str());
+    EXPECT_EQ(ret_added[0].n_metric, 2);
+    EXPECT_EQ(ret_added[0].count_result[0][0], 2);
+    EXPECT_EQ(ret_added[0].count_result[0][1], 20000);
+    EXPECT_STREQ(ret_added[0].metric_name[0].c_str(), metric_name[0]);
+    EXPECT_STREQ(ret_added[0].metric_name[1].c_str(), metric_name[1]);
+    EXPECT_EQ(ret_added[0].primary_metric_id, 1);
 
-//     EXPECT_EQ(ret_added[1].n_result, 1);
-//     EXPECT_STREQ(ret_added[1].key_result[0].c_str(), value_string_2_1_2.c_str());
-//     EXPECT_EQ(ret_added[1].n_metric, 2);
-//     EXPECT_EQ(ret_added[1].count_result[0][0], 1);
-//     EXPECT_EQ(ret_added[1].count_result[0][1], 10000);
-//     EXPECT_STREQ(ret_added[1].metric_name[0].c_str(), metric_name[0]);
-//     EXPECT_STREQ(ret_added[1].metric_name[1].c_str(), metric_name[1]);
-//     EXPECT_EQ(ret_added[1].primary_metric_id, 1);
+    EXPECT_EQ(ret_added[1].n_result, 1);
+    EXPECT_STREQ(ret_added[1].key_result[0].c_str(), value_string_2_1_2.c_str());
+    EXPECT_EQ(ret_added[1].n_metric, 2);
+    EXPECT_EQ(ret_added[1].count_result[0][0], 1);
+    EXPECT_EQ(ret_added[1].count_result[0][1], 10000);
+    EXPECT_STREQ(ret_added[1].metric_name[0].c_str(), metric_name[0]);
+    EXPECT_STREQ(ret_added[1].metric_name[1].c_str(), metric_name[1]);
+    EXPECT_EQ(ret_added[1].primary_metric_id, 1);
 
-//     fieldstat_free(instance);
-//     fieldstat_free(instance_from_deserialize);
-// }
+    fieldstat_free(instance);
+    fieldstat_free(instance_from_deserialize);
+}
 
 
 TEST(metric_test_topk, serialize_and_merge_by_blob_twice_expecting_double_result)
@@ -156,7 +140,7 @@ TEST(metric_test_topk, serialize_and_merge_by_blob_twice_expecting_double_result
     fieldstat_merge_with_blob(instance2, blob, blob_size);
     free(blob);
 
-    // query, tag
+    // query and test
     auto ret_added = test_get_query_result<Query_ret>(topk_query, instance2, 0);
 
     EXPECT_TRUE(ret_added.size() == 1);
@@ -172,6 +156,64 @@ TEST(metric_test_topk, serialize_and_merge_by_blob_twice_expecting_double_result
 
     fieldstat_free(instance);
     fieldstat_free(instance2);
+}
+
+TEST(metric_test_topk, serialize_and_merge_empty_to_empty)
+{
+    struct fieldstat *instance = fieldstat_new();
+    struct fieldstat *instance2 = fieldstat_new();
+
+    const char *metric_name[] = {"test_bytes", "test_packet_num"};
+    (void)fieldstat_register_topk(instance, "topk_add", 10, metric_name, 2, 1);
+
+    char *blob = NULL;
+    size_t blob_size = 0;
+    fieldstat_serialize(instance, &blob, &blob_size);
+    fieldstat_merge_with_blob(instance2, blob, blob_size);
+    free(blob);
+
+    auto ret_added = test_get_query_result<Query_ret>(topk_query, instance2, 0);
+    EXPECT_TRUE(ret_added.size() == 0);
+
+    fieldstat_free(instance);
+    fieldstat_free(instance2);
+}
+
+TEST(metric_test_topk, serialize_and_merge_empty_to_nonempty)
+{
+    struct fieldstat *instance_empty = fieldstat_new();
+    struct fieldstat *instance_added = fieldstat_new();
+    const char *metric_name[] = {"test_bytes", "test_packet_num"};
+    (void)fieldstat_register_topk(instance_empty, "topk_empty", 10, metric_name, 2, 1);
+    int id_added = fieldstat_register_topk(instance_added, "topk_add", 10, metric_name, 2, 1);
+    unsigned int added_value[] = {1, 10000};
+    std::string value_string = gen_rand_string(10);
+    fieldstat_topk_add(instance_added, id_added, value_string.c_str(), value_string.length(), added_value, &TEST_TAG_INT, 1);
+
+    char *blob = NULL;
+    size_t blob_size = 0;
+    fieldstat_serialize(instance_empty, &blob, &blob_size);
+    fieldstat_merge_with_blob(instance_added, blob, blob_size);
+    free(blob);
+
+    auto ret_added = test_get_query_result<Query_ret>(topk_query, instance_added, id_added);
+    EXPECT_TRUE(ret_added.size() == 1);
+    EXPECT_EQ(ret_added[0].n_result, 1);
+    EXPECT_STREQ(ret_added[0].key_result[0].c_str(), value_string.c_str());
+    EXPECT_EQ(ret_added[0].n_metric, 2);
+    EXPECT_EQ(ret_added[0].count_result[0][0], 1);
+    EXPECT_EQ(ret_added[0].count_result[0][1], 10000);
+    EXPECT_STREQ(ret_added[0].metric_name[0].c_str(), metric_name[0]);
+    EXPECT_STREQ(ret_added[0].metric_name[1].c_str(), metric_name[1]);
+    EXPECT_EQ(ret_added[0].primary_metric_id, 1);
+
+    int all_field_num = fieldstat_get_max_field_id(instance_added) + 1;
+    EXPECT_EQ(all_field_num, 2);
+    auto ret_merged_empty = test_get_query_result<Query_ret>(topk_query, instance_added, 1);
+    EXPECT_TRUE(ret_merged_empty.size() == 0);
+
+    fieldstat_free(instance_empty);
+    fieldstat_free(instance_added);
 }
 
 //TODO: 不同的metric个数，再来一遍
