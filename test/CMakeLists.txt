@@ -42,7 +42,7 @@ function (add_unit_test file_name)
 endfunction()
 
 # add_unit_test(gtest_hll)
-# add_unit_test(gtest_json_export)
+add_unit_test(gtest_json_export)
 # add_unit_test(gtest_counter)
 # add_unit_test(gtest_histogram)
 add_unit_test(gtest_topk)

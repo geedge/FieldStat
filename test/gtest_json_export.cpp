@@ -1,8 +1,3 @@
-// TODO
-// 不同tag组合
-// 空的instance
-// realloc for field
-//  超长tag，测试动态key的realloc
 
 // 大规模序列化测试
 
@@ -27,9 +22,9 @@ struct ST_hyperloglog *g_hll_standard;
 struct hdr_histogram *g_histogram_standard;
 #define TEST_TOPK_STANDARD_K 3
 const struct fieldstat_tag TEST_TAG_GLOBAL[3] = {
-    {.key = "test_tag_global 1", .type = TAG_INTEGER, .value_int = 1},
-    {.key = "test_tag_global 2", .type = TAG_DOUBLE, .value_double = 2.2},
-    {.key = "test_tag_global 3", .type = TAG_CSTRING, .value_str = "string 3"}};
+    {"test_tag_global 1", .type = TAG_INTEGER, .value_int = 1},
+    {"test_tag_global 2", .type = TAG_DOUBLE, .value_double = 2.2},
+    {"test_tag_global 3", .type = TAG_CSTRING, .value_str = {'s','t','r',' ','3','\0'}}};
 
 // TEST(export_test, network_blob_test_for_histogram)
 // {
@@ -126,8 +121,8 @@ void test_check_if_tag_list_is_in_json(cJSON *tag_obj, const Fieldstat_tag_list_
 void test_check_if_global_tag_is_in_json(cJSON *tag_obj)
 {
     struct fieldstat_tag_list tag_list = {.tag = (struct fieldstat_tag *)TEST_TAG_GLOBAL, .n_tag = 3};
-    const Fieldstat_tag_list_wrapper *benchmark = new Fieldstat_tag_list_wrapper(&tag_list);
-    test_check_if_tag_list_is_in_json(tag_obj, benchmark);
+    const Fieldstat_tag_list_wrapper benchmark(&tag_list);
+    test_check_if_tag_list_is_in_json(tag_obj, &benchmark);
 }
 
 void test_check_if_metric_histogram_correct(cJSON *metric_obj, const char *name)

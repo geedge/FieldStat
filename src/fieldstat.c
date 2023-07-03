@@ -339,18 +339,6 @@ static bool fieldstat_check_field(struct fs_field *field, enum field_type type)
     return true;
 }
 
-void fieldstat_clear_tag_list(struct fieldstat_tag_list *tag_list)
-{
-    for (int i = 0; i < tag_list->n_tag; i++) {
-        struct fieldstat_tag *tag = &tag_list->tag[i];
-        free((char *)tag->key);
-        if (tag->type == TAG_CSTRING && tag->value_str) {
-            free((char *)tag->value_str);
-        }
-    }
-    free(tag_list->tag);
-}
-
 void fieldstat_get_tag_lists(const struct fieldstat *instance, int field_id, struct fieldstat_tag_list **lists, size_t *n_list)
 {
     struct fs_field *field = instance->field_array[field_id];

@@ -454,19 +454,6 @@ struct field_paras *deserialize_parameters(const char *blob, size_t blob_size)
         }
 }
 */
-static void my_tag_list_free(struct fieldstat_tag *tag_list, size_t tag_num) {
-    for (int i = 0; i < tag_num; i++) {
-        if (tag_list->key) {
-            free((char *)tag_list->key);
-            tag_list->key = NULL;
-        }
-        if (tag_list->type == TAG_CSTRING && tag_list->value_str) {
-            free((char *)tag_list->value_str);
-            tag_list->value_str = NULL;
-        }
-    }
-    free(tag_list);
-}
 
 struct fs_field *field_deserialize(const char *blob, size_t blob_size)
 {
@@ -507,7 +494,7 @@ struct fs_field *field_deserialize(const char *blob, size_t blob_size)
         cell_read_tag(cell, &tag_list, &tag_num);
         field_insert_cell(field_out, cell, tag_list, tag_num);
 
-        my_tag_list_free(tag_list, tag_num);
+        free(tag_list);
     }
     printf("debug, the field has %u cells\n", HASH_COUNT(field_out->hash_tbl));
     mpack_tree_destroy(&tree);

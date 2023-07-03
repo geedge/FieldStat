@@ -6,6 +6,8 @@ extern "C"
 #endif
 
 #define EXPORT_VER 1 // increase by 1 when the serialization format is changed.
+#define MAX_TAG_KEY_LENGTH 32 // the max length of tag key, including '\0'
+#define MAX_TAG_STRING_VAL_LENGTH 32 // the max length of tag value, including '\0'
 
 enum field_type
 {
@@ -23,12 +25,12 @@ enum fs_tag_type
 	TAG_CSTRING
 };
 struct fieldstat_tag {
-	const char *key;
+	const char key[MAX_TAG_KEY_LENGTH];
     enum fs_tag_type type;
 	union{
 		long long value_int;
 		double value_double;
-		const char *value_str;
+		const char value_str[MAX_TAG_STRING_VAL_LENGTH];
 	};
 };
 
@@ -71,7 +73,6 @@ long long fieldstat_histogram_value_at_percentile(struct fieldstat *instance, in
 long long fieldstat_counter_get(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list);
 double fieldstat_hll_get(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list);
 void fieldstat_get_tag_lists(const struct fieldstat *instance, int field_id, struct fieldstat_tag_list **lists, size_t *n_list);
-void fieldstat_clear_tag_list(struct fieldstat_tag_list *tag_list);
 int fieldstat_topk_query(const struct fieldstat *instance, int id, const struct fieldstat_tag_list *tag_list, // infos
     char ***keys_out, size_t *n_key_out, // row info
     char ***metric_name_out, size_t *n_metric_out, size_t *primary_metric_id_out, // column info

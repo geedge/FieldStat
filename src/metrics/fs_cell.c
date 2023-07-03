@@ -58,21 +58,9 @@ struct cell {
     struct metrics *metric;
 };
 
-static void fieldtag_clear(struct fieldstat_tag *kv_pair)
-{
-    if (kv_pair->key) {
-        free((char *)kv_pair->key);
-        kv_pair->key = NULL;
-    }
-    if (kv_pair->type == TAG_CSTRING && kv_pair->value_str) {
-        free((char *)kv_pair->value_str);
-        kv_pair->value_str = NULL;
-    }
-}
-
 static void fieldtag_copy(const struct fieldstat_tag *kv_pair, struct fieldstat_tag *dest)
 {
-    dest->key = strdup(kv_pair->key);
+    memcpy((char *)dest->key, kv_pair->key, MAX_TAG_KEY_LENGTH);
     dest->type = kv_pair->type;
     switch(kv_pair->type)
     {
@@ -83,7 +71,7 @@ static void fieldtag_copy(const struct fieldstat_tag *kv_pair, struct fieldstat_
             dest->value_double = kv_pair->value_double;
             break;
         case TAG_CSTRING:
-            dest->value_str = strdup(kv_pair->value_str);
+            memcpy((char *)dest->value_str, kv_pair->value_str, MAX_TAG_STRING_VAL_LENGTH);
             break;
         default:
             assert(0);
@@ -176,9 +164,6 @@ void cell_serialize_write_fieldtag(mpack_writer_t *writer, const struct cell *pt
     }
     mpack_finish_array(writer);
 
-    for (int j = 0; j < tag_num; j++) {
-        fieldtag_clear(&tag_list[j]);
-    }
     free(tag_list);
 }
 
@@ -192,8 +177,7 @@ void deserialize_tag(mpack_node_t *root, struct fieldstat_tag **tag_list_out, si
         mpack_node_t tag = mpack_node_array_at(tag_arr, j);
 
         mpack_node_t key = mpack_node_map_cstr(tag, "key");
-        tag_list[j].key = (char *)malloc(mpack_node_strlen(key) + 1);
-        mpack_node_copy_cstr(key, (char *)tag_list[j].key, mpack_node_strlen(key) + 1);
+        mpack_node_copy_cstr(key, (char *)tag_list[j].key, MAX_TAG_KEY_LENGTH);
         tag_list[j].type = mpack_node_i8(mpack_node_map_cstr(tag, "type"));
 
         mpack_node_t value = mpack_node_map_cstr(tag, "value");
@@ -207,8 +191,7 @@ void deserialize_tag(mpack_node_t *root, struct fieldstat_tag **tag_list_out, si
                 tag_list[j].value_double = mpack_node_double(value);
                 break;
             case TAG_CSTRING:
-                tag_list[j].value_str = (char *)malloc(mpack_node_strlen(value) + 1);
-                mpack_node_copy_cstr(value, (char *)tag_list[j].value_str, mpack_node_strlen(value) + 1);
+                mpack_node_copy_cstr(value, (char *)tag_list[j].value_str, MAX_TAG_STRING_VAL_LENGTH);
                 break;
             default:
                 assert(0);
@@ -729,9 +712,6 @@ void cell_read_tag(const struct cell *pthis, struct fieldstat_tag **tag_list, si
 void cell_add_tag(struct cell *pthis, const struct fieldstat_tag *tag_list, size_t tag_num)
 {
     if (pthis->tag_num != 0) {
-        for (size_t i = 0; i < pthis->tag_num; i++) {
-            fieldtag_clear(&pthis->tag[i]);
-        }
         free(pthis->tag);
     }
     
@@ -814,9 +794,6 @@ struct cell *cell_deserialize(const char *blob, size_t blob_size)
     metric->deserialize(metric, content_blob, content_blob_size);
 
     mpack_tree_destroy(&tree);
-    for (int i = 0; i < tag_num; i++) {
-        fieldtag_clear(&tag_list[i]);
-    }
     free(tag_list);
     free(content_blob);
 
@@ -825,9 +802,6 @@ struct cell *cell_deserialize(const char *blob, size_t blob_size)
 
 void cell_free(struct cell *pthis)
 {
-    for (int i = 0; i < pthis->tag_num; i++) {
-        fieldtag_clear(&pthis->tag[i]);
-    }
     pthis->tag_num = 0;
     free(pthis->tag);
 

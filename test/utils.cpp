@@ -19,14 +19,15 @@ using namespace std;
 
 string gen_rand_string(int len)
 {
-    string s;
+    char cstr[len + 1];
     for (int i = 0; i < len; i++)
     {
-        s += 'a' + rand() % 26;
+        cstr[i] = 'a' + rand() % 26;
     }
+    cstr[len] = '\0';
+    string s(cstr);
     return s;
 }
-
 
 /* -------------------------------------------------------------------------- */
 /*                               taglist wrapper                              */
@@ -38,7 +39,7 @@ Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(const struct fieldstat_ta
     for (size_t i = 0; i < tag_list->n_tag; i++)
     {
         // copy the tag_list
-        tag_list_c.tag[i].key = strdup(tag_list->tag[i].key);
+        memcpy((char *)tag_list_c.tag[i].key, tag_list->tag[i].key, MAX_TAG_KEY_LENGTH);
         tag_list_c.tag[i].type = tag_list->tag[i].type;
         switch (tag_list->tag[i].type)
         {
@@ -49,7 +50,7 @@ Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(const struct fieldstat_ta
                 tag_list_c.tag[i].value_double = tag_list->tag[i].value_double;
                 break;
             case TAG_CSTRING:
-                tag_list_c.tag[i].value_str = strdup(tag_list->tag[i].value_str);
+                memcpy((char *)tag_list_c.tag[i].value_str, tag_list->tag[i].value_str, MAX_TAG_STRING_VAL_LENGTH);
                 break;
             default:
                 break;
@@ -58,14 +59,6 @@ Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(const struct fieldstat_ta
 }
 
 Fieldstat_tag_list_wrapper::~Fieldstat_tag_list_wrapper() {
-    for (size_t i = 0; i < tag_list_c.n_tag; i++)
-    {
-        free((void *)tag_list_c.tag[i].key);
-        if (tag_list_c.tag[i].type == TAG_CSTRING)
-        {
-            free((void *)tag_list_c.tag[i].value_str);
-        }
-    }
     free((void *)tag_list_c.tag);
 }
 
@@ -76,7 +69,7 @@ Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(std::uniform_int_distribu
     std::mt19937 rng(RAND_SEED);
     for (int i = 0; i < tag_count; i++)
     {
-        tag_list_c.tag[i].key = strdup(gen_rand_string(10).c_str());
+        strcpy((char *)tag_list_c.tag[i].key, gen_rand_string(10).c_str());
         int rand_ret = rand() % 3;
         if (rand_ret == 0)
         {
@@ -91,7 +84,7 @@ Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(std::uniform_int_distribu
         else
         {
             tag_list_c.tag[i].type = TAG_CSTRING;
-            tag_list_c.tag[i].value_str = strdup(gen_rand_string(10).c_str());
+            strcpy((char *)tag_list_c.tag[i].value_str, gen_rand_string(10).c_str());
         }
     }
 }
@@ -108,7 +101,7 @@ Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(const Fieldstat_tag_list_
     for (size_t i = 0; i < tag_list->n_tag; i++)
     {
         // copy the tag_list
-        tag_list_c.tag[i].key = strdup(tag_list->tag[i].key);
+        memcpy((char *)tag_list_c.tag[i].key, tag_list->tag[i].key, MAX_TAG_KEY_LENGTH);
         tag_list_c.tag[i].type = tag_list->tag[i].type;
         switch (tag_list->tag[i].type)
         {
@@ -119,7 +112,7 @@ Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(const Fieldstat_tag_list_
                 tag_list_c.tag[i].value_double = tag_list->tag[i].value_double;
                 break;
             case TAG_CSTRING:
-                tag_list_c.tag[i].value_str = strdup(tag_list->tag[i].value_str);
+                memcpy((char *)tag_list_c.tag[i].value_str, tag_list->tag[i].value_str, MAX_TAG_STRING_VAL_LENGTH);
                 break;
             default:
                 break;

@@ -6,8 +6,8 @@
 void set_tag_num(int num);
 int get_tag_num();
 
-const struct fieldstat_tag TEST_TAG_STRING = {"STRING KEY_", TAG_CSTRING, {.value_str = "100.1.1.2"}};
-const struct fieldstat_tag TEST_TAG_STRING_collided = {"collided", TAG_CSTRING, {.value_str = "2"}};
+const struct fieldstat_tag TEST_TAG_STRING = {"STRING KEY_", TAG_CSTRING, {.value_str = {'1','0','0','.','1','.','1','\0'}}};
+const struct fieldstat_tag TEST_TAG_STRING_collided = {"collided", TAG_CSTRING, {.value_str = {'2','\0'}}};
 const struct fieldstat_tag TEST_TAG_INT = {"INT key_", TAG_INTEGER, {.value_int = 100}};
 const struct fieldstat_tag TEST_TAG_INT_collided = {"collided", TAG_INTEGER, {.value_int = 2}};
 const struct fieldstat_tag TEST_TAG_DOUBLE = {"DOUBLE key_", TAG_DOUBLE, {.value_double = 100.1}};
@@ -64,7 +64,7 @@ std::vector<Query_ret> test_get_query_result(Query_ret (*query)(struct fieldstat
     }
     if (cell_num > 0){
         for (size_t i = 0; i < cell_num; i++) {
-            fieldstat_clear_tag_list(&tag_list[i]);
+            free(tag_list[i].tag);
         }
         free(tag_list);
     }
