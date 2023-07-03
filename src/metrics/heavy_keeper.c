@@ -349,6 +349,7 @@ struct heavy_keeper_result *heavy_keeper_query(struct heavy_keeper *hk) {
     struct heavy_keeper_result *stats  = heavy_keeper_result_new(hk);
 
     int heap_entry_num = sorted_set_cardinality(hk->top_K_heap);
+    printf("heavy_keeper_query enter, heap_entry_num = %d\n", heap_entry_num);
     unsigned *keys = (unsigned *)malloc(heap_entry_num * sizeof(unsigned));
     char **vals = (char **)malloc(heap_entry_num * sizeof(char *));
     size_t *val_lens = (size_t *)malloc(heap_entry_num * sizeof(size_t));
@@ -356,6 +357,7 @@ struct heavy_keeper_result *heavy_keeper_query(struct heavy_keeper *hk) {
     sorted_set_dump(hk->top_K_heap, keys, vals, val_lens, (void **)user_datas);
 
     int query_entry_num = heap_entry_num > hk->K ? hk->K : heap_entry_num;
+    printf("heavy_keeper_query enter,query_entry_num: %d\n", query_entry_num);
     stats->n_key = query_entry_num;
     int index_q = 0;
     for (int i = query_entry_num - 1; i >= 0; i--) {
@@ -390,9 +392,10 @@ static void heavy_keeper_merge_sketch(struct heavy_keeper *dest, const struct he
             struct Bucket *bucket_src = &(src->sketch[array_id * w + bucket_id]);
 
             if (bucket_dest->finger_print == bucket_src->finger_print) {
-                // printf("bucket at %d,%d fp %u equal, bucket point: %p, bucket_dest C(%llu) + bucket_src C(%llu)\n",array_id, bucket_id, bucket_dest->finger_print, bucket_dest, bucket_dest->count,bucket_src->count  );
+                printf("bucket count add: %u + %u\n", bucket_dest->count, bucket_src->count);
                 bucket_dest->count += bucket_src->count;
             } else {
+                printf("fp not equal: %u, %u\n", bucket_dest->finger_print, bucket_src->finger_print);
                 if (bucket_dest->count < bucket_src->count) {  // bucket_src stores the elephant flow.
                     // printf("write bucket_src: FP = %u, C = %llu to bucket 1. position: %d,%d\n", bucket_src->finger_print, bucket_src->count,array_id, bucket_id);
                     bucket_dest->count = bucket_src->count;
@@ -422,7 +425,7 @@ unsigned find_maxv_in_sketch(struct heavy_keeper *hk, const char *flow_id, int f
 void insert_to_sorted_set(struct sorted_set *ss, char *flow_id_str, int flow_id_len, unsigned count, unsigned int *other_counts, size_t metric_num) {
     int if_inserted = sorted_set_insert(ss, flow_id_str, flow_id_len, count);
 
-    if (other_counts != NULL || if_inserted) {
+    if (other_counts != NULL && if_inserted) {
         unsigned int **pst_other_count_in_rec = (unsigned int **)sorted_set_get_pointer_to_user_data(ss, flow_id_str, flow_id_len);
         if (*pst_other_count_in_rec != NULL) {
             printf("ERR: I didn't expect this to happen. Other count in rec is not NULL\n");
@@ -453,9 +456,9 @@ void heavy_keeper_merge_sorted_set(struct heavy_keeper *dest, const struct heavy
     for (int i = 0; i < size_dest; i++) {
         flow_id_str = vals[i];
         flow_id_len = val_lens[i] - 1;
-        // printf("in dest1, index: %d, flow id: %s, len: %zu\n", i, flow_id_str, flow_id_len);
 
         unsigned maxv = find_maxv_in_sketch(dest, flow_id_str, flow_id_len);
+        printf("in dest1, index: %d, flow id: %s, len: %zu, maxv: %u\n", i, flow_id_str, flow_id_len, maxv);
         insert_to_sorted_set(new_rec, flow_id_str, flow_id_len, maxv, user_datas[i], metric_num);
     }
 
@@ -465,12 +468,20 @@ void heavy_keeper_merge_sorted_set(struct heavy_keeper *dest, const struct heavy
         flow_id_str = vals[i];
         flow_id_len = val_lens[i] - 1;
 
-        if (sorted_set_get_member_score(dest->top_K_heap, flow_id_str, flow_id_len) != 0) {  // flows that are in dest sketch has been processed in the previous loop
+        unsigned int **pst_count_in_new_rec = (unsigned int **)sorted_set_get_pointer_to_user_data(new_rec, flow_id_str, flow_id_len);
+        if (pst_count_in_new_rec != NULL) {  // flows that are in dest sketch has been processed in the previous loop
+            // pst_count_in_new_rec and *pst_count_in_new_rec must be find as long as the dest is a heavy keeper with metric, because the flow is definitely added to new_rec in the previous loop,
+            for (int j = 0; j < metric_num; j++) {
+                (*pst_count_in_new_rec)[j] = count_add((*pst_count_in_new_rec)[j], (*user_datas)[j]);
+            }
             continue;
         }
 
-        // the dest heavekeeper has been merged, so the maxv is the maxv in the merged sketch, instead of the dest sketch
+        // the dest heavy keeper has been merged, so the maxv is the maxv in the merged sketch, instead of the dest sketch
         unsigned maxv = find_maxv_in_sketch(dest, flow_id_str, flow_id_len);
+
+        printf("in src, index: %d, flow id: %s, len: %zu, maxv: %u\n", i, flow_id_str, flow_id_len, maxv);
+
         insert_to_sorted_set(new_rec, flow_id_str, flow_id_len, maxv, user_datas[i], metric_num);
     }
 
@@ -483,10 +494,31 @@ void heavy_keeper_merge_sorted_set(struct heavy_keeper *dest, const struct heavy
     dest->top_K_heap = new_rec;
 }
 
+bool heavy_keeper_is_metric_header_equal(const struct heavy_keeper *hk1, const struct heavy_keeper *hk2)
+{
+    if (hk1->metric_header == NULL && hk2->metric_header == NULL) {
+        return true;
+    }
+    if (hk1->metric_header == NULL || hk2->metric_header == NULL) {
+        return false;
+    }
+    if (hk1->metric_header->n_metric != hk2->metric_header->n_metric) {
+        return false;
+    }
+    if (hk1->metric_header->primary_metric_index != hk2->metric_header->primary_metric_index) {
+        return false;
+    }
+    // do not check the metric names, because its time-consuming, and not necessary, since names are initialized with n_metric.
+
+    return true;
+}
+
 int heavy_keeper_merge(struct heavy_keeper *hk, const struct heavy_keeper *src) {
+    printf("heavy_keeper_merge enter\n");
     if (hk->params.array_num != src->params.array_num ||
         hk->params.max_bucket_num != src->params.max_bucket_num ||
-        hk->K != src->K) {
+        hk->K != src->K || 
+        heavy_keeper_is_metric_header_equal(hk, src) == false) {
         printf("ERROR: parameters of two merged heavy keeper must be the same\n");
         return -1;
     }

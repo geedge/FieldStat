@@ -312,6 +312,7 @@ void cell_topk_query(const struct cell *pthis,
     cstring_t **metric_name_out, size_t *num_metric_out, size_t *primary_metric_id_out, // column
     unsigned int ***metric_value_out)
 {
+    printf("cell_topk_query enter\n");
     struct metric_topk *topk = (struct metric_topk *)pthis->metric;
     struct heavy_keeper_result *result = heavy_keeper_query(topk->hk);
 

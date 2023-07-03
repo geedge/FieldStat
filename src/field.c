@@ -194,6 +194,7 @@ static void field_insert_cell_with_key(struct fs_field *field, struct cell *cell
     node->key_len = key_len;
     node->key = (char *)malloc(key_len + 1);
     memcpy(node->key, key, key_len);
+    node->key[key_len] = '\0';
     node->cell = cell;
     HASH_ADD_KEYPTR(hh, field->hash_tbl, node->key, node->key_len, node);
 }
@@ -290,6 +291,7 @@ struct fs_field *field_dup(const struct fs_field *src)
     HASH_ITER(hh, src->hash_tbl, node, tmp) {
         struct cell *new_cell = cell_duplicate(node->cell);
         field_insert_cell_with_key(dst, new_cell, node->key, node->key_len);
+        printf("field_dup:insert cell, key is : %s\n", node->key);
     }
     return dst;
 }
@@ -308,6 +310,7 @@ int field_merge(struct fs_field *dst, const struct fs_field *src)
             struct cell *new_cell = cell_duplicate(cell);
             field_insert_cell_with_key(dst, new_cell, node->key, node->key_len);
         } else {
+            printf("field_merge:cell merge\n");
             if (cell_merge(dst_cell, cell) != 0) {
                 printf("field_merge:cell merge failed\n");
                 return -1;
@@ -319,8 +322,10 @@ int field_merge(struct fs_field *dst, const struct fs_field *src)
 
 void field_get_tags(const struct fs_field *field, struct fieldstat_tag_list **tag_lists_out, size_t *n_tag_lists_out)
 {
+    printf("field_get_tags enter\n");
     *n_tag_lists_out = HASH_COUNT(field->hash_tbl);
     if (*n_tag_lists_out == 0) {
+        printf("field_get_tags, no tag found\n");
         *tag_lists_out = NULL;
         return;
     }
@@ -333,6 +338,10 @@ void field_get_tags(const struct fs_field *field, struct fieldstat_tag_list **ta
         struct fieldstat_tag *tags = NULL;
         size_t n_tags = 0;
         cell_read_tag(cell, &tags, &n_tags);
+        printf("field_get_tags, read tag result: ntag: %zu, key is \n", n_tags);
+        for (int i = 0; i < n_tags; i++) {
+            printf("%s:%lld\n", tags[i].key, tags[i].value_int);
+        }
         (*tag_lists_out)[i].tag = tags;
         (*tag_lists_out)[i].n_tag = n_tags;
         i++;

@@ -97,8 +97,9 @@ static int append_field_to_instance(struct fieldstat *instance, struct fs_field 
         instance->max_field *= 2;
         instance->field_array = realloc(instance->field_array, sizeof(struct fs_field *) * instance->max_field);
     }
-    instance->field_array[instance->n_field++] = (struct fs_field *)field;
-    field_set_id(field, instance->n_field - 1);
+    instance->field_array[instance->n_field] = (struct fs_field *)field;
+    field_set_id(field, instance->n_field);
+    instance->n_field++;
     return instance->n_field - 1;
 }
 
@@ -248,20 +249,20 @@ int fieldstat_merge_with_blob(struct fieldstat *instance, const char *blob, size
         fprintf(stderr, "fieldstat_deserialize failed\n");
         return -1;
     }
-    if (instance->n_field != src->n_field) {
-        fprintf(stderr, "instance->n_field != src->n_field\n");
-        return -1;
-    }
 
     for (int i = 0; i < src->n_field; i++) {
+        printf("fieldstat_merge_with_blob: %d\n", i);
         struct fs_field *tmp_field = src->field_array[i];
         int field_id_tmp = name_id_map_find_a_field_name(instance, field_get_name(tmp_field));
 
         if (field_id_tmp == -1) {
+            printf("fieldstat_merge_with_blob: new field %s\n", field_get_name(tmp_field));
             struct fs_field *copied_field = field_dup(tmp_field);
             int alloced_id = append_field_to_instance(instance, copied_field);
             name_id_map_add_a_field_name(instance, field_get_name(copied_field), alloced_id);
+            printf("new field append to id: %d\n", alloced_id);
         } else {
+            printf("fieldstat_merge_with_blob: merge field %s\n", field_get_name(tmp_field));
             field_merge(instance->field_array[field_id_tmp], tmp_field);
         }
     }
@@ -369,6 +370,7 @@ int fieldstat_topk_query(const struct fieldstat *instance, int id, const struct 
 
     struct cell *cell = field_find_cell(field, tag_list->tag, tag_list->n_tag);
     if (cell == NULL) {
+        printf("cannot find cell\n");
         *n_key_out = 0;
         *keys_out = NULL;
         *n_metric_out = 0;
