@@ -167,4 +167,14 @@ void Fieldstat_tag_list_wrapper::print_tag_list() const
     printf("print end\n");
 }
 
-
+struct fieldstat *test_serialize_and_deserialize(struct fieldstat *instance)
+{
+    // serialize 
+    char *blob = NULL;
+    size_t blob_size = 0;
+    fieldstat_serialize(instance, &blob, &blob_size);
+    // deserialize
+    struct fieldstat *instance_from_deserialize = fieldstat_deserialize(blob, blob_size);
+    free(blob);
+    return instance_from_deserialize;
+}

@@ -92,7 +92,7 @@ TEST(metric_test_hll, serialize_and_deserialize_for_2_fields_1st_empty_2nd_added
     EXPECT_NEAR(ret2, 1, 0.5);
 
     for (size_t i = 0; i < ret_2cell_2length; i++) {
-        tag_list_clear(&tag_list_2[i]);
+        fieldstat_clear_tag_list(&tag_list_2[i]);
     }
     free(tag_list_2);
     free(tag_list_1);

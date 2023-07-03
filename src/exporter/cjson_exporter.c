@@ -154,7 +154,7 @@ struct cell_iter *cell_iter_new(const struct fieldstat *instance) {
 
 void cell_iter_free_tag_list(struct cell_iter *iter) {
     for (int i = 0; i < iter->tag_num; i++){
-        tag_list_clear(&iter->tag_list[i]);
+        fieldstat_clear_tag_list(&iter->tag_list[i]);
     }
     free(iter->tag_list);
     iter->tag_list = NULL;
@@ -550,7 +550,7 @@ struct fieldstat_json_exporter *fieldstat_json_exporter_new(const struct fieldst
 void fieldstat_json_exporter_set_global_tag(struct fieldstat_json_exporter *exporter, const struct fieldstat_tag tag_list[], size_t n_tag)
 {
     if (exporter->global_tag_list != NULL) {
-        tag_list_clear(exporter->global_tag_list);
+        fieldstat_clear_tag_list(exporter->global_tag_list);
         free(exporter->global_tag_list);
     }
 
@@ -593,7 +593,7 @@ void fieldstat_json_exporter_free(struct fieldstat_json_exporter *exporter)
         free(exporter->name);
     }
     if (exporter->global_tag_list != NULL) {
-        tag_list_clear(exporter->global_tag_list);
+        fieldstat_clear_tag_list(exporter->global_tag_list);
         free(exporter->global_tag_list);
     }
     free(exporter);

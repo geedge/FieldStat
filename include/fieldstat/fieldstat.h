@@ -62,6 +62,7 @@ int fieldstat_histogram_record(struct fieldstat *instance, int field_id, long lo
 struct fieldstat *fieldstat_deserialize(const char *blob, size_t blob_size);
 int fieldstat_merge_with_blob(struct fieldstat *instance, const char *blob, size_t blob_size);
 int fieldstat_serialize(const struct fieldstat *instance, char **blob_out, size_t *blob_size_out);
+void fieldstat_refresh(struct fieldstat *instance);
 
 /* -------------------------------------------------------------------------- */
 /*                                    query                                   */
@@ -70,13 +71,12 @@ long long fieldstat_histogram_value_at_percentile(struct fieldstat *instance, in
 long long fieldstat_counter_get(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list);
 double fieldstat_hll_get(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list);
 void fieldstat_get_tag_lists(const struct fieldstat *instance, int field_id, struct fieldstat_tag_list **lists, size_t *n_list);
+void fieldstat_clear_tag_list(struct fieldstat_tag_list *tag_list);
 int fieldstat_topk_query(const struct fieldstat *instance, int id, const struct fieldstat_tag_list *tag_list, // infos
     char ***keys_out, size_t *n_key_out, // row info
     char ***metric_name_out, size_t *n_metric_out, size_t *primary_metric_id_out, // column info
     unsigned int ***metric_value_out); // values
 void fieldstat_get_serialized_blob(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list, char **blob, size_t *blob_size);
-
-void tag_list_clear(struct fieldstat_tag_list *tag_list);
 
 int fieldstat_get_max_field_id(const struct fieldstat *instance);
 const char *fieldstat_get_field_name(const struct fieldstat *instance, int field_id);

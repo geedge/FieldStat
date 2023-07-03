@@ -339,7 +339,7 @@ static bool fieldstat_check_field(struct fs_field *field, enum field_type type)
     return true;
 }
 
-void tag_list_clear(struct fieldstat_tag_list *tag_list)
+void fieldstat_clear_tag_list(struct fieldstat_tag_list *tag_list)
 {
     for (int i = 0; i < tag_list->n_tag; i++) {
         struct fieldstat_tag *tag = &tag_list->tag[i];

@@ -48,3 +48,26 @@ public:
 private:
     struct fieldstat_tag_list tag_list_c;
 };
+
+struct fieldstat *test_serialize_and_deserialize(struct fieldstat *instance);
+template <typename Query_ret>
+std::vector<Query_ret> test_get_query_result(Query_ret (*query)(struct fieldstat *, int field_id, const struct fieldstat_tag_list *),
+    struct fieldstat *instance, int queried_field_id)
+{
+    size_t cell_num;
+    struct fieldstat_tag_list *tag_list = NULL;
+    fieldstat_get_tag_lists(instance, queried_field_id, &tag_list, &cell_num);
+    std::vector<Query_ret> ret_vec;
+    for (size_t i = 0; i < cell_num; i++) {
+        Query_ret ret = query(instance, queried_field_id, &tag_list[i]);
+        ret_vec.push_back(ret);
+    }
+    if (cell_num > 0){
+        for (size_t i = 0; i < cell_num; i++) {
+            fieldstat_clear_tag_list(&tag_list[i]);
+        }
+        free(tag_list);
+    }
+
+    return ret_vec;
+}
