@@ -40,6 +40,7 @@ public:
     explicit Fieldstat_tag_list_wrapper();
     Fieldstat_tag_list_wrapper(const Fieldstat_tag_list_wrapper &tag_list_wrapper);
     ~Fieldstat_tag_list_wrapper();
+    bool operator==(const Fieldstat_tag_list_wrapper &tag_list_wrapper) const;
 
     const struct fieldstat_tag *get_tag() const;
     size_t get_tag_count() const;
@@ -76,3 +77,5 @@ std::vector<Query_ret> test_get_query_result(Query_ret (*query)(const struct fie
 
     return ret_vec;
 }
+
+void test_hll_add(int adding_time, struct fieldstat *instance, int id, const struct fieldstat_tag *tags, size_t tag_count);

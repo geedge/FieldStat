@@ -160,6 +160,42 @@ void Fieldstat_tag_list_wrapper::print_tag_list() const
     printf("print end\n");
 }
 
+bool Fieldstat_tag_list_wrapper::operator==(const Fieldstat_tag_list_wrapper &tag_list_wrapper) const
+{
+    const struct fieldstat_tag_list *tag_list = tag_list_wrapper.get_c_struct();
+    if (tag_list_c.n_tag != tag_list->n_tag) {
+        return false;
+    }
+    for (size_t i = 0; i < tag_list_c.n_tag; i++) {
+        if (strcmp((char *)tag_list_c.tag[i].key, (char *)tag_list->tag[i].key) != 0) {
+            return false;
+        }
+        if (tag_list_c.tag[i].type != tag_list->tag[i].type) {
+            return false;
+        }
+        switch (tag_list_c.tag[i].type) {
+            case TAG_INTEGER:
+                if (tag_list_c.tag[i].value_int != tag_list->tag[i].value_int) {
+                    return false;
+                }
+                break;
+            case TAG_DOUBLE:
+                if (tag_list_c.tag[i].value_double != tag_list->tag[i].value_double) {
+                    return false;
+                }
+                break;
+            case TAG_CSTRING:
+                if (strcmp((char *)tag_list_c.tag[i].value_str, (char *)tag_list->tag[i].value_str) != 0) {
+                    return false;
+                }
+                break;
+            default:
+                break;
+        }
+    }
+    return true;
+}
+
 struct fieldstat *test_serialize_and_deserialize(struct fieldstat *instance)
 {
     // serialize 
@@ -189,4 +225,11 @@ void test_merge_with_blob_twice(struct fieldstat *dest, const struct fieldstat *
     fieldstat_merge_with_blob(dest, blob, blob_size);
     fieldstat_merge_with_blob(dest, blob, blob_size);
     free(blob);
+}
+
+void test_hll_add(int adding_time, struct fieldstat *instance, int id, const struct fieldstat_tag *tags, size_t tag_count) {
+    for (int i = 0; i < adding_time; i++) {
+        std::string rand_str = gen_rand_string(10);
+        fieldstat_hll_add(instance, id, rand_str.c_str(), rand_str.size(), tags, tag_count);
+    }
 }

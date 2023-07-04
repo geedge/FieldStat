@@ -26,78 +26,78 @@ const struct fieldstat_tag TEST_TAG_GLOBAL[3] = {
     {"test_tag_global 2", .type = TAG_DOUBLE, .value_double = 2.2},
     {"test_tag_global 3", .type = TAG_CSTRING, .value_str = {'s','t','r',' ','3','\0'}}};
 
-// TEST(export_test, network_blob_test_for_histogram)
-// {
-//     struct fieldstat *instance = fieldstat_new();
+TEST(export_test, network_blob_test_for_histogram)
+{
+    struct fieldstat *instance = fieldstat_new();
 
-//     int id = fieldstat_register_histogram(instance, "test_histogram",
-//         g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
+    int id = fieldstat_register_histogram(instance, "test_histogram",
+        g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
 
-//     for (size_t i = 0; i < OPER_NUM; i++) {
-//         fieldstat_histogram_record(instance, id, g_histogram_standard_oper[i], &TEST_TAG_INT, 1);
-//     }
-//     struct fieldstat_tag_list tag_list = {.tag = (struct fieldstat_tag *)&TEST_TAG_INT, .n_tag = 1};
-//     char *blob = NULL;
-//     size_t blob_size = 0;
-//     fieldstat_get_serialized_blob(instance, id, &tag_list, &blob, &blob_size);
+    for (size_t i = 0; i < OPER_NUM; i++) {
+        fieldstat_histogram_record(instance, id, g_histogram_standard_oper[i], &TEST_TAG_INT, 1);
+    }
+    struct fieldstat_tag_list tag_list = {.tag = (struct fieldstat_tag *)&TEST_TAG_INT, .n_tag = 1};
+    char *blob = NULL;
+    size_t blob_size = 0;
+    fieldstat_get_serialized_blob(instance, id, &tag_list, &blob, &blob_size);
 
-//     struct hdr_histogram *histogram = NULL;
-//     hdr_log_decode(&histogram, blob, blob_size);
-//     EXPECT_TRUE(histogram != NULL);
-//     EXPECT_EQ(histogram->lowest_discernible_value, g_histogram_standard->lowest_discernible_value);
-//     EXPECT_EQ(histogram->highest_trackable_value, g_histogram_standard->highest_trackable_value);
-//     EXPECT_EQ(histogram->significant_figures, g_histogram_standard->significant_figures);
-//     EXPECT_TRUE(memcmp(histogram->counts, g_histogram_standard->counts, sizeof(int64_t) * histogram->counts_len) == 0);
+    struct hdr_histogram *histogram = NULL;
+    hdr_log_decode(&histogram, blob, blob_size);
+    EXPECT_TRUE(histogram != NULL);
+    EXPECT_EQ(histogram->lowest_discernible_value, g_histogram_standard->lowest_discernible_value);
+    EXPECT_EQ(histogram->highest_trackable_value, g_histogram_standard->highest_trackable_value);
+    EXPECT_EQ(histogram->significant_figures, g_histogram_standard->significant_figures);
+    EXPECT_TRUE(memcmp(histogram->counts, g_histogram_standard->counts, sizeof(int64_t) * histogram->counts_len) == 0);
 
-//     free(blob);
-//     fieldstat_free(instance);
-//     hdr_close(histogram);
-// }
+    free(blob);
+    fieldstat_free(instance);
+    hdr_close(histogram);
+}
 
-// #define BigLittleSwap32(A)        ((((uint32_t)(A) & 0xff000000) >> 24) | \
-//                                                        (((uint32_t)(A) & 0x00ff0000) >> 8) | \
-//                                                        (((uint32_t)(A) & 0x0000ff00) << 8) | \
-//                                                        (((uint32_t)(A) & 0x000000ff) << 24))
-// TEST(export_test, network_blob_test_for_hll)
-// {
-//     struct fieldstat *instance = fieldstat_new();
+#define BigLittleSwap32(A)        ((((uint32_t)(A) & 0xff000000) >> 24) | \
+                                                       (((uint32_t)(A) & 0x00ff0000) >> 8) | \
+                                                       (((uint32_t)(A) & 0x0000ff00) << 8) | \
+                                                       (((uint32_t)(A) & 0x000000ff) << 24))
+TEST(export_test, network_blob_test_for_hll)
+{
+    struct fieldstat *instance = fieldstat_new();
 
-//     int id = fieldstat_register_hll(instance, "test_hll", g_hll_standard->cfg.precision);
+    int id = fieldstat_register_hll(instance, "test_hll", g_hll_standard->cfg.precision);
 
-//     for (size_t i = 0; i < OPER_NUM; i++) {
-//         fieldstat_hll_add(instance, id, g_hll_standard_oper[i].c_str(), g_hll_standard_oper[i].length(), &TEST_TAG_INT, 1);
-//     }
-//     struct fieldstat_tag_list tag_list = {.tag = (struct fieldstat_tag *)&TEST_TAG_INT, .n_tag = 1};
-//     char *blob = NULL;
-//     size_t blob_size = 0;
-//     fieldstat_get_serialized_blob(instance, id, &tag_list, &blob, &blob_size);
-//     size_t dec_size = 0;
-//     unsigned char *dec = b64_decode_ex(blob, blob_size, &dec_size);
-//     free(blob);
+    for (size_t i = 0; i < OPER_NUM; i++) {
+        fieldstat_hll_add(instance, id, g_hll_standard_oper[i].c_str(), g_hll_standard_oper[i].length(), &TEST_TAG_INT, 1);
+    }
+    struct fieldstat_tag_list tag_list = {.tag = (struct fieldstat_tag *)&TEST_TAG_INT, .n_tag = 1};
+    char *blob = NULL;
+    size_t blob_size = 0;
+    fieldstat_get_serialized_blob(instance, id, &tag_list, &blob, &blob_size);
+    size_t dec_size = 0;
+    unsigned char *dec = b64_decode_ex(blob, blob_size, &dec_size);
+    free(blob);
 
-//     unsigned char version;
-//     memcpy(&version, dec, sizeof(unsigned char));
-//     EXPECT_EQ(version, 1);
-//     unsigned char precision;
-//     memcpy(&precision, dec + sizeof(unsigned char), sizeof(unsigned char));
-//     EXPECT_EQ(precision, g_hll_standard->cfg.precision);
+    unsigned char version;
+    memcpy(&version, dec, sizeof(unsigned char));
+    EXPECT_EQ(version, 1);
+    unsigned char precision;
+    memcpy(&precision, dec + sizeof(unsigned char), sizeof(unsigned char));
+    EXPECT_EQ(precision, g_hll_standard->cfg.precision);
 
-//     int num_reg = NUM_REG(precision);
-//     // Get the full words required
-//     int words = INT_CEIL(num_reg, REG_PER_WORD);
-//     size_t reg_size = words * sizeof(uint32_t);
+    int num_reg = NUM_REG(precision);
+    // Get the full words required
+    int words = INT_CEIL(num_reg, REG_PER_WORD);
+    size_t reg_size = words * sizeof(uint32_t);
 
-//     uint32_t *recovered_reg = (uint32_t *)malloc(reg_size);
-//     memcpy(recovered_reg, dec + 2, reg_size);
-//     for (int i = 0; i < words; i++) {
-//         uint32_t tmp = BigLittleSwap32(recovered_reg[i]);
-//         EXPECT_EQ(tmp, g_hll_standard->registers[i]);
-//     }
+    uint32_t *recovered_reg = (uint32_t *)malloc(reg_size);
+    memcpy(recovered_reg, dec + 2, reg_size);
+    for (int i = 0; i < words; i++) {
+        uint32_t tmp = BigLittleSwap32(recovered_reg[i]);
+        EXPECT_EQ(tmp, g_hll_standard->registers[i]);
+    }
 
-//     free(dec);
-//     fieldstat_free(instance);
-//     free(recovered_reg);
-// }
+    free(dec);
+    fieldstat_free(instance);
+    free(recovered_reg);
+}
 
 void test_check_if_tag_list_is_in_json(cJSON *tag_obj, const Fieldstat_tag_list_wrapper *benchmark)
 {

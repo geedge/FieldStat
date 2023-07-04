@@ -8,12 +8,6 @@
 #include "st_hyperloglog.h"
 
 
-void test_hll_add(int adding_time, struct fieldstat *instance, int id, const struct fieldstat_tag *tags, size_t tag_count) {
-    for (int i = 0; i < adding_time; i++) {
-        std::string rand_str = gen_rand_string(10);
-        fieldstat_hll_add(instance, id, rand_str.c_str(), rand_str.size(), tags, tag_count);
-    }
-}
 
 TEST(metric_test_hll, serialize_and_deserialize_for_2_fields_1st_empty_2nd_added)
 {
