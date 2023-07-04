@@ -423,11 +423,14 @@ TEST(export_test, skip_two_empty_field_and_export_last_two_with_global_tag_given
     cJSON_Delete(root_arr);
 }
 
-// TODO: 检查没有globaltag，且有写入的metric
 TEST(export_test, export_and_then_skip_when_4_topk_field_registered_given_global_tags) {
-
+    struct fieldstat *instance = fieldstat_new();
+    const char *topk_metric_name[] = {"topk_income_bytes"};
+    int id_1 = fieldstat_register_topk(instance, "topk1", TEST_TOPK_STANDARD_K, topk_metric_name, 1, 0);
+    (void)fieldstat_register_topk(instance, "topk_empty1", TEST_TOPK_STANDARD_K, topk_metric_name, 1, 0);
+    int id_2 = fieldstat_register_topk(instance, "topk2", TEST_TOPK_STANDARD_K, topk_metric_name, 1, 0);
+    (void)fieldstat_register_topk(instance, "topk_empty2", TEST_TOPK_STANDARD_K, topk_metric_name, 1, 0);
 }
-
 
 void init_hll_standard_oper()
 {

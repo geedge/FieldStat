@@ -138,7 +138,7 @@ TEST(metric_test_topk, serialize_and_merge_by_blob_twice_expecting_double_result
 
     int id_added = fieldstat_register_topk(instance, "topk_add", 10, metric_name, 2, 1);
     // register metric 
-    // TODO: 这个地方还是加两个吧
+
     fieldstat_topk_add(instance, id_added, value_string.c_str(), value_string.length(), added_value[0], &TEST_TAG_INT, 1);
     fieldstat_topk_add(instance, id_added, value_string.c_str(), value_string.length(), added_value[0], &TEST_TAG_INT_collided, 1);
 
