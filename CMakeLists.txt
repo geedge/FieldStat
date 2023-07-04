@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 2.8.8)
 
 set(lib_name fieldstat4)
 
+#the path where you install the cppcheck
+set(CPP_BIN_PATH "/home/chenzizhan/bin")
+
 project (${lib_name})
 
 # to fix issue: cannot find pthresh
@@ -23,7 +26,7 @@ if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 	set(CMAKE_INSTALL_PREFIX "/opt/MESA" CACHE PATH "default install path" FORCE)
 endif()
 
-find_program(CMAKE_CXX_CPPCHECK NAMES cppcheck HINTS /home/chenzizhan/heavykeeperczz/tools/home/chenzizhan/heavykeeperczz/usr/bin)
+find_program(CMAKE_CXX_CPPCHECK NAMES cppcheck HINTS ${CPP_BIN_PATH})
 if (CMAKE_CXX_CPPCHECK)
     list(
         APPEND CMAKE_CXX_CPPCHECK 
@@ -50,6 +53,8 @@ if (CMAKE_CXX_CPPCHECK)
             "--suppress=shadowFunction"
             "--suppress=shiftTooManyBitsSigned"
             "--suppress=preprocessorErrorDirective"
+            "--suppress=*:${PROJECT_SOURCE_DIR}/vendors/mpack/mpack.c"
+            "--suppress=*:${PROJECT_SOURCE_DIR}/test/utils.hpp"
     )
     set(CMAKE_C_CPPCHECK ${CMAKE_CXX_CPPCHECK})
 else()

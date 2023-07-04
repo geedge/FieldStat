@@ -235,9 +235,9 @@ void topk_standard_oper(std::function<void(const char *, size_t, unsigned int *)
     }
 }
 
-void topk_init(struct fieldstat *instance, Fieldstat_tag_list_wrapper *tags[], size_t tags_count, const char *topk_metric_name[], size_t arr_num, unsigned int test_expected_big_count[])
+int topk_init_with_field_name(struct fieldstat *instance, const char * field_name, Fieldstat_tag_list_wrapper *tags[], size_t tags_count, const char *topk_metric_name[], size_t arr_num, unsigned int test_expected_big_count[])
 {
-    int id_topk = fieldstat_register_topk(instance, "topk", TEST_TOPK_STANDARD_K, topk_metric_name, arr_num, 0);
+    int id_topk = fieldstat_register_topk(instance, field_name, TEST_TOPK_STANDARD_K, topk_metric_name, arr_num, 0);
 
     for (size_t j = 0; j < tags_count; j++) {
         const struct fieldstat_tag *tag_tmp = tags[j]->get_tag();
@@ -248,6 +248,12 @@ void topk_init(struct fieldstat *instance, Fieldstat_tag_list_wrapper *tags[], s
 
         topk_standard_oper(topk_add, arr_num, test_expected_big_count[j]);
     }
+    return id_topk;
+}
+
+void topk_init(struct fieldstat *instance, Fieldstat_tag_list_wrapper *tags[], size_t tags_count, const char *topk_metric_name[], size_t arr_num, unsigned int test_expected_big_count[])
+{
+    (void)topk_init_with_field_name(instance, "topk", tags, tags_count, topk_metric_name, arr_num, test_expected_big_count);
 }
 
 TEST(export_test, cjson_export_with_fixed_tag_and_many_metrics)
@@ -423,13 +429,49 @@ TEST(export_test, skip_two_empty_field_and_export_last_two_with_global_tag_given
     cJSON_Delete(root_arr);
 }
 
-TEST(export_test, export_and_then_skip_when_4_topk_field_registered_given_global_tags) {
+TEST(export_test, export_2_topk_field_registered_with_2_plus_1_cells_given_global_tags) {
     struct fieldstat *instance = fieldstat_new();
     const char *topk_metric_name[] = {"topk_income_bytes"};
-    int id_1 = fieldstat_register_topk(instance, "topk1", TEST_TOPK_STANDARD_K, topk_metric_name, 1, 0);
-    (void)fieldstat_register_topk(instance, "topk_empty1", TEST_TOPK_STANDARD_K, topk_metric_name, 1, 0);
-    int id_2 = fieldstat_register_topk(instance, "topk2", TEST_TOPK_STANDARD_K, topk_metric_name, 1, 0);
-    (void)fieldstat_register_topk(instance, "topk_empty2", TEST_TOPK_STANDARD_K, topk_metric_name, 1, 0);
+    const size_t tags_count_1 = 2;
+    Fieldstat_tag_list_wrapper *tags_1[tags_count_1];
+    fill_random_tag(tags_1, tags_count_1);
+    const size_t tags_count_2 = 1;
+    Fieldstat_tag_list_wrapper *tags_2[tags_count_2];
+    fill_random_tag(tags_2, tags_count_2);
+
+    unsigned int test_expected_big_count1[tags_count_1] = {1000, 1200};
+    unsigned int test_expected_big_count2[tags_count_2] = {2000};
+    (void)topk_init_with_field_name(instance, "topk1_2cells", tags_1, tags_count_1, topk_metric_name, 1, test_expected_big_count1); // field 0
+    (void)topk_init_with_field_name(instance, "topk2_1cell", tags_2, tags_count_2, topk_metric_name, 1, test_expected_big_count2); // field 1
+
+    cJSON *root_arr = test_exporter_extract_results_with_standard_global(instance);
+    int arr_num = cJSON_GetArraySize(root_arr);
+    EXPECT_EQ(arr_num, TEST_TOPK_STANDARD_K * (tags_count_1 + tags_count_2)); // 3 topk with K = 3
+    for (int i = 0; i < arr_num; i++) {
+        cJSON *root = cJSON_GetArrayItem(root_arr, i);
+        size_t topk_cell_idx = i / TEST_TOPK_STANDARD_K;
+        bool is_field_1 = topk_cell_idx < tags_count_1;
+        Fieldstat_tag_list_wrapper *benchmark_tag = is_field_1 ? tags_1[topk_cell_idx] : tags_2[topk_cell_idx - tags_count_1];
+        unsigned int big_count_benchmark = is_field_1 ? test_expected_big_count1[topk_cell_idx] : test_expected_big_count2[topk_cell_idx - tags_count_1];
+        // check tag
+        cJSON *tag = cJSON_GetObjectItem(root, "tags");
+        test_check_if_tag_list_is_in_json(tag, benchmark_tag);
+        test_check_if_global_tag_is_in_json(tag);
+        
+        cJSON *metrics = cJSON_GetObjectItem(root, "fields");
+
+        test_check_if_metric_topk_correct(metrics, topk_metric_name, big_count_benchmark, 1);
+        test_check_if_topk_tag_in_json(tag, is_field_1 ? "topk1_2cells" : "topk2_1cell");
+    }
+
+    for (size_t i = 0; i < tags_count_1; i++) {
+        delete tags_1[i];
+    }
+    for (size_t i = 0; i < tags_count_2; i++) {
+        delete tags_2[i];
+    }
+    fieldstat_free(instance);
+    cJSON_Delete(root_arr);
 }
 
 void init_hll_standard_oper()
