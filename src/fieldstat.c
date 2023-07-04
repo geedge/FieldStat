@@ -75,7 +75,6 @@ struct fieldstat *fieldstat_new()
 
 void fieldstat_free(struct fieldstat *instance)
 {
-    printf("fieldstat_free, nfield: %zu\n", instance->n_field);
     for (int i = 0; i < instance->n_field; i++) { // FIXME: 当前添加都是添加到最后，所以可以直接这样循环，会不会有unregister 的需求？
         field_free(instance->field_array[i]);
     }
@@ -134,13 +133,13 @@ int fieldstat_register_histogram(struct fieldstat *instance, const char *field_n
 {
     if (lowest_trackable_value < 1 || significant_figures < 1 || 5 < significant_figures)
 	{
-        printf("fieldstat_register_histogram: invalid params.\n");
+        printf("ERR: fieldstat_register_histogram: invalid params.\n");
 		return -1;
 	}
 
 	if (lowest_trackable_value * 2 > highest_trackable_value)
 	{
-        printf("fieldstat_register_histogram: invalid params.\n");
+        printf("ERR: fieldstat_register_histogram: invalid params.\n");
 		return -1;
 	}
 
@@ -153,7 +152,7 @@ int fieldstat_register_hll(struct fieldstat *instance, const char *field_name, u
 {
     // Ensure the precision is somewhat sane
     if (precision < 4 || precision > 18) {
-        printf("fieldstat_register_histogram: invalid params.\n");
+        printf("ERR: fieldstat_register_histogram: invalid params.\n");
         return -1;
     }
 
@@ -231,7 +230,7 @@ struct fieldstat *fieldstat_deserialize(const char *blob, size_t blob_size)
 
     int ver = mpack_node_i32(mpack_node_map_cstr(root, "ver"));
     if (ver != EXPORT_VER) {
-        printf("fieldstat_deserialize: invalid version\n");
+        printf("ERR: fieldstat_deserialize: invalid version\n");
         mpack_tree_destroy(&tree);
         return NULL;
     }
@@ -255,23 +254,18 @@ int fieldstat_merge_with_blob(struct fieldstat *instance, const char *blob, size
 {
     struct fieldstat *src = fieldstat_deserialize(blob, blob_size);
     if (src == NULL) {
-        fprintf(stderr, "fieldstat_deserialize failed\n");
         return -1;
     }
 
     for (int i = 0; i < src->n_field; i++) {
-        printf("fieldstat_merge_with_blob: %d\n", i);
         struct fs_field *tmp_field = src->field_array[i];
         int field_id_tmp = name_id_map_find_a_field_name(instance, field_get_name(tmp_field));
 
         if (field_id_tmp == -1) {
-            printf("fieldstat_merge_with_blob: new field %s\n", field_get_name(tmp_field));
             struct fs_field *copied_field = field_dup(tmp_field);
             int alloced_id = append_field_to_instance(instance, copied_field);
             name_id_map_add_a_field_name(instance, field_get_name(copied_field), alloced_id);
-            printf("new field append to id: %d\n", alloced_id);
         } else {
-            printf("fieldstat_merge_with_blob: merge field %s\n", field_get_name(tmp_field));
             field_merge(instance->field_array[field_id_tmp], tmp_field);
         }
     }
@@ -379,7 +373,6 @@ int fieldstat_topk_query(const struct fieldstat *instance, int id, const struct 
 
     struct cell *cell = field_find_cell(field, tag_list->tag, tag_list->n_tag);
     if (cell == NULL) {
-        printf("cannot find cell\n");
         *n_key_out = 0;
         *keys_out = NULL;
         *n_metric_out = 0;

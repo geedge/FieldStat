@@ -62,7 +62,6 @@ std::vector<Query_ret> test_get_query_result(Query_ret (*query)(const struct fie
     struct fieldstat_tag_list *tag_list = NULL;
     fieldstat_get_tag_lists(instance, queried_field_id, &tag_list, &cell_num);
 
-    printf("fieldstat_get_tag_lists, cell num: %zu\n", cell_num);
     std::vector<Query_ret> ret_vec;
     for (size_t i = 0; i < cell_num; i++) {
         Query_ret ret = query(instance, queried_field_id, &tag_list[i]);

@@ -101,7 +101,6 @@ TEST(export_test, network_blob_test_for_hll)
 
 void test_check_if_tag_list_is_in_json(cJSON *tag_obj, const Fieldstat_tag_list_wrapper *benchmark)
 {
-    printf("going to parse tag, num: %zu\n", benchmark->get_tag_count());
     for (size_t tag_id = 0; tag_id < benchmark->get_tag_count(); tag_id++) {
         cJSON *tag_val = cJSON_GetObjectItem(tag_obj, benchmark->get_tag()[tag_id].key);
         printf("the tag key is : %s\n", benchmark->get_tag()[tag_id].key);
@@ -317,7 +316,6 @@ TEST(export_test, cjson_export_with_fixed_tag_only_one_topk)
     const char *topk_metric_name[] = {"metric_name1"};
     unsigned int test_expected_big_count[tags_count] = {1000, 1200};
     topk_init(instance, tags, tags_count, topk_metric_name, 1, test_expected_big_count);
-    printf("init done\n");
 
     // export test
     cJSON *root_arr = test_exporter_extract_results(instance);

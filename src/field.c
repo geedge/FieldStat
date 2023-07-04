@@ -171,7 +171,6 @@ static struct cell *field_find_cell_with_key(const struct fs_field *field, const
     struct cell_hash_node *node;
     HASH_FIND(hh, field->hash_tbl, key, key_len, node);
     if (node == NULL) {
-        printf("field_find_cell_with_key: node == NULL\n");
         return NULL;
     }
     return node->cell;
@@ -215,9 +214,7 @@ struct cell *field_find_or_create_cell(struct fs_field *field, const struct fiel
     build_dynamic_cell_key(tag_list, tag_num, &dynamic_cell_key, &dynamic_key_size);
     struct cell *cell = field_find_cell_with_key(field, dynamic_cell_key, dynamic_key_size);
     if (cell == NULL) {
-        printf("cell is null, going to create one\n");
         cell = field_spawn_cell(field);
-        printf("cell is created\n");
         cell_add_tag(cell, tag_list, tag_num);
         field_insert_cell_with_key(field, cell, dynamic_cell_key, dynamic_key_size);
     }
@@ -291,7 +288,6 @@ struct fs_field *field_dup(const struct fs_field *src)
     HASH_ITER(hh, src->hash_tbl, node, tmp) {
         struct cell *new_cell = cell_duplicate(node->cell);
         field_insert_cell_with_key(dst, new_cell, node->key, node->key_len);
-        printf("field_dup:insert cell, key is : %s\n", node->key);
     }
     return dst;
 }
@@ -310,7 +306,6 @@ int field_merge(struct fs_field *dst, const struct fs_field *src)
             struct cell *new_cell = cell_duplicate(cell);
             field_insert_cell_with_key(dst, new_cell, node->key, node->key_len);
         } else {
-            printf("field_merge:cell merge\n");
             if (cell_merge(dst_cell, cell) != 0) {
                 printf("field_merge:cell merge failed\n");
                 return -1;
@@ -322,10 +317,8 @@ int field_merge(struct fs_field *dst, const struct fs_field *src)
 
 void field_get_tags(const struct fs_field *field, struct fieldstat_tag_list **tag_lists_out, size_t *n_tag_lists_out)
 {
-    printf("field_get_tags enter\n");
     *n_tag_lists_out = HASH_COUNT(field->hash_tbl);
     if (*n_tag_lists_out == 0) {
-        printf("field_get_tags, no tag found\n");
         *tag_lists_out = NULL;
         return;
     }
@@ -338,10 +331,7 @@ void field_get_tags(const struct fs_field *field, struct fieldstat_tag_list **ta
         struct fieldstat_tag *tags = NULL;
         size_t n_tags = 0;
         cell_read_tag(cell, &tags, &n_tags);
-        printf("field_get_tags, read tag result: ntag: %zu, key is \n", n_tags);
-        for (int i = 0; i < n_tags; i++) {
-            printf("%s:%lld\n", tags[i].key, tags[i].value_int);
-        }
+
         (*tag_lists_out)[i].tag = tags;
         (*tag_lists_out)[i].n_tag = n_tags;
         i++;
@@ -466,7 +456,6 @@ struct field_paras *deserialize_parameters(const char *blob, size_t blob_size)
 
 struct fs_field *field_deserialize(const char *blob, size_t blob_size)
 {
-    printf("field_deserialize enter, blob size:: %zu\n", blob_size);
     mpack_tree_t tree;
     mpack_tree_init_data(&tree, blob, blob_size);
     mpack_tree_parse(&tree);
@@ -477,14 +466,11 @@ struct fs_field *field_deserialize(const char *blob, size_t blob_size)
     mpack_node_t para_obj = mpack_node_map_cstr(root, "para");
     struct field_paras *field_para = deserialize_parameters(mpack_node_bin_data(para_obj), mpack_node_bin_size(para_obj));
 
-    printf("field_deserialize name is: %s, type is: %d\n", field_name, type);
-
     struct fs_field *field_out = field_new(type, field_name, field_para);
     free(field_name);
 
     mpack_node_t cells_arr = mpack_node_map_cstr(root, "cells");
     if (mpack_node_is_nil(cells_arr)) {
-        printf("The field has no serialized cell object.\n");
         mpack_tree_destroy(&tree);
         return field_out;
     }
@@ -493,7 +479,7 @@ struct fs_field *field_deserialize(const char *blob, size_t blob_size)
         mpack_node_t cell_node = mpack_node_array_at(cells_arr, i);
         struct cell *cell = cell_deserialize(mpack_node_bin_data(cell_node), mpack_node_bin_size(cell_node));
         if (cell == NULL) {
-            fprintf(stderr, "deserialize_for_cell_type failed\n");
+            printf("ERR: deserialize_for_cell_type failed\n");
             mpack_tree_destroy(&tree);
             return NULL;
         }
@@ -505,7 +491,6 @@ struct fs_field *field_deserialize(const char *blob, size_t blob_size)
 
         free(tag_list);
     }
-    printf("debug, the field has %u cells\n", HASH_COUNT(field_out->hash_tbl));
     mpack_tree_destroy(&tree);
     return field_out;
 }
@@ -526,8 +511,6 @@ int field_serialize(const struct fs_field *field, char **blob, size_t *blob_size
     size_t para_blob_size = 0;
     char *cell_blob = NULL;
     size_t cell_blob_size = 0;
-
-    printf("field_serialize enter, field name: %s\n", field->name);
     mpack_writer_t writer;
     mpack_writer_init_growable(&writer, blob, blob_size);
 
@@ -546,7 +529,6 @@ int field_serialize(const struct fs_field *field, char **blob, size_t *blob_size
     if (HASH_COUNT(field->hash_tbl) == 0) {
         mpack_write_nil(&writer);
     } else {
-        printf("serialize cells\n");
         struct cell_hash_node *node, *tmp;
         mpack_build_array(&writer);
         HASH_ITER(hh, field->hash_tbl, node, tmp) {
@@ -560,7 +542,6 @@ int field_serialize(const struct fs_field *field, char **blob, size_t *blob_size
 
     mpack_complete_map(&writer);
     if (mpack_writer_destroy(&writer) != mpack_ok) {
-        fprintf(stderr, "field_serialize failed\n");
         return -1;
     }
 

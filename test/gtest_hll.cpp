@@ -110,7 +110,6 @@ TEST(metric_test_hll, serialize_and_merge_twice_with_different_values)
     fieldstat_free(instance);
     fieldstat_free(instance2);
 }
-// TODO: 每个都加一个：merge new cell to summery 
 
 int main(int argc, char *argv[]) 
 {

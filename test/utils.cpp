@@ -229,7 +229,7 @@ void test_merge_with_blob_twice(struct fieldstat *dest, const struct fieldstat *
 
 void test_hll_add(int adding_time, struct fieldstat *instance, int id, const struct fieldstat_tag *tags, size_t tag_count) {
     for (int i = 0; i < adding_time; i++) {
-        std::string rand_str = gen_rand_string(10);
-        fieldstat_hll_add(instance, id, rand_str.c_str(), rand_str.size(), tags, tag_count);
+        std::string tmp_str = to_string(i);
+        fieldstat_hll_add(instance, id, tmp_str.c_str(), tmp_str.size(), tags, tag_count);
     }
 }

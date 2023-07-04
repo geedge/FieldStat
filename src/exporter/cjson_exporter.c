@@ -244,11 +244,9 @@ int cell_iter_next_nonempty_field(struct cell_iter *iter) {
             // here we do not need to worry if topk is empty, because when we find tag, it is ensured that topk_add occurred at least once
             cell_iter_step_into_topk(iter);
 
-            printf("goto topk, id: %d\n", iter->curr_id);
             return 1;
         }
         iter->state = ITER_STATE_TAG_MOVING;
-        printf("cell_iter_next new field: %d\n", iter->curr_id);
 
         return 1;
     }
@@ -259,7 +257,6 @@ int cell_iter_next_nonempty_field(struct cell_iter *iter) {
 int cell_iter_next_tag(struct cell_iter *iter) {
     if (iter->tag_idx < iter->tag_num - 1) {
         iter->tag_idx++;
-        printf("cell_iter_next move to new tag, key: %s\n", iter->tag_list[iter->tag_idx].tag->key);
         return 1;
     }
     return 0;
@@ -274,7 +271,6 @@ int cell_iter_next_topk(struct cell_iter *iter) {
 }
 
 int cell_iter_next(struct cell_iter *iter) {
-    printf("cell_iter_next enter, current id: %d, current tag id: %zu\n", iter->curr_id, iter->tag_idx);
     if (iter->state == ITER_STATE_INIT) {
         iter->curr_id = -1;
         return cell_iter_next_nonempty_field(iter);
@@ -312,8 +308,6 @@ struct export_kv_pair *cell_query_with_iter(const struct cell_iter *iter) {
 
     ret->key = strdup(cell_iter_get_name(iter));
 
-    printf("cell_query_with_iter enter, type: %d, key: %s \n", cell_iter_get_type(iter), ret->key);
-
     switch (cell_iter_get_type(iter)) {
         case FIELD_TYPE_COUNTER:
             ret->type = TAG_INTEGER;
@@ -336,15 +330,12 @@ void kv_pair_add_to_cjson(const struct export_kv_pair *pairs, cJSON *cjson_pair)
     switch (pairs->type)
     {
         case TAG_INTEGER:
-            printf("kv_pair_add_to_cjson, int: key: %s, value: %lld\n", pairs->key, pairs->value_int);
             cJSON_AddNumberToObject(cjson_pair, pairs->key, pairs->value_int);
             break;
         case TAG_DOUBLE:
             cJSON_AddNumberToObject(cjson_pair, pairs->key, pairs->value_double);
             break;
         case TAG_CSTRING:
-            printf("kv_pair_add_to_cjson, string: key: %s, value: %s\n", pairs->key, pairs->value_str);
-
             cJSON_AddStringToObject(cjson_pair, pairs->key, pairs->value_str);
             break;
         default:
@@ -472,7 +463,6 @@ void kv_pair_free_list(struct export_kv_pair *pairs, size_t len)
 void cjson_map_add_new_pair_for_one_loop(struct cjson_map **map_head_in, struct cell_iter *iter)
 {
     struct cjson_map *map_head = *map_head_in;
-    printf("cjson_map_add_new_pair_for_one_loop enter\n");
     struct export_kv_pair *tag_list;
     size_t tag_list_len;
 
@@ -486,7 +476,6 @@ void cjson_map_add_new_pair_for_one_loop(struct cjson_map **map_head_in, struct 
     kv_pair_free_list(tag_list, tag_list_len);
 
     char *key = cJSON_PrintUnformatted(cjson_tags);  // when this key is added to a new map entry, it is freed when the map is freed
-    printf("tagkey: %s\n", key);
     size_t key_len = strlen(key);
 
     struct cjson_map *map = cjson_map_find(map_head, key, key_len);
@@ -505,22 +494,18 @@ void cjson_map_add_new_pair_for_one_loop(struct cjson_map **map_head_in, struct 
     cell_iter_add_field_to_field_object(iter, map->cjson_fields);
 
     *map_head_in = map_head;
-    printf("cjson_map_add_new_pair_for_one_loop end\n");
 }
 
 struct cjson_map *hash_map_read_tag_and_field(const struct fieldstat *instance)
 {
-    printf("hash_map_read_tag_and_field enter\n");
     struct cjson_map *map_head = NULL; // new a hash head
     struct cell_iter *iter = cell_iter_new(instance);
-    printf("cell_iter_new done\n");
 
     while (cell_iter_next(iter)) {
         cjson_map_add_new_pair_for_one_loop(&map_head, iter);
     }
-    printf("cell_iter done\n");
-    cell_iter_free(iter);
 
+    cell_iter_free(iter);
     return map_head;
 }
 

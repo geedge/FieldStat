@@ -128,13 +128,9 @@ void cell_serialize_write_fieldtag(mpack_writer_t *writer, const struct cell *pt
     size_t tag_num;
     cell_read_tag(pthis, &tag_list, &tag_num);
 
-    printf("cell_serialize_write_fieldtag, after read tag, tag num: %zu\n", tag_num);
-
     mpack_write_cstr(writer, "tags");
     mpack_start_array(writer, tag_num);
     for (int j = 0; j < tag_num; j++) {
-        printf("serialize tag: k:%s\n", tag_list[j].key);
-        printf("serialize tag: type:%d\n", tag_list[j].type);
         mpack_start_map(writer, 3);
         mpack_write_cstr(writer, "key");
         mpack_write_cstr(writer, tag_list[j].key);
@@ -144,16 +140,12 @@ void cell_serialize_write_fieldtag(mpack_writer_t *writer, const struct cell *pt
         switch (tag_list[j].type)
         {
             case TAG_INTEGER:
-                printf("write value int: %lld\n", tag_list[j].value_int);
                 mpack_write_i64(writer, tag_list[j].value_int);
                 break;
             case TAG_DOUBLE:
-                printf("write value double: %lf\n", tag_list[j].value_double);
-
                 mpack_write_double(writer, tag_list[j].value_double);
                 break;
             case TAG_CSTRING:
-                printf("write value str: %s\n", tag_list[j].value_str);
                 mpack_write_cstr(writer, tag_list[j].value_str);
                 break;
             default:
@@ -198,7 +190,6 @@ void deserialize_tag(mpack_node_t *root, struct fieldstat_tag **tag_list_out, si
                 break;
         }
     }
-    printf("deserialize_tag exit\n");
     *tag_list_out = tag_list;
     *tag_num_out = tag_num;
 }
@@ -209,8 +200,6 @@ void deserialize_tag(mpack_node_t *root, struct fieldstat_tag **tag_list_out, si
 /* -------------------------------------------------------------------------- */
 static void metric_topk_serialize(const struct metrics *pthis, char **blob, size_t *blob_size)
 {
-    printf("metric_topk_serialize enter\n");
-
     struct metric_topk *topk = (struct metric_topk *)pthis;
     heavy_keeper_serialization(topk->hk, blob, blob_size);
 }
@@ -312,7 +301,6 @@ void cell_topk_query(const struct cell *pthis,
     cstring_t **metric_name_out, size_t *num_metric_out, size_t *primary_metric_id_out, // column
     unsigned int ***metric_value_out)
 {
-    printf("cell_topk_query enter\n");
     struct metric_topk *topk = (struct metric_topk *)pthis->metric;
     struct heavy_keeper_result *result = heavy_keeper_query(topk->hk);
 
@@ -375,12 +363,11 @@ static void metric_counter_serialize(const struct metrics *pthis, char **blob, s
     mpack_build_map(&writer);
 
     mpack_write_cstr(&writer, "value");
-    printf("metric_counter_serialize counter->value: %lld\n", counter->value);
     mpack_write_i64(&writer, counter->value);
 
     mpack_complete_map(&writer);
     if (mpack_writer_destroy(&writer) != mpack_ok) {
-        fprintf(stderr, "An error occurred in counter_metric_serialize!\n");
+        printf("ERR: An error occurred in counter_metric_serialize!\n");
     }
 }
 
@@ -409,7 +396,6 @@ int metric_counter_deserialize(struct metrics *pthis, const char *blob, size_t b
 
     struct metric_counter *counter = (struct metric_counter *)pthis;
     counter->value = mpack_node_i64(mpack_node_map_cstr(content_root, "value"));
-    printf("counter->value: %lld\n", counter->value);
 
     mpack_tree_destroy(&content_tree);
     return 0;
@@ -598,7 +584,7 @@ static int metric_histogram_deserialize(struct metrics *pthis, const char *blob,
     histogram->hdr = NULL;
     int ret = hdr_log_decode(&histogram->hdr, (char *)blob, blob_size); // still const, just to avoid warning
     if (ret != 0 || histogram->hdr == NULL) {
-        printf("metric_histogram_deserialize failed\n");
+        printf("ERR: metric_histogram_deserialize failed\n");
         return -1;
     }
     return 0;
@@ -628,7 +614,7 @@ struct cell *cell_create_for_histogram(long long lowest_trackable_value, long lo
     struct hdr_histogram* tmp_p_hdr = NULL;
     int ret = hdr_init((int64_t)lowest_trackable_value, (int64_t)highest_trackable_value, significant_figures, &tmp_p_hdr);
 	if (ret != 0) {
-        fprintf(stderr, "hdr_init failed!\n");
+        printf("ERR: hdr_init failed!\n");
         return NULL;
     }
 
@@ -738,21 +724,17 @@ void cell_add_tag(struct cell *pthis, const struct fieldstat_tag *tag_list, size
 
 void cell_serialize(const struct cell *pthis, char **blob, size_t *blob_size)
 {
-    printf("cell_serialize enter\n");
-
     mpack_writer_t writer;
     mpack_writer_init_growable(&writer, blob, blob_size);
     mpack_build_map(&writer);
 
     // write tags
     cell_serialize_write_fieldtag(&writer, pthis);
-    printf("write fieldtag done\n");
 
     // write content blob, wrap it with type info 
     char *blob_content = NULL;
     size_t blob_size_content = 0;
     pthis->metric->serialize(pthis->metric, &blob_content, &blob_size_content);
-    printf("write blob, blob_size_content blob size: %zu\n", blob_size_content);
     char *wrapped_content = NULL;
     size_t wrapped_size = 0;
     mpack_blob_wrap_basic_info(pthis->metric->type, blob_content, blob_size_content, &wrapped_content, &wrapped_size);
@@ -761,9 +743,8 @@ void cell_serialize(const struct cell *pthis, char **blob, size_t *blob_size)
 
     mpack_complete_map(&writer);
     if (mpack_writer_destroy(&writer) != mpack_ok) {
-        fprintf(stderr, "An error occurred in metric_topk_serialize!\n");
+        printf("ERR: An error occurred in metric_topk_serialize!\n");
     }
-    printf("cell_serialize done, blob size: %zu\n", *blob_size);
     free(blob_content);
     free(wrapped_content);
 }
@@ -789,7 +770,6 @@ struct cell *cell_deserialize(const char *blob, size_t blob_size)
     char *content_blob;
     size_t content_blob_size;
     mpack_blob_unpack_basic_info(mpack_node_bin_data(wrapped_content_blob_node), mpack_node_bin_size(wrapped_content_blob_node), &type, &content_blob, &content_blob_size);
-    printf("cell_deserialize, content_blob_size: %zu\n", content_blob_size);
     struct metrics *metric = metric_scheme_new(type);
     cell->metric = metric;
     metric->deserialize(metric, content_blob, content_blob_size);
@@ -844,11 +824,9 @@ struct cell *cell_duplicate(const struct cell *pthis)
 
     new_cell->metric = metric_scheme_new(pthis->metric->type);
     if (new_cell->metric == NULL) {
-        fprintf(stderr, "cell_duplicate: metric_scheme_new failed\n");
         return NULL;
     }
     if (new_cell->metric->copy(new_cell->metric, pthis->metric) != 0) {
-        fprintf(stderr, "cell_duplicate: metric copy failed\n");
         return NULL;
     }
 

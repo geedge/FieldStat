@@ -122,7 +122,6 @@ struct heavy_keeper *heavy_keeper_with_metrics_new(int max_query_num, const char
         printf("ERR: primary_metric index is out of range\n");
         return NULL;
     }
-    printf("heavy_keeper_with_metrics_new enter\n");
     
     struct heavy_keeper *hk = heavy_keeper_new(max_query_num, NULL);
     size_t name_len[n_metric];
@@ -193,7 +192,6 @@ void heavy_keeper_result_free(struct heavy_keeper_result *stats_hd) {
 }
 
 void heavy_keeper_free(struct heavy_keeper *hk) {
-    printf("free heavy keeper enter\n");
     sorted_set_free(hk->top_K_heap);
     free(hk->sketch);
     heavy_keeper_free_metric_header(hk->metric_header);
@@ -349,7 +347,6 @@ struct heavy_keeper_result *heavy_keeper_query(struct heavy_keeper *hk) {
     struct heavy_keeper_result *stats  = heavy_keeper_result_new(hk);
 
     int heap_entry_num = sorted_set_cardinality(hk->top_K_heap);
-    printf("heavy_keeper_query enter, heap_entry_num = %d\n", heap_entry_num);
     unsigned *keys = (unsigned *)malloc(heap_entry_num * sizeof(unsigned));
     char **vals = (char **)malloc(heap_entry_num * sizeof(char *));
     size_t *val_lens = (size_t *)malloc(heap_entry_num * sizeof(size_t));
@@ -357,7 +354,6 @@ struct heavy_keeper_result *heavy_keeper_query(struct heavy_keeper *hk) {
     sorted_set_dump(hk->top_K_heap, keys, vals, val_lens, (void **)user_datas);
 
     int query_entry_num = heap_entry_num > hk->K ? hk->K : heap_entry_num;
-    printf("heavy_keeper_query enter,query_entry_num: %d\n", query_entry_num);
     stats->n_key = query_entry_num;
     int index_q = 0;
     for (int i = query_entry_num - 1; i >= 0; i--) {
@@ -395,7 +391,6 @@ static void heavy_keeper_merge_sketch(struct heavy_keeper *dest, const struct he
                 bucket_dest->count += bucket_src->count;
             } else {
                 if (bucket_dest->count < bucket_src->count) {  // bucket_src stores the elephant flow.
-                    // printf("write bucket_src: FP = %u, C = %llu to bucket 1. position: %d,%d\n", bucket_src->finger_print, bucket_src->count,array_id, bucket_id);
                     bucket_dest->count = bucket_src->count;
                     bucket_dest->finger_print = bucket_src->finger_print;
                 }
@@ -425,9 +420,7 @@ void insert_to_sorted_set(struct sorted_set *ss, char *flow_id_str, int flow_id_
 
     if (other_counts != NULL && if_inserted) {
         unsigned int **pst_other_count_in_rec = (unsigned int **)sorted_set_get_pointer_to_user_data(ss, flow_id_str, flow_id_len);
-        if (*pst_other_count_in_rec != NULL) {
-            printf("ERR: I didn't expect this to happen. Other count in rec is not NULL\n");
-        }
+
         *pst_other_count_in_rec = (unsigned int *)malloc(sizeof(unsigned int) * metric_num);
         memcpy(*pst_other_count_in_rec, other_counts, sizeof(unsigned int) * metric_num);
     }
@@ -456,7 +449,6 @@ void heavy_keeper_merge_sorted_set(struct heavy_keeper *dest, const struct heavy
         flow_id_len = val_lens[i] - 1;
 
         unsigned maxv = find_maxv_in_sketch(dest, flow_id_str, flow_id_len);
-        printf("in dest1, index: %d, flow id: %s, len: %zu, maxv: %u\n", i, flow_id_str, flow_id_len, maxv);
         insert_to_sorted_set(new_rec, flow_id_str, flow_id_len, maxv, user_datas[i], metric_num);
     }
 
@@ -479,8 +471,6 @@ void heavy_keeper_merge_sorted_set(struct heavy_keeper *dest, const struct heavy
 
         // the dest heavy keeper has been merged, so the maxv is the maxv in the merged sketch, instead of the dest sketch
         unsigned maxv = find_maxv_in_sketch(dest, flow_id_str, flow_id_len);
-
-        printf("in src, index: %d, flow id: %s, len: %zu, maxv: %u\n", i, flow_id_str, flow_id_len, maxv);
 
         insert_to_sorted_set(new_rec, flow_id_str, flow_id_len, maxv, user_datas[i], metric_num);
     }
@@ -514,7 +504,6 @@ bool heavy_keeper_is_metric_header_equal(const struct heavy_keeper *hk1, const s
 }
 
 int heavy_keeper_merge(struct heavy_keeper *hk, const struct heavy_keeper *src) {
-    printf("heavy_keeper_merge enter\n");
     if (hk->params.array_num != src->params.array_num ||
         hk->params.max_bucket_num != src->params.max_bucket_num ||
         hk->K != src->K || 
@@ -570,7 +559,7 @@ int heavy_keeper_sorted_set_member_serialization(const char *val, size_t val_len
 
     mpack_complete_map(&writer);
     if (mpack_writer_destroy(&writer) != mpack_ok) {
-        fprintf(stderr, "An error occurred in heavy_keeper_sorted_set_member_serialization!\n");
+        printf("ERR: An error occurred in heavy_keeper_sorted_set_member_serialization!\n");
         return -1;
     }
     return 0;
@@ -587,7 +576,7 @@ int heavy_keeper_bucket_serialization(const struct Bucket *b, char **blob, size_
     mpack_write_u32(&writer, b->finger_print);
     mpack_complete_map(&writer);
     if (mpack_writer_destroy(&writer) != mpack_ok) {
-        fprintf(stderr, "An error occurred in heavy_keeper_bucket_serialization!\n");
+        printf("ERR: An error occurred in heavy_keeper_bucket_serialization!\n");
         return -1;
     }
     return 0;
@@ -671,7 +660,7 @@ void heavy_keeper_serialization(const struct heavy_keeper *hk, char **blob, size
 
     mpack_complete_map(&writer);
     if (mpack_writer_destroy(&writer) != mpack_ok) {
-        fprintf(stderr, "An error occurred encoding the data!\n");
+        printf("ERR: An error occurred in heavy_keeper_serialization\n");
     }
 }
 
@@ -705,7 +694,6 @@ struct heavy_keeper *heavy_keeper_deserialization(const char *blob, size_t size)
     mpack_node_t root = mpack_tree_root(&tree);
 
     int K = mpack_node_int(mpack_node_map_cstr(root, "K"));
-    printf("heavy_keeper_deserialization K: %d\n", K);
 
     struct heavy_keeper *hk = heavy_keeper_new(K, NULL);
     sorted_set_hook_function_of_free_user_data(hk->top_K_heap, free);
@@ -727,7 +715,6 @@ struct heavy_keeper *heavy_keeper_deserialization(const char *blob, size_t size)
     heavy_keeper_sorted_set_deserialization(&root, hk->top_K_heap);
 
     if (mpack_tree_destroy(&tree) != mpack_ok) {
-        fprintf(stderr, "An error occurred in heavy_keeper_deserialization!\n");
         return NULL;
     }
     return hk;
