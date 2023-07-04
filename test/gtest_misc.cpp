@@ -122,6 +122,10 @@ TEST(metric_test_misc, add_cell_with_many_tags)
 
     test_tag_query_by_comparing_with_benchmark(instance, id_counter, &tags, 1);
 
+    auto q_rets = test_get_query_result<long long>(fieldstat_counter_get, instance_from_deserialize, 0);
+    EXPECT_EQ(q_rets.size(), 1);
+    EXPECT_EQ(q_rets[0], 1234);
+
     delete tags;
     fieldstat_free(instance);
     fieldstat_free(instance_from_deserialize);
