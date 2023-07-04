@@ -96,6 +96,26 @@ TEST(metric_test_hll, serialize_and_merge_empty_to_nonempty)
     fieldstat_free(instance2);
 }
 
+TEST(metric_test_hll, serialize_and_merge_twice_with_different_values)
+{
+    struct fieldstat *instance = fieldstat_new();
+    struct fieldstat *instance2 = fieldstat_new();
+    int id_added = fieldstat_register_hll(instance, "add", 10);
+
+    test_hll_add(3, instance, id_added, &TEST_TAG_INT, 1);
+    test_merge_with_blob(instance2, instance);
+    fieldstat_refresh(instance);
+    test_hll_add(50, instance, id_added, &TEST_TAG_STRING, 1);
+    test_merge_with_blob(instance2, instance);
+
+    auto q_rets = test_get_query_result<double>(fieldstat_hll_get, instance2, id_added);
+    EXPECT_EQ(q_rets.size(), 2);
+    EXPECT_NEAR(q_rets[0], 3, 3 * 0.15);
+    EXPECT_NEAR(q_rets[1], 50, 50 * 0.15);
+
+    fieldstat_free(instance);
+    fieldstat_free(instance2);
+}
 // TODO: 每个都加一个：merge new cell to summery 
 
 int main(int argc, char *argv[]) 

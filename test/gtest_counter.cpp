@@ -91,6 +91,28 @@ TEST(metric_test_counter, serialize_and_merge_empty_to_nonempty)
     fieldstat_free(instance_added);
 }
 
+TEST(metric_test_counter, serialize_and_merge_twice_with_different_values)
+{
+    struct fieldstat *instance = fieldstat_new();
+    struct fieldstat *instance2 = fieldstat_new();
+    int id_added = fieldstat_register_counter(instance, "add");
+
+    fieldstat_counter_incrby(instance, id_added, 1000, &TEST_TAG_INT, 1);
+    test_merge_with_blob(instance2, instance);
+    fieldstat_refresh(instance);
+    
+    fieldstat_counter_incrby(instance, id_added, -70, &TEST_TAG_STRING, 1);
+    test_merge_with_blob(instance2, instance);
+
+    auto q_rets = test_get_query_result<long long>(fieldstat_counter_get, instance2, id_added);
+    EXPECT_EQ(q_rets.size(), 2);
+    EXPECT_EQ(q_rets[0], 1000);
+    EXPECT_EQ(q_rets[1], -70);
+
+    fieldstat_free(instance);
+    fieldstat_free(instance2);
+}
+
 int main(int argc, char *argv[]) 
 {
 	testing::InitGoogleTest(&argc, argv);

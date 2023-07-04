@@ -133,14 +133,14 @@ TEST(metric_test_topk, serialize_and_merge_by_blob_twice_expecting_double_result
     struct fieldstat *instance2 = fieldstat_new();
 
     const char *metric_name[] = {"test_bytes", "test_packet_num"};
-    unsigned int added_value[] = {1, 10000};
+    unsigned int added_value[1][2] = {{1, 10000}};
     std::string value_string = gen_rand_string(10);
 
     int id_added = fieldstat_register_topk(instance, "topk_add", 10, metric_name, 2, 1);
     // register metric 
     // TODO: 这个地方还是加两个吧
-    fieldstat_topk_add(instance, id_added, value_string.c_str(), value_string.length(), added_value, &TEST_TAG_INT, 1);
-    fieldstat_topk_add(instance, id_added, value_string.c_str(), value_string.length(), added_value, &TEST_TAG_INT_collided, 1);
+    fieldstat_topk_add(instance, id_added, value_string.c_str(), value_string.length(), added_value[0], &TEST_TAG_INT, 1);
+    fieldstat_topk_add(instance, id_added, value_string.c_str(), value_string.length(), added_value[0], &TEST_TAG_INT_collided, 1);
 
     test_merge_with_blob_twice(instance2, instance);
 
@@ -149,14 +149,9 @@ TEST(metric_test_topk, serialize_and_merge_by_blob_twice_expecting_double_result
 
     EXPECT_TRUE(ret_added.size() == 2);
 
-    EXPECT_EQ(ret_added[0].n_result, 1);
-    EXPECT_STREQ(ret_added[0].key_result[0].c_str(), value_string.c_str());
-    EXPECT_EQ(ret_added[0].n_metric, 2);
-    EXPECT_EQ(ret_added[0].count_result[0][0], 2);
-    EXPECT_EQ(ret_added[0].count_result[0][1], 20000);
-    EXPECT_STREQ(ret_added[0].metric_name[0].c_str(), metric_name[0]);
-    EXPECT_STREQ(ret_added[0].metric_name[1].c_str(), metric_name[1]);
-    EXPECT_EQ(ret_added[0].primary_metric_id, 1);
+    unsigned int added_value_double[1][2] = {{2, 20000}};
+    test_check_result_with_expected_query_ret(ret_added[0], 1, 2, 1, &value_string, (unsigned int *)added_value_double, metric_name);
+    test_check_result_with_expected_query_ret(ret_added[1], 1, 2, 1, &value_string, (unsigned int *)added_value_double, metric_name);
 
     fieldstat_free(instance);
     fieldstat_free(instance2);
@@ -196,14 +191,7 @@ TEST(metric_test_topk, serialize_and_merge_empty_to_nonempty)
 
     auto ret_added = test_get_query_result<Query_ret>(topk_query, instance_added, id_added);
     EXPECT_TRUE(ret_added.size() == 1);
-    EXPECT_EQ(ret_added[0].n_result, 1);
-    EXPECT_STREQ(ret_added[0].key_result[0].c_str(), value_string.c_str());
-    EXPECT_EQ(ret_added[0].n_metric, 2);
-    EXPECT_EQ(ret_added[0].count_result[0][0], 1);
-    EXPECT_EQ(ret_added[0].count_result[0][1], 10000);
-    EXPECT_STREQ(ret_added[0].metric_name[0].c_str(), metric_name[0]);
-    EXPECT_STREQ(ret_added[0].metric_name[1].c_str(), metric_name[1]);
-    EXPECT_EQ(ret_added[0].primary_metric_id, 1);
+    test_check_result_with_expected_query_ret(ret_added[0], 1, 2, 1, &value_string, (unsigned int *)added_value, metric_name);
 
     int all_field_num = fieldstat_get_max_field_id(instance_added) + 1;
     EXPECT_EQ(all_field_num, 2); // one original, one empty(from merge)
@@ -214,6 +202,35 @@ TEST(metric_test_topk, serialize_and_merge_empty_to_nonempty)
     fieldstat_free(instance_added);
 }
 
+TEST(metric_test_topk, serialize_and_merge_twice_with_different_values)
+{
+    struct fieldstat *instance = fieldstat_new();
+    struct fieldstat *instance2 = fieldstat_new();
+
+    const char *metric_name[] = {"test_bytes", "test_packet_num"};
+    unsigned int added_value[1][2] = {{1, 10000}};
+    std::string value_string1 = gen_rand_string(10);
+    std::string value_string2 = gen_rand_string(10);
+
+    int id_added = fieldstat_register_topk(instance, "topk_add", 10, metric_name, 2, 1);
+
+    fieldstat_topk_add(instance, id_added, value_string1.c_str(), value_string1.length(), added_value[0], &TEST_TAG_INT, 1);
+    test_merge_with_blob(instance2, instance);
+    fieldstat_refresh(instance);
+    fieldstat_topk_add(instance, id_added, value_string2.c_str(), value_string2.length(), added_value[0], &TEST_TAG_DOUBLE, 1);
+    test_merge_with_blob(instance2, instance);
+
+    // query and test
+    auto ret_added = test_get_query_result<Query_ret>(topk_query, instance2, 0);
+
+    EXPECT_TRUE(ret_added.size() == 2);
+
+    test_check_result_with_expected_query_ret(ret_added[0], 1, 2, 1, &value_string1, (unsigned int *)added_value, metric_name);
+    test_check_result_with_expected_query_ret(ret_added[1], 1, 2, 1, &value_string2, (unsigned int *)added_value, metric_name);
+
+    fieldstat_free(instance);
+    fieldstat_free(instance2);
+}
 
 // TODO：性能测试等
 

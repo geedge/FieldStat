@@ -57,7 +57,7 @@ TEST(metric_test_histogram, serialize_and_merge_by_blob_twice_expecting_double_r
     long long value_add_to_new_metric = 1;
     fieldstat_histogram_record(instance, id2_added, value_add_to_new_metric, &TEST_TAG_INT, 1);
 
-    test_merge_with_blob(instance2, instance);
+    test_merge_with_blob_twice(instance2, instance);
 
     auto q_rets = test_get_query_result<long long>(histogram_query, instance2, id2_added);
     EXPECT_EQ(q_rets.size(), 2);
@@ -115,6 +115,35 @@ TEST(metric_test_histogram, serialize_and_merge_empty_to_nonempty)
     fieldstat_free(instance_empty);
     fieldstat_free(instance_added);
 }
+
+TEST(metric_test_histogram, serialize_and_merge_twice_with_different_values)
+{
+    struct fieldstat *instance = fieldstat_new();
+    struct fieldstat *instance2 = fieldstat_new();
+
+    int id_added = fieldstat_register_histogram(instance, "add", 1, 600000, 3);
+    // metric add
+    long long value_add_twice = 1234;
+    long long value_add_once = 123;
+    fieldstat_histogram_record(instance, id_added, value_add_twice, &TEST_TAG_DOUBLE, 1);
+    fieldstat_histogram_record(instance, id_added, value_add_twice, &TEST_TAG_DOUBLE, 1);
+    fieldstat_histogram_record(instance, id_added, value_add_once, &TEST_TAG_DOUBLE, 1);
+    test_merge_with_blob(instance2, instance);
+
+    fieldstat_refresh(instance);
+    long long value_add_to_new_metric = 1;
+    fieldstat_histogram_record(instance, id_added, value_add_to_new_metric, &TEST_TAG_INT, 1);
+    test_merge_with_blob(instance2, instance);
+
+    auto q_rets = test_get_query_result<long long>(histogram_query, instance2, id_added);
+    EXPECT_EQ(q_rets.size(), 2);
+    EXPECT_EQ(q_rets[0], value_add_twice);
+    EXPECT_EQ(q_rets[1], value_add_to_new_metric);
+
+    fieldstat_free(instance);
+    fieldstat_free(instance2);
+}
+
 
 int main(int argc, char *argv[]) 
 {
