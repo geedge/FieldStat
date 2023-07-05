@@ -229,6 +229,7 @@ struct cell *field_find_or_create_cell(struct fs_field *field, const struct fiel
     if (cell == NULL) {
         if (HASH_COUNT(field->hash_tbl) >= field->max_cell_num) {
             printf("field_find_or_create_cell: field has too many cells, max num: %d\n", field->max_cell_num);
+            free(dynamic_cell_key);
             return NULL;
         }
         cell = field_spawn_cell(field);
@@ -315,11 +316,7 @@ struct fs_field *field_dup(const struct fs_field *src)
 
     struct fs_field *dst = field_new(src->type, src->name, params);
     field_set_id(dst, src->field_id);
-    struct cell_hash_node *node, *tmp;
-    HASH_ITER(hh, src->hash_tbl, node, tmp) {
-        struct cell *new_cell = cell_duplicate(node->cell);
-        field_insert_cell_with_key(dst, new_cell, node->key, node->key_len);
-    }
+    field_merge(dst, src);
     return dst;
 }
 

@@ -51,6 +51,9 @@ struct Bucket *new_sketch(struct heavy_keeper_options *params) {
 }
 
 void params_set_to_default(struct heavy_keeper_options *p, int K) {
+    if (K > 1000) { // don't let the sketch too large when K gets insanely large
+        K = 1000;
+    }
     double log_ret = log((double)K) / 2.3;  // 2.3: log_e(10), log_ret = log_10(K)
 
     if (log_ret < 3) {

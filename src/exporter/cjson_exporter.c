@@ -117,33 +117,6 @@ long get_current_time()
     return currentTime;
 }
 
-int my_cmp_kv_pair(const void *a, const void *b)
-{
-    struct export_kv_pair *aa = (struct export_kv_pair *)a;
-    struct export_kv_pair *bb = (struct export_kv_pair *)b;
-    int key_cmp = strcmp(aa->key, bb->key);
-    if (key_cmp != 0) {
-        return key_cmp;
-    }
-
-    assert(aa->type == bb->type);
-    switch (aa->type) {
-        case TAG_INTEGER:
-            return aa->value_int - bb->value_int;
-        case TAG_DOUBLE:
-            return aa->value_double - bb->value_double;
-        case TAG_CSTRING:
-            return strcmp(aa->value_str, bb->value_str);
-        default:
-            return 0;
-    }
-}
-
-void kv_pair_sort(struct export_kv_pair *tag_list, size_t arr_length)
-{
-    qsort(tag_list, arr_length, sizeof(struct export_kv_pair), my_cmp_kv_pair);
-}
-
 /* -------------------------------------------------------------------------- */
 /*                                    iter                                    */
 /* -------------------------------------------------------------------------- */
@@ -467,8 +440,6 @@ void cjson_map_add_new_pair_for_one_loop(struct cjson_map **map_head_in, struct 
     size_t tag_list_len;
 
     cell_iter_read_tag_list(iter, &tag_list, &tag_list_len);
-    // different tag order will cause different cjson string, so sort it first.
-    kv_pair_sort(tag_list, tag_list_len);
     cJSON *cjson_tags = cJSON_CreateObject(); // when this cjson_tags is added to a new map entry, it is freed when the map is freed
     for (int i = 0; i < tag_list_len; i++) {
         kv_pair_add_to_cjson(&tag_list[i], cjson_tags);

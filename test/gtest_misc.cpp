@@ -173,6 +173,32 @@ TEST(metric_test_misc, test_max_cell_num)
     Fieldstat_tag_list_wrapper tag(dist, 3);
     int ret = fieldstat_counter_incrby(instance, id_counter, 1, tag.get_tag(), tag.get_tag_count());
     EXPECT_EQ(ret, -1);
+
+    fieldstat_free(instance);
+}
+
+TEST(metric_test_misc, merge_cells_with_the_tags_of_the_same_contents_but_different_order)
+{
+    struct fieldstat *instance = fieldstat_new();
+    struct fieldstat *instance_dest = fieldstat_new();
+    struct fieldstat_tag list1[] = {TEST_TAG_INT, TEST_TAG_STRING};
+    struct fieldstat_tag list2[] = {TEST_TAG_STRING, TEST_TAG_INT};
+    int id_counter = fieldstat_register_counter(instance, "counter");
+
+    fieldstat_counter_incrby(instance, id_counter, 1, list1, 2);
+    fieldstat_counter_incrby(instance, id_counter, 1, list2, 2);
+
+    test_merge_with_blob(instance_dest, instance);
+
+    size_t cell_num;
+    struct fieldstat_tag_list *tag_list = NULL;
+    fieldstat_get_tag_lists(instance_dest, 0, &tag_list, &cell_num);
+    EXPECT_EQ(cell_num, 1);
+
+    fieldstat_free(instance);
+    fieldstat_free(instance_dest);
+    free(tag_list[0].tag);
+    free(tag_list);
 }
 
 int main(int argc, char *argv[]) 

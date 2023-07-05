@@ -115,6 +115,28 @@ void mpack_blob_unpack_basic_info(const char *blob, size_t blob_size, enum field
     mpack_tree_destroy(&tree);
 }
 
+int my_cmp_tag(const void *a, const void *b)
+{
+    struct fieldstat_tag *aa = (struct fieldstat_tag *)a;
+    struct fieldstat_tag *bb = (struct fieldstat_tag *)b;
+    int key_cmp = strcmp(aa->key, bb->key);
+    if (key_cmp != 0) {
+        return key_cmp;
+    }
+
+    assert(aa->type == bb->type);
+    switch (aa->type) {
+        case TAG_INTEGER:
+            return aa->value_int - bb->value_int;
+        case TAG_DOUBLE:
+            return aa->value_double - bb->value_double;
+        case TAG_CSTRING:
+            return strcmp(aa->value_str, bb->value_str);
+        default:
+            return 0;
+    }
+}
+
 /* 
     "tags":[{
         "key":<tag key string>
@@ -127,6 +149,8 @@ void cell_serialize_write_fieldtag(mpack_writer_t *writer, const struct cell *pt
     struct fieldstat_tag *tag_list;
     size_t tag_num;
     cell_read_tag(pthis, &tag_list, &tag_num);
+    // sort tag so that when merge by blob, we can merge cells with the same tags
+    qsort(tag_list, tag_num, sizeof(struct fieldstat_tag), my_cmp_tag);
 
     mpack_write_cstr(writer, "tags");
     mpack_start_array(writer, tag_num);
