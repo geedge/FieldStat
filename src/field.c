@@ -8,6 +8,8 @@
 #include "fs_cell.h"
 #include "mpack/mpack.h"
 
+#define DEFAULT_MAX_CELL_NUM 1024
+
 struct cell_hash_node {
     char *key; // kv_pair of tags
     size_t key_len; // exclude '\0'
@@ -48,6 +50,7 @@ struct fs_field {
     char *name;
     struct cell_hash_node *hash_tbl;
     struct field_paras *field_paras;
+    int max_cell_num;
 };
 
 static void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_tags, char **out_key, size_t *out_key_size)
@@ -172,6 +175,7 @@ struct fs_field *field_new(enum field_type type, const char *name, struct field_
     field->name = strdup(name);
     field->hash_tbl = NULL;
     field->field_paras = paras;
+    field->max_cell_num = DEFAULT_MAX_CELL_NUM;
     return field;
 }
 
@@ -223,7 +227,12 @@ struct cell *field_find_or_create_cell(struct fs_field *field, const struct fiel
     build_dynamic_cell_key(tag_list, tag_num, &dynamic_cell_key, &dynamic_key_size);
     struct cell *cell = field_find_cell_with_key(field, dynamic_cell_key, dynamic_key_size);
     if (cell == NULL) {
+        if (HASH_COUNT(field->hash_tbl) >= field->max_cell_num) {
+            printf("field_find_or_create_cell: field has too many cells, max num: %d\n", field->max_cell_num);
+            return NULL;
+        }
         cell = field_spawn_cell(field);
+
         cell_add_tag(cell, tag_list, tag_num);
         field_insert_cell_with_key(field, cell, dynamic_cell_key, dynamic_key_size);
     }
@@ -588,4 +597,9 @@ enum field_type field_get_type(const struct fs_field *field)
 const char *field_get_name(const struct fs_field *field)
 {
     return field->name;
+}
+
+void field_set_max_cell_num(struct fs_field *field, int max_cell_num)
+{
+    field->max_cell_num = max_cell_num;
 }

@@ -16,6 +16,7 @@ int field_get_id(const struct fs_field *field);
 void field_set_id(struct fs_field *field, int id);
 const char *field_get_name(const struct fs_field *field); // don't free the return value
 void field_get_tags(const struct fs_field *field, struct fieldstat_tag_list **tag_lists_out, size_t *n_tag_lists_out);
+void field_set_max_cell_num(struct fs_field *field, int max_cell_num);
 
 struct fs_field *field_deserialize(const char *blob, size_t blob_size);
 int field_serialize(const struct fs_field *field, char **blob, size_t *blob_size);

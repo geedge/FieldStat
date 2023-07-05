@@ -157,6 +157,24 @@ TEST(metric_test_misc, test_name_maping_when_merge)
     fieldstat_free(instance_summary);
 }
 
+TEST(metric_test_misc, test_max_cell_num)
+{
+    const int cell_max_num = 10;
+    struct fieldstat *instance = fieldstat_new();
+    int id_counter = fieldstat_register_counter(instance, "counter");
+    fieldstat_set_max_cell_num(instance, id_counter, cell_max_num);
+
+    std::uniform_int_distribution<int> dist(1,10000);
+    for (int i = 0; i < cell_max_num; i++) {
+        Fieldstat_tag_list_wrapper tag(dist, 3);
+        int ret = fieldstat_counter_incrby(instance, id_counter, 1, tag.get_tag(), tag.get_tag_count());
+        EXPECT_EQ(ret, 0);
+    }
+    Fieldstat_tag_list_wrapper tag(dist, 3);
+    int ret = fieldstat_counter_incrby(instance, id_counter, 1, tag.get_tag(), tag.get_tag_count());
+    EXPECT_EQ(ret, -1);
+}
+
 int main(int argc, char *argv[]) 
 {
 	testing::InitGoogleTest(&argc, argv);

@@ -178,6 +178,9 @@ int fieldstat_topk_add(struct fieldstat *instance, int field_id, const char *key
         return -1;
     }
     struct cell *cell = field_find_or_create_cell(field, tags, n_tag);
+    if (cell == NULL) {
+        return -1;
+    }
     cell_topk_add(cell, key, key_len, count);
 
     return 0;
@@ -191,6 +194,10 @@ int fieldstat_counter_incrby(struct fieldstat *instance, int field_id, long long
         return -1;
     }
     struct cell *cell = field_find_or_create_cell(field, tags, n_tag);
+    if (cell == NULL) {
+        return -1;
+    }
+    
     cell_counter_incrby(cell, increment);
     return 0;
 }
@@ -203,6 +210,9 @@ int fieldstat_histogram_record(struct fieldstat *instance, int field_id, long lo
         return -1;
     }
     struct cell *cell = field_find_or_create_cell(field, tags, n_tag);
+    if (cell == NULL) {
+        return -1;
+    }
     return cell_histogram_record(cell, value);
 }
 
@@ -214,6 +224,9 @@ int fieldstat_hll_add(struct fieldstat *instance, int field_id, const char *key,
         return -1;
     }
     struct cell *cell = field_find_or_create_cell(field, tags, n_tag);
+    if (cell == NULL) {
+        return -1;
+    }
     return cell_hll_add(cell, key, key_len);
 }
 /* -------------------------------------------------------------------------- */
@@ -475,4 +488,15 @@ void fieldstat_get_serialized_blob(const struct fieldstat *instance, int field_i
     }
 
     cell_get_plain_blob(cell, blob, blob_size);
+}
+
+void fieldstat_set_max_cell_num(struct fieldstat *instance, int field_id, int max_cell_num)
+{
+    struct fs_field *field = instance->field_array[field_id];
+    if (field == NULL) {
+        printf("ERR: field is not registered yet\n");
+        return;
+    }
+
+    field_set_max_cell_num(field, max_cell_num);
 }
