@@ -98,7 +98,7 @@ TEST(metric_test_hll, serialize_and_merge_twice_with_different_values)
 
     test_hll_add(3, instance, id_added, &TEST_TAG_INT, 1);
     test_merge_with_blob(instance2, instance);
-    fieldstat_refresh(instance);
+    fieldstat_reset(instance);
     test_hll_add(50, instance, id_added, &TEST_TAG_STRING, 1);
     test_merge_with_blob(instance2, instance);
 

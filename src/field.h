@@ -21,6 +21,7 @@ struct fs_field *field_deserialize(const char *blob, size_t blob_size);
 int field_serialize(const struct fs_field *field, char **blob, size_t *blob_size);
 void field_free(struct fs_field *field);
 void field_refresh(struct fs_field *field);
+void field_reset(struct fs_field *field);
 struct fs_field *field_dup(const struct fs_field *src);
 int field_merge(struct fs_field *dst, const struct fs_field *src);
 struct fs_field *field_new_topk(const char *name, int K, const char **metric_names, size_t num_metric, size_t primary_metric_id);

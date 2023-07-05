@@ -44,6 +44,7 @@ void flow_id_generate(char buffer[MAX_STRING_KEY_LEN], float elephant_flow_radio
 void profiling_counter()
 {
     printf("profiling_counter\n");
+    getchar();
     struct fieldstat *instance = fieldstat_new();
     int id_added = fieldstat_register_counter(instance, "add");
     for (int i = 0; i < ADD_OPER_NUM; i++)
@@ -53,11 +54,40 @@ void profiling_counter()
     fieldstat_free(instance);
 }
 
+void call_dynamic_key_build()
+{
+
+}
+
+void bin_print_struct(void *obj, size_t sizeof_obj)
+{
+    unsigned char *p = (unsigned char *)obj;
+    printf("sizeof_obj: %lu\n", sizeof_obj);
+    for (int i = 0; i < sizeof_obj; i++)
+    {
+        printf("%02x ", p[i]);
+    }
+    printf("\n");
+}
+
+void try_hash_compound_key()
+{
+    struct fieldstat_tag tag1 = {"key1", TAG_INTEGER, {.value_int = 100}};
+    struct fieldstat_tag tag2 = {"key2", TAG_DOUBLE, {.value_double = 100.0}};
+    struct fieldstat_tag tag3 = {"key3", TAG_CSTRING, {.value_str = {'1', '2', '3', '\0'}}};
+    struct fieldstat_tag tag_arr[] = {
+        {"key1", TAG_INTEGER, {.value_int = 100}},
+        {"key2", TAG_DOUBLE, {.value_double = 100.0}},
+        {"key3", TAG_CSTRING, {.value_str = {'1', '2', '3', '\0'}}},
+    };
+
+    bin_print_struct(&tag1, sizeof(tag1));
+    bin_print_struct(&tag2, sizeof(tag2));
+    bin_print_struct(&tag3, sizeof(tag3));
+    bin_print_struct(tag_arr, sizeof(tag_arr));
+}
 
 int main () {
-    struct fieldstat *instance = fieldstat_new();
-    printf("enter main\n");
-    getchar();
-    profiling_counter();
-    fieldstat_free(instance);
+    // profiling_counter();
+    try_hash_compound_key();
 }

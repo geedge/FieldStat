@@ -219,7 +219,7 @@ TEST(benchmark_test_accuracy, test_for_topk_metric)
     }
     struct fieldstat *instance_dest = fieldstat_new();
     test_merge_with_blob(instance_dest, instance);
-    fieldstat_refresh(instance);
+    fieldstat_reset(instance);
 
     for (int i = ADD_OPER_NUM / 2; i < ADD_OPER_NUM; i++) {
         fieldstat_topk_add(instance, id_added, myVec[i].first.c_str(), myVec[i].first.size(), counts, &TEST_TAG_INT, 1);
@@ -260,7 +260,7 @@ TEST(benchmark_test_accuracy, test_for_histogram_metric)
     }
     struct fieldstat *instance_dest = fieldstat_new();
     test_merge_with_blob(instance_dest, instance);
-    fieldstat_refresh(instance);
+    fieldstat_reset(instance);
     for (int i = ADD_OPER_NUM / 2; i < ADD_OPER_NUM; i++)
     {
         int rand_v = rand( ) % 100000;
@@ -301,7 +301,7 @@ TEST(benchmark_test_accuracy, test_for_hll_metric)
     }
     struct fieldstat *instance_dest = fieldstat_new();
     test_merge_with_blob(instance_dest, instance);
-    fieldstat_refresh(instance);
+    fieldstat_reset(instance);
     for (int i = ADD_OPER_NUM / 2; i < ADD_OPER_NUM; i++)
     {
         rand_string(buffer, sizeof(buffer));

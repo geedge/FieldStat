@@ -99,6 +99,15 @@ static void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_t
     free(dynamic_mem);
 }
 
+static void build_dynamic_cell_key2(const struct fieldstat_tag tags[], size_t n_tags, char **out_key, size_t *out_key_size)
+{
+    size_t key_len = sizeof(struct fieldstat_tag) * n_tags;
+    char *key = (char *)malloc(key_len);
+    memcpy(key, tags, key_len);
+    *out_key = key;
+    *out_key_size = key_len;
+}
+
 struct cell *field_spawn_cell(const struct fs_field *field)
 {
     struct cell *cell = NULL;
@@ -265,12 +274,25 @@ void field_free(struct fs_field *field)
     free(field);
 }
 
+// todo: 应该不用了，删掉
 void field_refresh(struct fs_field *field)
 {
     struct cell_hash_node *node, *tmp;
     HASH_ITER(hh, field->hash_tbl, node, tmp) {
         struct cell *cell = node->cell;
         cell_refresh(cell);
+    }
+}
+
+void field_reset(struct fs_field *field)
+{
+    struct cell_hash_node *node, *tmp;
+    HASH_ITER(hh, field->hash_tbl, node, tmp) {
+        struct cell *cell = node->cell;
+        cell_free(cell);
+        HASH_DEL(field->hash_tbl, node);
+        free(node->key);
+        free(node);
     }
 }
 

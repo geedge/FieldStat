@@ -88,7 +88,13 @@ void fieldstat_refresh(struct fieldstat *instance)
     for (int i = 0; i < instance->n_field; i++) {
         field_refresh(instance->field_array[i]);
     }
-    // TODO: 回收不活跃的
+}
+
+void fieldstat_reset(struct fieldstat *instance)
+{
+    for (int i = 0; i < instance->n_field; i++) {
+        field_reset(instance->field_array[i]);
+    }
 }
 
 static int append_field_to_instance(struct fieldstat *instance, struct fs_field *field)

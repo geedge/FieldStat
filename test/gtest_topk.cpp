@@ -216,7 +216,7 @@ TEST(metric_test_topk, serialize_and_merge_twice_with_different_values)
 
     fieldstat_topk_add(instance, id_added, value_string1.c_str(), value_string1.length(), added_value[0], &TEST_TAG_INT, 1);
     test_merge_with_blob(instance2, instance);
-    fieldstat_refresh(instance);
+    fieldstat_reset(instance);
     fieldstat_topk_add(instance, id_added, value_string2.c_str(), value_string2.length(), added_value[0], &TEST_TAG_DOUBLE, 1);
     test_merge_with_blob(instance2, instance);
 
@@ -231,9 +231,6 @@ TEST(metric_test_topk, serialize_and_merge_twice_with_different_values)
     fieldstat_free(instance);
     fieldstat_free(instance2);
 }
-
-// TODO：性能测试等
-
 
 int main(int argc, char *argv[]) 
 {

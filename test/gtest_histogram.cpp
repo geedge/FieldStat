@@ -130,7 +130,7 @@ TEST(metric_test_histogram, serialize_and_merge_twice_with_different_values)
     fieldstat_histogram_record(instance, id_added, value_add_once, &TEST_TAG_DOUBLE, 1);
     test_merge_with_blob(instance2, instance);
 
-    fieldstat_refresh(instance);
+    fieldstat_reset(instance);
     long long value_add_to_new_metric = 1;
     fieldstat_histogram_record(instance, id_added, value_add_to_new_metric, &TEST_TAG_INT, 1);
     test_merge_with_blob(instance2, instance);
