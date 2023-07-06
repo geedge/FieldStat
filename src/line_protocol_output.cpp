@@ -28,7 +28,7 @@ static void send_line_buf(struct line_protocol_output *line_protocol_output, cha
 		return;
 	}
 
-	if(UDP_PAYLOAD_SIZE - line_protocol_output->send_buf_offset < line_buf_len)
+	if(UDP_PAYLOAD_SIZE - line_protocol_output->send_buf_offset - 1 < line_buf_len)
 	{
 		flush_send_buf(line_protocol_output);
 	}

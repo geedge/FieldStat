@@ -589,7 +589,6 @@ void parse_telegraf_cjson_output(const char *compare)
 	FILE *fp;
 	char line[1024] = {0};
 	char *cjson_metric_str = NULL;
-	int ret = 0;
 
 	fp = fopen(telegraf_output_file, "r");
 	EXPECT_NE(nullptr, fp);
@@ -620,8 +619,7 @@ void parse_telegraf_cjson_output(const char *compare)
 	EXPECT_NE(nullptr, cjson_metric_str);
 	if(cjson_metric_str)
 	{
-		ret = strcmp(cjson_metric_str, compare);
-		EXPECT_EQ(0, ret);
+		EXPECT_STREQ(cjson_metric_str, compare);
 		free(cjson_metric_str);
 		cjson_metric_str = NULL;
 	}
@@ -2733,6 +2731,71 @@ TEST(FeildStatDynamicAPI, TableRowMetricValueSet)
 	value = fieldstat_dynamic_table_metric_value_get(instance, table_id, out_column_ids[1], "security_rule_hits", NULL, 0, 0);
 	EXPECT_EQ(2000, value);
 
+	fieldstat_dynamic_instance_free(instance);
+}
+
+
+
+TEST(FeildStatDynamicAPI, SendLenEqualUDPPayload)
+{
+	int ret = 0;
+	int n_thread = 1;
+	int table_id = -1;
+	char row_name[256];
+
+	const char *desired_output = "{\"fields\":{\"bytes\":0,\"packages\":1},"
+								 "\"name\":\"security_rule_hits_000009\","
+								 "\"tags\":{\"app_name\":\"firewall\",\"device_id\":"
+								 "\"test_device\",\"policy_id\":\"1\",\"quanlity\":"
+								 "\"0.500000\",\"table_name\":\"shaping\","
+								 "\"thread_id\":\"1\"}}";
+
+	const char *column_name[] = {"packages", "bytes"};
+	enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+	unsigned int out_column_ids[2];
+
+	struct fieldstat_tag tags[4];
+
+	tags[0].key = "policy_id";
+	tags[0].value_int = 1;
+	tags[0].value_type = 0;
+
+	tags[1].key = "quanlity";
+	tags[1].value_double = 0.50;
+	tags[1].value_type = 1;
+
+	tags[2].key = "device_id";
+	tags[2].value_str = "test_device";
+	tags[2].value_type = 2;
+
+	tags[3].key = "thread_id";
+	tags[3].value_int = 1;
+	tags[3].value_type = 0;
+
+	size_t ntags = sizeof(tags)/sizeof(tags[0]);
+
+	struct fieldstat_dynamic_instance *instance = fieldstat_dynamic_instance_new("firewall", n_thread);
+	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8700);
+	EXPECT_EQ(0, ret);
+
+	table_id = fieldstat_register_dynamic_table(instance, "shaping", column_name, 
+												column_type, 2, out_column_ids);
+	EXPECT_EQ(0, table_id);	
+
+	fieldstat_dynamic_instance_start(instance);
+
+	for(int i = 0; i < 10; i ++)
+	{
+		memset(row_name, 0, sizeof(row_name));
+		snprintf(row_name, sizeof(row_name), "security_rule_hits_%06d", i);
+		ret = fieldstat_dynamic_table_metric_value_incrby(
+				instance, table_id, out_column_ids[0],
+				row_name, 1, tags,
+				ntags, 0);
+		EXPECT_EQ(0, ret);
+	}
+	sleep(3);
+	parse_telegraf_cjson_output(desired_output);
 	fieldstat_dynamic_instance_free(instance);
 }
 
