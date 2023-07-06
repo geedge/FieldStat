@@ -23,20 +23,11 @@ struct Bucket {
     unsigned count; // the actual count, sum of all uuid_hash_node->count
 };
 
-struct metric_header {
-    char **metric_names;
-    size_t *name_len; // exclude '\0'
-    size_t n_metric;
-    size_t primary_metric_index;
-};
-
 struct heavy_keeper {
     int K;
     struct sorted_set *top_K_heap;
     struct heavy_keeper_options params;
     struct Bucket *sketch;
-
-    struct metric_header *metric_header;
 };
 
 #define FP_HASH_KEY 0
@@ -97,41 +88,13 @@ struct heavy_keeper *heavy_keeper_new(int max_query_num, struct heavy_keeper_opt
     return hk;
 }
 
-static void heavy_keeper_specify_metric_header(struct heavy_keeper *hk, const char *metric_name[], size_t name_str_len[], size_t n_metric, int primary_metric) {
-    hk->metric_header = (struct metric_header *)malloc(sizeof(struct metric_header));
-    hk->metric_header->n_metric = n_metric;
-    hk->metric_header->primary_metric_index = primary_metric;
-    hk->metric_header->metric_names = (char **)malloc(n_metric * sizeof(const char *));
-    hk->metric_header->name_len = (size_t *)malloc(n_metric * sizeof(size_t));
-    for (int i = 0; i < n_metric; i++) {
-        hk->metric_header->metric_names[i] = (char *)malloc(name_str_len[i] + 1);
-        memcpy(hk->metric_header->metric_names[i], metric_name[i], name_str_len[i]);
-        hk->metric_header->metric_names[i][name_str_len[i]] = '\0';
-        hk->metric_header->name_len[i] = name_str_len[i];
-    }
-}
-
-static void heavy_keeper_free_metric_header(struct metric_header *header) {
-    for (int i = 0; i < header->n_metric; i++) {
-        free(header->metric_names[i]);
-    }
-    free(header->metric_names);
-    free(header->name_len);
-    free(header);
-}
-
-struct heavy_keeper *heavy_keeper_with_metrics_new(int max_query_num, const char *metric_name[], size_t n_metric, size_t primary_metric) {
+struct heavy_keeper *heavy_keeper_with_data_new(int max_query_num) {
     if (primary_metric > n_metric - 1) {
         printf("ERR: primary_metric index is out of range\n");
         return NULL;
     }
     
     struct heavy_keeper *hk = heavy_keeper_new(max_query_num, NULL);
-    size_t name_len[n_metric];
-    for (int i = 0; i < n_metric; i++) {
-        name_len[i] = strlen(metric_name[i]);
-    }
-    heavy_keeper_specify_metric_header(hk, metric_name, name_len, n_metric, primary_metric);
 
     sorted_set_hook_function_of_free_user_data(hk->top_K_heap, free);
     return hk;
@@ -151,19 +114,7 @@ struct heavy_keeper_result *heavy_keeper_result_new(struct heavy_keeper *hk) {
     stats_hd->key = (char **)malloc(expected_max_len * sizeof(char *));
     stats_hd->key_len = (size_t *)malloc(expected_max_len * sizeof(size_t));
 
-    if (hk->metric_header == NULL) {
-        return stats_hd;
-    }
-
-    stats_hd->metric_value_arr = (unsigned int **)malloc(expected_max_len * sizeof(unsigned int *));
-    stats_hd->primary_metric_id = hk->metric_header->primary_metric_index;
-    stats_hd->metric_name = (char **)malloc(hk->metric_header->n_metric * sizeof(char *));
-    stats_hd->n_metric = hk->metric_header->n_metric;
-    for (int i = 0; i < hk->metric_header->n_metric; i++) {
-        stats_hd->metric_name[i] = (char *)malloc(hk->metric_header->name_len[i] + 1);
-        memcpy(stats_hd->metric_name[i], hk->metric_header->metric_names[i], hk->metric_header->name_len[i]);
-        stats_hd->metric_name[i][hk->metric_header->name_len[i]] = '\0';
-    }
+    stats_hd->cube_id = (unsigned *)malloc(expected_max_len * sizeof(unsigned));
 
     return stats_hd;
 }
@@ -176,28 +127,13 @@ void heavy_keeper_result_free(struct heavy_keeper_result *stats_hd) {
     free(stats_hd->count);
     free(stats_hd->key);
     free(stats_hd->key_len);
-
-    if (stats_hd->metric_value_arr == NULL) {
-        free(stats_hd);
-        return;
-    }
-
-    for (int i = 0; i < stats_hd->n_metric; i++) {
-        free(stats_hd->metric_name[i]);
-    }
-    for (int i = 0; i < stats_hd->n_key; i++) {
-        free(stats_hd->metric_value_arr[i]);
-    }
-
-    free(stats_hd->metric_value_arr);
-    free(stats_hd->metric_name);
+    free(stats_hd->cube_id);
     free(stats_hd);
 }
 
 void heavy_keeper_free(struct heavy_keeper *hk) {
     sorted_set_free(hk->top_K_heap);
     free(hk->sketch);
-    heavy_keeper_free_metric_header(hk->metric_header);
     free(hk);
 }
 
@@ -316,32 +252,19 @@ void heavy_keeper_add(struct heavy_keeper *heavy_keeper, const char *key, size_t
     }
 }
 
-int heavy_keeper_with_metrics_add(struct heavy_keeper *hk, const char *key, size_t key_len, unsigned int count[])
+int heavy_keeper_with_data_add(struct heavy_keeper *hk, const char *key, size_t key_len, unsigned int count, unsigned int cube_id)
 {
-    if (hk->metric_header == NULL) {
-        printf("ERR: metric_header is NULL, please call heavy_keeper_new_list instead of heavy_keeper_new.\n");
+    heavy_keeper_add(hk, key, key_len, count);
+
+    unsigned int *pst_data_in_rec = (unsigned int *)sorted_set_get_pointer_to_user_data(hk->top_K_heap, key, key_len);
+    if (pst_data_in_rec == NULL) { // the key is not added into sorted set
         return -1;
     }
-    size_t primary_id = hk->metric_header->primary_metric_index;
-    heavy_keeper_add(hk, key, key_len, count[primary_id]);
 
-    unsigned int **pst_other_count_in_rec = (unsigned int **)sorted_set_get_pointer_to_user_data(hk->top_K_heap, key, key_len);
-    if (pst_other_count_in_rec == NULL) { // the key is not added into sorted set
-        return 0;
+    if (*pst_data_in_rec == NULL) {
+        *pst_data_in_rec = (unsigned int *)malloc(sizeof(unsigned int));
     }
-
-    // fill the other metrics to sorted set
-    size_t metric_num = hk->metric_header->n_metric;
-    unsigned int *count_to_add = (unsigned int *)malloc(metric_num * sizeof(unsigned int));
-    memcpy(count_to_add, count, metric_num * sizeof(unsigned int));
-    if (*pst_other_count_in_rec == NULL) {
-        *pst_other_count_in_rec = count_to_add;
-    } else {
-        for (int i = 0; i < metric_num; i++) {
-            (*pst_other_count_in_rec)[i] = count_add((*pst_other_count_in_rec)[i], count_to_add[i]);
-        }
-        free(count_to_add);
-    }
+    *pst_data_in_rec = cube_id;
 
     return 0;
 }
@@ -353,7 +276,8 @@ struct heavy_keeper_result *heavy_keeper_query(struct heavy_keeper *hk) {
     unsigned *keys = (unsigned *)malloc(heap_entry_num * sizeof(unsigned));
     char **vals = (char **)malloc(heap_entry_num * sizeof(char *));
     size_t *val_lens = (size_t *)malloc(heap_entry_num * sizeof(size_t));
-    unsigned char **user_datas = (unsigned char **)malloc(heap_entry_num * sizeof(unsigned char *));
+
+    unsigned int **user_data = (unsigned int **)malloc(heap_entry_num * sizeof(unsigned int *));
     sorted_set_dump(hk->top_K_heap, keys, vals, val_lens, (void **)user_datas);
 
     int query_entry_num = heap_entry_num > hk->K ? hk->K : heap_entry_num;
@@ -364,11 +288,8 @@ struct heavy_keeper_result *heavy_keeper_query(struct heavy_keeper *hk) {
         strcpy(stats->key[index_q], vals[i]);
         stats->count[index_q] = keys[i];
         stats->key_len[index_q] = val_lens[i] - 1;
-
-        if (hk->metric_header != NULL) {
-            stats->metric_value_arr[index_q] = (unsigned int *)malloc(hk->metric_header->n_metric * sizeof(unsigned int));
-            memcpy(stats->metric_value_arr[index_q], user_datas[i], hk->metric_header->n_metric * sizeof(unsigned int));
-        }
+        stats->cube_id[index_q] = *(user_datas[i]);
+        
         index_q++;
     }
 
@@ -418,15 +339,16 @@ unsigned find_maxv_in_sketch(struct heavy_keeper *hk, const char *flow_id, int f
     return maxv;
 }
 
-void insert_to_sorted_set(struct sorted_set *ss, char *flow_id_str, int flow_id_len, unsigned count, unsigned int *other_counts, size_t metric_num) {
+int insert_to_sorted_set(struct sorted_set *ss, char *flow_id_str, int flow_id_len, unsigned count, unsigned int dimension_id) {
     int if_inserted = sorted_set_insert(ss, flow_id_str, flow_id_len, count);
 
-    if (other_counts != NULL && if_inserted) {
+    if (if_inserted) {
         unsigned int **pst_other_count_in_rec = (unsigned int **)sorted_set_get_pointer_to_user_data(ss, flow_id_str, flow_id_len);
 
-        *pst_other_count_in_rec = (unsigned int *)malloc(sizeof(unsigned int) * metric_num);
-        memcpy(*pst_other_count_in_rec, other_counts, sizeof(unsigned int) * metric_num);
+        *pst_other_count_in_rec = (unsigned int *)malloc(sizeof(unsigned int));
+        **pst_other_count_in_rec = dimension_id;
     }
+    return if_inserted;
 }
 
 void heavy_keeper_merge_sorted_set(struct heavy_keeper *dest, const struct heavy_keeper *src) {
@@ -439,20 +361,22 @@ void heavy_keeper_merge_sorted_set(struct heavy_keeper *dest, const struct heavy
     unsigned *keys = (unsigned *)malloc(max_size * sizeof(unsigned));
     char **vals = (char **)malloc(max_size * sizeof(char *));
     size_t *val_lens = (size_t *)malloc(max_size * sizeof(size_t));
-    unsigned int **user_datas = (unsigned int **)malloc(max_size * sizeof(unsigned int *));
+    unsigned int **user_datas_dummy = (unsigned int **)malloc(max_size * sizeof(unsigned int *));
 
-    sorted_set_dump(dest->top_K_heap, keys, vals, val_lens, (void **)user_datas);
+    sorted_set_dump(dest->top_K_heap, keys, vals, val_lens, (void **)user_datas_dummy);
+    int new_allocated_dimension_id = 0; // the merged fieldstat will be assigned with dimension_ids independent from the original ones
+                                        // it's ok because the corresponding vals are the name of the dimension, from which we recover the dimensions
 
     char *flow_id_str=NULL;
     size_t flow_id_len=0;
-    size_t metric_num = dest->metric_header->n_metric;
-
     for (int i = 0; i < size_dest; i++) {
         flow_id_str = vals[i];
         flow_id_len = val_lens[i] - 1;
 
         unsigned maxv = find_maxv_in_sketch(dest, flow_id_str, flow_id_len);
-        insert_to_sorted_set(new_rec, flow_id_str, flow_id_len, maxv, user_datas[i], metric_num);
+        if (insert_to_sorted_set(new_rec, flow_id_str, flow_id_len, maxv, new_allocated_dimension_id)) {
+            new_allocated_dimension_id++;
+        }
     }
 
     sorted_set_dump(src->top_K_heap, keys, vals, val_lens, (void **)user_datas);
@@ -461,21 +385,16 @@ void heavy_keeper_merge_sorted_set(struct heavy_keeper *dest, const struct heavy
         flow_id_str = vals[i];
         flow_id_len = val_lens[i] - 1;
 
-        unsigned int **pst_count_in_new_rec = (unsigned int **)sorted_set_get_pointer_to_user_data(new_rec, flow_id_str, flow_id_len);
-        if (pst_count_in_new_rec != NULL) {
-            // pst_count_in_new_rec and *pst_count_in_new_rec must not be NULL as long as the dest is added the same flow, because insert_to_sorted_set must created a new user data
-            //    so pst_count_in_new_rec is not NULL if and only if flows that are in dest sketch has been processed in the previous loop, in which case continue to the next flow not in dest
-
-            for (int j = 0; j < metric_num; j++) {
-                (*pst_count_in_new_rec)[j] = count_add((*pst_count_in_new_rec)[j], (*user_datas)[j]);
-            }
+        if (sorted_set_get_member_score(new_rec, flow_id_str, flow_id_len) != 0) {
             continue;
         }
 
         // the dest heavy keeper has been merged, so the maxv is the maxv in the merged sketch, instead of the dest sketch
         unsigned maxv = find_maxv_in_sketch(dest, flow_id_str, flow_id_len);
 
-        insert_to_sorted_set(new_rec, flow_id_str, flow_id_len, maxv, user_datas[i], metric_num);
+        if (insert_to_sorted_set(new_rec, flow_id_str, flow_id_len, maxv, new_allocated_dimension_id)) {
+            new_allocated_dimension_id++;
+        }
     }
 
     free(keys);
@@ -487,30 +406,10 @@ void heavy_keeper_merge_sorted_set(struct heavy_keeper *dest, const struct heavy
     dest->top_K_heap = new_rec;
 }
 
-bool heavy_keeper_is_metric_header_equal(const struct heavy_keeper *hk1, const struct heavy_keeper *hk2)
-{
-    if (hk1->metric_header == NULL && hk2->metric_header == NULL) {
-        return true;
-    }
-    if (hk1->metric_header == NULL || hk2->metric_header == NULL) {
-        return false;
-    }
-    if (hk1->metric_header->n_metric != hk2->metric_header->n_metric) {
-        return false;
-    }
-    if (hk1->metric_header->primary_metric_index != hk2->metric_header->primary_metric_index) {
-        return false;
-    }
-    // do not check the metric names, because its time-consuming, and not necessary, since names are initialized with n_metric.
-
-    return true;
-}
-
 int heavy_keeper_merge(struct heavy_keeper *hk, const struct heavy_keeper *src) {
     if (hk->params.array_num != src->params.array_num ||
         hk->params.max_bucket_num != src->params.max_bucket_num ||
-        hk->K != src->K || 
-        heavy_keeper_is_metric_header_equal(hk, src) == false) {
+        hk->K != src->K) {
         printf("ERROR: parameters of two merged heavy keeper must be the same\n");
         return -1;
     }
@@ -534,7 +433,6 @@ int heavy_keeper_merge(struct heavy_keeper *hk, const struct heavy_keeper *src) 
         {
             "member": <field_string>,
             "score": <primary_score>
-            "m_score": [<score1>, <score2>, ...]
         },
         {(more elements in ss, the sorted set)}
         ...
@@ -553,12 +451,7 @@ int heavy_keeper_sorted_set_member_serialization(const char *val, size_t val_len
     mpack_write_cstr(&writer, "score");
     mpack_write_u32(&writer, score);
 
-    mpack_write_cstr(&writer, "m_score");
-    mpack_build_array(&writer);
-    for (size_t i = 0; i < count_arr_size; i++) {
-        mpack_write_u32(&writer, count_arr[i]);
-    }
-    mpack_complete_array(&writer);
+    // do not serialize user data(dimension id), because we don't need it in merge.
 
     mpack_complete_map(&writer);
     if (mpack_writer_destroy(&writer) != mpack_ok) {
@@ -648,16 +541,6 @@ void heavy_keeper_serialization(const struct heavy_keeper *hk, char **blob, size
     size_t sketch_len = hk->params.max_bucket_num * hk->params.array_num;
     mpack_write_bin(&writer, (const char *)hk->sketch, sizeof(struct Bucket) * sketch_len);
 
-    mpack_write_cstr(&writer, "primary_id");
-    mpack_write_u32(&writer, hk->metric_header->primary_metric_index);
-
-    mpack_write_cstr(&writer, "metric_name");
-    mpack_build_array(&writer);
-    for (size_t i = 0; i < hk->metric_header->n_metric; i++) {
-        mpack_write_cstr(&writer, hk->metric_header->metric_names[i]);
-    }
-    mpack_complete_array(&writer);
-
     // heavy_keeper_sketch_serialization(hk, &writer);
     heavy_keeper_sorted_set_serialization(hk, &writer);
 
@@ -678,15 +561,12 @@ void heavy_keeper_sorted_set_deserialization(mpack_node_t *root, struct sorted_s
         const char *val = mpack_node_str(flow_id_str);
         size_t val_len = mpack_node_strlen(flow_id_str);
         unsigned int score = mpack_node_u32(mpack_node_map_cstr(item, "score"));
-        mpack_node_t score_array = mpack_node_map_cstr(item, "m_score");
-        size_t score_array_len = mpack_node_array_length(score_array);
-        unsigned int *m_score = (unsigned int *)malloc(score_array_len * sizeof(unsigned int)); // will be freed with sorted set
-        for (size_t j = 0; j < score_array_len; j++) {
-            m_score[j] = mpack_node_u32(mpack_node_array_at(score_array, j));
-        }
+
+        unsigned int *data_dummy = (unsigned int *)malloc(sizeof(unsigned int)); // will be freed with sorted set
+        *data_dummy = 0;
 
         sorted_set_insert(out, val, val_len, score);
-        sorted_set_insert_user_data(out, val, val_len, (void *)m_score);
+        sorted_set_insert_user_data(out, val, val_len, (void *)data_dummy);
     }
 }
 
@@ -704,16 +584,6 @@ struct heavy_keeper *heavy_keeper_deserialization(const char *blob, size_t size)
     mpack_node_t item_sketch = mpack_node_map_cstr(root, "sketch");
     size_t bin_size = mpack_node_bin_size(item_sketch);
     memcpy(hk->sketch, mpack_node_bin_data(item_sketch), bin_size);
-
-    mpack_node_t array_metric_name = mpack_node_map_cstr(root, "metric_name");
-    size_t n_metric = mpack_node_array_length(array_metric_name);
-    const char *metric_name_to_write[n_metric];
-    size_t metric_name_len[n_metric];
-    for (size_t i = 0; i < n_metric; i++) {
-        metric_name_to_write[i] = mpack_node_str(mpack_node_array_at(array_metric_name, i));
-        metric_name_len[i] = mpack_node_strlen(mpack_node_array_at(array_metric_name, i));
-    }
-    heavy_keeper_specify_metric_header(hk, metric_name_to_write, metric_name_len, n_metric, mpack_node_u32(mpack_node_map_cstr(root, "primary_id")));
 
     heavy_keeper_sorted_set_deserialization(&root, hk->top_K_heap);
 

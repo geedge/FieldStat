@@ -48,15 +48,9 @@ struct heavy_keeper_result {
     size_t n_key; // number of result
     char **key; // key[i] is the flow id, i < n_key
     size_t *key_len; // key_len[i] is the length flow id string, i < n_key
-    
-    size_t primary_metric_id; // the name of the primary metric
     unsigned *count; // count[i] is the metric count of the corresponding flow id
 
-    char **metric_name; // metric_name[i] is the name of the metric
-    size_t n_metric;
-    unsigned int **metric_value_arr; // metric_value[i] is the value of the corresponding key[i]. 
-                                 // Every key has n_metric_name metrics.
-                                 // primary count is also added to this array. So metric_value_arr[i][primary_metric_id] is equal to count[i]
+    unsigned *cube_id;
 };
 
 // Parameters used in algorithm

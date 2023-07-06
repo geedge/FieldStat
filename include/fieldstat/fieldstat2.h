@@ -65,7 +65,7 @@ cell 还是原来的cell，
 //有可能没有dimension，单纯在group里拿一个metric
 
 //implicit tag key, rule_id=101, chart_id=99    
-int fieldstat_register_cube(instance, struct fieldstat_tag *implicit_dimension, size_t n_tag, 
+int fieldstat_register_cube(instance, struct fieldstat_tag *shared_dimension, size_t n_dimension, 
                      enum sampling_mode mode, size_t max_n_cell);
 //return a cell id >= 0, if success; otherwise, return -1.
 int fieldstat_cube_add(instance, cube_id,  struct fieldstat_tag *dimensions, size_t n_tag, long long count);
@@ -77,6 +77,12 @@ int fieldstat_histogram_record(struct fieldstat *instance, int field_id, long lo
 
 void fieldstat_reset(struct fieldstat *instance); //所有register的不变，所有 tag 清除， field 不删除，但是field 内的数据删除
 unsigned long fieldstat_get_version(const struct fieldstat *instance);
+
+
+
+
+
+
 
 
 /* -------------------------------------------------------------------------- */
