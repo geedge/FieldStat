@@ -7,14 +7,46 @@
 #include "fs_cell.h"
 
 #include "fieldstat.h"
-#include "heavy_keeper.h"
 #include "hdr/hdr_histogram.h"
 #include "hdr/hdr_histogram_log.h"
 #include "st_hyperloglog.h"
 #include "mpack/mpack.h"
 
+enum counter_metric_type {
+    COUNTER_TYPE_COUNTER,
+    COUNTER_TYPE_GAUGE,
+};
 
-struct metrics;
+struct para_counter {
+    enum counter_metric_type type;
+};
+
+struct para_hdr{
+    // const char *bins;
+    long long lowest_trackable_value;
+    long long highest_trackable_value;
+    int significant_figures;
+};
+
+struct para_hll {
+    char precision;
+};
+
+struct field_paras {
+    union {
+        struct para_counter counter;
+        struct para_hdr hdr;
+        struct para_hll hll;
+    };
+};
+
+struct metric_info {
+    int id;
+    char *name;
+    struct field_paras *paras;
+    enum field_type type;
+};
+
 typedef void (*metrics_func_del)(struct metrics *);
 typedef void (*metrics_func_refresh)(struct metrics *);
 typedef int (*metrics_func_merge)(struct metrics *, const struct metrics *);
@@ -29,12 +61,7 @@ struct metrics {
     metrics_func_serialize serialize;
     metrics_func_deserialize deserialize;
 
-    enum field_type type;
-};
-
-struct metric_topk {
-    struct metrics base;
-    struct heavy_keeper *hk;
+    struct metric_info *infos;
 };
 
 struct metric_counter {
@@ -52,32 +79,8 @@ struct metric_histogram {
     struct hdr_histogram *hdr;
 };
 
-struct cell {
-    struct fieldstat_tag *tag;
-    size_t tag_num;
-    struct metrics *metric;
-};
 
-static void fieldtag_copy(const struct fieldstat_tag *kv_pair, struct fieldstat_tag *dest)
-{
-    memcpy((char *)dest->key, kv_pair->key, MAX_TAG_KEY_LENGTH);
-    dest->type = kv_pair->type;
-    switch(kv_pair->type)
-    {
-        case TAG_INTEGER:
-            dest->value_int = kv_pair->value_int;
-            break;
-        case TAG_DOUBLE:
-            dest->value_double = kv_pair->value_double;
-            break;
-        case TAG_CSTRING:
-            memcpy((char *)dest->value_str, kv_pair->value_str, MAX_TAG_STRING_VAL_LENGTH);
-            break;
-        default:
-            assert(0);
-            break;
-    }
-}
+
 
 /*
 {
@@ -115,35 +118,7 @@ void mpack_blob_unpack_basic_info(const char *blob, size_t blob_size, enum field
     mpack_tree_destroy(&tree);
 }
 
-int my_cmp_tag(const void *a, const void *b)
-{
-    struct fieldstat_tag *aa = (struct fieldstat_tag *)a;
-    struct fieldstat_tag *bb = (struct fieldstat_tag *)b;
-    int key_cmp = strcmp(aa->key, bb->key);
-    if (key_cmp != 0) {
-        return key_cmp;
-    }
-
-    assert(aa->type == bb->type);
-    switch (aa->type) {
-        case TAG_INTEGER:
-            return aa->value_int - bb->value_int;
-        case TAG_DOUBLE:
-            return aa->value_double - bb->value_double;
-        case TAG_CSTRING:
-            return strcmp(aa->value_str, bb->value_str);
-        default:
-            return 0;
-    }
-}
-
-/* 
-    "tags":[{
-        "key":<tag key string>
-        "type":0 1 or 2
-        "value":<tag value, can be int(0) double(1) or str(2)>
-    }]
-*/
+// TODO: 这个废除，改成只写一个id
 void cell_serialize_write_fieldtag(mpack_writer_t *writer, const struct cell *pthis)
 {
     struct fieldstat_tag *tag_list;
@@ -183,6 +158,7 @@ void cell_serialize_write_fieldtag(mpack_writer_t *writer, const struct cell *pt
     free(tag_list);
 }
 
+// TODO；一样废除
 void deserialize_tag(mpack_node_t *root, struct fieldstat_tag **tag_list_out, size_t *tag_num_out)
 {
     mpack_node_t tag_arr = mpack_node_map_cstr(*root, "tags");
@@ -216,146 +192,6 @@ void deserialize_tag(mpack_node_t *root, struct fieldstat_tag **tag_list_out, si
     }
     *tag_list_out = tag_list;
     *tag_num_out = tag_num;
-}
-
-
-/* -------------------------------------------------------------------------- */
-/*                                    metric-topk                             */
-/* -------------------------------------------------------------------------- */
-static void metric_topk_serialize(const struct metrics *pthis, char **blob, size_t *blob_size)
-{
-    struct metric_topk *topk = (struct metric_topk *)pthis;
-    heavy_keeper_serialization(topk->hk, blob, blob_size);
-}
-
-static void metric_topk_refresh(struct metrics *pthis)
-{
-    struct metric_topk *topk = (struct metric_topk *)pthis;
-    heavy_keeper_clear(topk->hk);
-}
-
-static int metric_topk_merge(struct metrics *pthis, const struct metrics *from)
-{
-    struct metric_topk *topk = (struct metric_topk *)pthis;
-    struct metric_topk *from_topk = (struct metric_topk *)from;
-    return heavy_keeper_merge(topk->hk, from_topk->hk);
-}
-
-static int metric_topk_copy(struct metrics *pthis, const struct metrics *from)
-{
-    struct metric_topk *topk = (struct metric_topk *)pthis;
-    struct metric_topk *from_topk = (struct metric_topk *)from;
-    if (topk->hk) {
-        heavy_keeper_free(topk->hk);
-    }
-
-    struct heavy_keeper_result *result = heavy_keeper_query(from_topk->hk);
-    topk->hk = heavy_keeper_with_metrics_new(heavy_keeper_get_config_K(from_topk->hk),
-        (const char **)result->metric_name, result->n_metric, result->primary_metric_id);
-    heavy_keeper_result_free(result);
-
-    return heavy_keeper_merge(topk->hk, from_topk->hk);
-}
-
-void metric_topk_free(struct metrics *pthis)
-{
-    struct metric_topk *topk = (struct metric_topk *)pthis;
-    heavy_keeper_free(topk->hk);
-    free(topk);
-}
-
-// blob: c_bin
-int metric_topk_deserialize(struct metrics *pthis, const char *blob, size_t blob_size) 
-{
-    struct metric_topk *topk = (struct metric_topk *)pthis;
-
-    struct heavy_keeper *hk = heavy_keeper_deserialization(blob, blob_size);
-    if (hk == NULL) {
-        return -1;
-    }
-    topk->hk = hk;
-
-    return 0;
-}
-
-static struct metric_topk *metric_topk_new_scheme()
-{
-    struct metric_topk *topk = malloc(sizeof(struct metric_topk));
-    struct metrics *base = &topk->base;
-    base->del = metric_topk_free;
-    base->refresh = metric_topk_refresh;
-    base->merge = metric_topk_merge;
-    base->copy = metric_topk_copy;
-    base->serialize = metric_topk_serialize;
-    base->deserialize = metric_topk_deserialize;
-    base->type = FIELD_TYPE_TOPK;
-
-    topk->hk = NULL;
-    return topk;
-}
-
-/* -------------------------------------------------------------------------- */
-/*                                    cell-topk                               */
-/* -------------------------------------------------------------------------- */
-
-struct cell *cell_create_for_topk(int K, const char **metric_names, size_t metric_num, size_t primary_metric_index)
-{
-    struct cell *cell = (struct cell *)malloc(sizeof(struct cell));
-    memset(cell, 0, sizeof(struct cell));
-    struct metric_topk *topk = metric_topk_new_scheme();
-    cell->metric = (struct metrics *)topk;
-
-    topk->hk = heavy_keeper_with_metrics_new(K, metric_names, metric_num, primary_metric_index);
-
-    return cell;
-}
-
-void cell_topk_add(struct cell *pthis, const char *key, size_t key_len, unsigned int value[])
-{
-    struct metric_topk *topk = (struct metric_topk *)pthis->metric;
-    heavy_keeper_with_metrics_add(topk->hk, key, key_len, value);
-}
-
-// (*values_out)[i] is the value of cstring_t (*keys_out)[i]
-// sub_metric_value_out: pointer to a 2-d array. sub_metric_value_out[i][j] is the value of (keys_out[i], sub_metric_name[j]), where i < num_out, j < num_metric_out
-
-typedef char * cstring_t;
-void cell_topk_query(const struct cell *pthis,
-    cstring_t **keys_out, size_t *num_out, // row
-    cstring_t **metric_name_out, size_t *num_metric_out, size_t *primary_metric_id_out, // column
-    unsigned int ***metric_value_out)
-{
-    struct metric_topk *topk = (struct metric_topk *)pthis->metric;
-    struct heavy_keeper_result *result = heavy_keeper_query(topk->hk);
-
-    // row
-    *num_out = result->n_key;
-    *keys_out = (cstring_t *)malloc(sizeof(cstring_t) * result->n_key);
-    for (int i = 0; i < result->n_key; i++) {
-        char *key_to_write = (char *)malloc(sizeof(char) * (result->key_len[i] + 1));
-        memcpy(key_to_write, result->key[i], result->key_len[i]);
-        key_to_write[result->key_len[i]] = '\0';
-        (*keys_out)[i] = key_to_write;
-    }
-
-    // column
-    *metric_name_out = (cstring_t *)malloc(sizeof(cstring_t) * result->n_metric);
-    for (int j = 0; j < result->n_metric; j++) {
-        (*metric_name_out)[j] = strdup(result->metric_name[j]);
-    }
-    *num_metric_out = result->n_metric;
-    *primary_metric_id_out = result->primary_metric_id;
-
-    // value
-    *metric_value_out = (unsigned int **)malloc(sizeof(unsigned int *) * result->n_key);
-    for (int i = 0; i < result->n_key; i++) {
-        (*metric_value_out)[i] = (unsigned int *)malloc(sizeof(unsigned int) * result->n_metric);
-        for (int j = 0; j < result->n_metric; j++) {
-            (*metric_value_out)[i][j] = result->metric_value_arr[i][j];
-        }
-    }
-    
-    heavy_keeper_result_free(result);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -425,6 +261,35 @@ int metric_counter_deserialize(struct metrics *pthis, const char *blob, size_t b
     return 0;
 }
 
+
+struct field_paras *construct_parameters(enum field_type type, ...)
+{
+    struct field_paras *paras = (struct field_paras *)malloc(sizeof(struct field_paras));
+    va_list ap;
+    va_start(ap, type);
+    switch (type) {
+        case FIELD_TYPE_TOPK:
+            paras->topk.K = va_arg(ap, int);
+            paras->topk.metric_names = va_arg(ap, char **);
+            paras->topk.num_metric = va_arg(ap, size_t);
+            paras->topk.primary_metric_id = va_arg(ap, size_t);
+            break;
+        case FIELD_TYPE_HLL:
+            paras->hll.precision = (char)va_arg(ap, int);
+            break;
+        case FIELD_TYPE_HISTOGRAM:
+            paras->hdr.lowest_trackable_value = va_arg(ap, long long);
+            paras->hdr.highest_trackable_value = va_arg(ap, long long);
+            paras->hdr.significant_figures = va_arg(ap, int);
+            break;
+        default:
+            printf("construct_parameters: unknown type\n");
+            assert(0);
+    }
+    va_end(ap);
+    return paras;
+}
+
 static struct metric_counter *metric_counter_new_scheme()
 {
     struct metric_counter *counter = malloc(sizeof(struct metric_counter));
@@ -439,6 +304,12 @@ static struct metric_counter *metric_counter_new_scheme()
 
     counter->value = 0;
     return counter;
+}
+
+struct metrics *metric_counter_new(const char *name, )
+{
+    struct metrics *ret = (struct metrics *)metric_counter_new_scheme();
+    ret->infos->paras = construct_parameters()
 }
 
 /* -------------------------------------------------------------------------- */
@@ -691,7 +562,8 @@ long long cell_histogram_count_le_value(const struct cell *pthis, long long valu
 /* -------------------------------------------------------------------------- */
 /*                                   cell                                     */
 /* -------------------------------------------------------------------------- */
-
+// todo: 这里的接口大概要复制成现在field.c 里的
+// 另外一个参考是new_field.h 里写的想法
 static struct metrics *metric_scheme_new(enum field_type type)
 {
     switch (type)
@@ -710,6 +582,7 @@ static struct metrics *metric_scheme_new(enum field_type type)
     }
 }
 
+// todo: 现在read tag 的是fieldstat
 void cell_read_tag(const struct cell *pthis, struct fieldstat_tag **tag_list, size_t *tag_count)
 {
     *tag_list = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * pthis->tag_num);

@@ -4,54 +4,20 @@
 
 #include "fieldstat.h"
 #include "field.h"
-#include "uthash.h"
+#include "uthash.h" // TODO： 用my uthash，优化dynamic dimension key 的查找速度
 #include "fs_cell.h"
 #include "mpack/mpack.h"
+#include "utils/heavy_keeper.h"
 
-#define DEFAULT_MAX_CELL_NUM 1024
+// todo: 删掉这个文件
 
-struct cell_hash_node {
-    char *key; // kv_pair of tags
-    size_t key_len; // exclude '\0'
-    struct cell *cell;
-    UT_hash_handle hh;
+struct fs_cell {
+    struct metrics **metric; // not continuous, metric[i] is NULL when not used
+    size_t metric_capacity;  // todo: 预留比如十几个，add 的时候如果不存在，加进去 方案2，new 依赖于fieldstat
+    int cell_id;
 };
 
-struct para_hdr{
-    // const char *bins;
-    long long lowest_trackable_value;
-    long long highest_trackable_value;
-    int significant_figures;
-};
 
-struct para_topk {
-    int K;
-    char **metric_names;
-    size_t num_metric;
-    size_t primary_metric_id;
-};
-
-struct para_hll {
-    char precision;
-};
-
-struct field_paras {
-    union {
-        // struct para_hdr hdr;
-        struct para_topk topk;
-        struct para_hdr hdr;
-        struct para_hll hll;
-    };
-};
-
-struct fs_field {
-    enum field_type type;
-    int field_id;
-    char *name;
-    struct cell_hash_node *hash_tbl;
-    struct field_paras *field_paras;
-    int max_cell_num;
-};
 
 static void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_tags, char **out_key, size_t *out_key_size)
 {
@@ -102,16 +68,7 @@ static void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_t
     free(dynamic_mem);
 }
 
-static void build_dynamic_cell_key2(const struct fieldstat_tag tags[], size_t n_tags, char **out_key, size_t *out_key_size)
-{
-    size_t key_len = sizeof(struct fieldstat_tag) * n_tags;
-    char *key = (char *)malloc(key_len);
-    memcpy(key, tags, key_len);
-    *out_key = key;
-    *out_key_size = key_len;
-}
-
-struct cell *field_spawn_cell(const struct fs_field *field)
+struct cell *field_spawn_cell(const struct fs_cube *field)
 {
     struct cell *cell = NULL;
     switch (field->type) {
@@ -139,162 +96,8 @@ struct cell *field_spawn_cell(const struct fs_field *field)
     return cell;
 }
 
-struct field_paras *construct_parameters(enum field_type type, ...)
-{
-    struct field_paras *paras = (struct field_paras *)malloc(sizeof(struct field_paras));
-    va_list ap;
-    va_start(ap, type);
-    switch (type) {
-        case FIELD_TYPE_TOPK:
-            paras->topk.K = va_arg(ap, int);
-            paras->topk.metric_names = va_arg(ap, char **);
-            paras->topk.num_metric = va_arg(ap, size_t);
-            paras->topk.primary_metric_id = va_arg(ap, size_t);
-            break;
-        case FIELD_TYPE_HLL:
-            paras->hll.precision = (char)va_arg(ap, int);
-            break;
-        case FIELD_TYPE_HISTOGRAM:
-            paras->hdr.lowest_trackable_value = va_arg(ap, long long);
-            paras->hdr.highest_trackable_value = va_arg(ap, long long);
-            paras->hdr.significant_figures = va_arg(ap, int);
-            break;
-        default:
-            printf("construct_parameters: unknown type\n");
-            assert(0);
-    }
-    va_end(ap);
-    return paras;
-}
 
-struct fs_field *field_new(enum field_type type, const char *name, struct field_paras *paras)
-{
-    struct fs_field *field = (struct fs_field *)malloc(sizeof(struct fs_field));
-    field->type = type;
-    field->field_id = -1;
-    field->name = strdup(name);
-    field->hash_tbl = NULL;
-    field->field_paras = paras;
-    field->max_cell_num = DEFAULT_MAX_CELL_NUM;
-    return field;
-}
-
-static struct cell *field_find_cell_with_key(const struct fs_field *field, const char *key, size_t key_len)
-{
-    struct cell_hash_node *node;
-    HASH_FIND(hh, field->hash_tbl, key, key_len, node);
-    if (node == NULL) {
-        return NULL;
-    }
-    return node->cell;
-}
-
-struct cell *field_find_cell(const struct fs_field *field, const struct fieldstat_tag tag_list[], size_t tag_num)
-{
-    char *dynamic_cell_key = NULL;
-    size_t dynamic_key_size = 0;
-    build_dynamic_cell_key(tag_list, tag_num, &dynamic_cell_key, &dynamic_key_size);
-    struct cell *cell = field_find_cell_with_key(field, dynamic_cell_key, dynamic_key_size);
-    free(dynamic_cell_key);
-    return cell;
-}
-// key_len does not include '\0'
-static void field_insert_cell_with_key(struct fs_field *field, struct cell *cell, const char *key, size_t key_len)
-{
-    struct cell_hash_node *node = (struct cell_hash_node *)malloc(sizeof(struct cell_hash_node));
-
-    node->key_len = key_len;
-    node->key = (char *)malloc(key_len + 1);
-    memcpy(node->key, key, key_len);
-    node->key[key_len] = '\0';
-    node->cell = cell;
-    HASH_ADD_KEYPTR(hh, field->hash_tbl, node->key, node->key_len, node);
-}
-
-void field_insert_cell(struct fs_field *field, struct cell *cell, const struct fieldstat_tag tag_list[], size_t tag_num)
-{
-    char *dynamic_cell_key = NULL;
-    size_t dynamic_key_size = 0;
-    build_dynamic_cell_key(tag_list, tag_num, &dynamic_cell_key, &dynamic_key_size);
-    field_insert_cell_with_key(field, cell, dynamic_cell_key, dynamic_key_size);
-    free(dynamic_cell_key);
-}
-
-struct cell *field_find_or_create_cell(struct fs_field *field, const struct fieldstat_tag tag_list[], size_t tag_num)
-{
-    char *dynamic_cell_key = NULL;
-    size_t dynamic_key_size = 0;
-    build_dynamic_cell_key(tag_list, tag_num, &dynamic_cell_key, &dynamic_key_size);
-    struct cell *cell = field_find_cell_with_key(field, dynamic_cell_key, dynamic_key_size);
-    if (cell == NULL) {
-        if (HASH_COUNT(field->hash_tbl) >= field->max_cell_num) {
-            printf("field_find_or_create_cell: field has too many cells, max num: %d\n", field->max_cell_num);
-            free(dynamic_cell_key);
-            return NULL;
-        }
-        cell = field_spawn_cell(field);
-
-        cell_add_tag(cell, tag_list, tag_num);
-        field_insert_cell_with_key(field, cell, dynamic_cell_key, dynamic_key_size);
-    }
-    free(dynamic_cell_key);
-
-    return cell;
-}
-
-struct fs_field *field_new_topk(const char *name, int K, const char **metric_names, size_t num_metric, size_t primary_metric_id)
-{
-    struct field_paras *paras = construct_parameters(FIELD_TYPE_TOPK, K, metric_names, num_metric, primary_metric_id);
-
-    struct fs_field *field = field_new(FIELD_TYPE_TOPK, name, paras);
-
-    return field;
-}
-
-struct fs_field *field_new_counter(const char *name)
-{
-    return  field_new(FIELD_TYPE_COUNTER, name, NULL);
-}
-
-struct fs_field *field_new_hll(const char *name, char precision)
-{
-    struct field_paras *paras = construct_parameters(FIELD_TYPE_HLL, precision);
-    struct fs_field *field = field_new(FIELD_TYPE_HLL, name, paras);
-    return field;
-}
-struct fs_field *field_new_histogram(const char *name, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures)
-{
-    struct field_paras *paras = construct_parameters(FIELD_TYPE_HISTOGRAM, lowest_trackable_value, highest_trackable_value, significant_figures);
-    struct fs_field *field = field_new(FIELD_TYPE_HISTOGRAM, name, paras);
-    return field;
-}
-
-void field_free(struct fs_field *field)
-{
-    struct cell_hash_node *node, *tmp;
-    HASH_ITER(hh, field->hash_tbl, node, tmp) {
-        struct cell *cell = node->cell;
-        cell_free(cell);
-        HASH_DEL(field->hash_tbl, node);
-        free(node->key);
-        free(node);
-    }
-    free(field->field_paras);
-    free(field->name);
-    free(field);
-}
-
-// todo: 应该不用了，删掉
-void field_refresh(struct fs_field *field)
-{
-    struct cell_hash_node *node, *tmp;
-    HASH_ITER(hh, field->hash_tbl, node, tmp) {
-        struct cell *cell = node->cell;
-        cell_refresh(cell);
-    }
-}
-
-void field_reset(struct fs_field *field)
+void cell_reset(struct fs_cube *field)
 {
     struct cell_hash_node *node, *tmp;
     HASH_ITER(hh, field->hash_tbl, node, tmp) {
@@ -306,7 +109,7 @@ void field_reset(struct fs_field *field)
     }
 }
 
-struct fs_field *field_dup(const struct fs_field *src)
+struct fs_cube *field_dup(const struct fs_cube *src)
 {
     struct field_paras *params = NULL;
     if (src->field_paras != NULL) {
@@ -314,13 +117,13 @@ struct fs_field *field_dup(const struct fs_field *src)
         memcpy(params, src->field_paras, sizeof(struct field_paras));
     }
 
-    struct fs_field *dst = field_new(src->type, src->name, params);
+    struct fs_cube *dst = field_new(src->type, src->name, params);
     field_set_id(dst, src->field_id);
     field_merge(dst, src);
     return dst;
 }
 
-int field_merge(struct fs_field *dst, const struct fs_field *src)
+int field_merge(struct fs_cube *dst, const struct fs_cube *src)
 {
     if (dst->type != src->type) {
         printf("field_merge:field type not match\n");
@@ -343,7 +146,7 @@ int field_merge(struct fs_field *dst, const struct fs_field *src)
     return 0;
 }
 
-void field_get_tags(const struct fs_field *field, struct fieldstat_tag_list **tag_lists_out, size_t *n_tag_lists_out)
+void field_get_tags(const struct fs_cube *field, struct fieldstat_tag_list **tag_lists_out, size_t *n_tag_lists_out)
 {
     *n_tag_lists_out = HASH_COUNT(field->hash_tbl);
     if (*n_tag_lists_out == 0) {
@@ -392,7 +195,7 @@ void field_get_tags(const struct fs_field *field, struct fieldstat_tag_list **ta
     "prec": <significant_figures>
 }
 */
-void serialize_field_parameters(const struct fs_field *field, char **blob, size_t *blob_size)
+void serialize_field_parameters(const struct fs_cube *field, char **blob, size_t *blob_size)
 {
     struct field_paras *para = field->field_paras;
     mpack_writer_t writer;
@@ -482,7 +285,7 @@ struct field_paras *deserialize_parameters(const char *blob, size_t blob_size)
 }
 */
 
-struct fs_field *field_deserialize(const char *blob, size_t blob_size)
+struct fs_cube *field_deserialize(const char *blob, size_t blob_size)
 {
     mpack_tree_t tree;
     mpack_tree_init_data(&tree, blob, blob_size);
@@ -494,7 +297,7 @@ struct fs_field *field_deserialize(const char *blob, size_t blob_size)
     mpack_node_t para_obj = mpack_node_map_cstr(root, "para");
     struct field_paras *field_para = deserialize_parameters(mpack_node_bin_data(para_obj), mpack_node_bin_size(para_obj));
 
-    struct fs_field *field_out = field_new(type, field_name, field_para);
+    struct fs_cube *field_out = field_new(type, field_name, field_para);
     free(field_name);
 
     mpack_node_t cells_arr = mpack_node_map_cstr(root, "cells");
@@ -533,7 +336,7 @@ struct fs_field *field_deserialize(const char *blob, size_t blob_size)
             "para":[may be null, one number, or a double array]
             "cells":[<bin_blob>]
         }*/
-int field_serialize(const struct fs_field *field, char **blob, size_t *blob_size)
+int field_serialize(const struct fs_cube *field, char **blob, size_t *blob_size)
 {
     char *para_blob = NULL;
     size_t para_blob_size = 0;
@@ -576,27 +379,27 @@ int field_serialize(const struct fs_field *field, char **blob, size_t *blob_size
     return 0;
 }
 
-int field_get_id(const struct fs_field *field)
+int field_get_id(const struct fs_cube *field)
 {
     return field->field_id;
 }
 
-void field_set_id(struct fs_field *field, int id)
+void field_set_id(struct fs_cube *field, int id)
 {
     field->field_id = id;
 }
 
-enum field_type field_get_type(const struct fs_field *field)
+enum field_type field_get_type(const struct fs_cube *field)
 {
     return field->type;
 }
 
-const char *field_get_name(const struct fs_field *field)
+const char *field_get_name(const struct fs_cube *field)
 {
     return field->name;
 }
 
-void field_set_max_cell_num(struct fs_field *field, int max_cell_num)
+void field_set_max_cell_num(struct fs_cube *field, int max_cell_num)
 {
     field->max_cell_num = max_cell_num;
 }
