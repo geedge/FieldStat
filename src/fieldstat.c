@@ -20,14 +20,14 @@ struct cell_id_map {
 
 struct fs_cube {
     enum sampling_mode sampling_mode;
-    struct dimension_cube_map map;
+    struct cell_manager map;
     size_t max_n_cell;
     int current_cell_id;
     struct cell_id_map *cell_id_map;
     size_t n_cell;
 
-    struct fieldstat_tag *shared_dimensions;
-    size_t n_shared_dimensions;
+    struct fieldstat_tag *shared_tags;
+    size_t n_shared_tags;
 
 };
 
@@ -36,9 +36,11 @@ struct fieldstat {
     size_t n_cube;
 
     size_t max_n_metric;
-    struct metrics *metrics;
+    struct metric *metrics;
     size_t n_metric;
 };
+
+
 
 int name_id_map_find_a_field_name(struct fieldstat *instance, const char *field_name)
 {
@@ -65,11 +67,11 @@ void fieldstat_reset(struct fieldstat *instance)
     // todo
 }
 
-static int append_metric_to_instance(struct fieldstat *instance, struct metrics *metric)
+static int append_metric_to_instance(struct fieldstat *instance, struct metric *metric)
 {
     if (instance->n_metric >= instance->max_n_metric) {
         instance->max_n_metric *= 2;
-        instance->metrics = realloc(instance->metrics, sizeof(struct metrics *) * instance->max_n_metric);
+        instance->metrics = realloc(instance->metrics, sizeof(struct metric *) * instance->max_n_metric);
     }
     instance->metrics[instance->n_metric] = metric;
     instance->n_metric++;
@@ -82,7 +84,7 @@ static int append_metric_to_instance(struct fieldstat *instance, struct metrics 
 
 int fieldstat_register_counter(struct fieldstat *instance, const char *field_name, bool is_gauge)
 {
-    struct metrics *metrics = metrics_new_counter(field_name, is_gauge);
+    struct metric *metrics = metrics_new_counter(field_name, is_gauge);
     return append_metric_to_instance(instance, metrics);
 }
 
@@ -92,13 +94,13 @@ int fieldstat_register_counter(struct fieldstat *instance, const char *field_nam
 
 int fieldstat_counter_incrby(struct fieldstat *instance, int metric_id, int cell_id, long long increment)
 {
-    struct metrics *metrics_info = instance->metrics[metric_id];
+    struct metric *metrics_info = instance->metrics[metric_id];
     if (metrics_info == NULL || metrics_get_type(metrics_info) != METRICS_TYPE_COUNTER) {
         printf("ERR: metrics is not registered yet\n");
         return -1;
     }
 
-    struct metrics * metrics = cell_find_or_create_metric(instance->cell[cell_id], metrics_info);
+    struct metric * metrics = cell_find_or_create_metric(instance->cell[cell_id], metrics_info);
     return metrics_counter_incrby(metrics, increment);
 }
 
@@ -118,7 +120,7 @@ int fieldstat_counter_incrby(struct fieldstat *instance, int metric_id, int cell
         "cells":[
             "metrics":<blob of each metric>
         ]
-        "dimension": {
+        "tag": {
             "type":<topk/comp>
             "blob":<serialize counter or topk>
         }
@@ -155,13 +157,8 @@ struct fieldstat *fieldstat_deserialize(const char *blob, size_t blob_size)
     return instance;
 }
 
-int fieldstat_merge_with_blob(struct fieldstat *instance, const char *blob, size_t blob_size)
+int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
 {
-    struct fieldstat *src = fieldstat_deserialize(blob, blob_size);
-    if (src == NULL) {
-        return -1;
-    }
-
     for (int i = 0; i < src->n_field; i++) {
         struct fs_cube *tmp_field = src->field_array[i];
         int field_id_tmp = name_id_map_find_a_field_name(instance, field_get_name(tmp_field));
@@ -225,17 +222,17 @@ const char *fieldstat_get_field_name(const struct fieldstat *instance, int field
     return field_get_name(field);
 }
 
-enum field_type fieldstat_get_field_type(const struct fieldstat *instance, int field_id)
+enum metric_type fieldstat_get_field_type(const struct fieldstat *instance, int field_id)
 {
     struct fs_cube *field = instance->field_array[field_id];
     if (field == NULL) {
         printf("ERR: field is not registered yet\n");
-        return (enum field_type)0xFFFFFFFF;
+        return (enum metric_type)0xFFFFFFFF;
     }
     return field_get_type(instance->field_array[field_id]);
 }
 
-static bool fieldstat_check_field(struct fs_cube *field, enum field_type type)
+static bool fieldstat_check_field(struct fs_cube *field, enum metric_type type)
 {
     if (field == NULL) {
         printf("ERR: field is not registered yet\n");
@@ -248,7 +245,7 @@ static bool fieldstat_check_field(struct fs_cube *field, enum field_type type)
     return true;
 }
 
-void fieldstat_get_tag_lists(const struct fieldstat *instance, int field_id, struct fieldstat_tag_list **lists, size_t *n_list)
+void fieldstat_get_tag_lists(const struct fieldstat *instance, int field_id, struct fieldstat_tag_group **lists, size_t *n_list)
 {
     struct fs_cube *field = instance->field_array[field_id];
     if (field == NULL) {
@@ -261,10 +258,10 @@ void fieldstat_get_tag_lists(const struct fieldstat *instance, int field_id, str
     field_get_tags(field, lists, n_list);
 }
 
-long long fieldstat_counter_get(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list)
+long long fieldstat_counter_get(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_group *tag_list)
 {
     struct fs_cube *field = instance->field_array[field_id];
-    if (!fieldstat_check_field(field, FIELD_TYPE_COUNTER)) {
+    if (!fieldstat_check_field(field, METRIC_TYPE_COUNTER)) {
         return -1;
     }
 
@@ -276,10 +273,10 @@ long long fieldstat_counter_get(const struct fieldstat *instance, int field_id, 
     return cell_counter_get(cell);
 }
 
-long long fieldstat_histogram_value_at_percentile(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list, double percentile)
+long long fieldstat_histogram_value_at_percentile(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_group *tag_list, double percentile)
 {
     struct fs_cube *field = instance->field_array[field_id];
-    if (!fieldstat_check_field(field, FIELD_TYPE_HISTOGRAM)) {
+    if (!fieldstat_check_field(field, METRIC_TYPE_HISTOGRAM)) {
         return -1;
     }
 
@@ -291,10 +288,10 @@ long long fieldstat_histogram_value_at_percentile(const struct fieldstat *instan
     return cell_histogram_value_at_percentile(cell, percentile);
 }
 
-long long fieldstat_histogram_count_le_value(struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list, long long value)
+long long fieldstat_histogram_count_le_value(struct fieldstat *instance, int field_id, const struct fieldstat_tag_group *tag_list, long long value)
 {
     struct fs_cube *field = instance->field_array[field_id];
-    if (!fieldstat_check_field(field, FIELD_TYPE_HISTOGRAM)) {
+    if (!fieldstat_check_field(field, METRIC_TYPE_HISTOGRAM)) {
         return -1;
     }
 
@@ -306,10 +303,10 @@ long long fieldstat_histogram_count_le_value(struct fieldstat *instance, int fie
     return cell_histogram_count_le_value(cell, value);
 }
 
-double fieldstat_hll_get(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list)
+double fieldstat_hll_get(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_group *tag_list)
 {
     struct fs_cube *field = instance->field_array[field_id];
-    if (!fieldstat_check_field(field, FIELD_TYPE_HLL)) {
+    if (!fieldstat_check_field(field, METRIC_TYPE_HLL)) {
         return -1;
     }
 
@@ -321,15 +318,15 @@ double fieldstat_hll_get(const struct fieldstat *instance, int field_id, const s
     return cell_hll_get(cell);
 }
 
-void fieldstat_get_serialized_blob(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list, char **blob, size_t *blob_size)
+void fieldstat_get_serialized_blob(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_group *tag_list, char **blob, size_t *blob_size)
 {
     struct fs_cube *field = instance->field_array[field_id];
     if (field == NULL) {
         printf("ERR: field is not registered yet\n");
         return;
     }
-    enum field_type type = field_get_type(field);
-    if (!(type == FIELD_TYPE_HLL || type == FIELD_TYPE_HISTOGRAM)) {
+    enum metric_type type = field_get_type(field);
+    if (!(type == METRIC_TYPE_HLL || type == METRIC_TYPE_HISTOGRAM)) {
         printf("ERR: Only metric of hll and histogram support get serialized blob\n");
         return;
     }

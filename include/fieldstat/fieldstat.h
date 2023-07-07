@@ -9,9 +9,9 @@ extern "C"
 
 enum metric_type
 {
-	metric_type_COUNTER,
-	metric_type_HLL,
-	metric_type_HISTOGRAM,
+	METRIC_TYPE_COUNTER,
+	METRIC_TYPE_HLL,
+	METRIC_TYPE_HISTOGRAM,
 };
 
 enum fs_tag_type
@@ -26,6 +26,7 @@ enum sampling_mode {
     SAMPLING_MODE_TOPK,
 };
 
+// tag 改成tag
 struct fieldstat_tag {
 	const char *key;
     enum fs_tag_type type;
@@ -36,7 +37,7 @@ struct fieldstat_tag {
 	};
 };
 
-struct fieldstat_tag_list
+struct fieldstat_tag_group
 {
     struct fieldstat_tag *tag;
     size_t n_tag;
@@ -50,17 +51,44 @@ int fieldstat_register_counter(struct fieldstat *instance, const char *field_nam
 int fieldstat_register_hll(struct fieldstat *instance, const char *field_name, unsigned char precision);
 int fieldstat_register_histogram(struct fieldstat *instance, const char *field_name, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures);
 
-int fieldstat_register_cube(struct fieldstat *instance, struct fieldstat_tag *shared_dimensions, size_t n_dimension, enum sampling_mode mode, size_t max_n_cell);
+int fieldstat_register_cube(struct fieldstat *instance, struct fieldstat_tag *shared_tags, size_t n_tag, enum sampling_mode mode, size_t max_n_cell);
 //return a cell id >= 0, if success; otherwise, return -1. Fail if: mode is (SAMPLING_MODE_COMPREHENSIVE) and cell number >= (max_n_cell) ; or SAMPLING_MODE_TOPK and cell already exists.
-int fieldstat_cube_add(struct fieldstat *instance, int cube_id,  struct fieldstat_tag *dimensions, size_t n_tag, long long count);
+int fieldstat_cube_add(struct fieldstat *instance, int cube_id,  struct fieldstat_tag *tags, size_t n_tag, long long count);
 
 int fieldstat_counter_incrby(struct fieldstat *instance, int metric_id, int cube_id, int cell_id, long long increment);
 
 void fieldstat_reset(struct fieldstat *instance); //所有register的不变，所有 tag 清除， field 不删除，但是field 内的数据删除
-unsigned long fieldstat_get_timestamp(const struct fieldstat *instance); // return the time when the instance is created.
+unsigned long fieldstat_get_version(const struct fieldstat *instance); // return the time when the instance is created.
+
+
+
+int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src);
+// todo: merge 的伪代码
+// for cube（merge topk 的情况）
+//     struct cell_manager merged_tags = dest.
+//     merged_tags.push(src.cube.map.pop().get_tag()) for every cube in cube_arr
+//      merged_tags.push(dest.cube.map.pop().get_tag()) for every cube in cube_arr
+// note: 这部分实际上放在了metric.c 里
+// metric需要支持的操作：
+//          修改id： 修改dest[tag].id 到merged_cell[tag.id]
+//          merge： 给定一个dest metric，一个src metric，并给出dest id和src id
+//          copy:   给定一个src metric，一个dest metric，并给出src id
+// dest cube manager   |   merged cube manager  | src cube manager    |  操作
+// 有                            有                  有                   dest[tag] = src[tag] + dest[tag]，修改id
+// 有                            有                  无                     修改id
+// 有                            无                  有                     删掉dest[tag]
+// 有                            无                  无                     删掉dest[tag]
+// 无                            有                  有                     创建dest[tag] = src[tag]， 修改id
+// 无                            有                  无                     不可能
+// 无                            无                  有                      无操作
+// 无                            无                  无                     无操作
+
+
+// merge comprehensive 的情况：
+// 构建increment tag，每个src 里有，但是dest里没有的，加入到increment里。直到dest放满。
+// 对于每个increment tag， dest[tag] = src[tag]，修改id为现在dest cube manager 里的id
 
 struct fieldstat *fieldstat_deserialize(const char *blob, size_t blob_size);
-int fieldstat_merge_with_blob(struct fieldstat *instance, const char *blob, size_t blob_size);
 int fieldstat_serialize(const struct fieldstat *instance, char **blob_out, size_t *blob_size_out);
 
 
@@ -73,7 +101,7 @@ void fieldstat_get_cube_info(const struct fieldstat *instance, int group_id,
     enum sampling_mode *mode);
 
 void fieldstat_get_cell_info(const struct fieldstat *instance, int group_id, int cell_id,
-    struct fieldstat_tag **dimensions, size_t *n_dimension,
+    struct fieldstat_tag **tags, size_t *n_tag,
     enum metric_type **metric_types, size_t *n_field);
 
 long long fieldstat_histogram_value_at_percentile(const struct fieldstat *instance, int metric_id, int cell_id, double percentile);

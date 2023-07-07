@@ -233,7 +233,7 @@ TEST(benchmark_test_accuracy, test_for_topk_metric)
     size_t n_metric = 0;
     size_t primary_key_id = 0;
     unsigned int **count_result = NULL;
-    struct fieldstat_tag_list tag_list = {(struct fieldstat_tag *)&TEST_TAG_INT, 1};
+    struct fieldstat_tag_group tag_list = {(struct fieldstat_tag *)&TEST_TAG_INT, 1};
     fieldstat_topk_query(instance_dest, id_added, &tag_list,
                          &key_result, &n_result, &metric_name_result, &n_metric, &primary_key_id, &count_result);
     std::vector<std::pair<std::string, int>> result_vec(n_result);
@@ -275,7 +275,7 @@ TEST(benchmark_test_accuracy, test_for_histogram_metric)
     for (size_t i = 0; i < ADD_OPER_NUM; i++) {
         hdr_record_value(histogram_standard, myVec[i]);
     }
-    struct fieldstat_tag_list tag_list = {(struct fieldstat_tag *)&TEST_TAG_INT, 1};
+    struct fieldstat_tag_group tag_list = {(struct fieldstat_tag *)&TEST_TAG_INT, 1};
     for (double i = 10; i <= 100; i += 10.0) {
         double standard = hdr_value_at_percentile(histogram_standard, i);
         double result = fieldstat_histogram_value_at_percentile(instance, id_added, &tag_list, i);
@@ -315,7 +315,7 @@ TEST(benchmark_test_accuracy, test_for_hll_metric)
     for (size_t i = 0; i < ADD_OPER_NUM; i++) {
         hll_standard.insert(myVec[i]);
     }
-    struct fieldstat_tag_list tag_list = {(struct fieldstat_tag *)&TEST_TAG_INT, 1};
+    struct fieldstat_tag_group tag_list = {(struct fieldstat_tag *)&TEST_TAG_INT, 1};
     double standard = (double)hll_standard.size();
     double result = fieldstat_hll_get(instance_dest, id_added, &tag_list);
     EXPECT_NEAR(standard, result, standard * 0.1);

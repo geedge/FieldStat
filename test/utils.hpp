@@ -34,7 +34,7 @@ std::string gen_rand_string(int len);
 
 class Fieldstat_tag_list_wrapper {
 public:
-    explicit Fieldstat_tag_list_wrapper(const struct fieldstat_tag_list *tag_list_c);
+    explicit Fieldstat_tag_list_wrapper(const struct fieldstat_tag_group *tag_list_c);
     explicit Fieldstat_tag_list_wrapper(std::uniform_int_distribution<int> &dist, int tag_count);
     // std::uniform_int_distribution<int> dist(1,100)
     explicit Fieldstat_tag_list_wrapper();
@@ -44,10 +44,10 @@ public:
 
     const struct fieldstat_tag *get_tag() const;
     size_t get_tag_count() const;
-    const struct fieldstat_tag_list *get_c_struct() const;
+    const struct fieldstat_tag_group *get_c_struct() const;
     void print_tag_list() const;
 private:
-    struct fieldstat_tag_list tag_list_c;
+    struct fieldstat_tag_group tag_list_c;
 };
 
 struct fieldstat *test_serialize_and_deserialize(struct fieldstat *instance);
@@ -55,11 +55,11 @@ void test_merge_with_blob(struct fieldstat *dest, const struct fieldstat *src);
 void test_merge_with_blob_twice(struct fieldstat *dest, const struct fieldstat *src);
 
 template <typename Query_ret>
-std::vector<Query_ret> test_get_query_result(Query_ret (*query)(const struct fieldstat *, int field_id, const struct fieldstat_tag_list *),
+std::vector<Query_ret> test_get_query_result(Query_ret (*query)(const struct fieldstat *, int field_id, const struct fieldstat_tag_group *),
     struct fieldstat *instance, int queried_field_id)
 {
     size_t cell_num;
-    struct fieldstat_tag_list *tag_list = NULL;
+    struct fieldstat_tag_group *tag_list = NULL;
     fieldstat_get_tag_lists(instance, queried_field_id, &tag_list, &cell_num);
 
     std::vector<Query_ret> ret_vec;

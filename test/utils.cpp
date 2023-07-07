@@ -33,7 +33,7 @@ string gen_rand_string(int len)
 /*                               taglist wrapper                              */
 /* -------------------------------------------------------------------------- */
 
-Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(const struct fieldstat_tag_list *tag_list) {
+Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(const struct fieldstat_tag_group *tag_list) {
     tag_list_c.tag = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * tag_list->n_tag);
     tag_list_c.n_tag = tag_list->n_tag;
     for (size_t i = 0; i < tag_list->n_tag; i++)
@@ -95,7 +95,7 @@ Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper() {
 }
 
 Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(const Fieldstat_tag_list_wrapper &tag_list_wrapper){
-    const struct fieldstat_tag_list *tag_list = tag_list_wrapper.get_c_struct();
+    const struct fieldstat_tag_group *tag_list = tag_list_wrapper.get_c_struct();
     tag_list_c.tag = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * tag_list->n_tag);
     tag_list_c.n_tag = tag_list->n_tag;
     for (size_t i = 0; i < tag_list->n_tag; i++)
@@ -130,7 +130,7 @@ size_t Fieldstat_tag_list_wrapper::get_tag_count() const
     return tag_list_c.n_tag;
 }
 
-const struct fieldstat_tag_list *Fieldstat_tag_list_wrapper::get_c_struct() const
+const struct fieldstat_tag_group *Fieldstat_tag_list_wrapper::get_c_struct() const
 {
     return &tag_list_c;
 }
@@ -162,7 +162,7 @@ void Fieldstat_tag_list_wrapper::print_tag_list() const
 
 bool Fieldstat_tag_list_wrapper::operator==(const Fieldstat_tag_list_wrapper &tag_list_wrapper) const
 {
-    const struct fieldstat_tag_list *tag_list = tag_list_wrapper.get_c_struct();
+    const struct fieldstat_tag_group *tag_list = tag_list_wrapper.get_c_struct();
     if (tag_list_c.n_tag != tag_list->n_tag) {
         return false;
     }

@@ -6,7 +6,7 @@
 #include "fieldstat.h"
 #include "base64/b64.h"
 
-long long histogram_query(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list)
+long long histogram_query(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_group *tag_list)
 {
     long long ret = fieldstat_histogram_value_at_percentile(instance, field_id, tag_list, 50.0);
     return ret;

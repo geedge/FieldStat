@@ -36,7 +36,7 @@ TEST(export_test, network_blob_test_for_histogram)
     for (size_t i = 0; i < OPER_NUM; i++) {
         fieldstat_histogram_record(instance, id, g_histogram_standard_oper[i], &TEST_TAG_INT, 1);
     }
-    struct fieldstat_tag_list tag_list = {.tag = (struct fieldstat_tag *)&TEST_TAG_INT, .n_tag = 1};
+    struct fieldstat_tag_group tag_list = {.tag = (struct fieldstat_tag *)&TEST_TAG_INT, .n_tag = 1};
     char *blob = NULL;
     size_t blob_size = 0;
     fieldstat_get_serialized_blob(instance, id, &tag_list, &blob, &blob_size);
@@ -67,7 +67,7 @@ TEST(export_test, network_blob_test_for_hll)
     for (size_t i = 0; i < OPER_NUM; i++) {
         fieldstat_hll_add(instance, id, g_hll_standard_oper[i].c_str(), g_hll_standard_oper[i].length(), &TEST_TAG_INT, 1);
     }
-    struct fieldstat_tag_list tag_list = {.tag = (struct fieldstat_tag *)&TEST_TAG_INT, .n_tag = 1};
+    struct fieldstat_tag_group tag_list = {.tag = (struct fieldstat_tag *)&TEST_TAG_INT, .n_tag = 1};
     char *blob = NULL;
     size_t blob_size = 0;
     fieldstat_get_serialized_blob(instance, id, &tag_list, &blob, &blob_size);
@@ -119,7 +119,7 @@ void test_check_if_tag_list_is_in_json(cJSON *tag_obj, const Fieldstat_tag_list_
 
 void test_check_if_global_tag_is_in_json(cJSON *tag_obj)
 {
-    struct fieldstat_tag_list tag_list = {.tag = (struct fieldstat_tag *)TEST_TAG_GLOBAL, .n_tag = 3};
+    struct fieldstat_tag_group tag_list = {.tag = (struct fieldstat_tag *)TEST_TAG_GLOBAL, .n_tag = 3};
     const Fieldstat_tag_list_wrapper benchmark(&tag_list);
     test_check_if_tag_list_is_in_json(tag_obj, &benchmark);
 }
@@ -163,12 +163,12 @@ void test_check_if_metric_topk_correct(cJSON *metric_obj, const char **name, uns
 
 void test_check_if_topk_tag_in_json(cJSON *tag_obj, const char *name)
 {
-    cJSON *topk_dimension = cJSON_GetObjectItem(tag_obj, name);
-    EXPECT_NE(topk_dimension, nullptr);
+    cJSON *topk_tag = cJSON_GetObjectItem(tag_obj, name);
+    EXPECT_NE(topk_tag, nullptr);
     bool match = false;
     for (int i = 0; i < TEST_TOPK_STANDARD_K; i ++) {
         std::string standard_flow = "flow id: " + std::to_string(i);
-        if (strcmp(topk_dimension->valuestring, standard_flow.c_str()) == 0) {
+        if (strcmp(topk_tag->valuestring, standard_flow.c_str()) == 0) {
             match = true;
             break;
         }

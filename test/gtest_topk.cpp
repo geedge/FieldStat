@@ -42,7 +42,7 @@ public:
     }
 };
 
-Query_ret topk_query(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_list *tag_list)
+Query_ret topk_query(const struct fieldstat *instance, int field_id, const struct fieldstat_tag_group *tag_list)
 {
     char **key_result = NULL;
     size_t n_result = 0;

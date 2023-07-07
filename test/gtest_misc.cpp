@@ -10,7 +10,7 @@ using namespace std;
 
 void test_tag_query_by_comparing_with_benchmark(const struct fieldstat *instance, int field_id, Fieldstat_tag_list_wrapper **tag_list_wrapper, int tag_choice_size)
 {
-    struct fieldstat_tag_list *tag_list;
+    struct fieldstat_tag_group *tag_list;
     size_t n_tag;
     fieldstat_get_tag_lists(instance, field_id, &tag_list, &n_tag);
 
@@ -191,7 +191,7 @@ TEST(metric_test_misc, merge_cells_with_the_tags_of_the_same_contents_but_differ
     test_merge_with_blob(instance_dest, instance);
 
     size_t cell_num;
-    struct fieldstat_tag_list *tag_list = NULL;
+    struct fieldstat_tag_group *tag_list = NULL;
     fieldstat_get_tag_lists(instance_dest, 0, &tag_list, &cell_num);
     EXPECT_EQ(cell_num, 1);
 

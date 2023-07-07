@@ -339,14 +339,14 @@ unsigned find_maxv_in_sketch(struct heavy_keeper *hk, const char *flow_id, int f
     return maxv;
 }
 
-int insert_to_sorted_set(struct sorted_set *ss, char *flow_id_str, int flow_id_len, unsigned count, unsigned int dimension_id) {
+int insert_to_sorted_set(struct sorted_set *ss, char *flow_id_str, int flow_id_len, unsigned count, unsigned int tag_id) {
     int if_inserted = sorted_set_insert(ss, flow_id_str, flow_id_len, count);
 
     if (if_inserted) {
         unsigned int **pst_other_count_in_rec = (unsigned int **)sorted_set_get_pointer_to_user_data(ss, flow_id_str, flow_id_len);
 
         *pst_other_count_in_rec = (unsigned int *)malloc(sizeof(unsigned int));
-        **pst_other_count_in_rec = dimension_id;
+        **pst_other_count_in_rec = tag_id;
     }
     return if_inserted;
 }
@@ -364,8 +364,8 @@ void heavy_keeper_merge_sorted_set(struct heavy_keeper *dest, const struct heavy
     unsigned int **user_datas_dummy = (unsigned int **)malloc(max_size * sizeof(unsigned int *));
 
     sorted_set_dump(dest->top_K_heap, keys, vals, val_lens, (void **)user_datas_dummy);
-    int new_allocated_dimension_id = 0; // the merged fieldstat will be assigned with dimension_ids independent from the original ones
-                                        // it's ok because the corresponding vals are the name of the dimension, from which we recover the dimensions
+    int new_allocated_tag_id = 0; // the merged fieldstat will be assigned with tag_ids independent from the original ones
+                                        // it's ok because the corresponding vals are the name of the tag, from which we recover the tags
 
     char *flow_id_str=NULL;
     size_t flow_id_len=0;
@@ -374,8 +374,8 @@ void heavy_keeper_merge_sorted_set(struct heavy_keeper *dest, const struct heavy
         flow_id_len = val_lens[i] - 1;
 
         unsigned maxv = find_maxv_in_sketch(dest, flow_id_str, flow_id_len);
-        if (insert_to_sorted_set(new_rec, flow_id_str, flow_id_len, maxv, new_allocated_dimension_id)) {
-            new_allocated_dimension_id++;
+        if (insert_to_sorted_set(new_rec, flow_id_str, flow_id_len, maxv, new_allocated_tag_id)) {
+            new_allocated_tag_id++;
         }
     }
 
@@ -392,8 +392,8 @@ void heavy_keeper_merge_sorted_set(struct heavy_keeper *dest, const struct heavy
         // the dest heavy keeper has been merged, so the maxv is the maxv in the merged sketch, instead of the dest sketch
         unsigned maxv = find_maxv_in_sketch(dest, flow_id_str, flow_id_len);
 
-        if (insert_to_sorted_set(new_rec, flow_id_str, flow_id_len, maxv, new_allocated_dimension_id)) {
-            new_allocated_dimension_id++;
+        if (insert_to_sorted_set(new_rec, flow_id_str, flow_id_len, maxv, new_allocated_tag_id)) {
+            new_allocated_tag_id++;
         }
     }
 
@@ -451,7 +451,7 @@ int heavy_keeper_sorted_set_member_serialization(const char *val, size_t val_len
     mpack_write_cstr(&writer, "score");
     mpack_write_u32(&writer, score);
 
-    // do not serialize user data(dimension id), because we don't need it in merge.
+    // do not serialize user data(tag id), because we don't need it in merge.
 
     mpack_complete_map(&writer);
     if (mpack_writer_destroy(&writer) != mpack_ok) {

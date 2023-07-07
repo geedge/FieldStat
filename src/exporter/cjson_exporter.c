@@ -66,7 +66,7 @@ struct export_kv_pair {
 struct fieldstat_json_exporter {
     const struct fieldstat *instance;
     char *name;
-    struct fieldstat_tag_list *global_tag_list;
+    struct fieldstat_tag_group *global_tag_list;
 };
 
 struct topk_iter {
@@ -82,7 +82,7 @@ struct topk_iter {
 struct cell_iter {
     int field_num;
     int curr_id;
-    struct fieldstat_tag_list *tag_list;
+    struct fieldstat_tag_group *tag_list;
     size_t tag_num;
     size_t tag_idx;
     const struct fieldstat *instance;
@@ -172,7 +172,7 @@ void cell_iter_free(struct cell_iter *iter) {
     free(iter);
 }
 
-enum field_type cell_iter_get_type(const struct cell_iter *iter) {
+enum metric_type cell_iter_get_type(const struct cell_iter *iter) {
     return fieldstat_get_field_type(iter->instance, iter->curr_id);
 }
 
@@ -180,7 +180,7 @@ const char *cell_iter_get_name(const struct cell_iter *iter) {
     return fieldstat_get_field_name(iter->instance, iter->curr_id);
 }
 
-struct fieldstat_tag_list *cell_iter_get_tag_list(const struct cell_iter *iter) {
+struct fieldstat_tag_group *cell_iter_get_tag_list(const struct cell_iter *iter) {
     return &iter->tag_list[iter->tag_idx];
 }
 
@@ -282,12 +282,12 @@ struct export_kv_pair *cell_query_with_iter(const struct cell_iter *iter) {
     ret->key = strdup(cell_iter_get_name(iter));
 
     switch (cell_iter_get_type(iter)) {
-        case FIELD_TYPE_COUNTER:
+        case METRIC_TYPE_COUNTER:
             ret->type = TAG_INTEGER;
             ret->value_int = fieldstat_counter_get(iter->instance, iter->curr_id, cell_iter_get_tag_list(iter));
             break;
-        case FIELD_TYPE_HLL:
-        case FIELD_TYPE_HISTOGRAM:
+        case METRIC_TYPE_HLL:
+        case METRIC_TYPE_HISTOGRAM:
             ret->type = TAG_CSTRING;
             fieldstat_get_serialized_blob(iter->instance, iter->curr_id, cell_iter_get_tag_list(iter), (char **)&ret->value_str, &len_dummy);
             break;
@@ -323,7 +323,7 @@ struct cjson_map *cjson_map_find(struct cjson_map *head, char *key, size_t key_l
     return s;
 }
 
-void tag_list_append_to_tag_object(const struct fieldstat_tag_list *tag_list, cJSON *cjson_tags)
+void tag_list_append_to_tag_object(const struct fieldstat_tag_group *tag_list, cJSON *cjson_tags)
 {
     size_t tag_list_len = tag_list->n_tag;
     struct export_kv_pair pairs = {0};
@@ -359,7 +359,7 @@ void cell_iter_get_topk_result_entry(struct cell_iter *iter, struct export_kv_pa
 
 void cell_iter_read_tag_list(struct cell_iter *iter, struct export_kv_pair **exported_tags, size_t *len_out)
 {
-    struct fieldstat_tag_list *tag_list_src = cell_iter_get_tag_list(iter);
+    struct fieldstat_tag_group *tag_list_src = cell_iter_get_tag_list(iter);
     size_t ret_tag_list_len = tag_list_src->n_tag;
 
     if (iter->state == ITER_STATE_TOPK_MOVING) {
@@ -571,7 +571,7 @@ void fieldstat_json_exporter_set_global_tag(struct fieldstat_json_exporter *expo
         free(exporter->global_tag_list);
     }
 
-    exporter->global_tag_list = malloc(sizeof(struct fieldstat_tag_list));
+    exporter->global_tag_list = malloc(sizeof(struct fieldstat_tag_group));
     exporter->global_tag_list->n_tag = n_tag;
     exporter->global_tag_list->tag = malloc(sizeof(struct fieldstat_tag) * n_tag);
     for (size_t i = 0; i < n_tag; i++) {
