@@ -62,6 +62,7 @@ int fieldstat_counter_incrby(struct fieldstat *instance, int metric_id, int cube
 void fieldstat_reset(struct fieldstat *instance); //所有register的不变，所有 tag 清除， field 不删除，但是field 内的数据删除
 unsigned long fieldstat_get_version(const struct fieldstat *instance); // return the time when the instance is created.
 
+// fixme: topk 会丢，后来的统计就上不来了。确认一下
 
 
 int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src);
