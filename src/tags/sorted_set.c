@@ -157,19 +157,45 @@ unsigned sorted_set_pop(struct sorted_set *ss)
     return count_ret;
 }
 
+unsigned sorted_set_pop_and_record_popped_back(struct sorted_set *ss, void *popped_user_data, size_t popped_user_data_size)
+{
+    struct hash_node *hash_tbl = ss->hash_tbl;
+    heap_entry *entry = (heap_entry *)pop_heap(ss->heap);
+    if (entry == NULL) {
+        return 0;
+    }
+    unsigned count_ret = sorted_set_entry_get_key(entry);
+    struct entry_data *tmp_data = sorted_set_entry_get_val(entry);
+
+    struct hash_node *s = NULL;
+    HASH_FIND(hh, hash_tbl, tmp_data->str, tmp_data->len - 1, s);
+    if (s == NULL) {
+        return 0;
+    }
+
+    HASH_DEL(hash_tbl, s);
+    free(s);
+    ss->hash_tbl = hash_tbl;
+
+    if (tmp_data->user_data != NULL) {
+        memcpy(popped_user_data, tmp_data->user_data, popped_user_data_size);
+    }
+
+    entry_data_destroy(tmp_data, ss->free_user_data_func);
+    free(entry->key);
+    free(entry);
+
+    return count_ret;
+}
+
+
 bool sorted_set_check_is_full(const struct sorted_set *ss)
 {
     return ss->heap->cur_size >= ss->heap->max_size;
 }
 
-int sorted_set_insert(struct sorted_set *ss, const char *member, size_t member_size, unsigned cnt)
+void sorted_set_insert_to_available_heap(struct sorted_set *ss, const char *member, size_t member_size, unsigned cnt)
 {
-    if (sorted_set_check_is_full(ss)) {
-        if (cnt <= sorted_set_get_min_score(ss)) {
-            return 0;
-        }
-        sorted_set_pop(ss);
-    }
     unsigned *tmp = (unsigned *)malloc(sizeof(unsigned));
     *tmp = cnt;
     struct entry_data *tmpId = entry_data_construct(member, member_size); 
@@ -185,7 +211,33 @@ int sorted_set_insert(struct sorted_set *ss, const char *member, size_t member_s
     s->val = (node == NULL) ? NULL : node;
     HASH_ADD_KEYPTR(hh, hash_tbl, s->member, member_size, s);
     ss->hash_tbl = hash_tbl;
+}
+
+int sorted_set_insert(struct sorted_set *ss, const char *member, size_t member_size, unsigned cnt)
+{
+    if (sorted_set_check_is_full(ss)) {
+        if (cnt <= sorted_set_get_min_score(ss)) {
+            return 0;
+        }
+        sorted_set_pop(ss);
+    }
+    sorted_set_insert_to_available_heap(ss, member, member_size, cnt);
     return 1;
+}
+
+
+int sorted_set_insert_and_record_popped_back(struct sorted_set *ss, const char *member, size_t member_size, unsigned cnt, void *popped_user_data, size_t popped_user_data_size)
+{
+    bool popped = false;
+    if (sorted_set_check_is_full(ss)) {
+        if (cnt <= sorted_set_get_min_score(ss)) {
+            return 0;
+        }
+        sorted_set_pop_and_record_popped_back(ss, popped_user_data, popped_user_data_size);
+        popped = true;
+    }
+    sorted_set_insert_to_available_heap(ss, member, member_size, cnt);
+    return popped ? 2 : 1;
 }
 
 unsigned sorted_set_get_min_score(const struct sorted_set *ss)

@@ -201,12 +201,10 @@ unsigned my_max(unsigned a, unsigned b) {
     return b;
 }
 
-void heavy_keeper_add(struct heavy_keeper *heavy_keeper, const char *key, size_t key_len, unsigned int count) {
-    if (key_len == 0) {
-        printf("key_len should not be 0\n");
-        return;
-    }
-
+static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_keeper, const char *key, size_t key_len, unsigned int count)
+{
+    int ret = -1;
+    unsigned int user_data_cube_id = 0;
     struct sorted_set *summary = heavy_keeper->top_K_heap;
     unsigned int FP = hash_xxhash_flow_id(key, key_len, FP_HASH_KEY);
     unsigned nMin = sorted_set_get_min_score(summary);
@@ -243,28 +241,41 @@ void heavy_keeper_add(struct heavy_keeper *heavy_keeper, const char *key, size_t
     unsigned int tmp_cnt = sorted_set_get_member_score(summary, key, key_len);
     if (tmp_cnt == 0) {  // the flow is not in sorted set
         if ((maxv - nMin <= count && maxv != nMin) || sorted_set_cardinality(summary) != heavy_keeper->K) {
-            sorted_set_insert(summary, key, key_len, maxv);
+            int insert_ret = sorted_set_insert_and_record_popped_back(summary, key, key_len, maxv, &user_data_cube_id, sizeof(unsigned int));
+            if (insert_ret == 2) { // insert success and popped one
+                ret = user_data_cube_id;
+            }
         }
     } else {
         if (maxv > tmp_cnt) {
             sorted_set_incrby(summary, key, key_len, maxv - tmp_cnt);
         }
     }
+    return ret;
 }
 
-int heavy_keeper_with_data_add(struct heavy_keeper *hk, const char *key, size_t key_len, unsigned int count, unsigned int cube_id)
-{
-    heavy_keeper_add(hk, key, key_len, count);
+void heavy_keeper_add(struct heavy_keeper *heavy_keeper, const char *key, size_t key_len, unsigned int count) {
+    if (key_len == 0) {
+        printf("key_len should not be 0\n");
+        return;
+    }
 
-    unsigned int *pst_data_in_rec = (unsigned int *)sorted_set_get_pointer_to_user_data(hk->top_K_heap, key, key_len);
+    (void)heavy_keeper_add_by_recording_popped_data(heavy_keeper, key, key_len, count);
+}
+
+int heavy_keeper_with_data_add(struct heavy_keeper *hk, const char *key, size_t key_len, unsigned int count, int cube_id, int *popped_id_out)
+{
+    *popped_id_out = heavy_keeper_add_by_recording_popped_data(hk, key, key_len, count);
+
+    int **pst_data_in_rec = (int **)sorted_set_get_pointer_to_user_data(hk->top_K_heap, key, key_len);
     if (pst_data_in_rec == NULL) { // the key is not added into sorted set
         return -1;
     }
 
     if (*pst_data_in_rec == NULL) {
-        *pst_data_in_rec = (unsigned int *)malloc(sizeof(unsigned int));
+        *pst_data_in_rec = (int *)malloc(sizeof(int));
     }
-    *pst_data_in_rec = cube_id;
+    **pst_data_in_rec = cube_id;
 
     return 0;
 }
@@ -298,6 +309,23 @@ struct heavy_keeper_result *heavy_keeper_query(struct heavy_keeper *hk) {
     free(val_lens);
     free(user_datas);
     return stats;
+}
+
+int heavy_keeper_query_one(struct heavy_keeper *hk, const char *key, size_t key_len, unsigned int *count_out, int *cube_id_out)
+{
+    unsigned int count = sorted_set_get_member_score(hk->top_K_heap, key, key_len);
+    if (count == 0) {
+        return -1;
+    }
+    *count_out = count;
+
+    int **pst_data_in_rec = (int **)sorted_set_get_pointer_to_user_data(hk->top_K_heap, key, key_len);
+    if (pst_data_in_rec == NULL) {
+        return -1;
+    }
+    *cube_id_out = **pst_data_in_rec;
+
+    return 0;
 }
 
 /*****************************************merge *****************************************/
@@ -343,9 +371,9 @@ int insert_to_sorted_set(struct sorted_set *ss, char *flow_id_str, int flow_id_l
     int if_inserted = sorted_set_insert(ss, flow_id_str, flow_id_len, count);
 
     if (if_inserted) {
-        unsigned int **pst_other_count_in_rec = (unsigned int **)sorted_set_get_pointer_to_user_data(ss, flow_id_str, flow_id_len);
+        int **pst_other_count_in_rec = (int **)sorted_set_get_pointer_to_user_data(ss, flow_id_str, flow_id_len);
 
-        *pst_other_count_in_rec = (unsigned int *)malloc(sizeof(unsigned int));
+        *pst_other_count_in_rec = (int *)malloc(sizeof(unsigned int));
         **pst_other_count_in_rec = tag_id;
     }
     return if_inserted;

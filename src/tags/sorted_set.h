@@ -36,6 +36,8 @@ void sorted_set_hook_function_of_free_user_data(struct sorted_set *ss, void (*fr
 */
 int sorted_set_insert(struct sorted_set *ss, const char *member, size_t member_size, unsigned cnt);
 
+int sorted_set_insert_and_record_popped_back(struct sorted_set *ss, const char *member, size_t member_size, unsigned cnt, void *popped_user_data, size_t popped_user_data_size);
+
 /**
  * @brief pop out the minumum-score entry from the sorted set.
  * @param ss the sorted set

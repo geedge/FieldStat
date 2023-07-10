@@ -50,7 +50,7 @@ struct heavy_keeper_result {
     size_t *key_len; // key_len[i] is the length flow id string, i < n_key
     unsigned *count; // count[i] is the metric count of the corresponding flow id
 
-    unsigned *cube_id;
+    int *cube_id;
 };
 
 // Parameters used in algorithm
@@ -88,17 +88,8 @@ void heavy_keeper_clear(struct heavy_keeper *hk);
  */
 void heavy_keeper_add(struct heavy_keeper *hk, const char *key, size_t key_len, unsigned int count);
 
-/*
-    * @brief   Add a flow to the heavy keeper, with many other metrics for the flow.
-    * @param   hk            the pointer to the heavy keeper.
-    * @param   key           the flow id string.
-    * @param   key_len       the length of the flow id string.
-    * @param   count         the count of the flow volume, packet numbers, etc. 
-    *       Length should be equal to the length of metrics initalized in heavy_keeper_with_metrics_new(). 
-    *       The count[primary_metric] will be used to rank the flow.
-    * @return  0 if success, -1 if metric list is not initialized.
-*/
-int heavy_keeper_with_metrics_add(struct heavy_keeper *hk, const char *key, size_t key_len, unsigned int count[]);
+// return -1 when the key is not inserted to the heavy keeper(not fail), return 0 if added. popped_id_out is -1 if not popped. any other value >= 0 means the id of the popped member.
+int heavy_keeper_with_data_add(struct heavy_keeper *hk, const char *key, size_t key_len, unsigned int count, int cube_id, int *popped_id_out);
 
 /**
  * @brief   Query the top-K flows.The flow id with bigger count ranks at smaller index.
@@ -106,6 +97,8 @@ int heavy_keeper_with_metrics_add(struct heavy_keeper *hk, const char *key, size
  * @return  a pointer to the heavy keeper query result. User should free it after use by calling heavy_keeper_result_free.
  */
 struct heavy_keeper_result *heavy_keeper_query(struct heavy_keeper *hk);
+
+int heavy_keeper_query_one(struct heavy_keeper *hk, const char *key, size_t key_len, unsigned int *count_out, int *cube_id_out);
 
 /**
  * @brief   free a heavy keeper query result.

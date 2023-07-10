@@ -27,13 +27,12 @@
 
 // 或者由heavy keeper 自己释放，但是cell的释放还是挺麻烦的，会让代码变得很复杂很恶心。
 
-
+/* ----------------------------------- 方案2 ---------------------------------- */
+// 不回收了
+// fixme: 当前使用方案2，合理吗
 
 // TODO: 应该是用这个，暂时先拿uthash凑合一下
 // #include "my_ut_hash.h"
-
-// NOTE:查询一个cell的tag时，本身就存在着tag的拼接，所以cell里不体现tag的概念，仅传ID。然而关于单个tag的哈希和结构定义一定要另外搞一个文件，不然ut哈希的头文件没法写
-// fIXME:于是，就有了这个文件，这里面的uthash是自定义的。
 
 
 #include "uthash.h"
@@ -46,11 +45,19 @@ struct cell_hash_node {
     UT_hash_handle hh;
 };
 
+struct tag_cube_map {
+    int cell_id;
+    struct fieldstat_tag *tags;
+    size_t n_tags;
+    UT_hash_handle hh;
+};
+
 struct cell_manager {
     union {
         struct heavy_keeper *topk_tag_id_map;
         struct cell_hash_node *comprehensive_tag_id_map;
     };
+    struct tag_cube_map *id_tag_map;
     enum sampling_mode sampling_mode;
     int max_cell_num;
 };
@@ -119,4 +126,168 @@ struct cell_manager *cell_manager_create(enum sampling_mode sampling_mode, int m
     return cell_manager;
 }
 
-int cell_manager_get_tag_by_cube_id(const struct tag_cube_map *pthis, int cube_id, struct fieldstat_tag **tag_out, size_t *tag_count_out);
+int cell_manager_get_tag_by_cube_id(const struct cell_manager *pthis, int cube_id, struct fieldstat_tag **tag_out, size_t *tag_count_out)
+{
+    struct tag_cube_map *hash_hdr = pthis->id_tag_map;
+    struct tag_cube_map *node = NULL;
+    HASH_FIND_INT(hash_hdr, &cube_id, node);
+    if (node == NULL) {
+        return -1;
+    }
+
+    *tag_out = node->tags;
+    *tag_count_out = node->n_tags;
+    return 0;
+}
+
+static void fieldtag_copy(const struct fieldstat_tag *kv_pair, struct fieldstat_tag *dest)
+{
+    dest->key = strdup(kv_pair->key);
+    dest->type = kv_pair->type;
+    switch(kv_pair->type)
+    {
+        case TAG_INTEGER:
+            dest->value_int = kv_pair->value_int;
+            break;
+        case TAG_DOUBLE:
+            dest->value_double = kv_pair->value_double;
+            break;
+        case TAG_CSTRING:
+            dest->value_str = strdup(kv_pair->value_str);
+            break;
+        default:
+            assert(0);
+            break;
+    }
+}
+
+void fieldtag_clear(struct fieldstat_tag *kv_pair)
+{
+    free(kv_pair->key);
+    if (kv_pair->type == TAG_CSTRING) {
+        free(kv_pair->value_str);
+    }
+}
+
+void fieldtag_arr_free(struct fieldstat_tag *kv_pairs, size_t n_pairs)
+{
+    for (int i = 0; i < (int)n_pairs; i++) {
+        fieldtag_clear(&kv_pairs[i]);
+    }
+    free(kv_pairs);
+}
+
+void cell_manager_id_tag_map_add(struct cell_manager *pthis, int cube_id, const struct fieldstat_tag tags[], size_t n_tags)
+{
+    struct tag_cube_map *node = (struct tag_cube_map *)malloc(sizeof(struct tag_cube_map));
+    node->cell_id = cube_id;
+    node->tags = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * n_tags);
+    for (int i = 0; i < (int)n_tags; i++) {
+        fieldtag_copy(&tags[i], &node->tags[i]);
+    }
+    node->n_tags = n_tags;
+
+    HASH_ADD_INT(pthis->id_tag_map, cell_id, node);
+}
+
+int cell_manager_get_cube_id_by_tag(const struct cell_manager *pthis, const struct fieldstat_tag *tag, size_t tag_count)
+{
+    char *key = NULL;
+    size_t key_size = 0;
+    build_dynamic_cell_key(tag, tag_count, &key, &key_size);
+    int cube_id = -1;
+
+    if (pthis->sampling_mode == SAMPLING_MODE_TOPK) {
+        int count_dummy = 0;
+        heavy_keeper_query_one(pthis->topk_tag_id_map, key, key_size, &count_dummy, &cube_id);
+    } else {
+        struct cell_hash_node *node = NULL;
+        HASH_FIND(hh, pthis->comprehensive_tag_id_map, key, key_size, node);
+        if (node == NULL) {
+            cube_id = -1;
+        } else {
+            cube_id = node->cell_id;
+        }
+    }
+
+    free(key);
+    return cube_id;
+}
+
+void cell_manager_comprehensive_map_add(struct cell_manager *pthis, const struct fieldstat_tag *tag, size_t tag_count, int cube_id)
+{
+    char *key = NULL;
+    size_t key_size = 0;
+    build_dynamic_cell_key(tag, tag_count, &key, &key_size);
+
+    struct cell_hash_node *node = (struct cell_hash_node *)malloc(sizeof(struct cell_hash_node));
+    node->key = key;
+    node->key_len = key_size;
+    node->cell_id = cube_id;
+    HASH_ADD_KEYPTR(hh, pthis->comprehensive_tag_id_map, node->key, node->key_len, node);
+}
+
+int cell_manager_topk_map_add(struct cell_manager *pthis, const struct fieldstat_tag *tag, size_t tag_count, unsigned int count, int cube_id)
+{
+    char *key = NULL;
+    size_t key_size = 0;
+    build_dynamic_cell_key(tag, tag_count, &key, &key_size);
+
+    int popped_cube_id = -1;
+
+    int ret = heavy_keeper_with_data_add(pthis->topk_tag_id_map, key, key_size, count, cube_id, &popped_cube_id);
+    free(key);
+
+    if (ret == -1) {
+        return -1;
+    }
+    if (popped_cube_id != -1) {
+        struct tag_cube_map *node = NULL;
+        HASH_FIND_INT(pthis->id_tag_map, &popped_cube_id, node);
+        if (node != NULL) {
+            HASH_DEL(pthis->id_tag_map, node);
+            fieldtag_arr_free(node->tags, node->n_tags);
+            free(node);
+        }
+    }
+    return 0;
+}
+
+int cell_manager_add_cube(struct cell_manager *pthis, const struct fieldstat_tag *tag, size_t tag_count, unsigned int count, int allocated_cube_id)
+{
+    if (pthis->sampling_mode == SAMPLING_MODE_COMPREHENSIVE) {
+        if (HASH_COUNT(pthis->comprehensive_tag_id_map) >= pthis->max_cell_num) {
+            return -1;
+        }
+        cell_manager_comprehensive_map_add(pthis, tag, tag_count, allocated_cube_id);
+    } else {
+        if (cell_manager_topk_map_add(pthis, tag, tag_count, count, allocated_cube_id) == -1) {
+            return -1;
+        }
+    }
+
+    cell_manager_id_tag_map_add(pthis, allocated_cube_id, tag, tag_count);
+    return 0; 
+}
+
+void cell_manager_free(struct cell_manager *pthis)
+{
+    struct tag_cube_map *node = NULL;
+    struct tag_cube_map *tmp = NULL;
+    HASH_ITER(hh, pthis->id_tag_map, node, tmp) {
+        HASH_DEL(pthis->id_tag_map, node);
+        fieldtag_arr_free(node->tags, node->n_tags);
+        free(node);
+    }
+
+    struct cell_hash_node *node2 = NULL;
+    struct cell_hash_node *tmp2 = NULL;
+    HASH_ITER(hh, pthis->comprehensive_tag_id_map, node2, tmp2) {
+        HASH_DEL(pthis->comprehensive_tag_id_map, node2);
+        free(node2->key);
+        free(node2);
+    }
+
+    heavy_keeper_free(pthis->topk_tag_id_map);
+    free(pthis);
+}
