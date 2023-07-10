@@ -7,22 +7,25 @@
 struct metric;
 
 const char *metric_get_name(const struct metric *metrics); // don't free the return value
+enum metric_type metric_get_type(const struct metric *metrics);
 void metric_free(struct metric *pthis);
 void metric_set_id(struct metric *metrics, int id);
 int metric_get_id(const struct metric *metrics);
 
 struct metric *metric_copy_structure(const struct metric *src);
-void metric_serialize(const struct metric *pthis, char **blob, size_t *blob_size);
+int metric_serialize(const struct metric *pthis, char **blob, size_t *blob_size);
 struct metric *metric_deserialize(const char *blob, size_t blob_size);
 int metric_merge_cell(struct metric *dest, const struct metric *src, int dest_cell_id, int src_cell_id);
 void metric_get_plain_blob(const struct metric *pthis, int cell_id, char **blob, size_t *blob_size);
 int metric_copy_cell(struct metric *dest, const struct metric *src, int dest_cell_id, int src_cell_id);
 int metric_change_cell_id(struct metric *pthis, int old_cell_id, int new_cell_id);
 
-struct metric *metric_create_for_counter(struct metric *pthis, const char *name, bool is_gauge);
+struct metric *metric_counter_new(const char *name, bool is_gauge);
 int metric_counter_incrby(struct metric *pthis, int cell_id, long long value);
 int metric_counter_set(struct metric *pthis, int cell_id, long long value);
 long long metric_counter_get(const struct metric *pthis, int cell_id);
+
+void metric_get_cell_ids(const struct metric *pthis, int **cell_ids, size_t *cell_id_count);
 
 
 // struct metric *metric_create_for_hll(const char precision);

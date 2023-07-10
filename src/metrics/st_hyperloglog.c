@@ -6,7 +6,7 @@
 #include "st_hyperloglog.h"
 #include "xxhash/xxhash.h"
 #include "mpack/mpack.h"
-#include "utils/crdt_utils.h"
+#include "crdt_utils.h"
 
 #include <stdint.h>
 #include <math.h>

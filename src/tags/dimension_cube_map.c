@@ -33,10 +33,15 @@
 
 // TODO: 应该是用这个，暂时先拿uthash凑合一下
 // #include "my_ut_hash.h"
-
+#include "stdio.h"
+#include "assert.h"
+#include "stdlib.h"
+#include "string.h"
 
 #include "uthash.h"
 #include "fieldstat.h"
+#include "tags/dimension_cube_map.h"
+#include "tags/heavy_keeper.h"
 
 struct cell_hash_node {
     char *key; // kv_pair of tags
@@ -61,6 +66,44 @@ struct cell_manager {
     enum sampling_mode sampling_mode;
     int max_cell_num;
 };
+
+
+static void fieldtag_copy(const struct fieldstat_tag *kv_pair, struct fieldstat_tag *dest)
+{
+    dest->key = strdup(kv_pair->key);
+    dest->type = kv_pair->type;
+    switch(kv_pair->type)
+    {
+        case TAG_INTEGER:
+            dest->value_int = kv_pair->value_int;
+            break;
+        case TAG_DOUBLE:
+            dest->value_double = kv_pair->value_double;
+            break;
+        case TAG_CSTRING:
+            dest->value_str = strdup(kv_pair->value_str);
+            break;
+        default:
+            assert(0);
+            break;
+    }
+}
+
+void fieldtag_clear(struct fieldstat_tag *kv_pair)
+{
+    free((char *)kv_pair->key);
+    if (kv_pair->type == TAG_CSTRING) {
+        free((char *)kv_pair->value_str);
+    }
+}
+
+void fieldtag_arr_free(struct fieldstat_tag *kv_pairs, size_t n_pairs)
+{
+    for (int i = 0; i < (int)n_pairs; i++) {
+        fieldtag_clear(&kv_pairs[i]);
+    }
+    free(kv_pairs);
+}
 
 static void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_tags, char **out_key, size_t *out_key_size)
 {
@@ -111,14 +154,14 @@ static void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_t
     free(dynamic_mem);
 }
 
-struct cell_manager *cell_manager_create(enum sampling_mode sampling_mode, int max_cell_num)
+struct cell_manager *cell_manager_new(enum sampling_mode sampling_mode, int max_cell_num)
 {
     struct cell_manager *cell_manager = (struct cell_manager *)malloc(sizeof(struct cell_manager));
 
     cell_manager->sampling_mode = sampling_mode;
     cell_manager->max_cell_num = max_cell_num;
     if (sampling_mode == SAMPLING_MODE_TOPK) {
-        cell_manager->topk_tag_id_map = heavy_keeper_create(max_cell_num);
+        cell_manager->topk_tag_id_map = heavy_keeper_with_data_new(max_cell_num);
     } else {
         cell_manager->comprehensive_tag_id_map = NULL;
     }
@@ -128,6 +171,7 @@ struct cell_manager *cell_manager_create(enum sampling_mode sampling_mode, int m
 
 int cell_manager_get_tag_by_cube_id(const struct cell_manager *pthis, int cube_id, struct fieldstat_tag **tag_out, size_t *tag_count_out)
 {
+    printf("cell_manager_get_tag_by_cube_id enter, id: %d\n", cube_id);
     struct tag_cube_map *hash_hdr = pthis->id_tag_map;
     struct tag_cube_map *node = NULL;
     HASH_FIND_INT(hash_hdr, &cube_id, node);
@@ -135,46 +179,13 @@ int cell_manager_get_tag_by_cube_id(const struct cell_manager *pthis, int cube_i
         return -1;
     }
 
-    *tag_out = node->tags;
+    *tag_out = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * node->n_tags);
+    for (int i = 0; i < (int)node->n_tags; i++) {
+        fieldtag_copy(&node->tags[i], &(*tag_out)[i]);
+    }
     *tag_count_out = node->n_tags;
+    printf("cell_manager_get_tag_by_cube_id exit\n");
     return 0;
-}
-
-static void fieldtag_copy(const struct fieldstat_tag *kv_pair, struct fieldstat_tag *dest)
-{
-    dest->key = strdup(kv_pair->key);
-    dest->type = kv_pair->type;
-    switch(kv_pair->type)
-    {
-        case TAG_INTEGER:
-            dest->value_int = kv_pair->value_int;
-            break;
-        case TAG_DOUBLE:
-            dest->value_double = kv_pair->value_double;
-            break;
-        case TAG_CSTRING:
-            dest->value_str = strdup(kv_pair->value_str);
-            break;
-        default:
-            assert(0);
-            break;
-    }
-}
-
-void fieldtag_clear(struct fieldstat_tag *kv_pair)
-{
-    free(kv_pair->key);
-    if (kv_pair->type == TAG_CSTRING) {
-        free(kv_pair->value_str);
-    }
-}
-
-void fieldtag_arr_free(struct fieldstat_tag *kv_pairs, size_t n_pairs)
-{
-    for (int i = 0; i < (int)n_pairs; i++) {
-        fieldtag_clear(&kv_pairs[i]);
-    }
-    free(kv_pairs);
 }
 
 void cell_manager_id_tag_map_add(struct cell_manager *pthis, int cube_id, const struct fieldstat_tag tags[], size_t n_tags)
@@ -198,7 +209,7 @@ int cell_manager_get_cube_id_by_tag(const struct cell_manager *pthis, const stru
     int cube_id = -1;
 
     if (pthis->sampling_mode == SAMPLING_MODE_TOPK) {
-        int count_dummy = 0;
+        unsigned int count_dummy = 0;
         heavy_keeper_query_one(pthis->topk_tag_id_map, key, key_size, &count_dummy, &cube_id);
     } else {
         struct cell_hash_node *node = NULL;
@@ -280,14 +291,17 @@ void cell_manager_free(struct cell_manager *pthis)
         free(node);
     }
 
-    struct cell_hash_node *node2 = NULL;
-    struct cell_hash_node *tmp2 = NULL;
-    HASH_ITER(hh, pthis->comprehensive_tag_id_map, node2, tmp2) {
-        HASH_DEL(pthis->comprehensive_tag_id_map, node2);
-        free(node2->key);
-        free(node2);
+    if (pthis->sampling_mode == SAMPLING_MODE_COMPREHENSIVE) {
+        struct cell_hash_node *node2 = NULL;
+        struct cell_hash_node *tmp2 = NULL;
+        HASH_ITER(hh, pthis->comprehensive_tag_id_map, node2, tmp2) {
+            HASH_DEL(pthis->comprehensive_tag_id_map, node2);
+            free(node2->key);
+            free(node2);
+        }
+    } else {
+        heavy_keeper_free(pthis->topk_tag_id_map);
     }
 
-    heavy_keeper_free(pthis->topk_tag_id_map);
     free(pthis);
 }

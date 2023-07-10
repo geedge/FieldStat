@@ -1,117 +1,50 @@
 
 #include <gtest/gtest.h>
-
+#include "fieldstat.h"
 #include "utils.hpp"
 
-#include "fieldstat.h"
-
-TEST(metric_test_counter, serialize_and_deserialize_for_2_fields_1st_empty_2nd_added)
+TEST(metric_test_counter, simple_register_and_query)
 {
     struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_register_cube(instance, NULL, 0, SAMPLING_MODE_COMPREHENSIVE, 10);
+    EXPECT_EQ(cube_id, 0);
 
-    int id1_empty = fieldstat_register_counter(instance, "empty");
-    int id2_added = fieldstat_register_counter(instance, "add");
+    int metric_id = fieldstat_register_counter(instance, cube_id, "czz_test counter metric", false);
+    EXPECT_EQ(metric_id, 0);
 
-    // metric add
-    fieldstat_counter_incrby(instance, id2_added, 10, &TEST_TAG_STRING, 1);
-    fieldstat_counter_incrby(instance, id2_added, -1, &TEST_TAG_STRING, 1);
-    fieldstat_counter_incrby(instance, id2_added, 12345, &TEST_TAG_INT, 1);
+    int cell_id = fieldstat_cube_add(instance, cube_id, &TEST_TAG_STRING, 1, 1);
+    EXPECT_NE(cell_id, -1);
 
-    struct fieldstat *instance_from_deserialize = test_serialize_and_deserialize(instance);
+    fieldstat_counter_incrby(instance, metric_id, cube_id, cell_id, 10086);
 
-    auto q_rets = test_get_query_result<long long>(fieldstat_counter_get, instance_from_deserialize, id2_added);
-    EXPECT_EQ(q_rets[0], 9);
-    EXPECT_EQ(q_rets[1], 12345);
+    // query
+    int ret_cell_id = fieldstat_get_max_cube_id(instance);
+    EXPECT_EQ(ret_cell_id, 0);
+    int ret_metric_id = fieldstat_get_max_metric_id(instance, ret_cell_id);
+    EXPECT_EQ(ret_metric_id, 0);
+    long long measure = fieldstat_counter_get(instance, cube_id, metric_id, cell_id);
+    printf("fieldstat_counter_get done, measure: %lld\n", measure);
+    EXPECT_EQ(measure, 10086);
+    const char *name = fieldstat_get_metric_name(instance, cube_id, metric_id);
+    EXPECT_STREQ(name, "czz_test counter metric");
 
-    auto q_rets_empty = test_get_query_result<long long>(fieldstat_counter_get, instance_from_deserialize, id1_empty);
-    EXPECT_EQ(q_rets_empty.size(), 0); 
+    printf("going to get cells\n");
 
-    fieldstat_free(instance);
-    fieldstat_free(instance_from_deserialize);
-}
-
-TEST(metric_test_counter, serialize_and_merge_by_blob_twice_expecting_double_result)
-{
-    struct fieldstat *instance = fieldstat_new();
-    struct fieldstat *instance2 = fieldstat_new();
-    int id_added = fieldstat_register_counter(instance, "add");
-
-    fieldstat_counter_incrby(instance, id_added, 1000, &TEST_TAG_INT, 1);
-    fieldstat_counter_incrby(instance, id_added, -70, &TEST_TAG_STRING, 1);
-    test_merge_with_blob_twice(instance2, instance);
-
-    auto q_rets = test_get_query_result<long long>(fieldstat_counter_get, instance2, id_added);
-    EXPECT_EQ(q_rets[0], 2000);
-    EXPECT_EQ(q_rets[1], -140);
+    int *ret_cell_ids = NULL;
+    struct fieldstat_tag_list *tag_list = NULL;
+    size_t n_cell = 0;
+    fieldstat_get_cells(instance, cube_id, metric_id, &ret_cell_ids, &tag_list, &n_cell);
+    EXPECT_EQ(n_cell, 1);
+    EXPECT_EQ(ret_cell_ids[0], cell_id);
+    EXPECT_EQ(tag_list->n_tag, 1);
+    EXPECT_STREQ(tag_list->tag[0].key, TEST_TAG_STRING.key);
 
     fieldstat_free(instance);
-    fieldstat_free(instance2);
+    free(ret_cell_ids);
+    fieldstat_tag_list_arr_free(tag_list, n_cell);
 }
 
-TEST(metric_test_counter, serialize_and_merge_empty_register_to_total_empty)
-{
-    struct fieldstat *instance = fieldstat_new();
-    struct fieldstat *instance2 = fieldstat_new();
-
-    (void)fieldstat_register_counter(instance, "empty");
-
-    test_merge_with_blob(instance2, instance);
-
-    auto q_rets = test_get_query_result<long long>(fieldstat_counter_get, instance2, 0);
-    EXPECT_EQ(q_rets.size(), 0);
-
-    EXPECT_EQ(fieldstat_get_max_field_id(instance2), 0);
-
-    fieldstat_free(instance);
-    fieldstat_free(instance2);
-}
-
-TEST(metric_test_counter, serialize_and_merge_empty_to_nonempty)
-{
-    struct fieldstat *instance_empty = fieldstat_new();
-    struct fieldstat *instance_added = fieldstat_new();
-
-    (void)fieldstat_register_counter(instance_empty, "empty");
-    int id_added = fieldstat_register_counter(instance_added, "add");
-
-    // metric add
-    fieldstat_counter_incrby(instance_added, id_added, 10, &TEST_TAG_STRING, 1);
-    fieldstat_counter_incrby(instance_added, id_added, 12345, &TEST_TAG_INT, 1);
-
-    test_merge_with_blob(instance_added, instance_empty);
-
-    auto q_rets = test_get_query_result<long long>(fieldstat_counter_get, instance_added, id_added);
-    EXPECT_EQ(q_rets.size(), 2);
-    EXPECT_EQ(q_rets[0], 10);
-    EXPECT_EQ(q_rets[1], 12345);
-    int all_field_num = fieldstat_get_max_field_id(instance_added) + 1;
-    EXPECT_EQ(all_field_num, 2); // one original, one empty(from merge)
-
-    fieldstat_free(instance_empty);
-    fieldstat_free(instance_added);
-}
-
-TEST(metric_test_counter, serialize_and_merge_twice_with_different_values)
-{
-    struct fieldstat *instance = fieldstat_new();
-    struct fieldstat *instance2 = fieldstat_new();
-    int id_added = fieldstat_register_counter(instance, "add");
-
-    fieldstat_counter_incrby(instance, id_added, 1000, &TEST_TAG_INT, 1);
-    test_merge_with_blob(instance2, instance);
-    fieldstat_reset(instance);
-    
-    fieldstat_counter_incrby(instance, id_added, -70, &TEST_TAG_STRING, 1);
-    test_merge_with_blob(instance2, instance);
-
-    auto q_rets = test_get_query_result<long long>(fieldstat_counter_get, instance2, id_added);
-    EXPECT_EQ(q_rets.size(), 2);
-    EXPECT_EQ(q_rets[0], 1000);
-    EXPECT_EQ(q_rets[1], -70);
-
-    fieldstat_free(instance);
-    fieldstat_free(instance2);
-}
+// TODO: cell 超过
 
 int main(int argc, char *argv[]) 
 {

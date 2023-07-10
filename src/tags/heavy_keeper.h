@@ -66,7 +66,7 @@ struct heavy_keeper_options{
 
 struct heavy_keeper;
 
-struct heavy_keeper *heavy_keeper_with_metrics_new(int max_query_num, const char *metric_name[], size_t n_metric, size_t primary_metric);
+struct heavy_keeper *heavy_keeper_with_data_new(int max_query_num);
 /**
  * @brief   free a heavy keeper.
  * @param   hk            the pointer to the heavy keeper.

@@ -15,7 +15,7 @@
 #include "xxhash/xxhash.h"
 #include "cjson/cJSON.h"
 
-#include "utils/sorted_set.h"
+#include "tags/sorted_set.h"
 
 
 struct Bucket {
@@ -89,11 +89,6 @@ struct heavy_keeper *heavy_keeper_new(int max_query_num, struct heavy_keeper_opt
 }
 
 struct heavy_keeper *heavy_keeper_with_data_new(int max_query_num) {
-    if (primary_metric > n_metric - 1) {
-        printf("ERR: primary_metric index is out of range\n");
-        return NULL;
-    }
-    
     struct heavy_keeper *hk = heavy_keeper_new(max_query_num, NULL);
 
     sorted_set_hook_function_of_free_user_data(hk->top_K_heap, free);
@@ -114,7 +109,7 @@ struct heavy_keeper_result *heavy_keeper_result_new(struct heavy_keeper *hk) {
     stats_hd->key = (char **)malloc(expected_max_len * sizeof(char *));
     stats_hd->key_len = (size_t *)malloc(expected_max_len * sizeof(size_t));
 
-    stats_hd->cube_id = (unsigned *)malloc(expected_max_len * sizeof(unsigned));
+    stats_hd->cube_id = (int *)malloc(expected_max_len * sizeof(int));
 
     return stats_hd;
 }
@@ -287,9 +282,9 @@ struct heavy_keeper_result *heavy_keeper_query(struct heavy_keeper *hk) {
     unsigned *keys = (unsigned *)malloc(heap_entry_num * sizeof(unsigned));
     char **vals = (char **)malloc(heap_entry_num * sizeof(char *));
     size_t *val_lens = (size_t *)malloc(heap_entry_num * sizeof(size_t));
+    int **user_data = (int **)malloc(heap_entry_num * sizeof(int *));
 
-    unsigned int **user_data = (unsigned int **)malloc(heap_entry_num * sizeof(unsigned int *));
-    sorted_set_dump(hk->top_K_heap, keys, vals, val_lens, (void **)user_datas);
+    sorted_set_dump(hk->top_K_heap, keys, vals, val_lens, (void **)user_data);
 
     int query_entry_num = heap_entry_num > hk->K ? hk->K : heap_entry_num;
     stats->n_key = query_entry_num;
@@ -299,7 +294,7 @@ struct heavy_keeper_result *heavy_keeper_query(struct heavy_keeper *hk) {
         strcpy(stats->key[index_q], vals[i]);
         stats->count[index_q] = keys[i];
         stats->key_len[index_q] = val_lens[i] - 1;
-        stats->cube_id[index_q] = *(user_datas[i]);
+        stats->cube_id[index_q] = *(user_data[i]);
         
         index_q++;
     }
@@ -307,7 +302,7 @@ struct heavy_keeper_result *heavy_keeper_query(struct heavy_keeper *hk) {
     free(keys);
     free(vals);
     free(val_lens);
-    free(user_datas);
+    free(user_data);
     return stats;
 }
 
@@ -407,7 +402,7 @@ void heavy_keeper_merge_sorted_set(struct heavy_keeper *dest, const struct heavy
         }
     }
 
-    sorted_set_dump(src->top_K_heap, keys, vals, val_lens, (void **)user_datas);
+    sorted_set_dump(src->top_K_heap, keys, vals, val_lens, (void **)user_datas_dummy);
 
     for (int i = 0; i < size_src; i++) {
         flow_id_str = vals[i];
@@ -428,7 +423,7 @@ void heavy_keeper_merge_sorted_set(struct heavy_keeper *dest, const struct heavy
     free(keys);
     free(vals);
     free(val_lens);
-    free(user_datas);
+    free(user_datas_dummy);
 
     sorted_set_free(dest->top_K_heap);
     dest->top_K_heap = new_rec;
@@ -469,7 +464,7 @@ int heavy_keeper_merge(struct heavy_keeper *hk, const struct heavy_keeper *src) 
     }
 }
 ***********************************************************************************/
-int heavy_keeper_sorted_set_member_serialization(const char *val, size_t val_len, unsigned int score, unsigned int *count_arr, size_t count_arr_size, char **blob, size_t *blob_sz) {
+int heavy_keeper_sorted_set_member_serialization(const char *val, size_t val_len, unsigned int score, char **blob, size_t *blob_sz) {
     mpack_writer_t writer;
     mpack_writer_init_growable(&writer, blob, blob_sz);
 
@@ -542,7 +537,7 @@ void heavy_keeper_sorted_set_serialization(const struct heavy_keeper *hk, mpack_
     sorted_set_dump(hk->top_K_heap, key_score, vals, val_lens, (void **)user_data);
     mpack_build_array(writer);
     for (size_t i = 0; i < heap_entry_num; i++) {
-        heavy_keeper_sorted_set_member_serialization(vals[i], val_lens[i], key_score[i], user_data[i], hk->metric_header->n_metric, &element_mpack_buff, &element_mpack_size);
+        heavy_keeper_sorted_set_member_serialization(vals[i], val_lens[i], key_score[i], &element_mpack_buff, &element_mpack_size);
         mpack_write_object_bytes(writer, element_mpack_buff, element_mpack_size);
         free(element_mpack_buff);
         element_mpack_size = 0;

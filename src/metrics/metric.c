@@ -8,7 +8,7 @@
 #include "mpack/mpack.h"
 #include "uthash.h"
 
-#include "metrics.h"
+#include "metric.h"
 #include "fieldstat.h"
 #include "tags/dimension_cube_map.h"
 #include "hdr/hdr_histogram.h"
@@ -49,7 +49,7 @@ struct metric_parameter {
 
 struct metric_info {
     int id;
-    const char *name;
+    char *name;
     struct metric_parameter *paras;
     enum metric_type type;
 };
@@ -90,14 +90,31 @@ struct metric {
 };
 
 
-struct metric_measure_data *metric_find_one_cell(struct metric *pthis, int id) {
+/* -------------------------------------------------------------------------- */
+/*                                 id cell map                                */
+/* -------------------------------------------------------------------------- */
+
+struct metric_measure_data *metric_find_one_cell(const struct metric *pthis, int id) {
     struct cell_id_data_map *map = pthis->data_map;
     struct cell_id_data_map *s;
     HASH_FIND_INT(map, &id, s);
     if (s == NULL) {
+        printf("ERR: metric_find_one_cell not found!\n");
         return NULL;
     }
     return s->data;
+}
+
+void metric_add_one_cell(struct metric *pthis, int id, struct metric_measure_data *data) {
+    struct cell_id_data_map *map = pthis->data_map;
+    struct cell_id_data_map *s;
+
+    s = (struct cell_id_data_map *)malloc(sizeof(struct cell_id_data_map));
+    s->id = id;
+    s->data = data;
+    HASH_ADD_INT(map, id, s);
+
+    pthis->data_map = map;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -108,6 +125,7 @@ struct metric_measure_data *metric_find_one_cell(struct metric *pthis, int id) {
 
 struct metric_measure_data *metric_scheme_counter_new(const struct metric_parameter *para)
 {
+    printf("metric_scheme_counter_new enter\n");
     struct metric_measure_data *data = (struct metric_measure_data *)malloc(sizeof(struct metric_measure_data));
     struct metric_counter_or_gauge *counter = (struct metric_counter_or_gauge *)malloc(sizeof(struct metric_counter_or_gauge));
     data->counter = counter;
@@ -241,7 +259,7 @@ struct metric_parameter *construct_parameters(enum metric_type type, ...)
     return paras;
 }
 
-struct metric_info *metric_info_new(const char *name, enum metric_type type, const struct metric_parameter *para)
+struct metric_info *metric_info_new(const char *name, enum metric_type type, struct metric_parameter *para)
 {
     struct metric_info *info = (struct metric_info *)malloc(sizeof(struct metric_info));
     info->name = strdup(name);
@@ -258,9 +276,13 @@ void metric_info_free(struct metric_info *info)
     free(info);
 }
 
-const char *metric_get_name(const struct metric *metrics)
+struct metric *metric_new(const char *name, enum metric_type type, struct metric_parameter *para)
 {
-    return metrics->info->name;
+    struct metric *pthis = (struct metric *)malloc(sizeof(struct metric));
+    pthis->info = metric_info_new(name, type, para);
+    pthis->scheme = &g_metric_scheme_table[type];
+    pthis->data_map = NULL;
+    return pthis;
 }
 
 void metric_free(struct metric *pthis)
@@ -439,7 +461,7 @@ metric blob:
             "PL":<content_blob(gen by scheme)>
         }]
 }*/
-void metric_serialize(const struct metric *pthis, char **blob, size_t *blob_size)
+int metric_serialize(const struct metric *pthis, char **blob, size_t *blob_size)
 {
     char *para_blob = NULL;
     size_t para_blob_size = 0;
@@ -497,7 +519,7 @@ struct metric *metric_deserialize(const char *blob, size_t blob_size)
     mpack_node_t para_obj = mpack_node_map_cstr(root, "para");
     struct metric_parameter *metric_para = deserialize_parameters(mpack_node_bin_data(para_obj), mpack_node_bin_size(para_obj));
 
-    struct metric *metric_out = metric_new(type, metric_name, metric_para);
+    struct metric *metric_out = metric_new(metric_name, type, metric_para);
     free(metric_name);
 
     mpack_node_t data_arr = mpack_node_map_cstr(root, "data");
@@ -522,12 +544,30 @@ struct metric *metric_deserialize(const char *blob, size_t blob_size)
     return metric_out;
 }
 
+bool metric_info_check_is_equal(struct metric_info *info1, struct metric_info *info2)
+{
+    if (info1->id != info2->id) {
+        return false;
+    }
+    if (info1->type != info2->type) {
+        return false;
+    }
+    if (strcmp(info1->name, info2->name) != 0) {
+        return false;
+    }
+    if (memcpy(info1->paras, info2->paras, sizeof(struct metric_parameter)) != 0) {
+        return false;
+    }
+    return true;
+}
+
 int metric_merge_cell(struct metric *dest, const struct metric *src, int dest_cell_id, int src_cell_id)
 {
     if (metric_info_check_is_equal(dest->info, src->info) == false) {
         return -1;
     }
     dest->scheme->merge(metric_find_one_cell(dest, dest_cell_id), metric_find_one_cell(src, src_cell_id));
+    return 0;
 }
 
 void metric_get_plain_blob(const struct metric *pthis, int cell_id, char **blob, size_t *blob_size)
@@ -566,7 +606,7 @@ int metric_copy_cell(struct metric *dest, const struct metric *src, int dest_cel
     }
     struct cell_id_data_map *new_node = (struct cell_id_data_map *)malloc(sizeof(struct cell_id_data_map));
     new_node->id = dest_cell_id;
-    new_node->data = dest->scheme->new();
+    new_node->data = dest->scheme->new(src->info->paras);
     int ret = dest->scheme->copy(new_node->data, node->data);
     if (ret == -1) {
         dest->scheme->del(new_node->data);
@@ -597,7 +637,7 @@ int metric_change_cell_id(struct metric *pthis, int old_cell_id, int new_cell_id
 /*                           metric operations                                */ 
 /* -------------------------------------------------------------------------- */
 
-struct metric *metric_create_for_counter(struct metric *pthis, const char *name, bool is_gauge)
+struct metric *metric_counter_new(const char *name, bool is_gauge)
 {
     struct metric *pthis = (struct metric *)malloc(sizeof(struct metric));
     struct metric_parameter *metric_para = construct_parameters(METRIC_TYPE_COUNTER, is_gauge ? COUNTER_TYPE_GAUGE : COUNTER_TYPE_COUNTER);
@@ -611,8 +651,9 @@ int metric_counter_incrby(struct metric *pthis, int cell_id, long long value)
 {
     struct metric_measure_data *data = metric_find_one_cell(pthis, cell_id);
     if (data == NULL) {
-        printf("cell id %d does not exist\n", cell_id);
-        return -1;
+        printf("metric_counter_incrby cell id %d does not exist\n", cell_id);
+        data = pthis->scheme->new(pthis->info->paras);
+        metric_add_one_cell(pthis, cell_id, data);
     }
     struct metric_counter_or_gauge *counter = data->counter;
     counter->value += value;
@@ -625,7 +666,7 @@ int metric_counter_set(struct metric *pthis, int cell_id, long long value)
     struct metric_measure_data *data = metric_find_one_cell(pthis, cell_id);
     if (data == NULL) {
         printf("cell id %d does not exist\n", cell_id);
-        return -1;
+        data = pthis->scheme->new(pthis->info->paras);
     }
     struct metric_counter_or_gauge *counter = data->counter;
     counter->value = value;
@@ -637,7 +678,7 @@ long long metric_counter_get(const struct metric *pthis, int cell_id)
 {
     struct metric_measure_data *data = metric_find_one_cell(pthis, cell_id);
     if (data == NULL) {
-        printf("cell id %d does not exist\n", cell_id);
+        printf("metric_counter_get cell id %d does not exist\n", cell_id);
         return -1;
     }
     struct metric_counter_or_gauge *counter = data->counter;
@@ -647,3 +688,36 @@ long long metric_counter_get(const struct metric *pthis, int cell_id)
 
 
 // TODO: other metric
+
+
+/* -------------------------------------------------------------------------- */
+/*                             query on the metric                            */
+/* -------------------------------------------------------------------------- */
+void metric_get_cell_ids(const struct metric *pthis, int **cell_ids, size_t *cell_id_count)
+{
+    printf("metric_get_cell_ids enter\n");
+    *cell_id_count = HASH_COUNT(pthis->data_map);
+    if (*cell_id_count == 0) {
+        printf("metric_get_cell_ids no cell ids\n");
+        *cell_ids = NULL;
+        return;
+    }
+    *cell_ids = (int *)malloc(sizeof(int) * (*cell_id_count));
+    struct cell_id_data_map *node, *tmp;
+    int i = 0;
+    HASH_ITER(hh, pthis->data_map, node, tmp) {
+        printf("metric_get_cell_ids cell id %d\n", node->id);
+        (*cell_ids)[i++] = node->id;
+    }
+    printf("metric_get_cell_ids exit\n");
+}
+
+const char *metric_get_name(const struct metric *metrics)
+{
+    return metrics->info->name;
+}
+
+enum metric_type metric_get_type(const struct metric *metrics)
+{
+    return metrics->info->type;
+}
