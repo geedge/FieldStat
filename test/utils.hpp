@@ -7,7 +7,7 @@ const struct fieldstat_tag TEST_TAG_INT = {"INT key_", TAG_INTEGER, {.value_int 
 const struct fieldstat_tag TEST_TAG_INT_collided = {"collided", TAG_INTEGER, {.value_int = 2}};
 const struct fieldstat_tag TEST_TAG_DOUBLE = {"DOUBLE key_", TAG_DOUBLE, {.value_double = 100.1}};
 const struct fieldstat_tag TEST_TAG_DOUBLE_collided = {"collided", TAG_DOUBLE, {.value_double = 2.0}};
-
+const struct fieldstat_tag TEST_SHARED_TAG = {"shared", TAG_INTEGER, {.value_int = 1}};
 
 std::string gen_rand_string(int len);
 

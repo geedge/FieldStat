@@ -267,12 +267,13 @@ int heavy_keeper_with_data_add(struct heavy_keeper *hk, const char *key, size_t 
         return -1;
     }
 
-    if (*pst_data_in_rec == NULL) {
+    if (*pst_data_in_rec == NULL) { // the key is added in this round, so give it a new id
         *pst_data_in_rec = (int *)malloc(sizeof(int));
+        **pst_data_in_rec = cube_id;
+        return 0;
     }
-    **pst_data_in_rec = cube_id;
 
-    return 0;
+    return 1;
 }
 
 struct heavy_keeper_result *heavy_keeper_query(struct heavy_keeper *hk) {
@@ -313,6 +314,10 @@ int heavy_keeper_query_one(struct heavy_keeper *hk, const char *key, size_t key_
         return -1;
     }
     *count_out = count;
+
+    if (cube_id_out == NULL) {
+        return 0;
+    }
 
     int **pst_data_in_rec = (int **)sorted_set_get_pointer_to_user_data(hk->top_K_heap, key, key_len);
     if (pst_data_in_rec == NULL) {

@@ -19,6 +19,7 @@ int metric_merge_cell(struct metric *dest, const struct metric *src, int dest_ce
 void metric_get_plain_blob(const struct metric *pthis, int cell_id, char **blob, size_t *blob_size);
 int metric_copy_cell(struct metric *dest, const struct metric *src, int dest_cell_id, int src_cell_id);
 int metric_change_cell_id(struct metric *pthis, int old_cell_id, int new_cell_id);
+void metric_delete_cell(struct metric *pthis, int cell_id);
 
 struct metric *metric_counter_new(const char *name, bool is_gauge, bool is_topk);
 int metric_counter_incrby(struct metric *pthis, int cell_id, long long value);

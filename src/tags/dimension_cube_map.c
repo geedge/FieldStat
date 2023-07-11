@@ -65,6 +65,7 @@ struct cell_manager {
     struct tag_cube_map *id_tag_map;
     enum sampling_mode sampling_mode;
     int max_cell_num;
+    int next_cell_id; // only used in comprehensive mode
 };
 
 
@@ -161,6 +162,7 @@ struct cell_manager *cell_manager_new(enum sampling_mode sampling_mode, int max_
 
     cell_manager->sampling_mode = sampling_mode;
     cell_manager->max_cell_num = max_cell_num;
+    cell_manager->next_cell_id = 0;
     if (sampling_mode == SAMPLING_MODE_TOPK) {
         cell_manager->topk_tag_id_map = heavy_keeper_with_data_new(max_cell_num);
     } else {
@@ -168,6 +170,53 @@ struct cell_manager *cell_manager_new(enum sampling_mode sampling_mode, int max_
     }
 
     return cell_manager;
+}
+
+void cell_manager_tag_cube_map_free(struct cell_manager *pthis)
+{
+    struct tag_cube_map *node = NULL;
+    struct tag_cube_map *tmp = NULL;
+    HASH_ITER(hh, pthis->id_tag_map, node, tmp) {
+        HASH_DEL(pthis->id_tag_map, node);
+        fieldtag_arr_free(node->tags, node->n_tags);
+        free(node);
+    }
+}
+
+void cell_manager_comprehensive_tag_id_map_free(struct cell_manager *pthis)
+{
+    struct cell_hash_node *node = NULL;
+    struct cell_hash_node *tmp = NULL;
+    HASH_ITER(hh, pthis->comprehensive_tag_id_map, node, tmp) {
+        HASH_DEL(pthis->comprehensive_tag_id_map, node);
+        free(node->key);
+        free(node);
+    }
+}
+
+void cell_manager_reset(struct cell_manager *pthis)
+{
+    if (pthis->sampling_mode == SAMPLING_MODE_TOPK) {
+        heavy_keeper_clear(pthis->topk_tag_id_map);
+    } else {
+        cell_manager_comprehensive_tag_id_map_free(pthis);
+        pthis->next_cell_id = 0;
+    }
+
+    cell_manager_tag_cube_map_free(pthis);
+}
+
+void cell_manager_free(struct cell_manager *pthis)
+{
+    cell_manager_tag_cube_map_free(pthis);
+
+    if (pthis->sampling_mode == SAMPLING_MODE_TOPK) {
+        heavy_keeper_free(pthis->topk_tag_id_map);
+    } else {
+        cell_manager_comprehensive_tag_id_map_free(pthis);
+    }
+
+    free(pthis);
 }
 
 int cell_manager_get_tag_by_cube_id(const struct cell_manager *pthis, int cube_id, struct fieldstat_tag **tag_out, size_t *tag_count_out)
@@ -226,6 +275,24 @@ int cell_manager_get_cube_id_by_tag(const struct cell_manager *pthis, const stru
     return cube_id;
 }
 
+int cell_manager_get_count_by_tag(const struct cell_manager *pthis, const struct fieldstat_tag *tag, size_t tag_count)
+{
+    if (pthis->sampling_mode == SAMPLING_MODE_COMPREHENSIVE) {
+        return -1;
+    }
+    char *key = NULL;
+    size_t key_size = 0;
+    build_dynamic_cell_key(tag, tag_count, &key, &key_size);
+    unsigned int count = 0;
+
+    if (pthis->sampling_mode == SAMPLING_MODE_TOPK) {
+        heavy_keeper_query_one(pthis->topk_tag_id_map, key, key_size, &count, NULL);
+    }
+
+    free(key);
+    return count;
+}
+
 void cell_manager_comprehensive_map_add(struct cell_manager *pthis, const struct fieldstat_tag *tag, size_t tag_count, int cube_id)
 {
     char *key = NULL;
@@ -248,6 +315,7 @@ int cell_manager_topk_map_add(struct cell_manager *pthis, const struct fieldstat
     int popped_cube_id = -1;
 
     int ret = heavy_keeper_with_data_add(pthis->topk_tag_id_map, key, key_size, count, cube_id, &popped_cube_id);
+    // todo: 想办法通知一下metric，把这个cube删了
     free(key);
 
     if (ret == -1) {
@@ -262,47 +330,26 @@ int cell_manager_topk_map_add(struct cell_manager *pthis, const struct fieldstat
             free(node);
         }
     }
-    return 0;
+    return ret;
 }
 
-int cell_manager_add_cube(struct cell_manager *pthis, const struct fieldstat_tag *tag, size_t tag_count, unsigned int count, int allocated_cube_id)
+int cell_manager_add_cube(struct cell_manager *pthis, const struct fieldstat_tag *tag, size_t tag_count, unsigned int count)
 {
     if (pthis->sampling_mode == SAMPLING_MODE_COMPREHENSIVE) {
         if (HASH_COUNT(pthis->comprehensive_tag_id_map) >= pthis->max_cell_num) {
             return -1;
         }
-        cell_manager_comprehensive_map_add(pthis, tag, tag_count, allocated_cube_id);
+        cell_manager_comprehensive_map_add(pthis, tag, tag_count, pthis->next_cell_id);
     } else {
-        if (cell_manager_topk_map_add(pthis, tag, tag_count, count, allocated_cube_id) == -1) {
+        int ret = cell_manager_topk_map_add(pthis, tag, tag_count, count, pthis->next_cell_id);
+        if (ret == -1) {
             return -1;
         }
-    }
-
-    cell_manager_id_tag_map_add(pthis, allocated_cube_id, tag, tag_count);
-    return 0; 
-}
-
-void cell_manager_free(struct cell_manager *pthis)
-{
-    struct tag_cube_map *node = NULL;
-    struct tag_cube_map *tmp = NULL;
-    HASH_ITER(hh, pthis->id_tag_map, node, tmp) {
-        HASH_DEL(pthis->id_tag_map, node);
-        fieldtag_arr_free(node->tags, node->n_tags);
-        free(node);
-    }
-
-    if (pthis->sampling_mode == SAMPLING_MODE_COMPREHENSIVE) {
-        struct cell_hash_node *node2 = NULL;
-        struct cell_hash_node *tmp2 = NULL;
-        HASH_ITER(hh, pthis->comprehensive_tag_id_map, node2, tmp2) {
-            HASH_DEL(pthis->comprehensive_tag_id_map, node2);
-            free(node2->key);
-            free(node2);
+        if (ret == 1) { // no new cube added, use original cube id
+            return 0;
         }
-    } else {
-        heavy_keeper_free(pthis->topk_tag_id_map);
     }
 
-    free(pthis);
+    cell_manager_id_tag_map_add(pthis, pthis->next_cell_id, tag, tag_count);
+    return pthis->next_cell_id++;
 }

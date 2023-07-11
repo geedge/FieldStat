@@ -41,4 +41,5 @@ function (add_unit_test file_name)
     # add_test(NAME ${file_name} COMMAND ${file_name})
 endfunction()
 
-add_unit_test(gtest_counter)
+add_unit_test(test_metric_counter)
+add_unit_test(unit_test_merge)

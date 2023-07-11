@@ -57,7 +57,7 @@ int fieldstat_register_histogram(struct fieldstat *instance, int cube_id, const 
 //  fieldstat_cube_add(instance, cube_id, tags, n_tag, count)  在topk 1里map一个，如果不在top里，返回-1
 // fieldstat_counter_incrby(instance, metric_id, cube_id, cell_id, increment)  相当于topk_add(cell_id, increment
 
-int fieldstat_register_cube(struct fieldstat *instance, struct fieldstat_tag *shared_tags, size_t n_tag, enum sampling_mode mode, size_t max_n_cell);
+int fieldstat_register_cube(struct fieldstat *instance, const struct fieldstat_tag *shared_tags, size_t n_tag, enum sampling_mode mode, size_t max_n_cell);
 //return a cell id >= 0, if success; otherwise, return -1. Fail if: mode is (SAMPLING_MODE_COMPREHENSIVE) and cell number >= (max_n_cell) ; or SAMPLING_MODE_TOPK and cell already exists.
 int fieldstat_cube_add(struct fieldstat *instance, int cube_id, const struct fieldstat_tag *tags, size_t n_tag, unsigned int count);
 // 这个接口对于topk的情况，变成用哈希算出来一个FP，然后这个FP
@@ -72,31 +72,6 @@ unsigned long fieldstat_get_version(const struct fieldstat *instance); // return
 
 
 int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src);
-// todo: merge 的伪代码
-// for cube（merge topk 的情况）
-//     struct cell_manager merged_tags = dest.
-//     merged_tags.push(src.cube.map.pop().get_tag()) for every cube in cube_arr
-//      merged_tags.push(dest.cube.map.pop().get_tag()) for every cube in cube_arr
-// note: 这部分实际上放在了metric.c 里
-// metric需要支持的操作：
-//          修改id： 修改dest[tag].id 到merged_cell[tag.id]
-//          merge： 给定一个dest metric，一个src metric，并给出dest id和src id
-//          copy:   给定一个src metric，一个dest metric，并给出src id
-// dest cube manager   |   merged cube manager  | src cube manager    |  操作
-// 有                            有                  有                   dest[tag] = src[tag] + dest[tag]，修改id
-// 有                            有                  无                     修改id
-// 有                            无                  有                     删掉dest[tag]
-// 有                            无                  无                     删掉dest[tag]
-// 无                            有                  有                     创建dest[tag] = src[tag]， 修改id
-// 无                            有                  无                     不可能
-// 无                            无                  有                      无操作
-// 无                            无                  无                     无操作
-
-
-// merge comprehensive 的情况：
-// 构建increment tag，每个src 里有，但是dest里没有的，加入到increment里。直到dest放满。
-// 对于每个increment tag， dest[tag] = src[tag]，修改id为现在dest cube manager 里的id
-
 struct fieldstat *fieldstat_deserialize(const char *blob, size_t blob_size);
 int fieldstat_serialize(const struct fieldstat *instance, char **blob_out, size_t *blob_size_out);
 
@@ -118,6 +93,11 @@ const char *fieldstat_get_metric_name(const struct fieldstat *instance, int cube
 enum metric_type fieldstat_get_metric_type(const struct fieldstat *instance, int cube_id, int metric_id);
 
 void fieldstat_tag_list_arr_free(struct fieldstat_tag_list *tag_list, size_t n_cell);
+
+// todo: 增加cube 的free，配套一个新的version接口
+// todo: 加注释，返回值是什么等等
+// todo: fieldstat_cube_add 对于topk 写一个新的接口
+// todo: incrby 时加一套校验，并且区别错误返回值
 
 #ifdef __cplusplus
 }

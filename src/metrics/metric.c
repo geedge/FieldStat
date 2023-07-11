@@ -571,7 +571,7 @@ struct metric *metric_deserialize(const char *blob, size_t blob_size)
         node->id = cell_id;
         node->data = metric_out->scheme->deserialize(data_blob, data_blob_size);
         free(data_blob);
-        HASH_ADD_INT(metric_out->data_map, id, node);
+        HASH_ADD_INT(metric_out->data_map, id, node); // fixme: 这里用add_one_cell 替代
     }
     mpack_tree_destroy(&tree);
     return metric_out;
@@ -626,34 +626,38 @@ void metric_del_at_position(struct metric *pthis, int cell_id)
 
 int metric_copy_cell(struct metric *dest, const struct metric *src, int dest_cell_id, int src_cell_id)
 {
-    struct cell_id_data_map *node;
-    HASH_FIND_INT(dest->data_map, &dest_cell_id, node);
-    if (node != NULL) {
+    if (metric_find_one_cell(dest, dest_cell_id)) {
         printf("cell id %d already exists in dest\n", dest_cell_id);
         return -1;
     }
-    HASH_FIND_INT(src->data_map, &src_cell_id, node);
-    if (node == NULL) {
+    struct metric_measure_data *data_src = metric_find_one_cell(src, src_cell_id);
+    if (data_src == NULL) {
         printf("cell id %d does not exist in src\n", src_cell_id);
         return -1;
     }
-    struct cell_id_data_map *new_node = (struct cell_id_data_map *)malloc(sizeof(struct cell_id_data_map));
-    new_node->id = dest_cell_id;
-    new_node->data = dest->scheme->new(src->info->paras);
-    int ret = dest->scheme->copy(new_node->data, node->data);
+
+    struct metric_measure_data *new_data = src->scheme->new(src->info->paras);
+    int ret = dest->scheme->copy(new_data, data_src);
     if (ret == -1) {
-        dest->scheme->del(new_node->data);
-        free(new_node);
+        dest->scheme->del(new_data);
         printf("copy failed\n");
         return -1;
     }
-    HASH_ADD_INT(dest->data_map, id, new_node);
+
+    metric_add_one_cell(dest, dest_cell_id, new_data);
 
     return 0;
 }
 
 int metric_change_cell_id(struct metric *pthis, int old_cell_id, int new_cell_id)
 {
+    if (old_cell_id == new_cell_id) {
+        return 0;
+    }
+    if (pthis->data_array) {
+        printf("metric_change_cell_id: data_array is not NULL, should not happen\n");
+        return -1;
+    }
     struct cell_id_data_map *node;
     HASH_FIND_INT(pthis->data_map, &old_cell_id, node);
     if (node == NULL) {
@@ -665,6 +669,21 @@ int metric_change_cell_id(struct metric *pthis, int old_cell_id, int new_cell_id
     return 0;
 }
 
+void metric_delete_cell(struct metric *pthis, int cell_id)
+{
+    if (pthis->data_array) {
+        printf("metric_delete_cell: data_array is not NULL, should not happen\n");
+        return;
+    }
+    struct cell_id_data_map *node;
+    HASH_FIND_INT(pthis->data_map, &cell_id, node);
+    if (node == NULL) {
+        return;
+    }
+    HASH_DEL(pthis->data_map, node);
+    pthis->scheme->del(node->data);
+    free(node);
+}
 
 /* -------------------------------------------------------------------------- */
 /*                           metric operations                                */ 

@@ -6,7 +6,7 @@
 TEST(metric_test_counter, simple_register_and_query)
 {
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_register_cube(instance, NULL, 0, SAMPLING_MODE_COMPREHENSIVE, 10);
+    int cube_id = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
     EXPECT_EQ(cube_id, 0);
 
     int metric_id = fieldstat_register_counter(instance, cube_id, "czz_test counter metric", false);

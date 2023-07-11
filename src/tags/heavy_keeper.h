@@ -88,7 +88,8 @@ void heavy_keeper_clear(struct heavy_keeper *hk);
  */
 void heavy_keeper_add(struct heavy_keeper *hk, const char *key, size_t key_len, unsigned int count);
 
-// return -1 when the key is not inserted to the heavy keeper(not fail), return 0 if added. popped_id_out is -1 if not popped. any other value >= 0 means the id of the popped member.
+// return -1 when the key is not inserted to the heavy keeper(not fail). popped_id_out is -1 if not popped. any other value >= 0 means the id of the popped member.
+// the cube id will give the key if the key is new, in which case return 0, if the key is already in the heavy keeper, return 1.
 int heavy_keeper_with_data_add(struct heavy_keeper *hk, const char *key, size_t key_len, unsigned int count, int cube_id, int *popped_id_out);
 
 /**
