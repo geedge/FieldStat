@@ -15,6 +15,8 @@
 #include "hdr/hdr_histogram_log.h"
 #include "st_hyperloglog.h"
 
+#define MAX_N_DATA_ARRAY_ITEM_INIT 1024
+
 enum counter_metric_type {
     COUNTER_TYPE_COUNTER,
     COUNTER_TYPE_GAUGE,
@@ -87,14 +89,20 @@ struct metric {
     const struct metric_scheme *scheme;
     struct metric_info *info;
     struct cell_id_data_map *data_map;
+    struct metric_measure_data **data_array;
+    size_t max_n_array_item;
+    size_t n_array_item;
 };
 
 
 /* -------------------------------------------------------------------------- */
 /*                                 id cell map                                */
 /* -------------------------------------------------------------------------- */
-
+// todo: 如果是comprehensive的情况，就变成数组
 struct metric_measure_data *metric_find_one_cell(const struct metric *pthis, int id) {
+    if (pthis->data_array != NULL) {
+        return pthis->data_array[id];
+    }
     struct cell_id_data_map *map = pthis->data_map;
     struct cell_id_data_map *s;
     HASH_FIND_INT(map, &id, s);
@@ -106,6 +114,18 @@ struct metric_measure_data *metric_find_one_cell(const struct metric *pthis, int
 }
 
 void metric_add_one_cell(struct metric *pthis, int id, struct metric_measure_data *data) {
+    if (pthis->data_array != NULL) {
+        assert(pthis->n_array_item == id);
+        if (id >= pthis->max_n_array_item) {
+            // realloc
+            pthis->max_n_array_item *= 2;
+            pthis->data_array = (struct metric_measure_data **)realloc(pthis->data_array, pthis->max_n_array_item * sizeof(struct metric_measure_data *));
+        }
+        pthis->data_array[id] = data;
+        pthis->n_array_item++;
+        return;
+    }
+
     struct cell_id_data_map *map = pthis->data_map;
     struct cell_id_data_map *s;
 
@@ -276,12 +296,19 @@ void metric_info_free(struct metric_info *info)
     free(info);
 }
 
-struct metric *metric_new(const char *name, enum metric_type type, struct metric_parameter *para)
+struct metric *metric_new(const char *name, enum metric_type type, struct metric_parameter *para, bool is_topk)
 {
     struct metric *pthis = (struct metric *)malloc(sizeof(struct metric));
+    memset(pthis, 0, sizeof(struct metric));
     pthis->info = metric_info_new(name, type, para);
     pthis->scheme = &g_metric_scheme_table[type];
-    pthis->data_map = NULL;
+
+    if (!is_topk) {
+        pthis->data_array = (struct metric_measure_data **)malloc(sizeof(struct metric_measure_data *) * MAX_N_DATA_ARRAY_ITEM_INIT);
+        pthis->max_n_array_item = MAX_N_DATA_ARRAY_ITEM_INIT;
+        memset(pthis->data_array, 0, sizeof(struct metric_measure_data *) * MAX_N_DATA_ARRAY_ITEM_INIT);
+    }
+
     return pthis;
 }
 
@@ -294,6 +321,12 @@ void metric_free(struct metric *pthis)
         pthis->scheme->del(cur->data);
         HASH_DEL(pthis->data_map, cur);
         free(cur);
+    }
+    if (pthis->data_array) {
+        for (int i = 0; i < pthis->n_array_item; i++) {
+            pthis->scheme->del(pthis->data_array[i]);
+        }
+        free(pthis->data_array);
     }
 
     free(pthis);
@@ -519,7 +552,7 @@ struct metric *metric_deserialize(const char *blob, size_t blob_size)
     mpack_node_t para_obj = mpack_node_map_cstr(root, "para");
     struct metric_parameter *metric_para = deserialize_parameters(mpack_node_bin_data(para_obj), mpack_node_bin_size(para_obj));
 
-    struct metric *metric_out = metric_new(metric_name, type, metric_para);
+    struct metric *metric_out = metric_new(metric_name, type, metric_para, false); // todo: 这里不一定是false，从上级的cube中带下来一个参数
     free(metric_name);
 
     mpack_node_t data_arr = mpack_node_map_cstr(root, "data");
@@ -637,12 +670,10 @@ int metric_change_cell_id(struct metric *pthis, int old_cell_id, int new_cell_id
 /*                           metric operations                                */ 
 /* -------------------------------------------------------------------------- */
 
-struct metric *metric_counter_new(const char *name, bool is_gauge)
+struct metric *metric_counter_new(const char *name, bool is_gauge, bool is_topk)
 {
-    struct metric *pthis = (struct metric *)malloc(sizeof(struct metric));
     struct metric_parameter *metric_para = construct_parameters(METRIC_TYPE_COUNTER, is_gauge ? COUNTER_TYPE_GAUGE : COUNTER_TYPE_COUNTER);
-    pthis->info = metric_info_new(name, METRIC_TYPE_COUNTER, metric_para);
-    pthis->scheme = &g_metric_scheme_table[METRIC_TYPE_COUNTER];
+    struct metric *pthis = metric_new(name, METRIC_TYPE_COUNTER, metric_para, is_topk);
 
     return pthis;
 }
@@ -696,6 +727,15 @@ long long metric_counter_get(const struct metric *pthis, int cell_id)
 void metric_get_cell_ids(const struct metric *pthis, int **cell_ids, size_t *cell_id_count)
 {
     printf("metric_get_cell_ids enter\n");
+    if (pthis->data_array) {
+        printf("metric_get_cell_ids data array\n");
+        *cell_id_count = pthis->n_array_item;
+        *cell_ids = (int *)malloc(sizeof(int) * (*cell_id_count));
+        for (int i = 0; i < *cell_id_count; i++) {
+            (*cell_ids)[i] = i;
+        }
+        return;
+    }
     *cell_id_count = HASH_COUNT(pthis->data_map);
     if (*cell_id_count == 0) {
         printf("metric_get_cell_ids no cell ids\n");

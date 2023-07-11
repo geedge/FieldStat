@@ -193,12 +193,13 @@ static int append_metric_to_cube(struct fs_cube *cube, struct metric *metric)
 
 int fieldstat_register_counter(struct fieldstat *instance, int cube_id, const char *field_name, bool is_gauge)
 {
-    struct metric *metric = metric_counter_new(field_name, is_gauge);
     struct fs_cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
         printf("ERR: cube is not registered yet\n");
         return -1;
     }
+    struct metric *metric = metric_counter_new(field_name, is_gauge, cube->sampling_mode == SAMPLING_MODE_TOPK ? true : false);
+
     return append_metric_to_cube(cube, metric);
 }
 

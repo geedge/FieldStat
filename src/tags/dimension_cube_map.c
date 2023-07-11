@@ -157,6 +157,7 @@ static void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_t
 struct cell_manager *cell_manager_new(enum sampling_mode sampling_mode, int max_cell_num)
 {
     struct cell_manager *cell_manager = (struct cell_manager *)malloc(sizeof(struct cell_manager));
+    memset(cell_manager, 0, sizeof(struct cell_manager));
 
     cell_manager->sampling_mode = sampling_mode;
     cell_manager->max_cell_num = max_cell_num;

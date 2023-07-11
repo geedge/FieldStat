@@ -53,9 +53,15 @@ int fieldstat_register_counter(struct fieldstat *instance, int cube_id, const ch
 int fieldstat_register_hll(struct fieldstat *instance, int cube_id, const char *field_name, unsigned char precision);
 int fieldstat_register_histogram(struct fieldstat *instance, int cube_id, const char *field_name, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures);
 
+//  fieldstat_register_cube(instance, shared_tags, n_tag, mode, max_n_cell)  创建一个用tag id 做key的topk
+//  fieldstat_cube_add(instance, cube_id, tags, n_tag, count)  在topk 1里map一个，如果不在top里，返回-1
+// fieldstat_counter_incrby(instance, metric_id, cube_id, cell_id, increment)  相当于topk_add(cell_id, increment
+
 int fieldstat_register_cube(struct fieldstat *instance, struct fieldstat_tag *shared_tags, size_t n_tag, enum sampling_mode mode, size_t max_n_cell);
 //return a cell id >= 0, if success; otherwise, return -1. Fail if: mode is (SAMPLING_MODE_COMPREHENSIVE) and cell number >= (max_n_cell) ; or SAMPLING_MODE_TOPK and cell already exists.
 int fieldstat_cube_add(struct fieldstat *instance, int cube_id, const struct fieldstat_tag *tags, size_t n_tag, unsigned int count);
+// 这个接口对于topk的情况，变成用哈希算出来一个FP，然后这个FP
+// 为了防止hash collision,设计sketch结构，如果一个tags命中几个sketch，取出sketch中的id。如果不对，就是在sketch上垒一个。
 
 int fieldstat_counter_incrby(struct fieldstat *instance, int metric_id, int cube_id, int cell_id, long long increment);
 
