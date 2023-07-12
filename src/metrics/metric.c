@@ -88,6 +88,7 @@ struct cell_id_data_map {
 struct metric {
     const struct metric_scheme *scheme;
     struct metric_info *info;
+    bool is_topk;
     struct cell_id_data_map *data_map;
     struct metric_measure_data **data_array;
     size_t max_n_array_item;
@@ -100,7 +101,7 @@ struct metric {
 /* -------------------------------------------------------------------------- */
 // todo: 如果是comprehensive的情况，就变成数组
 struct metric_measure_data *metric_find_one_cell(const struct metric *pthis, int id) {
-    if (pthis->data_array != NULL) {
+    if (!pthis->is_topk) {
         return pthis->data_array[id];
     }
     struct cell_id_data_map *map = pthis->data_map;
@@ -114,7 +115,7 @@ struct metric_measure_data *metric_find_one_cell(const struct metric *pthis, int
 }
 
 void metric_add_one_cell(struct metric *pthis, int id, struct metric_measure_data *data) {
-    if (pthis->data_array != NULL) {
+    if (!pthis->is_topk) {
         assert(pthis->n_array_item == id);
         if (id >= pthis->max_n_array_item) {
             // realloc
@@ -188,6 +189,8 @@ static int metric_scheme_counter_merge(struct metric_measure_data *pthis, const 
 {
     struct metric_counter_or_gauge *counter = pthis->counter;
     struct metric_counter_or_gauge *from_counter = from->counter;
+
+    printf("metric_scheme_counter_merge enter, value dest : %lld, value src: %lld\n", counter->value, from_counter->value);
     
     if (counter->type != from_counter->type) {
         printf("ERR: counter type not match!\n");
@@ -195,13 +198,15 @@ static int metric_scheme_counter_merge(struct metric_measure_data *pthis, const 
     }
     switch (counter->type) {
         case COUNTER_TYPE_COUNTER:
+            printf("counter->value += from_counter->value\n");
             counter->value += from_counter->value;
             break;
         case COUNTER_TYPE_GAUGE:
+            printf("counter->value = counter->value > from_counter->value ? counter->value : from_counter->value\n");
             counter->value = counter->value > from_counter->value ? counter->value : from_counter->value;
             break;
         default:
-            printf("ERR: counter type not match!\n");
+            printf("ERR: unknown counter type\n");
             return -1;
     }
 
@@ -304,6 +309,7 @@ struct metric *metric_new(const char *name, enum metric_type type, struct metric
     memset(pthis, 0, sizeof(struct metric));
     pthis->info = metric_info_new(name, type, para);
     pthis->scheme = &g_metric_scheme_table[type];
+    pthis->is_topk = is_topk;
 
     if (!is_topk) {
         pthis->data_array = (struct metric_measure_data **)malloc(sizeof(struct metric_measure_data *) * MAX_N_DATA_ARRAY_ITEM_INIT);
@@ -324,7 +330,7 @@ void metric_free(struct metric *pthis)
         HASH_DEL(pthis->data_map, cur);
         free(cur);
     }
-    if (pthis->data_array) {
+    if (!pthis->is_topk) {
         for (int i = 0; i < pthis->n_array_item; i++) {
             pthis->scheme->del(pthis->data_array[i]);
         }
@@ -350,6 +356,14 @@ struct metric *metric_copy_structure(const struct metric *src)
     metric_info_copy(dst->info, src->info);
     dst->scheme = &g_metric_scheme_table[src->info->type];
     dst->data_map = NULL;
+    dst->is_topk = src->is_topk;
+    if (!src->is_topk) {
+        dst->n_array_item = 0;
+        dst->data_array = (struct metric_measure_data **)malloc(sizeof(struct metric_measure_data *) * src->max_n_array_item);
+        dst->max_n_array_item = src->max_n_array_item;
+        memset(dst->data_array, 0, sizeof(struct metric_measure_data *) * src->max_n_array_item);
+    }
+
     return dst;
 }
 
@@ -587,16 +601,16 @@ struct metric *metric_deserialize(const char *blob, size_t blob_size)
 
 bool metric_info_check_is_equal(struct metric_info *info1, struct metric_info *info2)
 {
-    if (info1->id != info2->id) {
-        return false;
-    }
     if (info1->type != info2->type) {
+        printf("Error: metric_info_check_is_equal: metric type not equal\n");
         return false;
     }
     if (strcmp(info1->name, info2->name) != 0) {
+        printf("Error: metric_info_check_is_equal: metric name not equal\n");
         return false;
     }
-    if (memcpy(info1->paras, info2->paras, sizeof(struct metric_parameter)) != 0) {
+    if (memcmp(info1->paras, info2->paras, sizeof(struct metric_parameter)) != 0) {
+        printf("Error: metric_info_check_is_equal: metric paras not equal\n");
         return false;
     }
     return true;
@@ -604,10 +618,14 @@ bool metric_info_check_is_equal(struct metric_info *info1, struct metric_info *i
 
 int metric_merge_cell(struct metric *dest, const struct metric *src, int dest_cell_id, int src_cell_id)
 {
+    printf("metric_merge_cell enter\n");
     if (metric_info_check_is_equal(dest->info, src->info) == false) {
+        printf("Error: metric_merge_cell: metric info not equal\n");
         return -1;
     }
     dest->scheme->merge(metric_find_one_cell(dest, dest_cell_id), metric_find_one_cell(src, src_cell_id));
+
+    printf("metric_merge_cell exit, ret: %lld\n", metric_find_one_cell(dest, dest_cell_id)->counter->value);
     return 0;
 }
 
@@ -662,8 +680,8 @@ int metric_change_cell_id(struct metric *pthis, int old_cell_id, int new_cell_id
     if (old_cell_id == new_cell_id) {
         return 0;
     }
-    if (pthis->data_array) {
-        printf("metric_change_cell_id: data_array is not NULL, should not happen\n");
+    if (!pthis->is_topk) {
+        printf("metric_change_cell_id: comprehensive mode, should not happen\n");
         return -1;
     }
     struct cell_id_data_map *node;
@@ -679,7 +697,7 @@ int metric_change_cell_id(struct metric *pthis, int old_cell_id, int new_cell_id
 
 void metric_delete_cell(struct metric *pthis, int cell_id)
 {
-    if (pthis->data_array) {
+    if (!pthis->is_topk) {
         printf("metric_delete_cell: data_array is not NULL, should not happen\n");
         return;
     }
@@ -754,9 +772,14 @@ long long metric_counter_get(const struct metric *pthis, int cell_id)
 void metric_get_cell_ids(const struct metric *pthis, int **cell_ids, size_t *cell_id_count)
 {
     printf("metric_get_cell_ids enter\n");
-    if (pthis->data_array) {
+    if (!pthis->is_topk) {
         printf("metric_get_cell_ids data array\n");
         *cell_id_count = pthis->n_array_item;
+        if (*cell_id_count == 0) {
+            printf("metric_get_cell_ids no cell ids\n");
+            *cell_ids = NULL;
+            return;
+        }
         *cell_ids = (int *)malloc(sizeof(int) * (*cell_id_count));
         for (int i = 0; i < *cell_id_count; i++) {
             (*cell_ids)[i] = i;

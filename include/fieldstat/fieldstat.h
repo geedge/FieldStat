@@ -79,7 +79,7 @@ int fieldstat_serialize(const struct fieldstat *instance, char **blob_out, size_
 /* -------------------------------------------------------------------------- */
 /*                                    query                                   */
 /* -------------------------------------------------------------------------- */
-int fieldstat_get_max_cube_id(const struct fieldstat *instance);
+void fieldstat_get_cubes(const struct fieldstat *instance, int **cube_ids, size_t *n_cube);
 int fieldstat_get_max_metric_id(const struct fieldstat *instance, int cube_id);
 void fieldstat_get_cells(const struct fieldstat *instance, int cube_id, int metric_id,
     int **cell_ids, struct fieldstat_tag_list **tag_list, size_t *n_cell);
@@ -95,6 +95,7 @@ enum metric_type fieldstat_get_metric_type(const struct fieldstat *instance, int
 void fieldstat_tag_list_arr_free(struct fieldstat_tag_list *tag_list, size_t n_cell);
 
 // todo: 增加cube 的free，配套一个新的version接口
+// todo: 这个操作影响挺大的，比如新申请的cube，如果之前有的话，肯定不能再来一个，所以要有shared tag 到cube id 的匹配。比如append 操作的时候，不能跟n_cube 走，而是先找一个空。比如n_cube 要重命名成last_cube_id
 // todo: 加注释，返回值是什么等等
 // todo: fieldstat_cube_add 对于topk 写一个新的接口
 // todo: incrby 时加一套校验，并且区别错误返回值

@@ -4,46 +4,46 @@
 #include "dimension_cube_map.h"
 #include "utils.hpp"
 
-// TEST(unit_test_serialize, serialize_and_deserialize_tag_list)
-// {
-//     char *blob;
-//     size_t blob_size;
+TEST(unit_test_serialize, serialize_and_deserialize_tag_list)
+{
+    char *blob;
+    size_t blob_size;
 
-//     fieldtag_list_serialize(&TEST_TAG_INT, 1, &blob, &blob_size);
+    fieldtag_list_serialize(&TEST_TAG_INT, 1, &blob, &blob_size);
     
-//     struct fieldstat_tag *tag_list;
-//     size_t tag_list_size;
-//     fieldtag_list_deserialize(blob, blob_size, &tag_list, &tag_list_size);
+    struct fieldstat_tag *tag_list;
+    size_t tag_list_size;
+    fieldtag_list_deserialize(blob, blob_size, &tag_list, &tag_list_size);
 
-//     EXPECT_STREQ(tag_list->key, TEST_TAG_INT.key);
-//     EXPECT_EQ(tag_list->type, TEST_TAG_INT.type);
-//     EXPECT_EQ(tag_list->value_int, TEST_TAG_INT.value_int);
+    EXPECT_STREQ(tag_list->key, TEST_TAG_INT.key);
+    EXPECT_EQ(tag_list->type, TEST_TAG_INT.type);
+    EXPECT_EQ(tag_list->value_int, TEST_TAG_INT.value_int);
 
-//     free(blob);
-//     free((char *)tag_list->key);
-//     free(tag_list);
-// }
+    free(blob);
+    free((char *)tag_list->key);
+    free(tag_list);
+}
 
-// TEST(unit_test_serialize, serialize_and_deserialize_cell_manager)
-// {
-//     struct cell_manager *cm = cell_manager_new(SAMPLING_MODE_COMPREHENSIVE, 1000);
-//     int cell_id_1 = cell_manager_add_cell(cm, &TEST_TAG_INT, 1, 1);
-//     int cell_id_2 = cell_manager_add_cell(cm, &TEST_TAG_DOUBLE, 1, 1);
-//     int cell_id_3 = cell_manager_add_cell(cm, &TEST_TAG_STRING, 1, 1);
+TEST(unit_test_serialize, serialize_and_deserialize_cell_manager)
+{
+    struct cell_manager *cm = cell_manager_new(SAMPLING_MODE_COMPREHENSIVE, 1000);
+    int cell_id_1 = cell_manager_add_cell(cm, &TEST_TAG_INT, 1, 1);
+    int cell_id_2 = cell_manager_add_cell(cm, &TEST_TAG_DOUBLE, 1, 1);
+    int cell_id_3 = cell_manager_add_cell(cm, &TEST_TAG_STRING, 1, 1);
 
-//     char *blob;
-//     size_t blob_size;
-//     cell_manager_serialize(cm, &blob, &blob_size);
-//     struct cell_manager *cm2 = cell_manager_deserialize(blob, blob_size);
+    char *blob;
+    size_t blob_size;
+    cell_manager_serialize(cm, &blob, &blob_size);
+    struct cell_manager *cm2 = cell_manager_deserialize(blob, blob_size);
 
-//     EXPECT_EQ(cell_manager_get_cube_id_by_tag(cm2, &TEST_TAG_INT, 1), cell_id_1);
-//     EXPECT_EQ(cell_manager_get_cube_id_by_tag(cm2, &TEST_TAG_DOUBLE, 1), cell_id_2);
-//     EXPECT_EQ(cell_manager_get_cube_id_by_tag(cm2, &TEST_TAG_STRING, 1), cell_id_3);
+    EXPECT_EQ(cell_manager_get_cell_id_by_tag(cm2, &TEST_TAG_INT, 1), cell_id_1);
+    EXPECT_EQ(cell_manager_get_cell_id_by_tag(cm2, &TEST_TAG_DOUBLE, 1), cell_id_2);
+    EXPECT_EQ(cell_manager_get_cell_id_by_tag(cm2, &TEST_TAG_STRING, 1), cell_id_3);
 
-//     cell_manager_free(cm);
-//     cell_manager_free(cm2);
-//     free(blob);
-// }
+    cell_manager_free(cm);
+    cell_manager_free(cm2);
+    free(blob);
+}
 
 TEST(unit_test_serialize, serialize_and_deserialize_fieldstat_instance)
 {
@@ -61,7 +61,12 @@ TEST(unit_test_serialize, serialize_and_deserialize_fieldstat_instance)
     struct fieldstat *instance2 = fieldstat_deserialize(blob, blob_size);
     free(blob);
 
-    int ret_cell_id = fieldstat_get_max_cube_id(instance2);
+    int *ret_cube_id_arr = NULL;
+    size_t n_cube = 0;
+    fieldstat_get_cubes(instance2, &ret_cube_id_arr, &n_cube);
+    int ret_cell_id = ret_cube_id_arr[0];
+    free(ret_cube_id_arr);
+
     EXPECT_EQ(ret_cell_id, 0);
     int ret_metric_id = fieldstat_get_max_metric_id(instance2, ret_cell_id);
     EXPECT_EQ(ret_metric_id, 0);
@@ -91,6 +96,8 @@ TEST(unit_test_serialize, serialize_and_deserialize_fieldstat_instance)
     free(ret_cell_ids);
     fieldstat_tag_list_arr_free(tag_list, n_cell);
 }
+
+// todo: topk 的测试
 
 int main(int argc, char *argv[]) 
 {

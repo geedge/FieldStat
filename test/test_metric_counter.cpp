@@ -18,7 +18,11 @@ TEST(metric_test_counter, simple_register_and_query)
     fieldstat_counter_incrby(instance, metric_id, cube_id, cell_id, 10086);
 
     // query
-    int ret_cell_id = fieldstat_get_max_cube_id(instance);
+    int *ret_cube_id_arr = NULL;
+    size_t n_cube = 0;
+    fieldstat_get_cubes(instance, &ret_cube_id_arr, &n_cube);
+    int ret_cell_id = ret_cube_id_arr[0];
+    free(ret_cube_id_arr);
     EXPECT_EQ(ret_cell_id, 0);
     int ret_metric_id = fieldstat_get_max_metric_id(instance, ret_cell_id);
     EXPECT_EQ(ret_metric_id, 0);

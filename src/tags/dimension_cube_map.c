@@ -219,12 +219,12 @@ void cell_manager_free(struct cell_manager *pthis)
     free(pthis);
 }
 
-int cell_manager_get_tag_by_cube_id(const struct cell_manager *pthis, int cube_id, struct fieldstat_tag **tag_out, size_t *tag_count_out)
+int cell_manager_get_tag_by_cell_id(const struct cell_manager *pthis, int cell_id, struct fieldstat_tag **tag_out, size_t *tag_count_out)
 {
-    printf("cell_manager_get_tag_by_cube_id enter, id: %d\n", cube_id);
+    printf("cell_manager_get_tag_by_cell_id enter, id: %d\n", cell_id);
     struct tag_cube_map *hash_hdr = pthis->id_tag_map;
     struct tag_cube_map *node = NULL;
-    HASH_FIND_INT(hash_hdr, &cube_id, node);
+    HASH_FIND_INT(hash_hdr, &cell_id, node);
     if (node == NULL) {
         return -1;
     }
@@ -234,14 +234,14 @@ int cell_manager_get_tag_by_cube_id(const struct cell_manager *pthis, int cube_i
         fieldtag_copy(&node->tags[i], &(*tag_out)[i]);
     }
     *tag_count_out = node->n_tags;
-    printf("cell_manager_get_tag_by_cube_id exit\n");
+    printf("cell_manager_get_tag_by_cell_id exit\n");
     return 0;
 }
 
-void cell_manager_id_tag_map_add(struct cell_manager *pthis, int cube_id, const struct fieldstat_tag tags[], size_t n_tags)
+void cell_manager_id_tag_map_add(struct cell_manager *pthis, int cell_id, const struct fieldstat_tag tags[], size_t n_tags)
 {
     struct tag_cube_map *node = (struct tag_cube_map *)malloc(sizeof(struct tag_cube_map));
-    node->cell_id = cube_id;
+    node->cell_id = cell_id;
     node->tags = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * n_tags);
     for (int i = 0; i < (int)n_tags; i++) {
         fieldtag_copy(&tags[i], &node->tags[i]);
@@ -251,28 +251,31 @@ void cell_manager_id_tag_map_add(struct cell_manager *pthis, int cube_id, const 
     HASH_ADD_INT(pthis->id_tag_map, cell_id, node);
 }
 
-int cell_manager_get_cube_id_by_tag(const struct cell_manager *pthis, const struct fieldstat_tag *tag, size_t tag_count)
+int cell_manager_get_cell_id_by_tag(const struct cell_manager *pthis, const struct fieldstat_tag *tag, size_t tag_count)
 {
     char *key = NULL;
     size_t key_size = 0;
     build_dynamic_cell_key(tag, tag_count, &key, &key_size);
-    int cube_id = -1;
+    int cell_id = -1;
 
     if (pthis->sampling_mode == SAMPLING_MODE_TOPK) {
         unsigned int count_dummy = 0;
-        heavy_keeper_query_one(pthis->topk_tag_id_map, key, key_size, &count_dummy, &cube_id);
+        heavy_keeper_query_one(pthis->topk_tag_id_map, key, key_size, &count_dummy, &cell_id);
     } else {
+        printf("cell_manager_get_cell_id_by_tag find comprehensive, key: %s, comprehensive_tag_id_map card: %d\n", key, (int)HASH_COUNT(pthis->comprehensive_tag_id_map));
         struct cell_hash_node *node = NULL;
         HASH_FIND(hh, pthis->comprehensive_tag_id_map, key, key_size, node);
         if (node == NULL) {
-            cube_id = -1;
+            printf("cell_manager_get_cell_id_by_tag find comprehensive, not found\n");
+            cell_id = -1;
         } else {
-            cube_id = node->cell_id;
+            cell_id = node->cell_id;
+            printf("cell_manager_get_cell_id_by_tag find comprehensive, found %d\n", cell_id);
         }
     }
 
     free(key);
-    return cube_id;
+    return cell_id;
 }
 
 int cell_manager_get_count_by_tag(const struct cell_manager *pthis, const struct fieldstat_tag *tag, size_t tag_count)
@@ -293,37 +296,39 @@ int cell_manager_get_count_by_tag(const struct cell_manager *pthis, const struct
     return count;
 }
 
-void cell_manager_comprehensive_map_add(struct cell_manager *pthis, const struct fieldstat_tag *tag, size_t tag_count, int cube_id)
+void cell_manager_comprehensive_map_add(struct cell_manager *pthis, const struct fieldstat_tag *tag, size_t tag_count, int cell_id)
 {
     char *key = NULL;
     size_t key_size = 0;
     build_dynamic_cell_key(tag, tag_count, &key, &key_size);
+
+    printf("cell_manager_comprehensive_map_add enter, dynamic key: %s, key_size: %zu, cell_id: %d\n", key, key_size, cell_id);
 
     struct cell_hash_node *node = (struct cell_hash_node *)malloc(sizeof(struct cell_hash_node));
     node->key = key;
     node->key_len = key_size;
-    node->cell_id = cube_id;
+    node->cell_id = cell_id;
     HASH_ADD_KEYPTR(hh, pthis->comprehensive_tag_id_map, node->key, node->key_len, node);
 }
 
-int cell_manager_topk_map_add(struct cell_manager *pthis, const struct fieldstat_tag *tag, size_t tag_count, unsigned int count, int cube_id)
+int cell_manager_topk_map_add(struct cell_manager *pthis, const struct fieldstat_tag *tag, size_t tag_count, unsigned int count, int cell_id)
 {
     char *key = NULL;
     size_t key_size = 0;
     build_dynamic_cell_key(tag, tag_count, &key, &key_size);
 
-    int popped_cube_id = -1;
+    int popped_cell_id = -1;
 
-    int ret = heavy_keeper_with_data_add(pthis->topk_tag_id_map, key, key_size, count, cube_id, &popped_cube_id);
+    int ret = heavy_keeper_with_data_add(pthis->topk_tag_id_map, key, key_size, count, cell_id, &popped_cell_id);
     // todo: 想办法通知一下metric，把这个cube删了
     free(key);
 
     if (ret == -1) {
         return -1;
     }
-    if (popped_cube_id != -1) {
+    if (popped_cell_id != -1) {
         struct tag_cube_map *node = NULL;
-        HASH_FIND_INT(pthis->id_tag_map, &popped_cube_id, node);
+        HASH_FIND_INT(pthis->id_tag_map, &popped_cell_id, node);
         if (node != NULL) {
             HASH_DEL(pthis->id_tag_map, node);
             fieldtag_list_free(node->tags, node->n_tags);
