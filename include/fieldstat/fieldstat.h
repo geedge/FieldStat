@@ -107,6 +107,13 @@ int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric
 void fieldstat_reset(struct fieldstat *instance);
 unsigned long fieldstat_get_cell_version(const struct fieldstat *instance);
 
+/*
+    * @brief Delete the cube of cube_id. All the cells and metrics are deleted. The cube_id may be reused by other new cubes. Increase the corresponding cube_version by 1.
+    * @return 0 if success. -1 if cube_id is invalid.
+*/
+int fieldstat_delete_cube(struct fieldstat *instance, int cube_id);
+unsigned long fieldstat_get_cube_version(const struct fieldstat *instance, int cube_id);
+
 int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src);
 struct fieldstat *fieldstat_deserialize(const char *blob, size_t blob_size);
 int fieldstat_serialize(const struct fieldstat *instance, char **blob_out, size_t *blob_size_out);
