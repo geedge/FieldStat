@@ -11,14 +11,6 @@
 #include "metrics/metric.h"
 #include "tags/dimension_cube_map.h"
 
-// todo: 用来merge的时候用，暂时先放着
-// todo: 应该是cube里的概念，总之再说
-struct metric_name_id_map {
-    char *name;
-    int id;
-    UT_hash_handle hh;
-};
-
 struct fs_cube {
     enum sampling_mode sampling_mode;
     struct cell_manager *cell_manager;
@@ -38,11 +30,9 @@ struct fieldstat {
     struct fs_cube **cube;
     size_t n_cube;
     size_t max_n_cube;
-
-    struct metric_name_id_map *metric_name_id_map;
 };
 
-struct field_name_id_map {
+struct metric_name_id_map {
     char *name;
     int id;
     UT_hash_handle hh;
@@ -67,13 +57,6 @@ void fieldstat_free(struct fieldstat *instance)
         fieldstat_cube_free(instance, i);
     }
     free(instance->cube);
-
-    struct metric_name_id_map *node, *tmp;
-    HASH_ITER(hh, instance->metric_name_id_map, node, tmp) {
-        HASH_DEL(instance->metric_name_id_map, node);
-        free(node->name);
-        free(node);
-    }
 
     free(instance);
 }
@@ -129,9 +112,8 @@ int fieldstat_append_cube_to_instance(struct fieldstat *instance, struct fs_cube
     return instance->n_cube - 1;
 }
 
-struct fs_cube *fieldstat_cube_new(const struct fieldstat_tag *shared_tags, size_t n_tag, enum sampling_mode mode, size_t max_n_cell)
+void fieldstat_cube_info_init(struct fs_cube *cube, const struct fieldstat_tag *shared_tags, size_t n_tag, enum sampling_mode mode, size_t max_n_cell)
 {
-    struct fs_cube *cube = malloc(sizeof(struct fs_cube));
     memset(cube, 0, sizeof(struct fs_cube));
     cube->sampling_mode = mode;
     cube->max_n_cell = max_n_cell;
@@ -143,6 +125,12 @@ struct fs_cube *fieldstat_cube_new(const struct fieldstat_tag *shared_tags, size
     cube->max_n_metric = 16;
     cube->metrics = malloc(sizeof(struct metric *) * cube->max_n_metric);
     cube->n_metric = 0;
+}
+
+struct fs_cube *fieldstat_cube_new(const struct fieldstat_tag *shared_tags, size_t n_tag, enum sampling_mode mode, size_t max_n_cell)
+{
+    struct fs_cube *cube = malloc(sizeof(struct fs_cube));
+    fieldstat_cube_info_init(cube, shared_tags, n_tag, mode, max_n_cell);
 
     cube->cell_manager = cell_manager_new(mode, max_n_cell);
 
@@ -169,7 +157,7 @@ int fieldstat_cube_add(struct fieldstat *instance, int cube_id, const struct fie
         return -1;
     }
 
-    int ret = cell_manager_add_cube(cube->cell_manager, tags, n_tag, (unsigned int)count);
+    int ret = cell_manager_add_cell(cube->cell_manager, tags, n_tag, (unsigned int)count);
 
     return ret;
 }
@@ -254,54 +242,130 @@ int fieldstat_counter_incrby(struct fieldstat *instance, int metric_id, int cube
 // /*                                serialization                               */
 // /* -------------------------------------------------------------------------- */
 
-// /*
-// {
-//     "ver": <EXPORT_VER>
-//     "metrics"= {
-//         "name":
-//         "type":
-//         “para":<blob>
-//     }
-//     "cube"= {
-//         "cells":[
-//             "metrics":<blob of each metric>
-//         ]
-//         "tag": {
-//             "type":<topk/comp>
-//             "blob":<serialize counter or topk>
-//         }
-//     }
-// }
-// */
+/*
+{
+    "ver": <EXPORT_VER>
 
-// struct fieldstat *fieldstat_deserialize(const char *blob, size_t blob_size)
-// {
-//     mpack_tree_t tree;
-//     mpack_tree_init_data(&tree, blob, blob_size);
-//     mpack_tree_parse(&tree);
-//     mpack_node_t root = mpack_tree_root(&tree);
+    "cube"= {
+        [{
+        "shared_tags":[<tag_list_serialized_blob>]
+        "sampling_mode":0 or 1 
+        "max_n_cell":<max number of cells>
+        "metrics":[
+            [<blob>]
+        ]
+        "cm":<cell manager serialized blob>
+        }]
+    }
+}
+*/
 
-//     int ver = mpack_node_i32(mpack_node_map_cstr(root, "ver"));
-//     if (ver != EXPORT_VER) {
-//         printf("ERR: fieldstat_deserialize: invalid version\n");
-//         mpack_tree_destroy(&tree);
-//         return NULL;
-//     }
+int fieldstat_serialize(const struct fieldstat *instance, char **blob_out, size_t *blob_size_out)
+{
+    mpack_writer_t writer;
+    mpack_writer_init_growable(&writer, blob_out, blob_size_out);
+    mpack_build_map(&writer);
 
-//     struct fieldstat *instance = fieldstat_new();
+    mpack_write_cstr(&writer, "ver");
+    mpack_write_i32(&writer, EXPORT_VER);
 
-//     mpack_node_t field_arr = mpack_node_map_cstr(root, "metrics");
-//     for (int i = 0 ; i < mpack_node_array_length(field_arr); i++) {
-//         mpack_node_t field_blob_bin = mpack_node_array_at(field_arr, i);
-//         struct fs_cube *tmp_field = field_deserialize(mpack_node_bin_data(field_blob_bin), mpack_node_bin_size(field_blob_bin));
-//         append_metric_to_instance(instance, tmp_field);
-//     }
-//     instance->n_field = mpack_node_array_length(field_arr);
+    mpack_write_cstr(&writer, "cube");
+    mpack_build_array(&writer);
+    for (int i = 0; i < instance->n_cube; i++) {
+        struct fs_cube *cube = instance->cube[i];
+        if (cube == NULL) {
+            continue;
+        }
+        mpack_build_map(&writer);
+        mpack_write_cstr(&writer, "shared_tags");
+        char *shared_tag_blob = NULL;
+        size_t shared_tag_blob_size = 0;
+        fieldtag_list_serialize(cube->shared_tags, cube->n_shared_tags, &shared_tag_blob, &shared_tag_blob_size);
+        mpack_write_bin(&writer, shared_tag_blob, shared_tag_blob_size);
+        free(shared_tag_blob);
+        mpack_write_cstr(&writer, "sampling_mode");
+        mpack_write_i8(&writer, cube->sampling_mode);
+        mpack_write_cstr(&writer, "max_n_cell");
+        mpack_write_i64(&writer, cube->max_n_cell);
 
-//     mpack_tree_destroy(&tree);
- 
-//     return instance;
-// }
+        mpack_write_cstr(&writer, "metrics");
+        mpack_start_array(&writer, cube->n_metric);
+        for (int j = 0; j < cube->n_metric; j++) {
+            char *metric_blob = NULL;
+            size_t metric_blob_size = 0;
+            metric_serialize(cube->metrics[j], &metric_blob, &metric_blob_size);
+            mpack_write_bin(&writer, metric_blob, metric_blob_size);
+            free(metric_blob);
+        }
+        mpack_finish_array(&writer);
+
+        mpack_write_cstr(&writer, "cm");
+        char *cm_blob = NULL;
+        size_t cm_blob_size = 0;
+        cell_manager_serialize(cube->cell_manager, &cm_blob, &cm_blob_size);
+        mpack_write_bin(&writer, cm_blob, cm_blob_size);
+        free(cm_blob);
+
+        mpack_complete_map(&writer);
+    }
+    mpack_complete_array(&writer);
+
+    mpack_complete_map(&writer);
+    if (mpack_writer_destroy(&writer) != mpack_ok) {
+        printf("ERR: fieldstat_serialize: mpack_writer_destroy failed\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+struct fieldstat *fieldstat_deserialize(const char *blob, size_t blob_size)
+{
+    mpack_tree_t tree;
+    mpack_tree_init_data(&tree, blob, blob_size);
+    mpack_tree_parse(&tree);
+    mpack_node_t root = mpack_tree_root(&tree);
+    int ver = mpack_node_i32(mpack_node_map_cstr(root, "ver"));
+    if (ver != EXPORT_VER) {
+        printf("ERR: fieldstat_deserialize: invalid version\n");
+        mpack_tree_destroy(&tree);
+        return NULL;
+    }
+
+    struct fieldstat *instance = fieldstat_new();
+    mpack_node_t cube_node = mpack_node_map_cstr(root, "cube");
+    int n_cube = mpack_node_array_length(cube_node);
+    for (int i = 0; i < n_cube; i++) {
+        mpack_node_t cube = mpack_node_array_at(cube_node, i);
+
+        mpack_node_t shared_tags_node = mpack_node_map_cstr(cube, "shared_tags");
+        struct fieldstat_tag *shared_tags = NULL;
+        size_t n_shared_tags = 0;
+        fieldtag_list_deserialize(mpack_node_bin_data(shared_tags_node), mpack_node_bin_size(shared_tags_node), &shared_tags, &n_shared_tags);
+        int sampling_mode = mpack_node_i8(mpack_node_map_cstr(cube, "sampling_mode"));
+        int max_n_cell = mpack_node_i64(mpack_node_map_cstr(cube, "max_n_cell"));
+        struct fs_cube *fs_cube = malloc(sizeof(struct fs_cube));
+        fieldstat_cube_info_init(fs_cube, shared_tags, n_shared_tags, sampling_mode, max_n_cell);
+        fieldtag_list_free(shared_tags, n_shared_tags);
+
+        mpack_node_t metrics_node = mpack_node_map_cstr(cube, "metrics");
+        int n_metrics = mpack_node_array_length(metrics_node);
+        for (int j = 0; j < n_metrics; j++) {
+            mpack_node_t metric_node = mpack_node_array_at(metrics_node, j);
+            struct metric *metric = metric_deserialize(mpack_node_bin_data(metric_node), mpack_node_bin_size(metric_node));
+            append_metric_to_cube(fs_cube, metric);
+        }
+
+        mpack_node_t cm_node = mpack_node_map_cstr(cube, "cm");
+        struct cell_manager *cm = cell_manager_deserialize(mpack_node_bin_data(cm_node), mpack_node_bin_size(cm_node));
+        fs_cube->cell_manager = cm;
+
+        fieldstat_append_cube_to_instance(instance, fs_cube);
+    }
+
+    mpack_tree_destroy(&tree);
+    return instance;
+}
 
 /* -------------------------------------------------------------------------- */
 /*                                    merge                                   */
@@ -319,9 +383,9 @@ struct fs_cube *fieldstat_cube_dup(const struct fs_cube *cube)
     return cube_dup;
 }
 
-int name_id_map_get_id_by_name(struct field_name_id_map *map, const char *field_name)
+int name_id_map_get_id_by_name(struct metric_name_id_map *map, const char *field_name)
 {
-    struct field_name_id_map *entry = NULL;
+    struct metric_name_id_map *entry = NULL;
     HASH_FIND_STR(map, field_name, entry);
     if (entry == NULL) {
         return -1;
@@ -329,17 +393,17 @@ int name_id_map_get_id_by_name(struct field_name_id_map *map, const char *field_
     return entry->id;
 }
 
-void name_id_map_add(struct field_name_id_map **map, const char *name, int id)
+void name_id_map_add(struct metric_name_id_map **map, const char *name, int id)
 {
-    struct field_name_id_map *entry = malloc(sizeof(struct field_name_id_map));
+    struct metric_name_id_map *entry = malloc(sizeof(struct metric_name_id_map));
     entry->id = id;
     entry->name = strdup(name);
     HASH_ADD_KEYPTR(hh, *map, entry->name, strlen(entry->name), entry);
 }
 
-void name_id_map_free(struct field_name_id_map *map)
+void name_id_map_free(struct metric_name_id_map *map)
 {
-    struct field_name_id_map *entry, *tmp;
+    struct metric_name_id_map *entry, *tmp;
     HASH_ITER(hh, map, entry, tmp) {
         HASH_DEL(map, entry);
         free(entry->name);
@@ -347,7 +411,7 @@ void name_id_map_free(struct field_name_id_map *map)
     }
 }
 
-void name_id_map_init(struct field_name_id_map **map, const struct fs_cube *cube)
+void name_id_map_init(struct metric_name_id_map **map, const struct fs_cube *cube)
 {
     *map = NULL;
     const char *name;
@@ -372,9 +436,9 @@ void cube_push_all_cells_to_another_cell_manager(const struct fs_cube *src, stru
         for (int j = 0; j < cell_id_count_src; j ++) {
             cell_manager_get_tag_by_cube_id(cell_manager_src, cell_ids_src[j], &tags_src, &tag_count_src);
             int count = cell_manager_get_count_by_tag(cell_manager_src, tags_src, tag_count_src);
-            (void)cell_manager_add_cube(cell_manager_aim, tags_src, tag_count_src, count);
+            (void)cell_manager_add_cell(cell_manager_aim, tags_src, tag_count_src, count);
 
-            fieldtag_arr_free(tags_src, tag_count_src);
+            fieldtag_list_free(tags_src, tag_count_src);
         }
         free(cell_ids_src);
     }
@@ -388,7 +452,7 @@ int fieldstat_cube_merge_comprehensive(struct fs_cube *dest, const struct fs_cub
     size_t cell_id_count_src;
     struct fieldstat_tag *tags_src;
     size_t tag_count_src;
-    struct field_name_id_map *name_id_map_dest = NULL;
+    struct metric_name_id_map *name_id_map_dest = NULL;
     name_id_map_init(&name_id_map_dest, dest);
 
     for (int metric_id_src = 0; metric_id_src < src->n_metric; metric_id_src ++) {
@@ -410,16 +474,16 @@ int fieldstat_cube_merge_comprehensive(struct fs_cube *dest, const struct fs_cub
             int cell_id_tmp_dest = cell_manager_get_cube_id_by_tag(cell_manager_dest, tags_src, tag_count_src);
             if (cell_id_tmp_dest != -1) {
                 metric_merge_cell(dest->metrics[metric_id_dest], src->metrics[metric_id_src], cell_id_tmp_dest, cell_id_tmp_src);
-                fieldtag_arr_free(tags_src, tag_count_src);
+                fieldtag_list_free(tags_src, tag_count_src);
                 continue;
             }
-            cell_id_tmp_dest = cell_manager_add_cube(cell_manager_dest, tags_src, tag_count_src, 0);
+            cell_id_tmp_dest = cell_manager_add_cell(cell_manager_dest, tags_src, tag_count_src, 0);
             if (cell_id_tmp_dest == -1) { // the cube has already full
-                fieldtag_arr_free(tags_src, tag_count_src);
+                fieldtag_list_free(tags_src, tag_count_src);
                 break;
             }
             metric_copy_cell(dest->metrics[metric_id_dest], src->metrics[metric_id_src], cell_id_tmp_dest, cell_id_tmp_src);
-            fieldtag_arr_free(tags_src, tag_count_src);
+            fieldtag_list_free(tags_src, tag_count_src);
         }
         free(cell_ids_src);
     }
@@ -433,8 +497,8 @@ int fieldstat_cube_merge_topk(struct fs_cube *dest, const struct fs_cube *src)
     struct cell_manager *cell_manager_final = cell_manager_new(SAMPLING_MODE_TOPK, dest->max_n_cell);
     struct cell_manager *cell_manager_src = src->cell_manager;
     struct cell_manager *cell_manager_dest = dest->cell_manager;
-    struct field_name_id_map *name_id_map_src = NULL;
-    struct field_name_id_map *name_id_map_dest = NULL;
+    struct metric_name_id_map *name_id_map_src = NULL;
+    struct metric_name_id_map *name_id_map_dest = NULL;
     int *cell_ids_dest;
     size_t cell_id_count_dest;
     int *cell_ids_src;
@@ -484,7 +548,7 @@ int fieldstat_cube_merge_topk(struct fs_cube *dest, const struct fs_cube *src)
             } else { // tag exist in dest, but not final(source exist or not exist)
                 metric_delete_cell(dest->metrics[metric_id_dest], cell_id_tmp_dest);
             }
-            fieldtag_arr_free(tags_dest, tag_count_dest);
+            fieldtag_list_free(tags_dest, tag_count_dest);
         }
         free(cell_ids_dest);
     }
@@ -516,17 +580,17 @@ int fieldstat_cube_merge_topk(struct fs_cube *dest, const struct fs_cube *src)
             }
             int cell_id_tmp_final = cell_manager_get_cube_id_by_tag(cell_manager_final, tags_src, tag_count_src);
             if (cell_id_tmp_final == -1) { // tags not exist in final, which have been processed in previous loop
-                fieldtag_arr_free(tags_src, tag_count_src);
+                fieldtag_list_free(tags_src, tag_count_src);
                 continue;
             }
             int cell_id_tmp_dest = cell_manager_get_cube_id_by_tag(cell_manager_dest, tags_src, tag_count_src);
             if (cell_id_tmp_dest != -1) { // tags exist in dest, which have been processed in previous loop
-                fieldtag_arr_free(tags_src, tag_count_src);
+                fieldtag_list_free(tags_src, tag_count_src);
                 continue;
             }
             metric_copy_cell(dest->metrics[metric_id_dest], src->metrics[metric_id_src], cell_id_tmp_final, cell_id_tmp_src);
 
-            fieldtag_arr_free(tags_src, tag_count_src);
+            fieldtag_list_free(tags_src, tag_count_src);
         }
         free(cell_ids_src);
     }
@@ -553,7 +617,7 @@ int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
     // tag_id_map use cube shared tag as key, find cubes. Is is not a cell manager.
     struct cell_manager *tag_id_map = cell_manager_new(SAMPLING_MODE_COMPREHENSIVE, instance->n_cube + src->n_cube);
     for (int i = 0; i < instance->n_cube; i++) {
-        cell_manager_add_cube(tag_id_map, instance->cube[i]->shared_tags, instance->cube[i]->n_shared_tags, 0);
+        cell_manager_add_cell(tag_id_map, instance->cube[i]->shared_tags, instance->cube[i]->n_shared_tags, 0);
     }
 
     for (int i = 0; i < src->n_cube; i++) {

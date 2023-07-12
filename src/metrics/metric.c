@@ -231,7 +231,9 @@ struct metric_measure_data *metric_scheme_counter_deserialize(const char *blob, 
     counter->value = mpack_node_i64(mpack_node_map_cstr(content_root, "value"));
     counter->type = mpack_node_i8(mpack_node_map_cstr(content_root, "type"));
 
-    mpack_tree_destroy(&content_tree);
+    if (mpack_tree_destroy(&content_tree) != mpack_ok) {
+        printf("ERR: An error occurred in counter_metric_deserialize!\n");
+    }
     return ret;
 }
 
@@ -453,7 +455,7 @@ void mpack_blob_wrap_basic_info(int cell_id, const char *blob, size_t blob_size,
 {
     mpack_writer_t writer;
     mpack_writer_init_growable(&writer, new_blob, new_blob_size);
-    mpack_start_map(&writer, 3);
+    mpack_start_map(&writer, 2);
     mpack_write_cstr(&writer, "id");
     mpack_write_int(&writer, cell_id);
     mpack_write_cstr(&writer, "PL");
@@ -498,8 +500,6 @@ int metric_serialize(const struct metric *pthis, char **blob, size_t *blob_size)
 {
     char *para_blob = NULL;
     size_t para_blob_size = 0;
-    char *data_blob = NULL;
-    size_t data_blob_size = 0;
     mpack_writer_t writer;
     mpack_writer_init_growable(&writer, blob, blob_size);
 
@@ -515,20 +515,29 @@ int metric_serialize(const struct metric *pthis, char **blob, size_t *blob_size)
     free(para_blob);
 
     mpack_write_cstr(&writer, "data");
-    if (HASH_COUNT(pthis->data_map) == 0) {
+    int *cell_ids = NULL;
+    size_t cell_ids_size = 0;
+    metric_get_cell_ids(pthis, &cell_ids, &cell_ids_size);
+    if (cell_ids == NULL) {
         mpack_write_nil(&writer);
     } else {
-        struct cell_id_data_map *node, *tmp;
         mpack_build_array(&writer);
-        HASH_ITER(hh, pthis->data_map, node, tmp) {
-            pthis->scheme->serialize(node->data, &data_blob, &data_blob_size);
+        for (int i = 0; i < cell_ids_size; i++) {
+            struct metric_measure_data *data = metric_find_one_cell(pthis, cell_ids[i]);
+            printf("data id: %d, measure: %lld\n", cell_ids[i], data->counter->value);
+
+            char *data_blob = NULL;
+            size_t data_blob_size = 0;
+            pthis->scheme->serialize(data, &data_blob, &data_blob_size);
+
             char *tmp_data_wrapped_blob = NULL;
             size_t tmp_data_wrapped_blob_size = 0;
-            mpack_blob_wrap_basic_info(node->id, data_blob, data_blob_size, &tmp_data_wrapped_blob, &tmp_data_wrapped_blob_size);
+            mpack_blob_wrap_basic_info(cell_ids[i], data_blob, data_blob_size, &tmp_data_wrapped_blob, &tmp_data_wrapped_blob_size);
             mpack_write_bin(&writer, tmp_data_wrapped_blob, tmp_data_wrapped_blob_size);
             free(data_blob);
             free(tmp_data_wrapped_blob);
         }
+        free(cell_ids);
         mpack_complete_array(&writer);
     }
 
@@ -542,6 +551,7 @@ int metric_serialize(const struct metric *pthis, char **blob, size_t *blob_size)
 
 struct metric *metric_deserialize(const char *blob, size_t blob_size)
 {
+    printf("metric_deserialize enter\n");
     mpack_tree_t tree;
     mpack_tree_init_data(&tree, blob, blob_size);
     mpack_tree_parse(&tree);
@@ -567,11 +577,9 @@ struct metric *metric_deserialize(const char *blob, size_t blob_size)
         char *data_blob = NULL;
         size_t data_blob_size = 0;
         mpack_blob_unpack_basic_info(mpack_node_bin_data(data_node), mpack_node_bin_size(data_node), &data_blob, &data_blob_size, &cell_id);
-        struct cell_id_data_map *node = (struct cell_id_data_map *)malloc(sizeof(struct cell_id_data_map));
-        node->id = cell_id;
-        node->data = metric_out->scheme->deserialize(data_blob, data_blob_size);
+        struct metric_measure_data *data = metric_out->scheme->deserialize(data_blob, data_blob_size);
         free(data_blob);
-        HASH_ADD_INT(metric_out->data_map, id, node); // fixme: 这里用add_one_cell 替代
+        metric_add_one_cell(metric_out, cell_id, data);
     }
     mpack_tree_destroy(&tree);
     return metric_out;
@@ -755,6 +763,7 @@ void metric_get_cell_ids(const struct metric *pthis, int **cell_ids, size_t *cel
         }
         return;
     }
+
     *cell_id_count = HASH_COUNT(pthis->data_map);
     if (*cell_id_count == 0) {
         printf("metric_get_cell_ids no cell ids\n");

@@ -33,12 +33,13 @@
 
 // TODO: 应该是用这个，暂时先拿uthash凑合一下
 // #include "my_ut_hash.h"
-#include "stdio.h"
-#include "assert.h"
-#include "stdlib.h"
-#include "string.h"
+#include <stdio.h>
+#include <assert.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "uthash.h"
+#include "mpack/mpack.h"
 #include "fieldstat.h"
 #include "tags/dimension_cube_map.h"
 #include "tags/heavy_keeper.h"
@@ -68,8 +69,7 @@ struct cell_manager {
     int next_cell_id; // only used in comprehensive mode
 };
 
-
-static void fieldtag_copy(const struct fieldstat_tag *kv_pair, struct fieldstat_tag *dest)
+void fieldtag_copy(const struct fieldstat_tag *kv_pair, struct fieldstat_tag *dest)
 {
     dest->key = strdup(kv_pair->key);
     dest->type = kv_pair->type;
@@ -98,7 +98,7 @@ void fieldtag_clear(struct fieldstat_tag *kv_pair)
     }
 }
 
-void fieldtag_arr_free(struct fieldstat_tag *kv_pairs, size_t n_pairs)
+void fieldtag_list_free(struct fieldstat_tag *kv_pairs, size_t n_pairs)
 {
     for (int i = 0; i < (int)n_pairs; i++) {
         fieldtag_clear(&kv_pairs[i]);
@@ -178,7 +178,7 @@ void cell_manager_tag_cube_map_free(struct cell_manager *pthis)
     struct tag_cube_map *tmp = NULL;
     HASH_ITER(hh, pthis->id_tag_map, node, tmp) {
         HASH_DEL(pthis->id_tag_map, node);
-        fieldtag_arr_free(node->tags, node->n_tags);
+        fieldtag_list_free(node->tags, node->n_tags);
         free(node);
     }
 }
@@ -326,14 +326,14 @@ int cell_manager_topk_map_add(struct cell_manager *pthis, const struct fieldstat
         HASH_FIND_INT(pthis->id_tag_map, &popped_cube_id, node);
         if (node != NULL) {
             HASH_DEL(pthis->id_tag_map, node);
-            fieldtag_arr_free(node->tags, node->n_tags);
+            fieldtag_list_free(node->tags, node->n_tags);
             free(node);
         }
     }
     return ret;
 }
 
-int cell_manager_add_cube(struct cell_manager *pthis, const struct fieldstat_tag *tag, size_t tag_count, unsigned int count)
+int cell_manager_add_cell(struct cell_manager *pthis, const struct fieldstat_tag *tag, size_t tag_count, unsigned int count)
 {
     if (pthis->sampling_mode == SAMPLING_MODE_COMPREHENSIVE) {
         if (HASH_COUNT(pthis->comprehensive_tag_id_map) >= pthis->max_cell_num) {
@@ -352,4 +352,235 @@ int cell_manager_add_cube(struct cell_manager *pthis, const struct fieldstat_tag
 
     cell_manager_id_tag_map_add(pthis, pthis->next_cell_id, tag, tag_count);
     return pthis->next_cell_id++;
+}
+
+int my_cmp_tag(const void *a, const void *b)
+{
+    struct fieldstat_tag *aa = (struct fieldstat_tag *)a;
+    struct fieldstat_tag *bb = (struct fieldstat_tag *)b;
+    int key_cmp = strcmp(aa->key, bb->key);
+    if (key_cmp != 0) {
+        return key_cmp;
+    }
+
+    assert(aa->type == bb->type);
+    switch (aa->type) {
+        case TAG_INTEGER:
+            return aa->value_int - bb->value_int;
+        case TAG_DOUBLE:
+            return aa->value_double - bb->value_double;
+        case TAG_CSTRING:
+            return strcmp(aa->value_str, bb->value_str);
+        default:
+            return 0;
+    }
+}
+
+/* 
+    [{
+        "key":<tag key string>
+        "type":0 1 or 2
+        "value":<tag value, can be int(0) double(1) or str(2)>
+    }]
+*/
+void fieldtag_list_serialize(const struct fieldstat_tag *tag_list, size_t tag_num, char **blob, size_t *blob_size)
+{
+    struct fieldstat_tag *tag_list_sorted = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * tag_num);
+    for (int i = 0; i < tag_num; i++) {
+        fieldtag_copy(&tag_list[i], &tag_list_sorted[i]);
+    }
+    // sort tag so that when merge by blob, we can merge cells with the same tags
+    qsort(tag_list_sorted, tag_num, sizeof(struct fieldstat_tag), my_cmp_tag);
+
+    mpack_writer_t writer;
+    mpack_writer_init_growable(&writer, blob, blob_size);
+
+    mpack_start_array(&writer, tag_num);
+    for (int j = 0; j < tag_num; j++) {
+        mpack_start_map(&writer, 3);
+        mpack_write_cstr(&writer, "key");
+        mpack_write_cstr(&writer, tag_list_sorted[j].key);
+        mpack_write_cstr(&writer, "type");
+        mpack_write_i8(&writer, tag_list_sorted[j].type);
+        mpack_write_cstr(&writer, "value");
+        switch (tag_list_sorted[j].type)
+        {
+            case TAG_INTEGER:
+                mpack_write_i64(&writer, tag_list_sorted[j].value_int);
+                break;
+            case TAG_DOUBLE:
+                mpack_write_double(&writer, tag_list_sorted[j].value_double);
+                break;
+            case TAG_CSTRING:
+                mpack_write_cstr(&writer, tag_list_sorted[j].value_str);
+                break;
+            default:
+                assert(0);
+                break;
+        }
+        mpack_finish_map(&writer);
+    }
+    mpack_finish_array(&writer);
+
+    if (mpack_writer_destroy(&writer) != mpack_ok) {
+        fprintf(stderr, "mpack writer fieldtag_list_serialize destroy failed\n");
+        exit(1);
+    }
+
+    fieldtag_list_free(tag_list_sorted, tag_num);
+}
+
+
+void fieldtag_list_deserialize(const char *blob, size_t blob_size, struct fieldstat_tag **tag_list_out, size_t *tag_num_out)
+{
+    mpack_tree_t tree;
+    mpack_tree_init_data(&tree, blob, blob_size);
+    mpack_tree_parse(&tree);
+    mpack_node_t tag_arr = mpack_tree_root(&tree);
+
+    size_t tag_num = mpack_node_array_length(tag_arr);
+
+    struct fieldstat_tag *tag_list = malloc(sizeof(struct fieldstat_tag) * tag_num);
+    for (int j = 0; j < tag_num; j++) {
+        mpack_node_t tag = mpack_node_array_at(tag_arr, j);
+
+        mpack_node_t key = mpack_node_map_cstr(tag, "key");
+        tag_list[j].key = (const char *)malloc(mpack_node_strlen(key) + 1);
+        mpack_node_copy_cstr(key, (char *)tag_list[j].key, mpack_node_strlen(key) + 1);
+        tag_list[j].type = mpack_node_i8(mpack_node_map_cstr(tag, "type"));
+
+        mpack_node_t value = mpack_node_map_cstr(tag, "value");
+
+        switch (tag_list[j].type)
+        {
+            case TAG_INTEGER:
+                tag_list[j].value_int = mpack_node_i64(value);
+                break;
+            case TAG_DOUBLE:
+                tag_list[j].value_double = mpack_node_double(value);
+                break;
+            case TAG_CSTRING:
+                tag_list[j].value_str = (const char *)malloc(mpack_node_strlen(value) + 1);
+                mpack_node_copy_cstr(value, (char *)tag_list[j].value_str, mpack_node_strlen(value) + 1);
+                break;
+            default:
+                assert(0);
+                break;
+        }
+    }
+    *tag_list_out = tag_list;
+    *tag_num_out = tag_num;
+
+    mpack_tree_destroy(&tree);
+}
+
+/*
+{
+    "mode":<sampling mode int8>
+    "max_n_cell":<max cell number int32>
+
+    "id_tag_map": [{
+        "id": <id in cell manager>,
+        "tags": [{
+                "key": "field1",
+                "type":0, 1, or 2
+                "value": "value1"
+                },
+                <tag2>,...],
+        },
+        ...,
+        ]
+    "topk_map": <topk_serializing_blob>
+}
+*/
+int cell_manager_serialize(const struct cell_manager *pthis, char **blob, size_t *blob_size)
+{
+    mpack_writer_t writer;
+    mpack_writer_init_growable(&writer, blob, blob_size);
+    mpack_build_map(&writer);
+    mpack_write_cstr(&writer, "mode");
+    mpack_write_i8(&writer, pthis->sampling_mode);
+    mpack_write_cstr(&writer, "max_n_cell");
+    mpack_write_i32(&writer, pthis->max_cell_num);
+    
+    mpack_write_cstr(&writer, "id_tag_map");
+    mpack_build_array(&writer);
+    struct tag_cube_map *node = NULL;
+    struct tag_cube_map *tmp = NULL;
+    HASH_ITER(hh, pthis->id_tag_map, node, tmp) {
+        mpack_build_map(&writer);
+        mpack_write_cstr(&writer, "id");
+        mpack_write_int(&writer, node->cell_id);
+        mpack_write_cstr(&writer, "tags");
+        char *tag_blob = NULL;
+        size_t tag_blob_size = 0;
+        fieldtag_list_serialize(node->tags, node->n_tags, &tag_blob, &tag_blob_size);
+        mpack_write_bin(&writer, tag_blob, tag_blob_size);
+        free(tag_blob);
+        mpack_complete_map(&writer);
+    }
+    mpack_complete_array(&writer); // id_tag_map
+
+    if (pthis->sampling_mode == SAMPLING_MODE_TOPK) {
+        mpack_write_cstr(&writer, "topk_map");
+        char *topk_blob = NULL;
+        size_t topk_blob_size = 0;
+        heavy_keeper_serialization(pthis->topk_tag_id_map, &topk_blob, &topk_blob_size);
+        mpack_write_bin(&writer, topk_blob, topk_blob_size);
+        free(topk_blob);
+    }
+
+    mpack_complete_map(&writer);
+    if (mpack_writer_destroy(&writer) != mpack_ok) {
+        printf("ERR: An error occurred in cell_manager_serialize\n");
+    }
+
+    return 0;
+}
+
+struct cell_manager *cell_manager_deserialize(const char *blob, size_t blob_size)
+{
+    mpack_tree_t tree;
+    mpack_tree_init_data(&tree, blob, blob_size);
+    mpack_tree_parse(&tree);
+    mpack_node_t root = mpack_tree_root(&tree);
+
+    enum sampling_mode mode = (enum sampling_mode) mpack_node_i8(mpack_node_map_cstr(root, "mode"));
+    int max_n_cell = mpack_node_i32(mpack_node_map_cstr(root, "max_n_cell"));
+    struct cell_manager *pthis = cell_manager_new(mode, max_n_cell);
+
+    mpack_node_t id_tag_map = mpack_node_map_cstr(root, "id_tag_map");
+    int n_cell = mpack_node_array_length(id_tag_map);
+    int cell_id_max = -1;
+    for (int i = 0; i < n_cell; i++) {
+        mpack_node_t cell = mpack_node_array_at(id_tag_map, i);
+        int cell_id = mpack_node_i32(mpack_node_map_cstr(cell, "id"));
+        mpack_node_t tags = mpack_node_map_cstr(cell, "tags");
+        size_t n_tag;
+        struct fieldstat_tag *tag_list;
+        const char *tag_blob = mpack_node_bin_data(tags);
+        size_t tag_blob_size = mpack_node_bin_size(tags);
+        fieldtag_list_deserialize(tag_blob, tag_blob_size, &tag_list, &n_tag);
+        cell_manager_id_tag_map_add(pthis, cell_id, tag_list, n_tag);
+        if (mode == SAMPLING_MODE_COMPREHENSIVE) {
+            cell_manager_comprehensive_map_add(pthis, tag_list, n_tag, cell_id);
+            printf("cell_manager_deserialize add a cell %d, tag key(0): %s\n", cell_id, tag_list[0].key);
+        }
+
+        if (cell_id > cell_id_max) {
+            cell_id_max = cell_id;
+        }
+
+        fieldtag_list_free(tag_list, n_tag);
+    }
+    if (mode == SAMPLING_MODE_TOPK) {
+        mpack_node_t topk_map = mpack_node_map_cstr(root, "topk_map");
+        const char *topk_blob = mpack_node_bin_data(topk_map);
+        size_t topk_blob_size = mpack_node_bin_size(topk_map);
+        pthis->topk_tag_id_map = heavy_keeper_deserialization(topk_blob, topk_blob_size);
+    }
+    pthis->next_cell_id = cell_id_max + 1;
+
+    mpack_tree_destroy(&tree);
+    return pthis;
 }

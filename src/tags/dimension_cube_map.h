@@ -2,6 +2,11 @@
 #pragma once
 #include "fieldstat.h"
 
+#ifdef __cplusplus
+extern "C"{
+#endif
+
+
 // cube manager
 struct cell_manager;
 
@@ -14,7 +19,16 @@ int cell_manager_get_tag_by_cube_id(const struct cell_manager *pthis, int cube_i
 int cell_manager_get_count_by_tag(const struct cell_manager *pthis, const struct fieldstat_tag *tag, size_t tag_count); // only for topk
 
 // todo: 由cell manager控制id，且topk 的id为其在sorted set里的id
-int cell_manager_add_cube(struct cell_manager *pthis, const struct fieldstat_tag *tag, size_t tag_count, unsigned int count);
+int cell_manager_add_cell(struct cell_manager *pthis, const struct fieldstat_tag *tag, size_t tag_count, unsigned int count);
 
 
-void fieldtag_arr_free(struct fieldstat_tag *kv_pairs, size_t n_pairs);
+void fieldtag_list_free(struct fieldstat_tag *kv_pairs, size_t n_pairs);
+void fieldtag_list_serialize(const struct fieldstat_tag *tag_list, size_t tag_num, char **blob, size_t *blob_size);
+void fieldtag_list_deserialize(const char *blob, size_t blob_size, struct fieldstat_tag **tag_list_out, size_t *tag_num_out);
+
+int cell_manager_serialize(const struct cell_manager *pthis, char **blob, size_t *blob_size);
+struct cell_manager *cell_manager_deserialize(const char *blob, size_t blob_size);
+
+#ifdef __cplusplus
+}
+#endif

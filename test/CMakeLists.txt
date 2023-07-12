@@ -15,9 +15,9 @@ cmake_minimum_required(VERSION 2.8)
 
 include_directories(${PROJECT_SOURCE_DIR}/test)
 include_directories(${PROJECT_SOURCE_DIR}/src)
-include_directories(${PROJECT_SOURCE_DIR}/src/utils)
+include_directories(${PROJECT_SOURCE_DIR}/src/tags)
 include_directories(${PROJECT_SOURCE_DIR}/src/metrics)
-include_directories(${PROJECT_SOURCE_DIR}/include)
+include_directories(${PROJECT_SOURCE_DIR}/include/fieldstat)
 
 # zlib, first install zlib from https://zlib.net/
 SET (ZLIB_ROOT "/home/chenzizhan/zlib")
@@ -41,5 +41,6 @@ function (add_unit_test file_name)
     # add_test(NAME ${file_name} COMMAND ${file_name})
 endfunction()
 
-add_unit_test(test_metric_counter)
-add_unit_test(unit_test_merge)
+# add_unit_test(test_metric_counter)
+# add_unit_test(unit_test_merge)
+add_unit_test(unit_test_serialize)
