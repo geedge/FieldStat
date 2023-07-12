@@ -49,7 +49,7 @@ void fieldstat_free(struct fieldstat *instance);
     * @param n_tag: number of shared tags.
     * @param mode: sampling mode. Refer to enum sampling_mode.
     * @param max_n_cell: max number of cells in each cube.
-    * @return cube id, if success; otherwise, return -1. Fail when tags are not unique.
+    * @return cube id, if success; otherwise, return -1. Fail when tags are NULL. the uniqueness of shared_tags is not checked, user should guarantee that shared_tags are unique.
 */
 int fieldstat_register_cube(struct fieldstat *instance, const struct fieldstat_tag *shared_tags, size_t n_tag, enum sampling_mode mode, size_t max_n_cell);
 
@@ -114,6 +114,10 @@ unsigned long fieldstat_get_cell_version(const struct fieldstat *instance);
 int fieldstat_delete_cube(struct fieldstat *instance, int cube_id);
 unsigned long fieldstat_get_cube_version(const struct fieldstat *instance, int cube_id);
 
+/*
+ @brief Merge the instance. The registered cubes and metrics are merged even if there are no cells added.
+ @return 0 if success. -1 if failed. Failed when the registered cubes or metrics between dest and src of the same keys has different types or configurations.
+*/
 int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src);
 struct fieldstat *fieldstat_deserialize(const char *blob, size_t blob_size);
 int fieldstat_serialize(const struct fieldstat *instance, char **blob_out, size_t *blob_size_out);
@@ -143,9 +147,6 @@ const char *fieldstat_get_metric_name(const struct fieldstat *instance, int cube
 enum metric_type fieldstat_get_metric_type(const struct fieldstat *instance, int cube_id, int metric_id);
 
 void fieldstat_tag_list_arr_free(struct fieldstat_tag_list *tag_list, size_t n_cell);
-
-// todo: 增加cube 的free，配套一个新的version接口
-// todo: 这个操作影响挺大的，比如新申请的cube，如果之前有的话，肯定不能再来一个，所以要有shared tag 到cube id 的匹配。比如append 操作的时候，不能跟n_cube 走，而是先找一个空。比如n_cube 要重命名成last_cube_id
 
 #ifdef __cplusplus
 }

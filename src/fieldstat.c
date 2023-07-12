@@ -185,7 +185,7 @@ struct fs_cube *fieldstat_cube_new(const struct fieldstat_tag *shared_tags, size
 
 int fieldstat_register_cube(struct fieldstat *instance, const struct fieldstat_tag *shared_tags, size_t n_tag, enum sampling_mode mode, size_t max_n_cell)
 {
-    if (n_tag == 0) {
+    if (n_tag == 0 || shared_tags == NULL) {
         printf("ERR: shared tags must not be empty\n");
         return -1;
     }
@@ -541,24 +541,42 @@ int fieldstat_cube_merge_comprehensive(struct fs_cube *dest, const struct fs_cub
             int cell_id_tmp_dest = cell_manager_get_cell_id_by_tag(cell_manager_dest, tags_src, tag_count_src);
             if (cell_id_tmp_dest != -1) {
                 printf("cell already exist, merge cell from %d to %d\n", cell_id_tmp_src, cell_id_tmp_dest);
-                metric_merge_cell(dest->metrics[metric_id_dest], src->metrics[metric_id_src], cell_id_tmp_dest, cell_id_tmp_src);
+                if (metric_merge_cell(dest->metrics[metric_id_dest], src->metrics[metric_id_src], cell_id_tmp_dest, cell_id_tmp_src) != 0) {
+                    goto ERR;
+                }
                 fieldtag_list_free(tags_src, tag_count_src);
+                tags_src = NULL;
                 continue;
             }
             cell_id_tmp_dest = cell_manager_add_cell(cell_manager_dest, tags_src, tag_count_src, 0);
             if (cell_id_tmp_dest == -1) { // the cube has already full
                 fieldtag_list_free(tags_src, tag_count_src);
+                tags_src = NULL;
                 break;
             }
             printf("cell not exist, copy cell from %d to %d\n", cell_id_tmp_src, cell_id_tmp_dest);
-            metric_copy_cell(dest->metrics[metric_id_dest], src->metrics[metric_id_src], cell_id_tmp_dest, cell_id_tmp_src);
+            if (metric_copy_cell(dest->metrics[metric_id_dest], src->metrics[metric_id_src], cell_id_tmp_dest, cell_id_tmp_src) != 0) {
+                goto ERR;
+            }
             fieldtag_list_free(tags_src, tag_count_src);
+            tags_src = NULL;
         }
         free(cell_ids_src);
+        cell_ids_src = NULL;
     }
 
     name_id_map_free(name_id_map_dest);
     return 0;
+
+ERR:
+    name_id_map_free(name_id_map_dest);
+    if (tags_src != NULL) {
+        fieldtag_list_free(tags_src, tag_count_src);
+    }
+    if (cell_ids_src != NULL) {
+        free(cell_ids_src);
+    }
+    return -1;
 }
 
 int fieldstat_cube_merge_topk(struct fs_cube *dest, const struct fs_cube *src)
@@ -582,7 +600,6 @@ int fieldstat_cube_merge_topk(struct fs_cube *dest, const struct fs_cube *src)
     // merge cell manager
     cube_push_all_cells_to_another_cell_manager(src, cell_manager_final);
     cube_push_all_cells_to_another_cell_manager(dest, cell_manager_final);
-
 
     // dest cube manager   |   merged cube manager | src cube manager    |  operation
     //  -----              |   -----               | -----               |  -----
@@ -610,16 +627,24 @@ int fieldstat_cube_merge_topk(struct fs_cube *dest, const struct fs_cube *src)
             int cell_id_tmp_final = cell_manager_get_cell_id_by_tag(cell_manager_final, tags_dest, tag_count_dest);
             int cell_id_tmp_src = cell_manager_get_cell_id_by_tag(cell_manager_src, tags_dest, tag_count_dest);
             if (cell_id_tmp_final != -1 && cell_id_tmp_src != -1) { // tags exist in dest, final and source
-                metric_merge_cell(dest->metrics[metric_id_dest], src->metrics[metric_id_src], cell_id_tmp_dest, cell_id_tmp_src);
-                metric_change_cell_id(dest->metrics[metric_id_dest], cell_id_tmp_dest, cell_id_tmp_final);
+                if (metric_merge_cell(dest->metrics[metric_id_dest], src->metrics[metric_id_src], cell_id_tmp_dest, cell_id_tmp_src) != 0) {
+                    goto ERR;
+                }
+                if (metric_change_cell_id(dest->metrics[metric_id_dest], cell_id_tmp_dest, cell_id_tmp_final) != 0) {
+                    goto ERR;
+                }
             } else if (cell_id_tmp_final != -1 && cell_id_tmp_src == -1) { // tags exist in dest and final, but not source
-                metric_change_cell_id(dest->metrics[metric_id_dest], cell_id_tmp_dest, cell_id_tmp_final);
+                if (metric_change_cell_id(dest->metrics[metric_id_dest], cell_id_tmp_dest, cell_id_tmp_final) != 0) {
+                    goto ERR;
+                }
             } else { // tag exist in dest, but not final(source exist or not exist)
                 metric_delete_cell(dest->metrics[metric_id_dest], cell_id_tmp_dest);
             }
             fieldtag_list_free(tags_dest, tag_count_dest);
+            tags_dest = NULL;
         }
         free(cell_ids_dest);
+        cell_ids_dest = NULL;
     }
 
     // dest cube manager   |   merged cube manager  | src cube manager    |     operation
@@ -651,18 +676,25 @@ int fieldstat_cube_merge_topk(struct fs_cube *dest, const struct fs_cube *src)
             int cell_id_tmp_final = cell_manager_get_cell_id_by_tag(cell_manager_final, tags_src, tag_count_src);
             if (cell_id_tmp_final == -1) { // tags not exist in final, which have been processed in previous loop
                 fieldtag_list_free(tags_src, tag_count_src);
+                tags_src = NULL;
                 continue;
             }
             int cell_id_tmp_dest = cell_manager_get_cell_id_by_tag(cell_manager_dest, tags_src, tag_count_src);
             if (cell_id_tmp_dest != -1) { // tags exist in dest, which have been processed in previous loop
                 fieldtag_list_free(tags_src, tag_count_src);
+                tags_src = NULL;
                 continue;
             }
-            metric_copy_cell(dest->metrics[metric_id_dest], src->metrics[metric_id_src], cell_id_tmp_final, cell_id_tmp_src);
+            if (metric_copy_cell(dest->metrics[metric_id_dest], src->metrics[metric_id_src], cell_id_tmp_final, cell_id_tmp_src) == -1) {
+                printf("error: copy cell failed\n");
+                goto ERR;
+            }
 
             fieldtag_list_free(tags_src, tag_count_src);
+            tags_src = NULL;
         }
         free(cell_ids_src);
+        cell_ids_src = NULL;
     }
 
     cell_manager_free(cell_manager_dest);
@@ -672,6 +704,25 @@ int fieldstat_cube_merge_topk(struct fs_cube *dest, const struct fs_cube *src)
     name_id_map_free(name_id_map_src);
 
     return 0;
+
+ERR:
+    printf("error: fieldstat_cube_merge_topk failed\n");
+    name_id_map_free(name_id_map_dest);
+    name_id_map_free(name_id_map_src);
+    cell_manager_free(cell_manager_final);
+    if (tags_src != NULL) {
+        fieldtag_list_free(tags_src, tag_count_src);
+    }
+    if (tags_dest != NULL) {
+        fieldtag_list_free(tags_dest, tag_count_dest);
+    }
+    if (cell_ids_src != NULL) {
+        free(cell_ids_src);
+    }
+    if (cell_ids_dest != NULL) {
+        free(cell_ids_dest);
+    }
+    return -1;
 }
 
 int fieldstat_cube_merge(struct fs_cube *dest, const struct fs_cube *src)
@@ -695,6 +746,7 @@ int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
         cell_manager_add_cell(tag_id_map, instance->cube[i]->shared_tags, instance->cube[i]->n_shared_tags, 0);
     }
 
+    int ret = 0;
     for (int i = 0; i < src->valid_cube_arr_length; i++) {
         struct fs_cube *cube_src = src->cube[i];
         if (cube_src == NULL) {
@@ -709,14 +761,17 @@ int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
         } else {
             if (instance->cube[cube_id_tmp]->sampling_mode != cube_src->sampling_mode) {
                 printf("ERR: cube sampling mode not match\n");
-                return -1;
+                ret = -1;
+                continue;
             }
-            fieldstat_cube_merge(instance->cube[cube_id_tmp], cube_src);
+            if (fieldstat_cube_merge(instance->cube[cube_id_tmp], cube_src) == -1) {
+                ret = -1;
+            }
         }
     }
 
     cell_manager_free(tag_id_map);
-    return 0;
+    return ret;
 }
 
 /* -------------------------------------------------------------------------- */
