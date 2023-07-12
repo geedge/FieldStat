@@ -242,8 +242,113 @@ struct metric_measure_data *metric_scheme_counter_deserialize(const char *blob, 
     return ret;
 }
 
+/* --------------------------------- hll -------------------------------- */
 
-// todo other metric schemes write here
+struct metric_measure_data *metric_scheme_hll_new(const struct metric_parameter *para)
+{
+    printf("metric_scheme_hll_new enter\n");
+    struct metric_measure_data *data = (struct metric_measure_data *)malloc(sizeof(struct metric_measure_data));
+    struct ST_hyperloglog *hll = ST_hyperloglog_new(para->hll.precision);
+    data->hll = hll;
+    return data;
+}
+
+static void metric_scheme_hll_free(struct metric_measure_data *data)
+{
+    ST_hyperloglog_free(data->hll);
+    free(data);
+}
+
+static void metric_scheme_hll_serialize(const struct metric_measure_data *data, char **blob, size_t *blob_size)
+{
+    struct ST_hyperloglog *hll = data->hll;
+    ST_hyperloglog_serialize(hll, blob, blob_size);
+}
+
+static int metric_scheme_hll_merge(struct metric_measure_data *pthis, const struct metric_measure_data *from)
+{
+    struct ST_hyperloglog *hll = pthis->hll;
+    struct ST_hyperloglog *from_hll = from->hll;
+
+    return ST_hyperloglog_merge(hll, from_hll);
+}
+
+static int metric_scheme_hll_copy(struct metric_measure_data *pthis, const struct metric_measure_data *from)
+{
+    struct ST_hyperloglog *hll = pthis->hll;
+    struct ST_hyperloglog *from_hll = from->hll;
+    
+    return ST_hyperloglog_merge(hll, from_hll);
+}
+
+struct metric_measure_data *metric_scheme_hll_deserialize(const char *blob, size_t blob_size) 
+{
+    struct metric_measure_data *ret = (struct metric_measure_data *)malloc(sizeof(struct metric_measure_data));
+    struct ST_hyperloglog *hll = ST_hyperloglog_deserialize(blob, blob_size);
+    ret->hll = hll;
+
+    return ret;
+}
+
+
+/* --------------------------------- histogram -------------------------------- */
+
+struct metric_measure_data *metric_scheme_histogram_new(const struct metric_parameter *para)
+{
+    printf("metric_scheme_histogram_new enter\n");
+
+    struct hdr_histogram* tmp_p_hdr = NULL;
+    int ret = hdr_init((int64_t)para->hdr.lowest_trackable_value, (int64_t)para->hdr.highest_trackable_value, para->hdr.significant_figures, &tmp_p_hdr);
+	if (ret != 0) {
+        printf("ERR: hdr_init failed!\n");
+        return NULL;
+    }
+    struct metric_measure_data *data = (struct metric_measure_data *)malloc(sizeof(struct metric_measure_data));
+    data->hdr = tmp_p_hdr;
+
+    return data;
+}
+
+static void metric_scheme_histogram_free(struct metric_measure_data *data)
+{
+    hdr_close(data->hdr);
+    free(data);
+}
+
+static void metric_scheme_histogram_serialize(const struct metric_measure_data *data, char **blob, size_t *blob_size)
+{
+    struct hdr_histogram *hdr = data->hdr;
+    hdr_log_encode(hdr, blob);
+    *blob_size = strlen(*blob);
+}
+
+static int metric_scheme_histogram_merge(struct metric_measure_data *pthis, const struct metric_measure_data *from)
+{
+    struct hdr_histogram *hdr = pthis->hdr;
+    struct hdr_histogram *from_hdr = from->hdr;
+
+    return hdr_add(hdr, from_hdr);
+}
+
+static int metric_scheme_histogram_copy(struct metric_measure_data *pthis, const struct metric_measure_data *from)
+{
+    struct hdr_histogram *hdr = pthis->hdr;
+    struct hdr_histogram *from_hdr = from->hdr;
+    return hdr_add(hdr, from_hdr);
+}
+
+struct metric_measure_data *metric_scheme_histogram_deserialize(const char *blob, size_t blob_size) 
+{
+    struct hdr_histogram *hdr = NULL;
+    int ret = hdr_log_decode(&hdr, (char *)blob, blob_size);
+    if (ret != 0 || hdr == NULL) {
+        printf("ERR: hdr_log_decode failed!\n");
+        return NULL;
+    }
+    struct metric_measure_data *data = (struct metric_measure_data *)malloc(sizeof(struct metric_measure_data));
+    data->hdr = hdr;
+    return data;
+}
 
 static const struct metric_scheme g_metric_scheme_table[] = {
     [METRIC_TYPE_COUNTER] = {
@@ -254,8 +359,23 @@ static const struct metric_scheme g_metric_scheme_table[] = {
         .merge = metric_scheme_counter_merge,
         .copy = metric_scheme_counter_copy,
     },
+    [METRIC_TYPE_HLL] = {
+        .new = metric_scheme_hll_new,
+        .del = metric_scheme_hll_free,
+        .serialize = metric_scheme_hll_serialize,
+        .deserialize = metric_scheme_hll_deserialize,
+        .merge = metric_scheme_hll_merge,
+        .copy = metric_scheme_hll_copy,
+    },
+    [METRIC_TYPE_HISTOGRAM] = {
+        .new = metric_scheme_histogram_new,
+        .del = metric_scheme_histogram_free,
+        .serialize = metric_scheme_histogram_serialize,
+        .deserialize = metric_scheme_histogram_deserialize,
+        .merge = metric_scheme_histogram_merge,
+        .copy = metric_scheme_histogram_copy,
+    },
 };
-
 
 /* -------------------------------------------------------------------------- */
 /*                                   metric                                   */
