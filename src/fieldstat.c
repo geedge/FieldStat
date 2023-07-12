@@ -265,6 +265,48 @@ int fieldstat_register_counter(struct fieldstat *instance, int cube_id, const ch
     return append_metric_to_cube(cube, metric);
 }
 
+int fieldstat_register_hll(struct fieldstat *instance, int cube_id, const char *field_name, unsigned char precision)
+{
+    struct fs_cube *cube = instance->cube[cube_id];
+    if (cube == NULL) {
+        printf("ERR: cube is not registered yet\n");
+        return -1;
+    }
+    if (precision < 4 || precision > 18) {
+        printf("ERR: precision must be between 4 and 18\n");
+        return -1;
+    }
+    struct metric *metric = metric_hll_new(field_name, precision, cube->sampling_mode == SAMPLING_MODE_TOPK ? true : false);
+
+    return append_metric_to_cube(cube, metric);
+}
+
+int fieldstat_register_histogram(struct fieldstat *instance, int cube_id, const char *field_name, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures)
+{
+    struct fs_cube *cube = instance->cube[cube_id];
+    if (cube == NULL) {
+        printf("ERR: cube is not registered yet\n");
+        return -1;
+    }
+    if (lowest_trackable_value < 1) {
+        printf("ERR: lowest_trackable_value not correct.\n");
+        return -1;
+    }
+    if (significant_figures < 1 || significant_figures > 5) {
+        printf("ERR: significant_figures must be between 1 and 5\n");
+        return -1;
+    }
+    if (lowest_trackable_value * 2 > highest_trackable_value)
+	{
+        printf("ERR: highest_trackable_value must be at least twice as large as lowest_trackable_value\n");
+		return -1;
+	}
+
+    struct metric *metric = metric_histogram_new(field_name, lowest_trackable_value, highest_trackable_value, significant_figures, cube->sampling_mode == SAMPLING_MODE_TOPK ? true : false);
+
+    return append_metric_to_cube(cube, metric);
+}
+
 /* -------------------------------------------------------------------------- */
 /*                               metric operation                              */
 /* -------------------------------------------------------------------------- */
@@ -282,12 +324,12 @@ int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric
 {
     struct fs_cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
-        printf("ERR: cube is not registered yet\n");
+        printf("ERR: fieldstat_counter_incrby cube is not registered yet\n");
         return -1;
     }
     struct metric *metric = cube->metrics[metric_id];
     if (metric == NULL || metric_get_type(metric) != METRIC_TYPE_COUNTER) {
-        printf("ERR: metrics is not registered yet\n");
+        printf("ERR: fieldstat_counter_incrby metrics is not registered yet\n");
         return -2;
     }
 
@@ -295,6 +337,53 @@ int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric
     return 0;
 }
 
+int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long value)
+{
+    struct fs_cube *cube = instance->cube[cube_id];
+    if (cube == NULL) {
+        printf("ERR: fieldstat_counter_set cube is not registered yet\n");
+        return -1;
+    }
+    struct metric *metric = cube->metrics[metric_id];
+    if (metric == NULL || metric_get_type(metric) != METRIC_TYPE_COUNTER) {
+        printf("ERR: fieldstat_counter_set metrics is not registered yet\n");
+        return -2;
+    }
+
+    return metric_counter_set(metric, cell_id, value);
+}
+
+int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, const char *key, size_t value_len)
+{
+    struct fs_cube *cube = instance->cube[cube_id];
+    if (cube == NULL) {
+        printf("ERR: fieldstat_hll_add cube is not registered yet\n");
+        return -1;
+    }
+    struct metric *metric = cube->metrics[metric_id];
+    if (metric == NULL || metric_get_type(metric) != METRIC_TYPE_HLL) {
+        printf("ERR: fieldstat_hll_add metrics is not registered yet\n");
+        return -2;
+    }
+
+    return metric_hll_add(metric, cell_id, key, value_len);
+}
+
+int fieldstat_histogram_record(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long value)
+{
+    struct fs_cube *cube = instance->cube[cube_id];
+    if (cube == NULL) {
+        printf("ERR: fieldstat_histogram_record cube is not registered yet\n");
+        return -1;
+    }
+    struct metric *metric = cube->metrics[metric_id];
+    if (metric == NULL || metric_get_type(metric) != METRIC_TYPE_HISTOGRAM) {
+        printf("ERR: fieldstat_histogram_record metrics is not registered yet\n");
+        return -2;
+    }
+
+    return metric_histogram_record(metric, cell_id, value);
+}
 
 
 // /* -------------------------------------------------------------------------- */
@@ -844,11 +933,61 @@ long long fieldstat_counter_get(const struct fieldstat *instance, int cube_id, i
     printf("fieldstat_counter_get enter\n");
     struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id);
     if (metric == NULL || metric_get_type(metric) != METRIC_TYPE_COUNTER) {
-        printf("ERR: metrics is not registered yet\n");
+        printf("ERR: fieldstat_counter_get metrics is not registered yet\n");
         return -1;
     }
 
     return metric_counter_get(metric, cell_id);
+}
+
+
+double fieldstat_hll_get(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id)
+{
+    struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id);
+    if (metric == NULL || metric_get_type(metric) != METRIC_TYPE_HLL) {
+        printf("ERR: fieldstat_hll_get metrics is not registered yet\n");
+        return -1;
+    }
+
+    return metric_hll_get(metric, cell_id);
+}
+
+long long fieldstat_histogram_value_at_percentile(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, double percentile)
+{
+    struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id);
+    if (metric == NULL || metric_get_type(metric) != METRIC_TYPE_HISTOGRAM) {
+        printf("ERR: fieldstat_histogram_value_at_percentile metrics is not registered yet\n");
+        return -1;
+    }
+
+    return metric_histogram_value_at_percentile(metric, cell_id, percentile);
+}
+
+long long fieldstat_histogram_count_le_value(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long value)
+{
+    struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id);
+    if (metric == NULL || metric_get_type(metric) != METRIC_TYPE_HISTOGRAM) {
+        printf("ERR: fieldstat_histogram_value_le_value metrics is not registered yet\n");
+        return -1;
+    }
+
+    return metric_histogram_count_le_value(metric, cell_id, value);
+}
+
+void fieldstat_get_serialized_blob(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, char **blob, size_t *blob_size)
+{
+    struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id);
+    if (metric == NULL) {
+        printf("ERR: fieldstat_get_serialized_blob metrics is not registered yet\n");
+        return;
+    }
+    enum metric_type type = metric_get_type(metric);
+    if (!(type == METRIC_TYPE_HLL || type == METRIC_TYPE_HISTOGRAM)) {
+        printf("ERR: Only metric of hll and histogram support get serialized blob\n");
+        return;
+    }
+
+    metric_get_serialized_blob(metric, cell_id, blob, blob_size);
 }
 
 void fieldstat_tag_list_arr_free(struct fieldstat_tag_list *tag_list, size_t n_cell)

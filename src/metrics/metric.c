@@ -835,6 +835,17 @@ void metric_delete_cell(struct metric *pthis, int cell_id)
 /*                           metric operations                                */ 
 /* -------------------------------------------------------------------------- */
 
+struct metric_measure_data *metric_find_or_new_cell(struct metric *pthis, int cell_id)
+{
+    struct metric_measure_data *data = metric_find_one_cell(pthis, cell_id);
+    if (data == NULL) {
+        printf("cell id %d does not exist\n", cell_id);
+        data = pthis->scheme->new(pthis->info->paras);
+        metric_add_one_cell(pthis, cell_id, data);
+    }
+    return data;
+}
+
 struct metric *metric_counter_new(const char *name, bool is_gauge, bool is_topk)
 {
     struct metric_parameter *metric_para = construct_parameters(METRIC_TYPE_COUNTER, is_gauge ? COUNTER_TYPE_GAUGE : COUNTER_TYPE_COUNTER);
@@ -845,12 +856,7 @@ struct metric *metric_counter_new(const char *name, bool is_gauge, bool is_topk)
 
 int metric_counter_incrby(struct metric *pthis, int cell_id, long long value)
 {
-    struct metric_measure_data *data = metric_find_one_cell(pthis, cell_id);
-    if (data == NULL) {
-        printf("metric_counter_incrby cell id %d does not exist\n", cell_id);
-        data = pthis->scheme->new(pthis->info->paras);
-        metric_add_one_cell(pthis, cell_id, data);
-    }
+    struct metric_measure_data *data = metric_find_or_new_cell(pthis, cell_id);
     struct metric_counter_or_gauge *counter = data->counter;
     counter->value += value;
 
@@ -859,12 +865,11 @@ int metric_counter_incrby(struct metric *pthis, int cell_id, long long value)
 
 int metric_counter_set(struct metric *pthis, int cell_id, long long value)
 {
-    struct metric_measure_data *data = metric_find_one_cell(pthis, cell_id);
-    if (data == NULL) {
-        printf("cell id %d does not exist\n", cell_id);
-        data = pthis->scheme->new(pthis->info->paras);
-    }
+    struct metric_measure_data *data = metric_find_or_new_cell(pthis, cell_id);
     struct metric_counter_or_gauge *counter = data->counter;
+    if (counter->type == COUNTER_TYPE_COUNTER) {
+        return -1;
+    }
     counter->value = value;
 
     return 0;
@@ -881,10 +886,83 @@ long long metric_counter_get(const struct metric *pthis, int cell_id)
     return counter->value;
 }
 
+struct metric *metric_hll_new(const char *name, unsigned char precision, bool is_topk)
+{
+    struct metric_parameter *metric_para = construct_parameters(METRIC_TYPE_HLL, precision);
+    struct metric *pthis = metric_new(name, METRIC_TYPE_HLL, metric_para, is_topk);
 
+    return pthis;
+}
 
-// TODO: other metric
+int metric_hll_add(struct metric *pthis, int cell_id, const char *key, size_t key_len)
+{
+    struct metric_measure_data *data = metric_find_or_new_cell(pthis, cell_id);
 
+    return ST_hyperloglog_add(data->hll, key, key_len);
+}
+
+double metric_hll_get(const struct metric *pthis, int cell_id)
+{
+    struct metric_measure_data *data = metric_find_one_cell(pthis, cell_id);
+    if (data == NULL) {
+        printf("metric_hll_get cell id %d does not exist\n", cell_id);
+        return -1;
+    }
+    return ST_hyperloglog_count(data->hll);
+}
+
+struct metric *metric_histogram_new(const char *name, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures, bool is_topk)
+{
+    struct metric_parameter *metric_para = construct_parameters(METRIC_TYPE_HISTOGRAM, lowest_trackable_value, highest_trackable_value, significant_figures);
+    struct metric *pthis = metric_new(name, METRIC_TYPE_HISTOGRAM, metric_para, is_topk);
+
+    return pthis;
+}
+
+int metric_histogram_record(struct metric *pthis, int cell_id, long long value)
+{
+    struct metric_measure_data *data = metric_find_or_new_cell(pthis, cell_id);
+    
+    bool ret = hdr_record_value(data->hdr, value);
+    if (!ret) {
+        printf("metric_histogram_record: hdr_record_value failed\n");
+        return -1;
+    }
+    return 0;
+}
+
+long long metric_histogram_value_at_percentile(const struct metric *pthis, int cell_id, double percentile)
+{
+    struct metric_measure_data *data = metric_find_one_cell(pthis, cell_id);
+    if (data == NULL) {
+        printf("metric_histogram_value_at_percentile cell id %d does not exist\n", cell_id);
+        return -1;
+    }
+    return hdr_value_at_percentile(data->hdr, percentile);
+}
+
+static long long hdr_count_le_value(const struct hdr_histogram* h, long long value)
+{
+	struct hdr_iter iter;
+	long long count = 0;
+	hdr_iter_recorded_init(&iter, h);
+	while (hdr_iter_next(&iter))
+	{
+		if((long long)iter.value <= value)
+			count ++;
+	}
+	return count;
+}
+
+long long metric_histogram_count_le_value(const struct metric *pthis, int cell_id, long long value)
+{
+    struct metric_measure_data *data = metric_find_one_cell(pthis, cell_id);
+    if (data == NULL) {
+        printf("metric_histogram_count_le_value cell id %d does not exist\n", cell_id);
+        return -1;
+    }
+    return hdr_count_le_value(data->hdr, value);
+}
 
 /* -------------------------------------------------------------------------- */
 /*                             query on the metric                            */
