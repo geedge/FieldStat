@@ -149,16 +149,22 @@ int fieldstat_register_cube(struct fieldstat *instance, const struct fieldstat_t
     return cube_id;
 }
 
-int fieldstat_cube_add(struct fieldstat *instance, int cube_id, const struct fieldstat_tag *tags, size_t n_tag, unsigned int count)
+int fieldstat_cube_add(struct fieldstat *instance, int cube_id, const struct fieldstat_tag *tags, size_t n_tag, long long increment)
 {
     printf("fieldstat_cube_add enter\n");
+
     struct fs_cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
         printf("ERR: cube is not registered yet\n");
         return -1;
     }
 
-    int ret = cell_manager_add_cell(cube->cell_manager, tags, n_tag, (unsigned int)count);
+    if (cube->sampling_mode == SAMPLING_MODE_TOPK && increment <= 0) {
+        printf("ERR: cube is not in sampling mode\n");
+        return -1;
+    }
+
+    int ret = cell_manager_add_cell(cube->cell_manager, tags, n_tag, (unsigned int)increment);
 
     return ret;
 }
@@ -225,15 +231,21 @@ struct metric *fieldstat_find_metric(const struct fieldstat *instance, int cube_
     return cube->metrics[metric_id];
 }
 
-int fieldstat_counter_incrby(struct fieldstat *instance, int metric_id, int cube_id, int cell_id, long long increment)
+int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long increment)
 {
-    struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id);
-    if (metric == NULL || metric_get_type(metric) != METRIC_TYPE_COUNTER) {
-        printf("ERR: metrics is not registered yet\n");
+    struct fs_cube *cube = instance->cube[cube_id];
+    if (cube == NULL) {
+        printf("ERR: cube is not registered yet\n");
         return -1;
     }
+    struct metric *metric = cube->metrics[metric_id];
+    if (metric == NULL || metric_get_type(metric) != METRIC_TYPE_COUNTER) {
+        printf("ERR: metrics is not registered yet\n");
+        return -2;
+    }
 
-    return metric_counter_incrby(metric, cell_id, increment);
+    metric_counter_incrby(metric, cell_id, increment);
+    return 0;
 }
 
 

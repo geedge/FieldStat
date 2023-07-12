@@ -15,7 +15,7 @@ TEST(metric_test_counter, simple_register_and_query)
     int cell_id = fieldstat_cube_add(instance, cube_id, &TEST_TAG_STRING, 1, 1);
     EXPECT_NE(cell_id, -1);
 
-    fieldstat_counter_incrby(instance, metric_id, cube_id, cell_id, 10086);
+    fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id, 10086);
 
     // query
     int *ret_cube_id_arr = NULL;

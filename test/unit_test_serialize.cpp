@@ -52,8 +52,8 @@ TEST(unit_test_serialize, serialize_and_deserialize_fieldstat_instance)
     int metric_id = fieldstat_register_counter(instance, cube_id, "czz_test counter metric", true);
     int cell_id1 = fieldstat_cube_add(instance, cube_id, &TEST_TAG_STRING, 1, 1);
     int cell_id2 = fieldstat_cube_add(instance, cube_id, &TEST_TAG_STRING_collided, 1, 1);
-    fieldstat_counter_incrby(instance, metric_id, cube_id, cell_id1, 10086);
-    fieldstat_counter_incrby(instance, metric_id, cube_id, cell_id2, 123);
+    fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id1, 10086);
+    fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id2, 123);
 
     char *blob;
     size_t blob_size;

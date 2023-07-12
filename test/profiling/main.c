@@ -49,7 +49,7 @@ void profiling_counter()
     int id_added = fieldstat_register_counter(instance, "add");
     for (int i = 0; i < ADD_OPER_NUM; i++)
     {
-        fieldstat_counter_incrby(instance, id_added, 1, &TEST_TAG_INT, 1);
+        fieldstat_counter_incrby(instance, 1, id_added, &TEST_TAG_INT, 1);
     }
     fieldstat_free(instance);
 }

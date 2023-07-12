@@ -103,7 +103,7 @@ TEST(unit_test_merge, new_cell_on_existing_cube_and_metric_comprehensive)
     fieldstat_merge(instance_dest, instance);
 
     int cell_id = fieldstat_cube_add(instance, cube_id, &TEST_TAG_STRING, 1, 1);
-    fieldstat_counter_incrby(instance, metric_id, cube_id, cell_id, 10086);
+    fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id, 10086);
 
     fieldstat_merge(instance_dest, instance);
 
@@ -139,7 +139,7 @@ TEST(unit_test_merge, merge_existing_cell_on_existing_cube_and_metric_comprehens
     int cube_id = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
     int metric_id = fieldstat_register_counter(instance, cube_id, "metric_name", false);
     int cell_id = fieldstat_cube_add(instance, cube_id, &TEST_TAG_STRING, 1, 1);
-    fieldstat_counter_incrby(instance, metric_id, cube_id, cell_id, 5);
+    fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id, 5);
     struct fieldstat *instance_dest = fieldstat_new();
 
     fieldstat_merge(instance_dest, instance);
