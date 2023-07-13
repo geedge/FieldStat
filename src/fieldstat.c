@@ -919,6 +919,7 @@ void fieldstat_get_cells(const struct fieldstat *instance, int cube_id, int metr
 
     metric_get_cell_ids(metric, cell_ids, n_cell);
     if (*n_cell == 0) {
+        *tag_list = NULL;
         return;
     }
 

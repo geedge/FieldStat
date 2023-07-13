@@ -104,9 +104,7 @@ int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id
 int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, const char *key, size_t value_len);
 double fieldstat_hll_get(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id);
 int fieldstat_histogram_record(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long value);
-long long fieldstat_histogram_value_at_percentile(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, double percentile);
-long long fieldstat_histogram_count_le_value(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long value);
-void fieldstat_get_serialized_blob(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, char **blob, size_t *blob_size);
+
 /*
     * @brief Delete all the cells, also the content of every metrics. The cube and metrics are not deleted. Increase cell_version by 1.
 */
@@ -143,11 +141,12 @@ void fieldstat_get_cubes(const struct fieldstat *instance, int **cube_ids, size_
 int fieldstat_get_max_metric_id(const struct fieldstat *instance, int cube_id);
 void fieldstat_get_cells(const struct fieldstat *instance, int cube_id, int metric_id,
     int **cell_ids, struct fieldstat_tag_list **tag_list, size_t *n_cell);
+void fieldstat_get_shared_tags(const struct fieldstat *instance, int cube_id, struct fieldstat_tag_list *tag_list);
 
-// long long fieldstat_histogram_value_at_percentile(const struct fieldstat *instance, int metric_id, int cell_id, double percentile);
 long long fieldstat_counter_get(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id);
-// double fieldstat_hll_get(const struct fieldstat *instance, int metric_id, int cell_id);
-// void fieldstat_get_serialized_blob(const struct fieldstat *instance, int metric_id, int cell_id, char **blob, size_t *blob_size);
+long long fieldstat_histogram_value_at_percentile(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, double percentile);
+long long fieldstat_histogram_count_le_value(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long value);
+void fieldstat_get_serialized_blob(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, char **blob, size_t *blob_size);
 
 const char *fieldstat_get_metric_name(const struct fieldstat *instance, int cube_id, int metric_id);
 enum metric_type fieldstat_get_metric_type(const struct fieldstat *instance, int cube_id, int metric_id);
