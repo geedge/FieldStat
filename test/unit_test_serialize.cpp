@@ -24,7 +24,40 @@ TEST(unit_test_serialize, serialize_and_deserialize_tag_list)
     free(tag_list);
 }
 
-TEST(unit_test_serialize, serialize_and_deserialize_cell_manager)
+void test_cell_manager_read_tag_and_comp_with_standard(struct cell_manager *cm, int cell_id, const struct fieldstat_tag *tag_list, size_t tag_list_size)
+{
+    struct fieldstat_tag *tag_list_tested;
+    size_t tag_list_tested_size;
+    cell_manager_get_tag_by_cell_id(cm, cell_id, &tag_list_tested, &tag_list_tested_size);
+    EXPECT_EQ(tag_list_tested_size, tag_list_size);
+    for (size_t i = 0; i < tag_list_size; i++)
+    {
+        EXPECT_STREQ(tag_list_tested[i].key, tag_list[i].key);
+        EXPECT_EQ(tag_list_tested[i].type, tag_list[i].type);
+        if (tag_list[i].type == TAG_INTEGER)
+        {
+            EXPECT_EQ(tag_list_tested[i].value_int, tag_list[i].value_int);
+        }
+        else if (tag_list[i].type == TAG_DOUBLE)
+        {
+            EXPECT_EQ(tag_list_tested[i].value_double, tag_list[i].value_double);
+        }
+        else if (tag_list[i].type == TAG_CSTRING)
+        {
+            EXPECT_STREQ(tag_list_tested[i].value_str, tag_list[i].value_str);
+        }
+    }
+    if (tag_list_tested != NULL) {
+        free((char *)tag_list_tested->key);
+        if (tag_list_tested->type == TAG_CSTRING)
+        {
+            free((char *)tag_list_tested->value_str);
+        }
+        free(tag_list_tested);
+    }
+}
+
+TEST(unit_test_serialize, serialize_and_deserialize_cell_manager_comprehensive)
 {
     struct cell_manager *cm = cell_manager_new(SAMPLING_MODE_COMPREHENSIVE, 1000);
     int cell_id_1 = cell_manager_add_cell(cm, &TEST_TAG_INT, 1, 1);
@@ -39,6 +72,43 @@ TEST(unit_test_serialize, serialize_and_deserialize_cell_manager)
     EXPECT_EQ(cell_manager_get_cell_id_by_tag(cm2, &TEST_TAG_INT, 1), cell_id_1);
     EXPECT_EQ(cell_manager_get_cell_id_by_tag(cm2, &TEST_TAG_DOUBLE, 1), cell_id_2);
     EXPECT_EQ(cell_manager_get_cell_id_by_tag(cm2, &TEST_TAG_STRING, 1), cell_id_3);
+
+    test_cell_manager_read_tag_and_comp_with_standard(cm2, cell_id_1, &TEST_TAG_INT, 1);
+    test_cell_manager_read_tag_and_comp_with_standard(cm2, cell_id_2, &TEST_TAG_DOUBLE, 1);
+    test_cell_manager_read_tag_and_comp_with_standard(cm2, cell_id_3, &TEST_TAG_STRING, 1);
+
+    cell_manager_free(cm);
+    cell_manager_free(cm2);
+    free(blob);
+}
+
+TEST(unit_test_serialize, serialize_and_deserialize_cell_manager_topk)
+{
+    struct cell_manager *cm = cell_manager_new(SAMPLING_MODE_TOPK, 1000);
+    int cell_id_1 = cell_manager_add_cell(cm, &TEST_TAG_INT, 1, 1);
+    int cell_id_2 = cell_manager_add_cell(cm, &TEST_TAG_DOUBLE, 1, 2);
+    int cell_id_3 = cell_manager_add_cell(cm, &TEST_TAG_STRING, 1, 3);
+
+    char *blob;
+    size_t blob_size;
+    cell_manager_serialize(cm, &blob, &blob_size);
+    EXPECT_EQ(cell_manager_get_cell_id_by_tag(cm, &TEST_TAG_INT, 1), cell_id_1);
+    EXPECT_EQ(cell_manager_get_cell_id_by_tag(cm, &TEST_TAG_DOUBLE, 1), cell_id_2);
+    EXPECT_EQ(cell_manager_get_cell_id_by_tag(cm, &TEST_TAG_STRING, 1), cell_id_3);
+
+    struct cell_manager *cm2 = cell_manager_deserialize(blob, blob_size);
+
+    EXPECT_EQ(cell_manager_get_cell_id_by_tag(cm2, &TEST_TAG_INT, 1), cell_id_1);
+    EXPECT_EQ(cell_manager_get_cell_id_by_tag(cm2, &TEST_TAG_DOUBLE, 1), cell_id_2);
+    EXPECT_EQ(cell_manager_get_cell_id_by_tag(cm2, &TEST_TAG_STRING, 1), cell_id_3);
+
+    EXPECT_EQ(cell_manager_get_count_by_tag(cm2, &TEST_TAG_INT, 1), 1);
+    EXPECT_EQ(cell_manager_get_count_by_tag(cm2, &TEST_TAG_DOUBLE, 1), 2);
+    EXPECT_EQ(cell_manager_get_count_by_tag(cm2, &TEST_TAG_STRING, 1), 3);
+
+    test_cell_manager_read_tag_and_comp_with_standard(cm2, cell_id_1, &TEST_TAG_INT, 1);
+    test_cell_manager_read_tag_and_comp_with_standard(cm2, cell_id_2, &TEST_TAG_DOUBLE, 1);
+    test_cell_manager_read_tag_and_comp_with_standard(cm2, cell_id_3, &TEST_TAG_STRING, 1);
 
     cell_manager_free(cm);
     cell_manager_free(cm2);
@@ -96,8 +166,6 @@ TEST(unit_test_serialize, serialize_and_deserialize_fieldstat_instance)
     free(ret_cell_ids);
     fieldstat_tag_list_arr_free(tag_list, n_cell);
 }
-
-// todo: topk 的测试
 
 int main(int argc, char *argv[]) 
 {

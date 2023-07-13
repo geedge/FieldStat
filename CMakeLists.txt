@@ -55,6 +55,7 @@ if (CMAKE_CXX_CPPCHECK)
             "--suppress=preprocessorErrorDirective"
             "--suppress=*:${PROJECT_SOURCE_DIR}/vendors/mpack/mpack.c"
             "--suppress=*:${PROJECT_SOURCE_DIR}/test/utils.hpp"
+            "--suppress=*:${PROJECT_SOURCE_DIR}/test/unit_test_serialize.cpp"
     )
     set(CMAKE_C_CPPCHECK ${CMAKE_CXX_CPPCHECK})
 else()

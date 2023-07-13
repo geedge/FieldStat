@@ -460,7 +460,8 @@ int heavy_keeper_merge(struct heavy_keeper *hk, const struct heavy_keeper *src) 
     "ss": [
         {
             "member": <field_string>,
-            "score": <primary_score>
+            "score": <primary_score>,
+            "id":<cell_id>
         },
         {(more elements in ss, the sorted set)}
         ...
@@ -469,7 +470,7 @@ int heavy_keeper_merge(struct heavy_keeper *hk, const struct heavy_keeper *src) 
     }
 }
 ***********************************************************************************/
-int heavy_keeper_sorted_set_member_serialization(const char *val, size_t val_len, unsigned int score, char **blob, size_t *blob_sz) {
+int heavy_keeper_sorted_set_member_serialization(const char *val, size_t val_len, unsigned int score, unsigned int cell_id, char **blob, size_t *blob_sz) {
     mpack_writer_t writer;
     mpack_writer_init_growable(&writer, blob, blob_sz);
 
@@ -478,8 +479,8 @@ int heavy_keeper_sorted_set_member_serialization(const char *val, size_t val_len
     mpack_write_str(&writer, val, val_len - 1);
     mpack_write_cstr(&writer, "score");
     mpack_write_u32(&writer, score);
-
-    // do not serialize user data(tag id), because we don't need it in merge.
+    mpack_write_cstr(&writer, "id");
+    mpack_write_u32(&writer, cell_id);
 
     mpack_complete_map(&writer);
     if (mpack_writer_destroy(&writer) != mpack_ok) {
@@ -542,7 +543,7 @@ void heavy_keeper_sorted_set_serialization(const struct heavy_keeper *hk, mpack_
     sorted_set_dump(hk->top_K_heap, key_score, vals, val_lens, (void **)user_data);
     mpack_build_array(writer);
     for (size_t i = 0; i < heap_entry_num; i++) {
-        heavy_keeper_sorted_set_member_serialization(vals[i], val_lens[i], key_score[i], &element_mpack_buff, &element_mpack_size);
+        heavy_keeper_sorted_set_member_serialization(vals[i], val_lens[i], key_score[i], *user_data[i], &element_mpack_buff, &element_mpack_size);
         mpack_write_object_bytes(writer, element_mpack_buff, element_mpack_size);
         free(element_mpack_buff);
         element_mpack_size = 0;
@@ -590,11 +591,11 @@ void heavy_keeper_sorted_set_deserialization(mpack_node_t *root, struct sorted_s
         size_t val_len = mpack_node_strlen(flow_id_str);
         unsigned int score = mpack_node_u32(mpack_node_map_cstr(item, "score"));
 
-        unsigned int *data_dummy = (unsigned int *)malloc(sizeof(unsigned int)); // will be freed with sorted set
-        *data_dummy = 0;
+        unsigned int *id = (unsigned int *)malloc(sizeof(unsigned int)); // will be freed with sorted set
+        *id = mpack_node_u32(mpack_node_map_cstr(item, "id"));
 
         sorted_set_insert(out, val, val_len, score);
-        sorted_set_insert_user_data(out, val, val_len, (void *)data_dummy);
+        sorted_set_insert_user_data(out, val, val_len, (void *)id);
     }
 }
 

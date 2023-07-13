@@ -42,5 +42,5 @@ function (add_unit_test file_name)
 endfunction()
 
 # add_unit_test(test_metric_counter)
-add_unit_test(unit_test_merge)
-# add_unit_test(unit_test_serialize)
+# add_unit_test(unit_test_merge)
+add_unit_test(unit_test_serialize)

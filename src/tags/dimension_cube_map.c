@@ -155,7 +155,7 @@ static void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_t
     free(dynamic_mem);
 }
 
-struct cell_manager *cell_manager_new(enum sampling_mode sampling_mode, int max_cell_num)
+struct cell_manager *cell_manager_new_without_map(enum sampling_mode sampling_mode, int max_cell_num)
 {
     struct cell_manager *cell_manager = (struct cell_manager *)malloc(sizeof(struct cell_manager));
     memset(cell_manager, 0, sizeof(struct cell_manager));
@@ -163,6 +163,14 @@ struct cell_manager *cell_manager_new(enum sampling_mode sampling_mode, int max_
     cell_manager->sampling_mode = sampling_mode;
     cell_manager->max_cell_num = max_cell_num;
     cell_manager->next_cell_id = 0;
+
+    return cell_manager;
+}
+
+struct cell_manager *cell_manager_new(enum sampling_mode sampling_mode, int max_cell_num)
+{
+    struct cell_manager *cell_manager = cell_manager_new_without_map(sampling_mode, max_cell_num);
+
     if (sampling_mode == SAMPLING_MODE_TOPK) {
         cell_manager->topk_tag_id_map = heavy_keeper_with_data_new(max_cell_num);
     } else {
@@ -211,6 +219,7 @@ void cell_manager_free(struct cell_manager *pthis)
     cell_manager_tag_cube_map_free(pthis);
 
     if (pthis->sampling_mode == SAMPLING_MODE_TOPK) {
+        printf("cell_manager_free going to call free heavy_keeper\n");
         heavy_keeper_free(pthis->topk_tag_id_map);
     } else {
         cell_manager_comprehensive_tag_id_map_free(pthis);
@@ -552,7 +561,7 @@ struct cell_manager *cell_manager_deserialize(const char *blob, size_t blob_size
 
     enum sampling_mode mode = (enum sampling_mode) mpack_node_i8(mpack_node_map_cstr(root, "mode"));
     int max_n_cell = mpack_node_i32(mpack_node_map_cstr(root, "max_n_cell"));
-    struct cell_manager *pthis = cell_manager_new(mode, max_n_cell);
+    struct cell_manager *pthis = cell_manager_new_without_map(mode, max_n_cell);
 
     mpack_node_t id_tag_map = mpack_node_map_cstr(root, "id_tag_map");
     int n_cell = mpack_node_array_length(id_tag_map);
