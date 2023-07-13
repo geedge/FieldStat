@@ -115,8 +115,12 @@ struct metric_measure_data *metric_find_one_cell(const struct metric *pthis, int
 }
 
 void metric_add_one_cell(struct metric *pthis, int id, struct metric_measure_data *data) {
+    printf("metric_add_one_cell enter, id: %d, n_array_item: %zu\n", id, pthis->n_array_item);
     if (!pthis->is_topk) {
-        assert(pthis->n_array_item == id);
+        if (id != pthis->n_array_item) {
+            printf("ERR: metric_add_one_cell id(%d) != n_array_item(%zu)\n", id, pthis->n_array_item);
+            return;
+        }
         if (id >= pthis->max_n_array_item) {
             // realloc
             pthis->max_n_array_item *= 2;
@@ -444,20 +448,39 @@ void metric_free(struct metric *pthis)
 {
     metric_info_free(pthis->info);
 
-    struct cell_id_data_map *cur, *tmp;
-    HASH_ITER(hh, pthis->data_map, cur, tmp) {
-        pthis->scheme->del(cur->data);
-        HASH_DEL(pthis->data_map, cur);
-        free(cur);
-    }
     if (!pthis->is_topk) {
         for (int i = 0; i < pthis->n_array_item; i++) {
             pthis->scheme->del(pthis->data_array[i]);
         }
         free(pthis->data_array);
+    } else {
+        struct cell_id_data_map *cur, *tmp;
+        HASH_ITER(hh, pthis->data_map, cur, tmp) {
+            pthis->scheme->del(cur->data);
+            HASH_DEL(pthis->data_map, cur);
+            free(cur);
+        }
     }
 
     free(pthis);
+}
+
+void metric_reset(struct metric *pthis)
+{
+    if (!pthis->is_topk) {
+        for (int i = 0; i < pthis->n_array_item; i++) {
+            pthis->scheme->del(pthis->data_array[i]);
+            pthis->n_array_item = 0;
+            memset(pthis->data_array, 0, sizeof(struct metric_measure_data *) * pthis->max_n_array_item);
+        }
+    } else {
+        struct cell_id_data_map *cur, *tmp;
+        HASH_ITER(hh, pthis->data_map, cur, tmp) {
+            pthis->scheme->del(cur->data);
+            HASH_DEL(pthis->data_map, cur);
+            free(cur);
+        }
+    }
 }
 
 void metric_info_copy(struct metric_info *dst, const struct metric_info *src)
@@ -838,6 +861,7 @@ void metric_delete_cell(struct metric *pthis, int cell_id)
 struct metric_measure_data *metric_find_or_new_cell(struct metric *pthis, int cell_id)
 {
     struct metric_measure_data *data = metric_find_one_cell(pthis, cell_id);
+    printf("metric_find_or_new_cell, is add?(1 for add new one) %d\n", data == NULL);
     if (data == NULL) {
         printf("cell id %d does not exist\n", cell_id);
         data = pthis->scheme->new(pthis->info->paras);
@@ -856,6 +880,7 @@ struct metric *metric_counter_new(const char *name, bool is_gauge, bool is_topk)
 
 int metric_counter_incrby(struct metric *pthis, int cell_id, long long value)
 {
+    printf("metric_counter_incrby: cell_id %d, value %lld\n", cell_id, value);
     struct metric_measure_data *data = metric_find_or_new_cell(pthis, cell_id);
     struct metric_counter_or_gauge *counter = data->counter;
     counter->value += value;

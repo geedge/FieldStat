@@ -64,7 +64,7 @@ struct fieldstat_json_exporter {
 
 struct cell_iter {
     int *cube_ids;
-    int n_cube;
+    size_t n_cube;
     int curr_cube_idx;
 
     int max_metric_id;
@@ -154,16 +154,16 @@ void cell_iter_free(struct cell_iter *iter) {
     free(iter);
 }
 
-inline enum metric_type cell_iter_get_type(const struct cell_iter *iter) {
+enum metric_type cell_iter_get_type(const struct cell_iter *iter) {
     return fieldstat_get_metric_type(iter->instance, iter->cube_ids[iter->curr_cube_idx], iter->curr_metric_id);
 }
 
-inline const char *cell_iter_get_name(const struct cell_iter *iter) {
+const char *cell_iter_get_name(const struct cell_iter *iter) {
     return fieldstat_get_metric_name(iter->instance, iter->cube_ids[iter->curr_cube_idx], iter->curr_metric_id);
 }
 
 int cell_iter_next_nonempty_cube(struct cell_iter *iter) {
-    const struct fieldstat_instance *instance = iter->instance;
+    const struct fieldstat *instance = iter->instance;
     while (iter->curr_cube_idx < iter->n_cube - 1) {
         int cube_id_next = iter->cube_ids[++iter->curr_cube_idx];
 
@@ -190,7 +190,7 @@ int cell_iter_next_cell(struct cell_iter *iter) {
 }
 
 int cell_iter_next_nonempty_metric(struct cell_iter *iter) {
-    const struct fieldstat_instance *instance = iter->instance;
+    const struct fieldstat *instance = iter->instance;
     while (iter->curr_metric_id < iter->max_metric_id) {
         int metric_id_next = ++iter->curr_metric_id;
 
@@ -317,8 +317,7 @@ void tag_list_append_to_tag_object(const struct fieldstat_tag_list *tag_list, cJ
 void cell_iter_read_tag_list(struct cell_iter *iter, struct export_kv_pair **exported_tags, size_t *len_out)
 {
     struct fieldstat_tag_list *tag_list_cell = &iter->tag_list[iter->curr_cell_idx];
-    struct fieldstat_tag_list *tag_arr_shared;
-    fieldstat_get_shared_tags(iter->instance, iter->curr_cube_idx, &tag_arr_shared);
+    struct fieldstat_tag_list *tag_arr_shared = fieldstat_get_shared_tags(iter->instance, iter->curr_cube_idx);
 
     size_t ret_tag_list_len = tag_list_cell->n_tag + tag_arr_shared->n_tag;
 
@@ -435,9 +434,13 @@ void fieldstat_json_exporter_write_global_tags(const struct fieldstat_json_expor
 char *fieldstat_json_exporter_export(const struct fieldstat_json_exporter *exporter)
 {
     const struct fieldstat *instance = exporter->instance;
-    if (fieldstat_get_max_field_id(instance) == -1) {
+    int *cube_id_dummy;
+    size_t cube_id_len;
+    fieldstat_get_cubes(instance, &cube_id_dummy, &cube_id_len);
+    if (cube_id_len == 0) {
         return NULL;
     }
+    free(cube_id_dummy);
 
     struct cjson_map *map_head = hash_map_read_tag_and_field(instance);
     if (map_head == NULL) {

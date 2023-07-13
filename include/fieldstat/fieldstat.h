@@ -141,7 +141,7 @@ void fieldstat_get_cubes(const struct fieldstat *instance, int **cube_ids, size_
 int fieldstat_get_max_metric_id(const struct fieldstat *instance, int cube_id);
 void fieldstat_get_cells(const struct fieldstat *instance, int cube_id, int metric_id,
     int **cell_ids, struct fieldstat_tag_list **tag_list, size_t *n_cell);
-void fieldstat_get_shared_tags(const struct fieldstat *instance, int cube_id, struct fieldstat_tag_list *tag_list);
+struct fieldstat_tag_list *fieldstat_get_shared_tags(const struct fieldstat *instance, int cube_id);
 
 long long fieldstat_counter_get(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id);
 long long fieldstat_histogram_value_at_percentile(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, double percentile);

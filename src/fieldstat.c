@@ -70,9 +70,8 @@ void fieldstat_reset(struct fieldstat *instance)
 {
     for (size_t i = 0; i < instance->valid_cube_arr_length; i++) {
         for (size_t j = 0; j < instance->cube[i]->n_metric; j++) {
-            metric_free(instance->cube[i]->metrics[j]);
+            metric_reset(instance->cube[i]->metrics[j]);
         }
-        instance->cube[i]->n_metric = 0;
 
         cell_manager_reset(instance->cube[i]->cell_manager);
     }
@@ -600,7 +599,7 @@ void name_id_map_init(struct metric_name_id_map **map, const struct fs_cube *cub
 
 int fieldstat_cube_merge_comprehensive(struct fs_cube *dest, const struct fs_cube *src)
 {
-    printf("merge comprehensive enter\n");
+    printf("fieldstat_cube_merge_comprehensive enter hello?\n");
     struct cell_manager *cell_manager_src = src->cell_manager;
     struct cell_manager *cell_manager_dest = dest->cell_manager;
     int *cell_ids_src;
@@ -608,9 +607,12 @@ int fieldstat_cube_merge_comprehensive(struct fs_cube *dest, const struct fs_cub
     struct fieldstat_tag *tags_src;
     size_t tag_count_src;
     struct metric_name_id_map *name_id_map_dest = NULL;
+    printf("fieldstat_cube_merge_comprehensive 1\n");
     name_id_map_init(&name_id_map_dest, dest);
+    printf("fieldstat_cube_merge_comprehensive 2, n metric: %zu\n", src->n_metric);
 
     for (int metric_id_src = 0; metric_id_src < src->n_metric; metric_id_src ++) {
+        printf("fieldstat_cube_merge_comprehensive, metric_id_src: %d\n--------------------------------\n", metric_id_src);
         const char *name_src = metric_get_name(src->metrics[metric_id_src]);
         int metric_id_dest = name_id_map_get_id_by_name(name_id_map_dest, name_src);
         if (metric_id_dest == -1) { // metric not exist in dest, new an empty metric
@@ -618,7 +620,9 @@ int fieldstat_cube_merge_comprehensive(struct fs_cube *dest, const struct fs_cub
             struct metric *metric_dup = metric_copy_structure(src->metrics[metric_id_src]);
             metric_id_dest = append_metric_to_cube(dest, metric_dup);
         }
+        printf("fieldstat_cube_merge_comprehensive, before metric_get_cell_ids\n");
         metric_get_cell_ids(src->metrics[metric_id_src], &cell_ids_src, &cell_id_count_src);
+        printf("fieldstat_cube_merge_comprehensive, metric_get_cell_ids done, cell count: %zu\n", cell_id_count_src);
         if (cell_id_count_src == 0) { // no cell in this metric
             continue;
         }
@@ -929,6 +933,40 @@ void fieldstat_get_cells(const struct fieldstat *instance, int cube_id, int metr
     }
 }
 
+struct fieldstat_tag_list *fieldstat_get_shared_tags(const struct fieldstat *instance, int cube_id)
+{
+    struct fs_cube *cube = instance->cube[cube_id];
+    if (cube == NULL) {
+        printf("ERR: cube is not registered yet\n");
+        return NULL;
+    }
+
+    struct fieldstat_tag_list *tag_list = (struct fieldstat_tag_list *)malloc(sizeof(struct fieldstat_tag_list));
+    for (int i = 0; i < cube->n_shared_tags; i++) {
+        struct fieldstat_tag *tag_dest = &(tag_list->tag[i]);
+        struct fieldstat_tag *tag_src = &(cube->shared_tags[i]);
+        tag_dest->key = strdup(tag_src->key);
+        tag_dest->type = tag_src->type;
+        switch (tag_src->type) {
+            case TAG_INTEGER:
+                tag_dest->value_int = tag_src->value_int;
+                break;
+            case TAG_CSTRING:
+                tag_dest->value_str = strdup(tag_src->value_str);
+                break;
+            case TAG_DOUBLE:
+                tag_dest->value_double = tag_src->value_double;
+                break;
+            default:
+                printf("ERR: tag type not supported\n");
+                break;
+        }
+    }
+    tag_list->n_tag = cube->n_shared_tags;
+
+    return tag_list;
+}
+
 long long fieldstat_counter_get(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id)
 {
     printf("fieldstat_counter_get enter\n");
@@ -940,7 +978,6 @@ long long fieldstat_counter_get(const struct fieldstat *instance, int cube_id, i
 
     return metric_counter_get(metric, cell_id);
 }
-
 
 double fieldstat_hll_get(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id)
 {
@@ -988,7 +1025,7 @@ void fieldstat_get_serialized_blob(const struct fieldstat *instance, int cube_id
         return;
     }
 
-    metric_get_serialized_blob(metric, cell_id, blob, blob_size);
+    metric_get_plain_blob(metric, cell_id, blob, blob_size);
 }
 
 void fieldstat_tag_list_arr_free(struct fieldstat_tag_list *tag_list, size_t n_cell)

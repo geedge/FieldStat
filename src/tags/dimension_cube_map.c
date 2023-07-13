@@ -270,7 +270,7 @@ int cell_manager_get_cell_id_by_tag(const struct cell_manager *pthis, const stru
             cell_id = -1;
         } else {
             cell_id = node->cell_id;
-            printf("cell_manager_get_cell_id_by_tag find comprehensive, found %d\n", cell_id);
+            printf("cell_manager_get_cell_id_by_tag find comprehensive, found, cell id : %d\n", cell_id);
         }
     }
 

@@ -162,10 +162,39 @@ TEST(unit_test_merge, merge_existing_cell_on_existing_cube_and_metric_comprehens
     fieldstat_free(instance_dest);
 }
 
-TEST(unit_test_merge, new_too_many_cells_comprehensive)
+TEST(unit_test_merge, new_too_many_cells_on_one_metric_comprehensive)
 {
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 2);
+    int metric_id = fieldstat_register_counter(instance, cube_id, "metric name", false);
+    int cell_id1 = fieldstat_cube_add(instance, cube_id, &TEST_TAG_STRING, 1, 1);
+    fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id1, 1);
+    struct fieldstat *instance_dest = fieldstat_new();
+    fieldstat_merge(instance_dest, instance);
+    fieldstat_reset(instance);
 
+    int cell_id2 = fieldstat_cube_add(instance, cube_id, &TEST_TAG_INT, 1, 1);
+    fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id2, 2);
+    int cell_id3 = fieldstat_cube_add(instance, cube_id, &TEST_TAG_DOUBLE, 1, 1);
+    printf("add oper before 3nd incrby\n");
+    fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id3, 3);
+
+    printf("add oper done\n");
+    fieldstat_merge(instance_dest, instance);
+
+    int *cell_ids = NULL;
+    struct fieldstat_tag_list *tag_list = NULL;
+    size_t n_cell = 0;
+    fieldstat_get_cells(instance_dest, 0, 0, &cell_ids, &tag_list, &n_cell);
+    EXPECT_EQ(n_cell, 2);
+
+    fieldstat_free(instance);
+    fieldstat_free(instance_dest);
+    free(cell_ids);
+    fieldstat_tag_list_arr_free(tag_list, n_cell);
 }
+
+//todo: TEST(unit_test_merge, new_too_many_cells_on_multiple_metric_comprehensive) 
 
 TEST(unit_test_merge, merge_on_full_metric_comprehensive)
 {

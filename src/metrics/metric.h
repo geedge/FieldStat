@@ -9,8 +9,7 @@ struct metric;
 const char *metric_get_name(const struct metric *metrics); // don't free the return value
 enum metric_type metric_get_type(const struct metric *metrics);
 void metric_free(struct metric *pthis);
-void metric_set_id(struct metric *metrics, int id);
-int metric_get_id(const struct metric *metrics);
+void metric_reset(struct metric *pthis);
 
 struct metric *metric_copy_structure(const struct metric *src);
 int metric_serialize(const struct metric *pthis, char **blob, size_t *blob_size);
