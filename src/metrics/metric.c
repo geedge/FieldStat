@@ -117,17 +117,14 @@ struct metric_measure_data *metric_find_one_cell(const struct metric *pthis, int
 void metric_add_one_cell(struct metric *pthis, int id, struct metric_measure_data *data) {
     printf("metric_add_one_cell enter, id: %d, n_array_item: %zu\n", id, pthis->n_array_item);
     if (!pthis->is_topk) {
-        if (id != pthis->n_array_item) {
-            printf("ERR: metric_add_one_cell id(%d) != n_array_item(%zu)\n", id, pthis->n_array_item);
-            return;
-        }
         if (id >= pthis->max_n_array_item) {
-            // realloc
-            pthis->max_n_array_item *= 2;
+            while (id >= pthis->max_n_array_item) {
+                pthis->max_n_array_item *= 2;
+            }
             pthis->data_array = (struct metric_measure_data **)realloc(pthis->data_array, pthis->max_n_array_item * sizeof(struct metric_measure_data *));
         }
         pthis->data_array[id] = data;
-        pthis->n_array_item++;
+        pthis->n_array_item = pthis->n_array_item > id ? pthis->n_array_item : id + 1;
         return;
     }
 
@@ -450,6 +447,9 @@ void metric_free(struct metric *pthis)
 
     if (!pthis->is_topk) {
         for (int i = 0; i < pthis->n_array_item; i++) {
+            if (pthis->data_array[i] == NULL) {
+                continue;
+            }
             pthis->scheme->del(pthis->data_array[i]);
         }
         free(pthis->data_array);
@@ -469,6 +469,9 @@ void metric_reset(struct metric *pthis)
 {
     if (!pthis->is_topk) {
         for (int i = 0; i < pthis->n_array_item; i++) {
+            if (pthis->data_array[i] == NULL) {
+                continue;
+            }
             pthis->scheme->del(pthis->data_array[i]);
             pthis->n_array_item = 0;
             memset(pthis->data_array, 0, sizeof(struct metric_measure_data *) * pthis->max_n_array_item);
@@ -997,16 +1000,34 @@ void metric_get_cell_ids(const struct metric *pthis, int **cell_ids, size_t *cel
     printf("metric_get_cell_ids enter\n");
     if (!pthis->is_topk) {
         printf("metric_get_cell_ids data array\n");
-        *cell_id_count = pthis->n_array_item;
-        if (*cell_id_count == 0) {
+        size_t n_id_max = pthis->n_array_item;
+        if (n_id_max == 0) {
             printf("metric_get_cell_ids no cell ids\n");
             *cell_ids = NULL;
+            *cell_id_count = 0;
             return;
         }
-        *cell_ids = (int *)malloc(sizeof(int) * (*cell_id_count));
-        for (int i = 0; i < *cell_id_count; i++) {
-            (*cell_ids)[i] = i;
+
+        int *tmp_id_container = (int *)malloc(sizeof(int) * n_id_max);
+        int n_id = 0;
+        for (int i = 0; i < n_id_max; i++) {
+            if (pthis->data_array[i] != NULL) {
+                tmp_id_container[n_id++] = i;
+            }
         }
+        
+        if (n_id == 0) {
+            printf("metric_get_cell_ids no cell ids\n");
+            *cell_ids = NULL;
+            *cell_id_count = 0;
+            free(tmp_id_container);
+            return;
+        }
+        
+        *cell_id_count = n_id;
+        *cell_ids = (int *)malloc(sizeof(int) * n_id);
+        memcpy(*cell_ids, tmp_id_container, sizeof(int) * n_id);
+        free(tmp_id_container);
         return;
     }
 
