@@ -330,14 +330,16 @@ static int metric_scheme_histogram_merge(struct metric_measure_data *pthis, cons
     struct hdr_histogram *hdr = pthis->hdr;
     struct hdr_histogram *from_hdr = from->hdr;
 
-    return hdr_add(hdr, from_hdr);
+    (void)hdr_add(hdr, from_hdr);
+    return 0;
 }
 
 static int metric_scheme_histogram_copy(struct metric_measure_data *pthis, const struct metric_measure_data *from)
 {
     struct hdr_histogram *hdr = pthis->hdr;
     struct hdr_histogram *from_hdr = from->hdr;
-    return hdr_add(hdr, from_hdr);
+    (void)hdr_add(hdr, from_hdr);
+    return 0;
 }
 
 struct metric_measure_data *metric_scheme_histogram_deserialize(const char *blob, size_t blob_size) 

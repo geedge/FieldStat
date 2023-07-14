@@ -355,14 +355,19 @@ int cell_manager_add_cell(struct cell_manager *pthis, const struct fieldstat_tag
         if (HASH_COUNT(pthis->comprehensive_tag_id_map) >= pthis->max_cell_num) {
             return -1;
         }
+        int existing_cell_id = cell_manager_get_cell_id_by_tag(pthis, tag, tag_count);
+        if (existing_cell_id != -1) {
+            return existing_cell_id;
+        }
+
         cell_manager_comprehensive_map_add(pthis, tag, tag_count, pthis->next_cell_id);
     } else {
         int ret = cell_manager_topk_map_add(pthis, tag, tag_count, count, pthis->next_cell_id);
         if (ret == -1) {
             return -1;
         }
-        if (ret == 1) { // no new cube added, use original cube id
-            return 0;
+        if (ret == 1) {
+            return cell_manager_get_cell_id_by_tag(pthis, tag, tag_count);
         }
     }
 
