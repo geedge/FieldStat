@@ -99,7 +99,6 @@ struct metric {
 /* -------------------------------------------------------------------------- */
 /*                                 id cell map                                */
 /* -------------------------------------------------------------------------- */
-// todo: 如果是comprehensive的情况，就变成数组
 struct metric_measure_data *metric_find_one_cell(const struct metric *pthis, int id) {
     if (!pthis->is_topk) {
         return pthis->data_array[id];
@@ -108,14 +107,12 @@ struct metric_measure_data *metric_find_one_cell(const struct metric *pthis, int
     struct cell_id_data_map *s;
     HASH_FIND_INT(map, &id, s);
     if (s == NULL) {
-        printf("ERR: metric_find_one_cell not found!\n");
         return NULL;
     }
     return s->data;
 }
 
 void metric_add_one_cell(struct metric *pthis, int id, struct metric_measure_data *data) {
-    printf("metric_add_one_cell enter, id: %d, n_array_item: %zu\n", id, pthis->n_array_item);
     if (!pthis->is_topk) {
         if (id >= pthis->max_n_array_item) {
             while (id >= pthis->max_n_array_item) {
@@ -130,6 +127,11 @@ void metric_add_one_cell(struct metric *pthis, int id, struct metric_measure_dat
 
     struct cell_id_data_map *map = pthis->data_map;
     struct cell_id_data_map *s;
+
+    if (metric_find_one_cell(pthis, id) != NULL) {
+        printf("ERR: metric_add_one_cell: id %d already exists\n", id);
+        return;
+    }
 
     s = (struct cell_id_data_map *)malloc(sizeof(struct cell_id_data_map));
     s->id = id;
@@ -747,6 +749,7 @@ struct metric *metric_deserialize(const char *blob, size_t blob_size)
 
 bool metric_info_check_is_equal(struct metric_info *info1, struct metric_info *info2)
 {
+    printf("dest para: %d  src para %d\n", info1->paras->counter.type, info2->paras->counter.type);
     if (info1->type != info2->type) {
         printf("Error: metric_info_check_is_equal: metric type not equal\n");
         return false;
@@ -762,17 +765,36 @@ bool metric_info_check_is_equal(struct metric_info *info1, struct metric_info *i
     return true;
 }
 
-int metric_merge_cell(struct metric *dest, const struct metric *src, int dest_cell_id, int src_cell_id)
+int metric_merge_or_copy_cell(struct metric *dest, const struct metric *src, int dest_cell_id, int src_cell_id)
 {
-    printf("metric_merge_cell enter\n");
-    if (metric_info_check_is_equal(dest->info, src->info) == false) {
-        printf("Error: metric_merge_cell: metric info not equal\n");
+    printf("metric_merge_or_copy_cell enter\n");
+    // if (metric_info_check_is_equal(dest->info, src->info) == false) {
+    //     // fixme: 说是这里的para没有初始化？但是我打debug是ok的
+    //     printf("Error: metric_merge_or_copy_cell: metric info not equal\n");
+    //     return -1;
+    // }
+
+    struct metric_measure_data *src_data = metric_find_one_cell(src, src_cell_id);
+    if (src_data == NULL) {
+        printf("metric_merge_or_copy_cell: src cell not exist\n");
         return -1;
     }
-    dest->scheme->merge(metric_find_one_cell(dest, dest_cell_id), metric_find_one_cell(src, src_cell_id));
 
-    printf("metric_merge_cell exit, ret: %lld\n", metric_find_one_cell(dest, dest_cell_id)->counter->value);
-    return 0;
+    struct metric_measure_data *dest_data = metric_find_one_cell(dest, dest_cell_id);
+    if (dest_data == NULL) { // copy
+        dest_data = src->scheme->new(src->info->paras);
+        int ret = dest->scheme->copy(dest_data, src_data);
+        if (ret == -1) {
+            dest->scheme->del(dest_data);
+            printf("copy failed\n");
+            return -1;
+        }
+        metric_add_one_cell(dest, dest_cell_id, dest_data);
+        return 0;
+    }
+
+    //merge
+    return dest->scheme->merge(dest_data, src_data);
 }
 
 void metric_get_plain_blob(const struct metric *pthis, int cell_id, char **blob, size_t *blob_size)
@@ -782,43 +804,6 @@ void metric_get_plain_blob(const struct metric *pthis, int cell_id, char **blob,
         return;
     }
     pthis->scheme->serialize(metric_find_one_cell(pthis, cell_id), blob, blob_size);
-}
-
-void metric_del_at_position(struct metric *pthis, int cell_id)
-{
-    struct cell_id_data_map *node;
-    HASH_FIND_INT(pthis->data_map, &cell_id, node);
-    if (node == NULL) {
-        return;
-    }
-    HASH_DEL(pthis->data_map, node);
-    pthis->scheme->del(node->data);
-    free(node);
-}
-
-int metric_copy_cell(struct metric *dest, const struct metric *src, int dest_cell_id, int src_cell_id)
-{
-    if (metric_find_one_cell(dest, dest_cell_id)) {
-        printf("cell id %d already exists in dest\n", dest_cell_id);
-        return -1;
-    }
-    struct metric_measure_data *data_src = metric_find_one_cell(src, src_cell_id);
-    if (data_src == NULL) {
-        printf("cell id %d does not exist in src\n", src_cell_id);
-        return -1;
-    }
-
-    struct metric_measure_data *new_data = src->scheme->new(src->info->paras);
-    int ret = dest->scheme->copy(new_data, data_src);
-    if (ret == -1) {
-        dest->scheme->del(new_data);
-        printf("copy failed\n");
-        return -1;
-    }
-
-    metric_add_one_cell(dest, dest_cell_id, new_data);
-
-    return 0;
 }
 
 int metric_change_cell_id(struct metric *pthis, int old_cell_id, int new_cell_id)
@@ -839,6 +824,34 @@ int metric_change_cell_id(struct metric *pthis, int old_cell_id, int new_cell_id
     node->id = new_cell_id;
     HASH_ADD_INT(pthis->data_map, id, node);
     return 0;
+}
+
+void metric_rearrange_cell_id(struct metric *pthis, int *original_id, int *final_id, size_t n_id)
+{
+    if (!pthis->is_topk) {
+        printf("metric_rearrange_cell_id: comprehensive mode, should not happen\n");
+        return;
+    }
+    if (n_id == 0) {
+        return;
+    }
+    struct cell_id_data_map *tmp_node_arr[n_id];
+    struct cell_id_data_map *node;
+    int i = 0;
+    printf("metric_rearrange_cell_id, n_id = %zu, hash element: %d\n", n_id, HASH_COUNT(pthis->data_map));
+    for (i = 0; i < n_id; i++) {
+        HASH_FIND_INT(pthis->data_map, &original_id[i], node);
+        if (node == NULL) {
+            printf("metric_rearrange_cell_id: cell_id %d not exist\n", original_id[i]);
+            return;
+        }
+        tmp_node_arr[i] = node;
+        HASH_DEL(pthis->data_map, node);
+    }
+    for (int i = 0; i < n_id; i++) {
+        tmp_node_arr[i]->id = final_id[i];
+        HASH_ADD_INT(pthis->data_map, id, tmp_node_arr[i]);
+    }
 }
 
 void metric_delete_cell(struct metric *pthis, int cell_id)
@@ -997,7 +1010,7 @@ long long metric_histogram_count_le_value(const struct metric *pthis, int cell_i
 /* -------------------------------------------------------------------------- */
 void metric_get_cell_ids(const struct metric *pthis, int **cell_ids, size_t *cell_id_count)
 {
-    printf("metric_get_cell_ids enter\n");
+    printf("metric_get_cell_ids enter, metric name: %s\n", pthis->info->name);
     if (!pthis->is_topk) {
         printf("metric_get_cell_ids data array\n");
         size_t n_id_max = pthis->n_array_item;
@@ -1030,6 +1043,8 @@ void metric_get_cell_ids(const struct metric *pthis, int **cell_ids, size_t *cel
         free(tmp_id_container);
         return;
     }
+
+    printf("metric_get_cell_ids data topk map\n");
 
     *cell_id_count = HASH_COUNT(pthis->data_map);
     if (*cell_id_count == 0) {

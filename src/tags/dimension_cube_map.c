@@ -228,6 +228,7 @@ void cell_manager_free(struct cell_manager *pthis)
     free(pthis);
 }
 
+// FIXME: 如果我改了hk，那这个函数就会被改掉，完全不能理解
 int cell_manager_get_tag_by_cell_id(const struct cell_manager *pthis, int cell_id, struct fieldstat_tag **tag_out, size_t *tag_count_out)
 {
     printf("cell_manager_get_tag_by_cell_id enter, id: %d\n", cell_id);
@@ -235,6 +236,7 @@ int cell_manager_get_tag_by_cell_id(const struct cell_manager *pthis, int cell_i
     struct tag_cube_map *node = NULL;
     HASH_FIND_INT(hash_hdr, &cell_id, node);
     if (node == NULL) {
+        printf("cell_manager_get_tag_by_cell_id exit, id: %d, not found\n", cell_id);
         return -1;
     }
 

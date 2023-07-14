@@ -99,6 +99,7 @@ void heavy_keeper_clear(struct heavy_keeper *hk) {
     memset(hk->sketch, 0, (size_t)hk->params.array_num * (size_t)hk->params.max_bucket_num * sizeof(struct Bucket));
     sorted_set_free(hk->top_K_heap);
     hk->top_K_heap = sorted_set_new(hk->K);
+    sorted_set_hook_function_of_free_user_data(hk->top_K_heap, free);
 }
 
 struct heavy_keeper_result *heavy_keeper_result_new(struct heavy_keeper *hk) {
@@ -272,7 +273,7 @@ int heavy_keeper_with_data_add(struct heavy_keeper *hk, const char *key, size_t 
         **pst_data_in_rec = cube_id;
         return 0;
     }
-
+    // use the original id
     return 1;
 }
 
