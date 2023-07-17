@@ -879,7 +879,7 @@ void metric_delete_cell(struct metric *pthis, int cell_id)
 struct metric_measure_data *metric_find_or_new_cell(struct metric *pthis, int cell_id)
 {
     struct metric_measure_data *data = metric_find_one_cell(pthis, cell_id);
-    printf("metric_find_or_new_cell, is add?(1 for add new one) %d\n", data == NULL);
+
     if (data == NULL) {
         printf("cell id %d does not exist\n", cell_id);
         data = pthis->scheme->new(pthis->info->paras);

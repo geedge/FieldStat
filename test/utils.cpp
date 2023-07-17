@@ -55,8 +55,23 @@ Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(const struct fieldstat_ta
     }
 }
 
+Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(const char * key, int value)
+{
+    tag_list_c.tag = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag));
+    tag_list_c.n_tag = 1;
+    tag_list_c.tag[0].key = strdup(key);
+    tag_list_c.tag[0].type = TAG_INTEGER;
+    tag_list_c.tag[0].value_int = value;
+}
+
 Fieldstat_tag_list_wrapper::~Fieldstat_tag_list_wrapper() {
-    free((void *)tag_list_c.tag);
+    for (int i = 0; i < tag_list_c.n_tag; i++) {
+        free((char *)tag_list_c.tag[i].key);
+        if (tag_list_c.tag[i].type == TAG_CSTRING) {
+            free((char *)tag_list_c.tag[i].value_str);
+        }
+    }
+    free(tag_list_c.tag);
 }
 
 Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(std::uniform_int_distribution<int> &dist, int tag_count)
@@ -66,7 +81,7 @@ Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(std::uniform_int_distribu
     std::mt19937 rng(1);
     for (int i = 0; i < tag_count; i++)
     {
-        strcpy((char *)tag_list_c.tag[i].key, gen_rand_string(10).c_str());
+        tag_list_c.tag[i].key = strdup(gen_rand_string(10).c_str());
         int rand_ret = rand() % 3;
         if (rand_ret == 0)
         {
@@ -81,7 +96,7 @@ Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(std::uniform_int_distribu
         else
         {
             tag_list_c.tag[i].type = TAG_CSTRING;
-            strcpy((char *)tag_list_c.tag[i].value_str, gen_rand_string(10).c_str());
+            tag_list_c.tag[i].value_str = strdup(gen_rand_string(10).c_str());
         }
     }
 }

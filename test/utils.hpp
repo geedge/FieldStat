@@ -14,6 +14,7 @@ std::string gen_rand_string(int len);
 class Fieldstat_tag_list_wrapper {
 public:
     explicit Fieldstat_tag_list_wrapper(const struct fieldstat_tag_list *tag_list_c);
+    explicit Fieldstat_tag_list_wrapper(const char * key, int value);
     explicit Fieldstat_tag_list_wrapper(std::uniform_int_distribution<int> &dist, int tag_count);
     // std::uniform_int_distribution<int> dist(1,100)
     explicit Fieldstat_tag_list_wrapper();

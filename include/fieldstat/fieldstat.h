@@ -137,7 +137,7 @@ struct fieldstat_tag_list
     size_t n_tag;
 };
 
-void fieldstat_get_cubes(const struct fieldstat *instance, int **cube_ids, size_t *n_cube);
+void fieldstat_get_cubes(const struct fieldstat *instance, int **cube_ids, int *n_cube);
 int fieldstat_get_max_metric_id(const struct fieldstat *instance, int cube_id);
 void fieldstat_get_cells(const struct fieldstat *instance, int cube_id, int metric_id,
     int **cell_ids, struct fieldstat_tag_list **tag_list, size_t *n_cell);

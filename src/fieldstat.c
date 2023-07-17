@@ -107,31 +107,8 @@ unsigned long fieldstat_get_cube_version(const struct fieldstat *instance, int c
 void fieldstat_clear_one_tag(const struct fieldstat_tag *tag)
 {
     free((char *)tag->key);
-    if (tag->type == TAG_CSTRING) {
+    if (tag->type == TAG_CSTRING && tag->value_str != NULL) {
         free((char *)tag->value_str);
-    }
-}
-
-static void fieldtag_list_copy(const struct fieldstat_tag *tag, size_t n_tag, struct fieldstat_tag *dest)
-{
-    for (size_t i = 0; i < n_tag; i++) {
-        dest[i].key = strdup(tag[i].key);
-        dest[i].type = tag[i].type;
-        switch(tag->type)
-        {
-            case TAG_INTEGER:
-                dest[i].value_int = tag[i].value_int;
-                break;
-            case TAG_DOUBLE:
-                dest[i].value_double = tag[i].value_double;
-                break;
-            case TAG_CSTRING:
-                dest[i].value_str = strdup(tag[i].value_str);
-                break;
-            default:
-                assert(0);
-                break;
-        }
     }
 }
 
@@ -164,7 +141,27 @@ void fieldstat_cube_info_init(struct fs_cube *cube, const struct fieldstat_tag *
     cube->max_n_cell = max_n_cell;
     cube->next_cell_id = 0;
     cube->shared_tags = malloc(sizeof(struct fieldstat_tag) * n_tag);
-    fieldtag_list_copy(shared_tags, n_tag, cube->shared_tags);
+    for (int i = 0; i < n_tag; i++) {
+        struct fieldstat_tag *dest_tag = &cube->shared_tags[i];
+        dest_tag->key = strdup(shared_tags[i].key);
+        dest_tag->type = shared_tags[i].type;
+        switch (dest_tag->type)
+        {
+        case TAG_INTEGER:
+            dest_tag->value_int = shared_tags[i].value_int;
+            break;
+        case TAG_CSTRING:
+            dest_tag->value_str = strdup(shared_tags[i].value_str);
+            break;
+        case TAG_DOUBLE:
+            dest_tag->value_double = shared_tags[i].value_double;
+            break;
+        
+        default:
+            break;
+        }
+    }
+
     cube->n_shared_tags = n_tag;
 
     cube->max_n_metric = 16;
@@ -200,7 +197,7 @@ int fieldstat_cube_add(struct fieldstat *instance, int cube_id, const struct fie
 
     struct fs_cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
-        printf("ERR: cube is not registered yet\n");
+        printf("fieldstat_cube_add ERR: cube is not registered yet\n");
         return -1;
     }
 
@@ -218,7 +215,7 @@ void fieldstat_cube_free(struct fieldstat *instance, int cube_id)
 {
     struct fs_cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
-        printf("ERR: cube is not registered yet\n");
+        printf("fieldstat_cube_free ERR: cube is not registered yet\n");
         return;
     }
     printf("fieldstat_cube_free enter\n");
@@ -257,7 +254,7 @@ int fieldstat_register_counter(struct fieldstat *instance, int cube_id, const ch
 {
     struct fs_cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
-        printf("ERR: cube is not registered yet\n");
+        printf("fieldstat_register_counter ERR: cube is not registered yet\n");
         return -1;
     }
     struct metric *metric = metric_counter_new(field_name, is_gauge, cube->sampling_mode == SAMPLING_MODE_TOPK ? true : false);
@@ -269,7 +266,7 @@ int fieldstat_register_hll(struct fieldstat *instance, int cube_id, const char *
 {
     struct fs_cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
-        printf("ERR: cube is not registered yet\n");
+        printf("fieldstat_register_hll ERR: cube is not registered yet\n");
         return -1;
     }
     if (precision < 4 || precision > 18) {
@@ -285,7 +282,7 @@ int fieldstat_register_histogram(struct fieldstat *instance, int cube_id, const 
 {
     struct fs_cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
-        printf("ERR: cube is not registered yet\n");
+        printf("fieldstat_register_histogram ERR: cube is not registered yet\n");
         return -1;
     }
     if (lowest_trackable_value < 1) {
@@ -314,7 +311,7 @@ struct metric *fieldstat_find_metric(const struct fieldstat *instance, int cube_
 {
     struct fs_cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
-        printf("ERR: cube is not registered yet\n");
+        printf("fieldstat_find_metric ERR: cube is not registered yet\n");
         return NULL;
     }
     return cube->metrics[metric_id];
@@ -879,9 +876,9 @@ int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
 /* -------------------------------------------------------------------------- */
 /*                                    query                                   */
 /* -------------------------------------------------------------------------- */
-void fieldstat_get_cubes(const struct fieldstat *instance, int **cube_ids, size_t *n_cube)
+void fieldstat_get_cubes(const struct fieldstat *instance, int **cube_ids, int *n_cube)
 {
-    size_t all_available_cube_count = 0;
+    int all_available_cube_count = 0;
     if (instance->valid_cube_arr_length == 0) {
         *cube_ids = NULL;
         *n_cube = 0;
@@ -915,7 +912,7 @@ int fieldstat_get_max_metric_id(const struct fieldstat *instance, int cube_id)
 {
     struct fs_cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
-        printf("ERR: cube is not registered yet\n");
+        printf("fieldstat_get_max_metric_id ERR: cube is not registered yet\n");
         return -1;
     }
     return cube->n_metric - 1;
@@ -949,11 +946,12 @@ struct fieldstat_tag_list *fieldstat_get_shared_tags(const struct fieldstat *ins
 {
     struct fs_cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
-        printf("ERR: cube is not registered yet\n");
+        printf("fieldstat_get_shared_tags ERR: cube is not registered yet\n");
         return NULL;
     }
 
     struct fieldstat_tag_list *tag_list = (struct fieldstat_tag_list *)malloc(sizeof(struct fieldstat_tag_list));
+    tag_list->tag = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * cube->n_shared_tags);
     for (int i = 0; i < cube->n_shared_tags; i++) {
         struct fieldstat_tag *tag_dest = &(tag_list->tag[i]);
         struct fieldstat_tag *tag_src = &(cube->shared_tags[i]);

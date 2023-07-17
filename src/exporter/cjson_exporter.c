@@ -64,7 +64,7 @@ struct fieldstat_json_exporter {
 
 struct cell_iter {
     int *cube_ids;
-    size_t n_cube;
+    int n_cube;
     int curr_cube_idx;
 
     int max_metric_id;
@@ -72,8 +72,8 @@ struct cell_iter {
 
     struct fieldstat_tag_list *tag_list;
     int *cell_ids;
-    size_t n_cell;
-    size_t curr_cell_idx;
+    int n_cell;
+    int curr_cell_idx;
 
     const struct fieldstat *instance;
 };
@@ -131,6 +131,12 @@ struct cell_iter *cell_iter_new(const struct fieldstat *instance) {
     memset(iter, 0, sizeof(struct cell_iter));
     iter->instance = instance;
     fieldstat_get_cubes(instance, &iter->cube_ids, &iter->n_cube);
+    printf("cell_iter_new number of cube_ids: %d\n", iter->n_cube);
+    printf("ids are: \n");
+    for (int i = 0; i < iter->n_cube; i++) {
+        printf("%d ", iter->cube_ids[i]);
+    }
+    printf("\n");
     iter->curr_cube_idx = -1;
     iter->curr_metric_id = -1;
 
@@ -174,7 +180,8 @@ int cell_iter_next_nonempty_cube(struct cell_iter *iter) {
 
         iter->max_metric_id = metric_id_max_next;
         iter->curr_metric_id = -1;
-        iter->curr_cube_idx = cube_id_next;
+
+        printf("cell_iter_next_nonempty_cube curr cube idx: %d, cube_id_next: %d\n", iter->curr_cube_idx, cube_id_next);
         return 1;
     }
 
@@ -193,13 +200,13 @@ int cell_iter_next_nonempty_metric(struct cell_iter *iter) {
     const struct fieldstat *instance = iter->instance;
     while (iter->curr_metric_id < iter->max_metric_id) {
         int metric_id_next = ++iter->curr_metric_id;
+        int cube_id = iter->cube_ids[iter->curr_cube_idx];
 
-        fieldstat_get_cells(instance, iter->curr_cube_idx, metric_id_next, &iter->cell_ids, &iter->tag_list, &iter->n_cell);
+        fieldstat_get_cells(instance, cube_id, metric_id_next, &iter->cell_ids, &iter->tag_list, (size_t *)&iter->n_cell);
         if (iter->n_cell == 0) {
             continue;
         }
 
-        iter->curr_metric_id = metric_id_next;
         iter->curr_cell_idx = 0;
         return 1;
     }
@@ -211,26 +218,32 @@ int cell_iter_next(struct cell_iter *iter) {
     if (iter->curr_cube_idx == -1) { // first time
         while (cell_iter_next_nonempty_cube(iter)) {
             if (cell_iter_next_nonempty_metric(iter)) {
+                printf("initial iter, find cube: %d, metric: %d, cell: %d\n", iter->cube_ids[iter->curr_cube_idx], iter->curr_metric_id, iter->curr_cell_idx);
                 return 1;
             }
+            printf("empty cube: %d, id : %d\n", iter->curr_cube_idx, iter->cube_ids[iter->curr_cube_idx]);
         }
         return 0;
     }
 
     if (cell_iter_next_cell(iter)) {
+        printf("iter cell,  find cube id: %d, metric: %d, cell: %d\n", iter->cube_ids[iter->curr_cube_idx], iter->curr_metric_id, iter->curr_cell_idx);
         return 1;
     }
 
     cell_iter_free_cell_records(iter);
     if (cell_iter_next_nonempty_metric(iter)) {
+        printf("iter new metric, old cube,  find cube: %d, metric: %d, cell: %d\n", iter->cube_ids[iter->curr_cube_idx], iter->curr_metric_id, iter->curr_cell_idx);
         return 1;
     }
 
     while (cell_iter_next_nonempty_cube(iter)) {
         if (cell_iter_next_nonempty_metric(iter)) {
+            printf("iter new cube,  find cube: %d, metric: %d, cell: %d\n", iter->cube_ids[iter->curr_cube_idx], iter->curr_metric_id, iter->curr_cell_idx);
             return 1;
         }
     }
+    printf("iter fin normally\n");
     return 0;
 }
 
@@ -247,12 +260,12 @@ struct export_kv_pair *cell_query_with_iter(const struct cell_iter *iter) {
     switch (cell_iter_get_type(iter)) {
         case METRIC_TYPE_COUNTER:
             ret->type = TAG_INTEGER;
-            ret->value_int = fieldstat_counter_get(iter->instance, iter->curr_cube_idx, iter->curr_metric_id, iter->cell_ids[iter->curr_cell_idx]);
+            ret->value_int = fieldstat_counter_get(iter->instance, iter->cube_ids[iter->curr_cube_idx], iter->curr_metric_id, iter->cell_ids[iter->curr_cell_idx]);
             break;
         case METRIC_TYPE_HLL:
         case METRIC_TYPE_HISTOGRAM:
             ret->type = TAG_CSTRING;
-            fieldstat_get_serialized_blob(iter->instance, iter->curr_cube_idx, iter->curr_metric_id, iter->cell_ids[iter->curr_cell_idx],
+            fieldstat_get_serialized_blob(iter->instance, iter->cube_ids[iter->curr_cube_idx], iter->curr_metric_id, iter->cell_ids[iter->curr_cell_idx],
                 (char **)&ret->value_str, &len_dummy);
             break;
 
@@ -317,7 +330,7 @@ void tag_list_append_to_tag_object(const struct fieldstat_tag_list *tag_list, cJ
 void cell_iter_read_tag_list(struct cell_iter *iter, struct export_kv_pair **exported_tags, size_t *len_out)
 {
     struct fieldstat_tag_list *tag_list_cell = &iter->tag_list[iter->curr_cell_idx];
-    struct fieldstat_tag_list *tag_arr_shared = fieldstat_get_shared_tags(iter->instance, iter->curr_cube_idx);
+    struct fieldstat_tag_list *tag_arr_shared = fieldstat_get_shared_tags(iter->instance, iter->cube_ids[iter->curr_cube_idx]); // todo: 这里效率太低了，把tag_arr_shared放到iter里，每个cube更新一次
 
     size_t ret_tag_list_len = tag_list_cell->n_tag + tag_arr_shared->n_tag;
 
@@ -329,7 +342,7 @@ void cell_iter_read_tag_list(struct cell_iter *iter, struct export_kv_pair **exp
         kv_pair_fill_with_tags(tag_list++, &tag_list_cell->tag[i]);
     }
     for (int i = 0; i < tag_arr_shared->n_tag; i++) {
-        kv_pair_fill_with_tags(tag_list, &tag_arr_shared->tag[i]);
+        kv_pair_fill_with_tags(tag_list++, &tag_arr_shared->tag[i]);
     }
 
     fieldstat_tag_list_arr_free(tag_arr_shared, 1);
@@ -363,6 +376,7 @@ void cjson_map_add_new_pair_for_one_loop(struct cjson_map **map_head_in, struct 
     cell_iter_read_tag_list(iter, &tag_list, &tag_list_len);
     cJSON *cjson_tags = cJSON_CreateObject(); // when this cjson_tags is added to a new map entry, it is freed when the map is freed
     for (int i = 0; i < tag_list_len; i++) {
+        // printf("cjson_map_add_new_pair_for_one_loop, add tag: %s\n", tag_list[i].key);
         kv_pair_add_to_cjson(&tag_list[i], cjson_tags);
     }
     kv_pair_free_list(tag_list, tag_list_len);
@@ -433,17 +447,21 @@ void fieldstat_json_exporter_write_global_tags(const struct fieldstat_json_expor
 */
 char *fieldstat_json_exporter_export(const struct fieldstat_json_exporter *exporter)
 {
+    printf("fieldstat_json_exporter_export enter\n");
     const struct fieldstat *instance = exporter->instance;
     int *cube_id_dummy;
-    size_t cube_id_len;
+    int cube_id_len;
     fieldstat_get_cubes(instance, &cube_id_dummy, &cube_id_len);
     if (cube_id_len == 0) {
+        printf("fieldstat_json_exporter_export no cubes\n");
+
         return NULL;
     }
     free(cube_id_dummy);
 
     struct cjson_map *map_head = hash_map_read_tag_and_field(instance);
     if (map_head == NULL) {
+        printf("fieldstat_json_exporter_export no map_head\n");
         return NULL;
     }
 
@@ -534,8 +552,7 @@ void fieldstat_json_exporter_free(struct fieldstat_json_exporter *exporter)
         free(exporter->name);
     }
     if (exporter->global_tag_list != NULL) {
-        free(exporter->global_tag_list->tag);
-        free(exporter->global_tag_list);
+        fieldstat_tag_list_arr_free(exporter->global_tag_list, 1);
     }
     free(exporter);
 }
