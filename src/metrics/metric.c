@@ -128,11 +128,6 @@ void metric_add_one_cell(struct metric *pthis, int id, struct metric_measure_dat
     struct cell_id_data_map *map = pthis->data_map;
     struct cell_id_data_map *s;
 
-    if (metric_find_one_cell(pthis, id) != NULL) {
-        printf("ERR: metric_add_one_cell: id %d already exists\n", id);
-        return;
-    }
-
     s = (struct cell_id_data_map *)malloc(sizeof(struct cell_id_data_map));
     s->id = id;
     s->data = data;
@@ -149,7 +144,6 @@ void metric_add_one_cell(struct metric *pthis, int id, struct metric_measure_dat
 
 struct metric_measure_data *metric_scheme_counter_new(const struct metric_parameter *para)
 {
-    printf("metric_scheme_counter_new enter\n");
     struct metric_measure_data *data = (struct metric_measure_data *)malloc(sizeof(struct metric_measure_data));
     struct metric_counter_or_gauge *counter = (struct metric_counter_or_gauge *)malloc(sizeof(struct metric_counter_or_gauge));
     data->counter = counter;
@@ -192,8 +186,6 @@ static int metric_scheme_counter_merge(struct metric_measure_data *pthis, const 
 {
     struct metric_counter_or_gauge *counter = pthis->counter;
     struct metric_counter_or_gauge *from_counter = from->counter;
-
-    printf("metric_scheme_counter_merge enter, value dest : %lld, value src: %lld\n", counter->value, from_counter->value);
     
     if (counter->type != from_counter->type) {
         printf("ERR: counter type not match!\n");
@@ -201,11 +193,9 @@ static int metric_scheme_counter_merge(struct metric_measure_data *pthis, const 
     }
     switch (counter->type) {
         case COUNTER_TYPE_COUNTER:
-            printf("counter->value += from_counter->value\n");
             counter->value += from_counter->value;
             break;
         case COUNTER_TYPE_GAUGE:
-            printf("counter->value = counter->value > from_counter->value ? counter->value : from_counter->value\n");
             counter->value = counter->value > from_counter->value ? counter->value : from_counter->value;
             break;
         default:
@@ -249,7 +239,6 @@ struct metric_measure_data *metric_scheme_counter_deserialize(const char *blob, 
 
 struct metric_measure_data *metric_scheme_hll_new(const struct metric_parameter *para)
 {
-    printf("metric_scheme_hll_new enter\n");
     struct metric_measure_data *data = (struct metric_measure_data *)malloc(sizeof(struct metric_measure_data));
     struct ST_hyperloglog *hll = ST_hyperloglog_new(para->hll.precision);
     data->hll = hll;
@@ -460,6 +449,7 @@ void metric_free(struct metric *pthis)
     } else {
         struct cell_id_data_map *cur, *tmp;
         HASH_ITER(hh, pthis->data_map, cur, tmp) {
+            printf("free cell of id: %d\n", cur->id);
             pthis->scheme->del(cur->data);
             HASH_DEL(pthis->data_map, cur);
             free(cur);
@@ -472,14 +462,14 @@ void metric_free(struct metric *pthis)
 void metric_reset(struct metric *pthis)
 {
     if (!pthis->is_topk) {
-        for (int i = 0; i < pthis->n_array_item; i++) {
+        for (int i = 0; i < pthis->max_n_array_item; i++) {
             if (pthis->data_array[i] == NULL) {
                 continue;
             }
             pthis->scheme->del(pthis->data_array[i]);
-            pthis->n_array_item = 0;
-            memset(pthis->data_array, 0, sizeof(struct metric_measure_data *) * pthis->max_n_array_item);
         }
+        pthis->n_array_item = 0;
+        memset(pthis->data_array, 0, sizeof(struct metric_measure_data *) * pthis->max_n_array_item);
     } else {
         struct cell_id_data_map *cur, *tmp;
         HASH_ITER(hh, pthis->data_map, cur, tmp) {
@@ -655,6 +645,7 @@ metric blob:
         "type":<field_type>
         "id":<field_id>
         "para":[may be null, one number, or a double array]
+        "is_topk":<is_topk>
         "data":[{
             "id":<cell_id>
             "PL":<content_blob(gen by scheme)>
@@ -678,6 +669,9 @@ int metric_serialize(const struct metric *pthis, char **blob, size_t *blob_size)
     mpack_write_bin(&writer, para_blob, para_blob_size);
     free(para_blob);
 
+    mpack_write_cstr(&writer, "is_topk");
+    mpack_write_bool(&writer, pthis->is_topk);
+
     mpack_write_cstr(&writer, "data");
     int *cell_ids = NULL;
     size_t cell_ids_size = 0;
@@ -688,7 +682,6 @@ int metric_serialize(const struct metric *pthis, char **blob, size_t *blob_size)
         mpack_build_array(&writer);
         for (int i = 0; i < cell_ids_size; i++) {
             struct metric_measure_data *data = metric_find_one_cell(pthis, cell_ids[i]);
-            printf("data id: %d, measure: %lld\n", cell_ids[i], data->counter->value);
 
             char *data_blob = NULL;
             size_t data_blob_size = 0;
@@ -725,8 +718,8 @@ struct metric *metric_deserialize(const char *blob, size_t blob_size)
     enum metric_type type = mpack_node_i32(mpack_node_map_cstr(root, "type"));
     mpack_node_t para_obj = mpack_node_map_cstr(root, "para");
     struct metric_parameter *metric_para = deserialize_parameters(mpack_node_bin_data(para_obj), mpack_node_bin_size(para_obj));
-
-    struct metric *metric_out = metric_new(metric_name, type, metric_para, false); // todo: 这里不一定是false，从上级的cube中带下来一个参数
+    bool is_topk = mpack_node_bool(mpack_node_map_cstr(root, "is_topk"));
+    struct metric *metric_out = metric_new(metric_name, type, metric_para, is_topk);
     free(metric_name);
 
     mpack_node_t data_arr = mpack_node_map_cstr(root, "data");
@@ -808,26 +801,6 @@ void metric_get_plain_blob(const struct metric *pthis, int cell_id, char **blob,
     pthis->scheme->serialize(metric_find_one_cell(pthis, cell_id), blob, blob_size);
 }
 
-int metric_change_cell_id(struct metric *pthis, int old_cell_id, int new_cell_id)
-{
-    if (old_cell_id == new_cell_id) {
-        return 0;
-    }
-    if (!pthis->is_topk) {
-        printf("metric_change_cell_id: comprehensive mode, should not happen\n");
-        return -1;
-    }
-    struct cell_id_data_map *node;
-    HASH_FIND_INT(pthis->data_map, &old_cell_id, node);
-    if (node == NULL) {
-        return -1;
-    }
-    HASH_DEL(pthis->data_map, node);
-    node->id = new_cell_id;
-    HASH_ADD_INT(pthis->data_map, id, node);
-    return 0;
-}
-
 void metric_rearrange_cell_id(struct metric *pthis, int *original_id, int *final_id, size_t n_id)
 {
     if (!pthis->is_topk) {
@@ -840,17 +813,17 @@ void metric_rearrange_cell_id(struct metric *pthis, int *original_id, int *final
     struct cell_id_data_map *tmp_node_arr[n_id];
     struct cell_id_data_map *node;
     int i = 0;
-    printf("metric_rearrange_cell_id, n_id = %zu, hash element: %d\n", n_id, HASH_COUNT(pthis->data_map));
+    int valid_id_count = 0;
     for (i = 0; i < n_id; i++) {
         HASH_FIND_INT(pthis->data_map, &original_id[i], node);
         if (node == NULL) {
-            printf("metric_rearrange_cell_id: cell_id %d not exist\n", original_id[i]);
-            return;
+            printf("ERR: metric_rearrange_cell_id: cell_id %d not exist\n", original_id[i]);
+            continue;
         }
-        tmp_node_arr[i] = node;
+        tmp_node_arr[valid_id_count++] = node;
         HASH_DEL(pthis->data_map, node);
     }
-    for (int i = 0; i < n_id; i++) {
+    for (int i = 0; i < valid_id_count; i++) {
         tmp_node_arr[i]->id = final_id[i];
         HASH_ADD_INT(pthis->data_map, id, tmp_node_arr[i]);
     }
@@ -867,6 +840,7 @@ void metric_delete_cell(struct metric *pthis, int cell_id)
     if (node == NULL) {
         return;
     }
+    // printf("metric_delete_cell: find cell_id %d\n", cell_id);
     HASH_DEL(pthis->data_map, node);
     pthis->scheme->del(node->data);
     free(node);
@@ -881,7 +855,6 @@ struct metric_measure_data *metric_find_or_new_cell(struct metric *pthis, int ce
     struct metric_measure_data *data = metric_find_one_cell(pthis, cell_id);
 
     if (data == NULL) {
-        printf("cell id %d does not exist\n", cell_id);
         data = pthis->scheme->new(pthis->info->paras);
         metric_add_one_cell(pthis, cell_id, data);
     }
@@ -898,7 +871,6 @@ struct metric *metric_counter_new(const char *name, bool is_gauge, bool is_topk)
 
 int metric_counter_incrby(struct metric *pthis, int cell_id, long long value)
 {
-    printf("metric_counter_incrby: cell_id %d, value %lld\n", cell_id, value);
     struct metric_measure_data *data = metric_find_or_new_cell(pthis, cell_id);
     struct metric_counter_or_gauge *counter = data->counter;
     counter->value += value;
@@ -1012,9 +984,7 @@ long long metric_histogram_count_le_value(const struct metric *pthis, int cell_i
 /* -------------------------------------------------------------------------- */
 void metric_get_cell_ids(const struct metric *pthis, int **cell_ids, size_t *cell_id_count)
 {
-    printf("metric_get_cell_ids enter, metric name: %s\n", pthis->info->name);
     if (!pthis->is_topk) {
-        printf("metric_get_cell_ids data array\n");
         size_t n_id_max = pthis->n_array_item;
         if (n_id_max == 0) {
             printf("metric_get_cell_ids no cell ids\n");
@@ -1046,8 +1016,6 @@ void metric_get_cell_ids(const struct metric *pthis, int **cell_ids, size_t *cel
         return;
     }
 
-    printf("metric_get_cell_ids data topk map\n");
-
     *cell_id_count = HASH_COUNT(pthis->data_map);
     if (*cell_id_count == 0) {
         printf("metric_get_cell_ids no cell ids\n");
@@ -1058,10 +1026,8 @@ void metric_get_cell_ids(const struct metric *pthis, int **cell_ids, size_t *cel
     struct cell_id_data_map *node, *tmp;
     int i = 0;
     HASH_ITER(hh, pthis->data_map, node, tmp) {
-        printf("metric_get_cell_ids cell id %d\n", node->id);
         (*cell_ids)[i++] = node->id;
     }
-    printf("metric_get_cell_ids exit\n");
 }
 
 const char *metric_get_name(const struct metric *metrics)

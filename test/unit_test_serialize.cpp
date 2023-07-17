@@ -60,9 +60,9 @@ void test_cell_manager_read_tag_and_comp_with_standard(struct cell_manager *cm, 
 TEST(unit_test_serialize, serialize_and_deserialize_cell_manager_comprehensive)
 {
     struct cell_manager *cm = cell_manager_new(SAMPLING_MODE_COMPREHENSIVE, 1000);
-    int cell_id_1 = cell_manager_add_cell(cm, &TEST_TAG_INT, 1, 1);
-    int cell_id_2 = cell_manager_add_cell(cm, &TEST_TAG_DOUBLE, 1, 1);
-    int cell_id_3 = cell_manager_add_cell(cm, &TEST_TAG_STRING, 1, 1);
+    int cell_id_1 = cell_manager_add_cell(cm, &TEST_TAG_INT, 1);
+    int cell_id_2 = cell_manager_add_cell(cm, &TEST_TAG_DOUBLE, 1);
+    int cell_id_3 = cell_manager_add_cell(cm, &TEST_TAG_STRING, 1);
 
     char *blob;
     size_t blob_size;
@@ -85,9 +85,10 @@ TEST(unit_test_serialize, serialize_and_deserialize_cell_manager_comprehensive)
 TEST(unit_test_serialize, serialize_and_deserialize_cell_manager_topk)
 {
     struct cell_manager *cm = cell_manager_new(SAMPLING_MODE_TOPK, 1000);
-    int cell_id_1 = cell_manager_add_cell(cm, &TEST_TAG_INT, 1, 1);
-    int cell_id_2 = cell_manager_add_cell(cm, &TEST_TAG_DOUBLE, 1, 2);
-    int cell_id_3 = cell_manager_add_cell(cm, &TEST_TAG_STRING, 1, 3);
+    int popped_cell_id;
+    int cell_id_1 = cell_manager_add_cell_topk(cm, &TEST_TAG_INT, 1, 1, &popped_cell_id);
+    int cell_id_2 = cell_manager_add_cell_topk(cm, &TEST_TAG_DOUBLE, 1, 2, &popped_cell_id);
+    int cell_id_3 = cell_manager_add_cell_topk(cm, &TEST_TAG_STRING, 1, 3, &popped_cell_id);
 
     char *blob;
     size_t blob_size;

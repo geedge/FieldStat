@@ -274,7 +274,7 @@ int heavy_keeper_with_data_add(struct heavy_keeper *hk, const char *key, size_t 
         return 0;
     }
     // use the original id
-    return 1;
+    return -2;
 }
 
 struct heavy_keeper_result *heavy_keeper_query(struct heavy_keeper *hk) {

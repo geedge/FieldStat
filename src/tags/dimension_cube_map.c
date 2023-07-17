@@ -228,10 +228,8 @@ void cell_manager_free(struct cell_manager *pthis)
     free(pthis);
 }
 
-// FIXME: 如果我改了hk，那这个函数就会被改掉，完全不能理解
 int cell_manager_get_tag_by_cell_id(const struct cell_manager *pthis, int cell_id, struct fieldstat_tag **tag_out, size_t *tag_count_out)
 {
-    printf("cell_manager_get_tag_by_cell_id enter, id: %d\n", cell_id);
     struct tag_cube_map *hash_hdr = pthis->id_tag_map;
     struct tag_cube_map *node = NULL;
     HASH_FIND_INT(hash_hdr, &cell_id, node);
@@ -245,7 +243,6 @@ int cell_manager_get_tag_by_cell_id(const struct cell_manager *pthis, int cell_i
         fieldtag_copy(&node->tags[i], &(*tag_out)[i]);
     }
     *tag_count_out = node->n_tags;
-    printf("cell_manager_get_tag_by_cell_id exit\n");
     return 0;
 }
 
@@ -273,7 +270,6 @@ int cell_manager_get_cell_id_by_tag(const struct cell_manager *pthis, const stru
         unsigned int count_dummy = 0;
         heavy_keeper_query_one(pthis->topk_tag_id_map, key, key_size, &count_dummy, &cell_id);
     } else {
-        printf("cell_manager_get_cell_id_by_tag find comprehensive, key: %s, comprehensive_tag_id_map card: %d\n", key, (int)HASH_COUNT(pthis->comprehensive_tag_id_map));
         struct cell_hash_node *node = NULL;
         HASH_FIND(hh, pthis->comprehensive_tag_id_map, key, key_size, node);
         if (node == NULL) {
@@ -281,7 +277,6 @@ int cell_manager_get_cell_id_by_tag(const struct cell_manager *pthis, const stru
             cell_id = -1;
         } else {
             cell_id = node->cell_id;
-            printf("cell_manager_get_cell_id_by_tag find comprehensive, found, cell id : %d\n", cell_id);
         }
     }
 
@@ -322,24 +317,21 @@ void cell_manager_comprehensive_map_add(struct cell_manager *pthis, const struct
     HASH_ADD_KEYPTR(hh, pthis->comprehensive_tag_id_map, node->key, node->key_len, node);
 }
 
-int cell_manager_topk_map_add(struct cell_manager *pthis, const struct fieldstat_tag *tag, size_t tag_count, unsigned int count, int cell_id)
+int cell_manager_topk_map_add(struct cell_manager *pthis, const struct fieldstat_tag *tag, size_t tag_count, unsigned int count, int cell_id, int *popped_cell_id)
 {
     char *key = NULL;
     size_t key_size = 0;
     build_dynamic_cell_key(tag, tag_count, &key, &key_size);
 
-    int popped_cell_id = -1;
-
-    int ret = heavy_keeper_with_data_add(pthis->topk_tag_id_map, key, key_size, count, cell_id, &popped_cell_id);
-    // todo: 想办法通知一下metric，把这个cube删了
+    int ret = heavy_keeper_with_data_add(pthis->topk_tag_id_map, key, key_size, count, cell_id, popped_cell_id);
     free(key);
 
     if (ret == -1) {
         return -1;
     }
-    if (popped_cell_id != -1) {
+    if (*popped_cell_id != -1) {
         struct tag_cube_map *node = NULL;
-        HASH_FIND_INT(pthis->id_tag_map, &popped_cell_id, node);
+        HASH_FIND_INT(pthis->id_tag_map, popped_cell_id, node);
         if (node != NULL) {
             HASH_DEL(pthis->id_tag_map, node);
             fieldtag_list_free(node->tags, node->n_tags);
@@ -349,26 +341,38 @@ int cell_manager_topk_map_add(struct cell_manager *pthis, const struct fieldstat
     return ret;
 }
 
-int cell_manager_add_cell(struct cell_manager *pthis, const struct fieldstat_tag *tag, size_t tag_count, unsigned int count)
+int cell_manager_add_cell(struct cell_manager *pthis, const struct fieldstat_tag *tag, size_t tag_count)
+{
+    if (pthis->sampling_mode == SAMPLING_MODE_TOPK) {
+        printf("cell_manager_add_cell enter, sampling mode is topk\n");
+        return -1;
+    }
+    if (HASH_COUNT(pthis->comprehensive_tag_id_map) >= pthis->max_cell_num) {
+        return -1;
+    }
+    int existing_cell_id = cell_manager_get_cell_id_by_tag(pthis, tag, tag_count);
+    if (existing_cell_id != -1) {
+        return existing_cell_id;
+    }
+
+    cell_manager_comprehensive_map_add(pthis, tag, tag_count, pthis->next_cell_id);
+
+    cell_manager_id_tag_map_add(pthis, pthis->next_cell_id, tag, tag_count);
+    return pthis->next_cell_id++;
+}
+
+int cell_manager_add_cell_topk(struct cell_manager *pthis, const struct fieldstat_tag *tag, size_t tag_count, unsigned int count, int *popped_cell_id)
 {
     if (pthis->sampling_mode == SAMPLING_MODE_COMPREHENSIVE) {
-        if (HASH_COUNT(pthis->comprehensive_tag_id_map) >= pthis->max_cell_num) {
-            return -1;
-        }
-        int existing_cell_id = cell_manager_get_cell_id_by_tag(pthis, tag, tag_count);
-        if (existing_cell_id != -1) {
-            return existing_cell_id;
-        }
-
-        cell_manager_comprehensive_map_add(pthis, tag, tag_count, pthis->next_cell_id);
-    } else {
-        int ret = cell_manager_topk_map_add(pthis, tag, tag_count, count, pthis->next_cell_id);
-        if (ret == -1) {
-            return -1;
-        }
-        if (ret == 1) {
-            return cell_manager_get_cell_id_by_tag(pthis, tag, tag_count);
-        }
+        printf("cell_manager_add_cell_topk enter, sampling mode is comprehensive\n");
+        return -1;
+    }
+    int ret = cell_manager_topk_map_add(pthis, tag, tag_count, count, pthis->next_cell_id, popped_cell_id);
+    if (ret == -1) {
+        return -1;
+    }
+    if (ret == 1) {
+        return cell_manager_get_cell_id_by_tag(pthis, tag, tag_count);
     }
 
     cell_manager_id_tag_map_add(pthis, pthis->next_cell_id, tag, tag_count);

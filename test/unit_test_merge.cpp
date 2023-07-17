@@ -19,7 +19,7 @@ TEST(unit_test_merge, test_metric_name_mapping_with_new_metric_on_existing_cube)
     fieldstat_merge(instance_dest, instance);
 
     int *cube_id;
-    size_t n_cube;
+    int n_cube;
     fieldstat_get_cubes(instance_dest, &cube_id, &n_cube);
     EXPECT_TRUE(n_cube == 2);
     EXPECT_TRUE(cube_id[0] == cube_id_dest);
@@ -48,7 +48,7 @@ TEST(unit_test_merge, cube_shared_tag_mapping)
     fieldstat_merge(instance_dest, instance);
 
     int *cube_id;
-    size_t n_cube;
+    int n_cube;
     fieldstat_get_cubes(instance_dest, &cube_id, &n_cube);
     EXPECT_TRUE(n_cube == 2);
     EXPECT_STREQ(fieldstat_get_metric_name(instance_dest, cube_id_dest, 0), "metric in cube 2");
@@ -65,7 +65,7 @@ TEST(unit_test_merge, empty_instance)
     fieldstat_merge(instance_dest, instance);
 
     int *cube_id;
-    size_t n_cube;
+    int n_cube;
     fieldstat_get_cubes(instance_dest, &cube_id, &n_cube);
     EXPECT_TRUE(n_cube == 0);
 
@@ -84,7 +84,7 @@ TEST(unit_test_merge, new_cube_and_metric_to_empty_comprehensive)
     fieldstat_merge(instance_dest, instance);
 
     int *cube_id_dest;
-    size_t n_cube;
+    int n_cube;
     fieldstat_get_cubes(instance_dest, &cube_id_dest, &n_cube);
     EXPECT_TRUE(n_cube == 1);
     EXPECT_STREQ(fieldstat_get_metric_name(instance_dest, cube_id_dest[0], 0), "metric_name");
@@ -108,7 +108,7 @@ TEST(unit_test_merge, new_cell_on_existing_cube_and_metric_comprehensive)
     fieldstat_merge(instance_dest, instance);
 
     int *cube_id_dest;
-    size_t n_cube;
+    int n_cube;
     fieldstat_get_cubes(instance_dest, &cube_id_dest, &n_cube);
     EXPECT_TRUE(n_cube == 1);
     int ret_cube_id = cube_id_dest[0];
@@ -145,7 +145,7 @@ TEST(unit_test_merge, merge_existing_cell_on_existing_cube_and_metric_comprehens
     fieldstat_merge(instance_dest, instance);
 
     int *cube_id_dest;
-    size_t n_cube;
+    int n_cube;
     fieldstat_get_cubes(instance_dest, &cube_id_dest, &n_cube);
     EXPECT_TRUE(n_cube == 1);
     int ret_cube_id = cube_id_dest[0];
@@ -240,7 +240,7 @@ TEST(unit_test_merge, new_cube_and_metric_to_empty_topk)
     fieldstat_merge(instance_dest, instance);
 
     int *cube_id_dest;
-    size_t n_cube;
+    int n_cube;
     fieldstat_get_cubes(instance_dest, &cube_id_dest, &n_cube);
     EXPECT_TRUE(n_cube == 1);
     EXPECT_STREQ(fieldstat_get_metric_name(instance_dest, cube_id_dest[0], 0), "metric_name");
@@ -264,7 +264,7 @@ TEST(unit_test_merge, new_cell_on_existing_cube_and_metric_topk)
     fieldstat_merge(instance_dest, instance);
 
     int *cube_id_dest;
-    size_t n_cube;
+    int n_cube;
     fieldstat_get_cubes(instance_dest, &cube_id_dest, &n_cube);
     EXPECT_TRUE(n_cube == 1);
     int ret_cube_id = cube_id_dest[0];
@@ -304,7 +304,7 @@ TEST(unit_test_merge, merge_existing_cell_on_existing_cube_and_metric_topk)
     fieldstat_merge(instance_dest, instance);
 
     int *cube_id_dest;
-    size_t n_cube;
+    int n_cube;
     fieldstat_get_cubes(instance_dest, &cube_id_dest, &n_cube);
     EXPECT_TRUE(n_cube == 1);
     int ret_cube_id = cube_id_dest[0];
