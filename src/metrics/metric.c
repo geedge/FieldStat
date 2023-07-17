@@ -449,7 +449,6 @@ void metric_free(struct metric *pthis)
     } else {
         struct cell_id_data_map *cur, *tmp;
         HASH_ITER(hh, pthis->data_map, cur, tmp) {
-            printf("free cell of id: %d\n", cur->id);
             pthis->scheme->del(cur->data);
             HASH_DEL(pthis->data_map, cur);
             free(cur);

@@ -221,7 +221,6 @@ int cell_iter_next(struct cell_iter *iter) {
                 printf("initial iter, find cube: %d, metric: %d, cell: %d\n", iter->cube_ids[iter->curr_cube_idx], iter->curr_metric_id, iter->curr_cell_idx);
                 return 1;
             }
-            printf("empty cube: %d, id : %d\n", iter->curr_cube_idx, iter->cube_ids[iter->curr_cube_idx]);
         }
         return 0;
     }
@@ -233,7 +232,7 @@ int cell_iter_next(struct cell_iter *iter) {
 
     cell_iter_free_cell_records(iter);
     if (cell_iter_next_nonempty_metric(iter)) {
-        printf("iter new metric, old cube,  find cube: %d, metric: %d, cell: %d\n", iter->cube_ids[iter->curr_cube_idx], iter->curr_metric_id, iter->curr_cell_idx);
+        printf("iter new metric, old cube, find cube: %d, metric: %d, cell: %d\n", iter->cube_ids[iter->curr_cube_idx], iter->curr_metric_id, iter->curr_cell_idx);
         return 1;
     }
 

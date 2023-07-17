@@ -33,18 +33,17 @@ TEST(Fuzz_test, fuzz_test)
     const int METRIC_NUM = 2;
     const char *metric_name_of_topk[METRIC_NUM] = {"topk1", "topk2"};
     const char *metric_name_of_comprehensive[METRIC_NUM] = {"counter_", "hll_"};
-    const int CUBE_NUM = 6;
+    const int CUBE_NUM = 20;
     int cube_ids[CUBE_NUM];
     bool cube_is_topk[CUBE_NUM];
     Fieldstat_tag_list_wrapper *shared_tag[CUBE_NUM];
-    fill_random_tag_of_length_1_to_3(shared_tag, CUBE_NUM);
-
-    const int CELL_NUM = 1000;
-    Fieldstat_tag_list_wrapper *tag_list_wrapper[CELL_NUM];
-    fill_random_tag_of_length_1_to_3(tag_list_wrapper, CELL_NUM - 300);
-    for (int i = CELL_NUM - 300; i < CELL_NUM; i++) {
-        tag_list_wrapper[i] = new Fieldstat_tag_list_wrapper("elephant", i / 30);
+    for (int i = 0; i < CUBE_NUM; i++) {
+        shared_tag[i] = new Fieldstat_tag_list_wrapper("shared_tag", i);
     }
+
+    const int CELL_NUM = 200;
+    Fieldstat_tag_list_wrapper *tag_list_wrapper[CELL_NUM];
+    fill_random_tag_of_length_1_to_3(tag_list_wrapper, CELL_NUM);
 
     const int TEST_ROUND = 1000;
     struct fieldstat *instance = fieldstat_new();
@@ -82,9 +81,9 @@ TEST(Fuzz_test, fuzz_test)
             }
         };
 
-    for (int i = 0; i < CUBE_NUM; i++) { // leave 2 cube unregistered
-        // bool is_topk = rand() % 2 == 0;
-        bool is_topk = true;
+    for (int i = 0; i < CUBE_NUM - 2; i++) { // leave 2 cube unregistered
+        bool is_topk = rand() % 2 == 0;
+        // bool is_topk = true;
         cube_is_topk[i] = is_topk;
         cube_ids[i] = fieldstat_register_cube(instance, shared_tag[i]->get_tag(), shared_tag[i]->get_tag_count(), is_topk ? SAMPLING_MODE_TOPK : SAMPLING_MODE_COMPREHENSIVE,
             is_topk ? 10 : CELL_NUM);
@@ -93,8 +92,8 @@ TEST(Fuzz_test, fuzz_test)
             metric_reg_funcs[metric_id](cube_ids[i]);
         }
     }
-    // cube_ids[CUBE_NUM - 2] = -1;
-    // cube_ids[CUBE_NUM - 1] = -1;
+    cube_ids[CUBE_NUM - 2] = -1;
+    cube_ids[CUBE_NUM - 1] = -1;
 
     for (int i = 0; i < TEST_ROUND; i++) {
         if (i != 0 && i % 100 == 0) {
@@ -109,14 +108,6 @@ TEST(Fuzz_test, fuzz_test)
         }
         int cube_id = rand() % CUBE_NUM;
         if (cube_ids[cube_id] != -1) {
-            // fixme: cube 在merge时版本控制
-            // if (rand() % 100 == 0) {
-            //     // delete a cube
-            //     cube_ids[cube_id] = -1;
-            //     fieldstat_delete_cube(instance, cube_ids[cube_id]);
-            //     continue;
-            // }
-
             if (cube_is_topk[cube_id]) {
                 Fieldstat_tag_list_wrapper * tmp = tag_list_wrapper[rand() % CELL_NUM];
                 int cell_id = fieldstat_cube_add(instance, cube_ids[cube_id], tmp->get_tag(), tmp->get_tag_count(), rand_nums[i]);
@@ -139,8 +130,8 @@ TEST(Fuzz_test, fuzz_test)
             }
         } else {
             // create a new cube
-            // bool is_topk = rand() % 2 == 0;
-            bool is_topk = true;
+            bool is_topk = rand() % 2 == 0;
+            // bool is_topk = true;
             cube_is_topk[cube_id] = is_topk;
             if (is_topk) {
                 cube_ids[cube_id] = fieldstat_register_cube(instance, shared_tag[cube_id]->get_tag(), shared_tag[cube_id]->get_tag_count(), SAMPLING_MODE_TOPK, 10);
@@ -164,11 +155,39 @@ TEST(Fuzz_test, fuzz_test)
         delete shared_tag[i];
     }
 
-    // struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new(instance_dest);
-    // char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter);
-    // printf("%s\n", json_string);
-    // fieldstat_json_exporter_free(fieldstat_json_exporter);
-    // free(json_string);
+    printf("czzzz test (dest)----------------\n");
+    int *cubes;
+    int cube_num;
+    fieldstat_get_cubes(instance_dest, &cubes, &cube_num);
+    for (int i = 0; i < cube_num; i++) {
+        EXPECT_EQ(fieldstat_get_max_metric_id(instance_dest, cubes[i]), METRIC_NUM - 1);
+        int *cells0;
+        size_t cell_num0;
+        struct fieldstat_tag_list *tags0;
+        fieldstat_get_cells(instance_dest, cubes[i], 0, &cells0, &tags0, &cell_num0);
+        int *cells1;
+        size_t cell_num1;
+        struct fieldstat_tag_list *tags1;
+        fieldstat_get_cells(instance_dest, cubes[i], 1, &cells1, &tags1, &cell_num1);
+
+        EXPECT_EQ(cell_num0, cell_num1);
+        for (int j = 0; j < cell_num0; j++) {
+            EXPECT_TRUE(Fieldstat_tag_list_wrapper(&tags0[j]) == Fieldstat_tag_list_wrapper(&tags1[j]));
+            EXPECT_EQ(cells0[j], cells1[j]);
+        }
+        free(cells0);
+        free(cells1);
+        fieldstat_tag_list_arr_free(tags0, cell_num0);
+        fieldstat_tag_list_arr_free(tags1, cell_num1);
+    }
+    free(cubes);
+
+    printf("czzzz test (json)----------------\n");
+    struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new(instance_dest);
+    char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter);
+    printf("%s\n", json_string);
+    fieldstat_json_exporter_free(fieldstat_json_exporter);
+    free(json_string);
 
     fieldstat_free(instance_dest);
     fieldstat_free(instance);
