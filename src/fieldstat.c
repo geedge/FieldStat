@@ -83,7 +83,7 @@ unsigned long fieldstat_get_cell_version(const struct fieldstat *instance)
     return instance->cell_version;
 }
 
-int fieldstat_delete_cube(struct fieldstat *instance, int cube_id)
+int fieldstat_unregister_cube(struct fieldstat *instance, int cube_id)
 {
     if (cube_id >= instance->valid_cube_arr_length) {
         printf("ERR: cube_id is out of range\n");

@@ -371,7 +371,7 @@ TEST(export_test, skip_empty_metrics_given_cube_deleted) {
     struct fieldstat *instance = fieldstat_new();
     int cube_id_del = fieldstat_register_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
     int cube_id = fieldstat_register_cube(instance, TEST_TAG_SHARED2, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
-    fieldstat_delete_cube(instance, cube_id_del);
+    fieldstat_unregister_cube(instance, cube_id_del);
     (void)fieldstat_register_counter(instance, cube_id, "counter", false);
     (void)fieldstat_register_counter(instance, cube_id, "counter2", false);
     int metric_id = fieldstat_register_counter(instance, cube_id, "counter3", false);

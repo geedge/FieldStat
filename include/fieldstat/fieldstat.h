@@ -52,7 +52,12 @@ void fieldstat_free(struct fieldstat *instance);
     * @return cube id, if success; otherwise, return -1. Fail when tags are NULL. the uniqueness of shared_tags is not checked, user should guarantee that shared_tags are unique.
 */
 int fieldstat_register_cube(struct fieldstat *instance, const struct fieldstat_tag *shared_tags, size_t n_tag, enum sampling_mode mode, size_t max_n_cell);
-
+/*
+    * @brief Delete the cube of cube_id. All the cells and metrics are deleted. The cube_id may be reused by other new cubes. Increase the corresponding cube_version by 1.
+    * @return 0 if success. -1 if cube_id is invalid.
+*/
+int fieldstat_unregister_cube(struct fieldstat *instance, int cube_id);
+unsigned long fieldstat_get_cube_version(const struct fieldstat *instance, int cube_id);
 /*
     * @brief add a metric to the cube of cube_id. One metric may have multiple sub-metric that are associated with different cells.
     * @param cube_id: cube id, previously returned by fieldstat_register_cube.
@@ -111,12 +116,6 @@ int fieldstat_histogram_record(struct fieldstat *instance, int cube_id, int metr
 void fieldstat_reset(struct fieldstat *instance);
 unsigned long fieldstat_get_cell_version(const struct fieldstat *instance);
 
-/*
-    * @brief Delete the cube of cube_id. All the cells and metrics are deleted. The cube_id may be reused by other new cubes. Increase the corresponding cube_version by 1.
-    * @return 0 if success. -1 if cube_id is invalid.
-*/
-int fieldstat_delete_cube(struct fieldstat *instance, int cube_id);
-unsigned long fieldstat_get_cube_version(const struct fieldstat *instance, int cube_id);
 
 /*
  @brief Merge the instance. The registered cubes and metrics are merged even if there are no cells added.
