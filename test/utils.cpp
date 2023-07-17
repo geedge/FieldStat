@@ -65,7 +65,7 @@ Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(const char * key, int val
 }
 
 Fieldstat_tag_list_wrapper::~Fieldstat_tag_list_wrapper() {
-    for (int i = 0; i < tag_list_c.n_tag; i++) {
+    for (size_t i = 0; i < tag_list_c.n_tag; i++) {
         free((char *)tag_list_c.tag[i].key);
         if (tag_list_c.tag[i].type == TAG_CSTRING) {
             free((char *)tag_list_c.tag[i].value_str);

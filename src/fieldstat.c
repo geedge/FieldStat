@@ -97,6 +97,10 @@ int fieldstat_delete_cube(struct fieldstat *instance, int cube_id)
 
 unsigned long fieldstat_get_cube_version(const struct fieldstat *instance, int cube_id)
 {
+    if (cube_id >= instance->valid_cube_arr_length) {
+        printf("ERR: cube_id is out of range\n");
+        return 0;
+    }
     return instance->cube_version[cube_id];
 }
 

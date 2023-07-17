@@ -13,7 +13,6 @@
 #include "hdr/hdr_histogram.h"
 #include "hdr/hdr_histogram_log.h"
 #include "st_hyperloglog.h"
-#include "heavy_keeper.h"
 
 const size_t OPER_NUM = 10000;
 std::string g_hll_standard_oper[OPER_NUM];
