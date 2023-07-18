@@ -233,19 +233,28 @@ TEST(metric_test_counter, performance_test_on_60000_cells_comprehensive_1000000_
     fieldstat_free(instance);
 }
 
+int cmpfunc(const void *a, const void *b)
+{
+    return (*(int *)a - *(int *)b);
+}
+
 TEST(metric_test_counter, performance_test_on_1000_cells_topk_1000000_times)
 {
     int cell_count = 60000;
     struct fieldstat_tag tags[cell_count];
     for (int i = 0; i < cell_count; i++) {
         tags[i] = TEST_TAG_INT;
-        tags[i].value_int = i;
+        // tags[i].value_int = rand() % 10000;
+        if (rand()%2)
+            tags[i].value_int = i;
+        else
+            tags[i].value_int = rand() % 1000;
     }
-    getchar();
     struct fieldstat *instance = fieldstat_new();
-    fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_TOPK, cell_count);
+    fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_TOPK, 1000);
     fieldstat_register_counter(instance, 0, "test", 0);
 
+    // getchar();
     clock_t start = clock();
     for (size_t i = 0; i < 1000000; i++) {
         int cell_id = fieldstat_cube_add(instance, 0, &tags[i % cell_count], 1, 1);
@@ -254,9 +263,22 @@ TEST(metric_test_counter, performance_test_on_1000_cells_topk_1000000_times)
     }
     clock_t end = clock();
     double seconds = (double)(end - start) / CLOCKS_PER_SEC;
+    // exit(0);
+
     EXPECT_TRUE(seconds < 1); // 1 = 0.000001 * 1000000
     printf("performance_test_on_1000_cells_topk_1000000_times time cost: %f\n", seconds);
-    exit(0);
+    int *ret_cell_ids = NULL;
+    struct fieldstat_tag_list *tag_list = NULL;
+    size_t n_cell = 0;
+    fieldstat_get_cells(instance, 0, 0, &ret_cell_ids, &tag_list, &n_cell);
+    qsort(ret_cell_ids, n_cell, sizeof(int), cmpfunc);
+    printf("biggest cell id: %d\n", ret_cell_ids[n_cell - 1]);
+    for (size_t i = 0; i < n_cell; i++) {
+        printf("%d ", ret_cell_ids[i]);
+    }
+    printf("\n");
+    
+
     fieldstat_free(instance);
 }
 
