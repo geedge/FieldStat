@@ -195,6 +195,7 @@ int fieldstat_register_cube(struct fieldstat *instance, const struct fieldstat_t
     return cube_id;
 }
 
+// todo: topk 模式下，针对当前cellid 大小的检测
 int fieldstat_cube_add(struct fieldstat *instance, int cube_id, const struct fieldstat_tag *tags, size_t n_tag, long long increment)
 {
     struct fs_cube *cube = instance->cube[cube_id];
@@ -269,7 +270,7 @@ int fieldstat_register_counter(struct fieldstat *instance, int cube_id, const ch
         printf("ERR: fieldstat_register_counter cube is not registered yet\n");
         return -1;
     }
-    struct metric *metric = metric_counter_new(field_name, is_gauge, cube->sampling_mode == SAMPLING_MODE_TOPK ? true : false);
+    struct metric *metric = metric_counter_new(field_name, is_gauge);
 
     return append_metric_to_cube(cube, metric);
 }
@@ -285,7 +286,7 @@ int fieldstat_register_hll(struct fieldstat *instance, int cube_id, const char *
         printf("ERR: precision must be between 4 and 18\n");
         return -1;
     }
-    struct metric *metric = metric_hll_new(field_name, precision, cube->sampling_mode == SAMPLING_MODE_TOPK ? true : false);
+    struct metric *metric = metric_hll_new(field_name, precision);
 
     return append_metric_to_cube(cube, metric);
 }
@@ -311,7 +312,7 @@ int fieldstat_register_histogram(struct fieldstat *instance, int cube_id, const 
 		return -1;
 	}
 
-    struct metric *metric = metric_histogram_new(field_name, lowest_trackable_value, highest_trackable_value, significant_figures, cube->sampling_mode == SAMPLING_MODE_TOPK ? true : false);
+    struct metric *metric = metric_histogram_new(field_name, lowest_trackable_value, highest_trackable_value, significant_figures);
 
     return append_metric_to_cube(cube, metric);
 }

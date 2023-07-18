@@ -273,11 +273,8 @@ TEST(metric_test_counter, performance_test_on_1000_cells_topk_1000000_times)
     fieldstat_get_cells(instance, 0, 0, &ret_cell_ids, &tag_list, &n_cell);
     qsort(ret_cell_ids, n_cell, sizeof(int), cmpfunc);
     printf("biggest cell id: %d\n", ret_cell_ids[n_cell - 1]);
-    for (size_t i = 0; i < n_cell; i++) {
-        printf("%d ", ret_cell_ids[i]);
-    }
-    printf("\n");
-    
+    free(ret_cell_ids);
+    fieldstat_tag_list_arr_free(tag_list, n_cell);
 
     fieldstat_free(instance);
 }
