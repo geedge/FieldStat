@@ -6,8 +6,10 @@
 // serialize, merge and reset every rand times[0,100]
 
 
+#include <stdio.h>
 #include <gtest/gtest.h>
 #include <functional>
+#include <time.h>
 #include <random>
 #include "fieldstat.h"
 #include "fieldstat_exporter.h"
@@ -95,6 +97,9 @@ TEST(Fuzz_test, fuzz_test)
     cube_ids[CUBE_NUM - 2] = -1;
     cube_ids[CUBE_NUM - 1] = -1;
 
+    getchar(); // todo: remove this line
+    clock_t start = clock();
+
     for (int i = 0; i < TEST_ROUND; i++) {
         if (i != 0 && i % 100 == 0) {
             char *blob;
@@ -145,6 +150,9 @@ TEST(Fuzz_test, fuzz_test)
         }
     }
 
+    clock_t end = clock();
+    printf("time: %lf\n", (double)(end - start) / CLOCKS_PER_SEC);
+
     for (int i = 0; i < TEST_ROUND; i++) {
         delete rand_strs[i];
     }
@@ -154,6 +162,8 @@ TEST(Fuzz_test, fuzz_test)
     for (int i = 0; i < CUBE_NUM; i++) {
         delete shared_tag[i];
     }
+
+    exit(0); // todo: 测完删了
 
     printf("czzzz test (dest)----------------\n");
     int *cubes;
@@ -171,7 +181,7 @@ TEST(Fuzz_test, fuzz_test)
         fieldstat_get_cells(instance_dest, cubes[i], 1, &cells1, &tags1, &cell_num1);
 
         EXPECT_EQ(cell_num0, cell_num1);
-        for (int j = 0; j < cell_num0; j++) {
+        for (size_t j = 0; j < cell_num0; j++) {
             EXPECT_TRUE(Fieldstat_tag_list_wrapper(&tags0[j]) == Fieldstat_tag_list_wrapper(&tags1[j]));
             EXPECT_EQ(cells0[j], cells1[j]);
         }
