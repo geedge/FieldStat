@@ -279,8 +279,7 @@ int cell_manager_get_cell_id_by_tag(const struct cell_manager *pthis, const stru
     int cell_id = -1;
 
     if (pthis->sampling_mode == SAMPLING_MODE_TOPK) {
-        unsigned int count_dummy = 0;
-        heavy_keeper_query_one(pthis->topk_tag_id_map, key, key_size, &count_dummy, &cell_id);
+        heavy_keeper_query_one(pthis->topk_tag_id_map, key, key_size, NULL, &cell_id);
     } else {
         struct cell_hash_node *node = NULL;
         HASH_FIND(hh, pthis->comprehensive_tag_id_map, key, key_size, node);
@@ -313,7 +312,7 @@ int cell_manager_get_count_by_tag(const struct cell_manager *pthis, const struct
     return count;
 }
 
-void cell_manager_comprehensive_map_add(struct cell_manager *pthis, const struct fieldstat_tag *tag, size_t tag_count, int cell_id, int *existing_cell_id)
+int cell_manager_comprehensive_map_add(struct cell_manager *pthis, const struct fieldstat_tag *tag, size_t tag_count, int cell_id, int *existing_cell_id)
 {
     char *key = NULL;
     size_t key_size = 0;
@@ -324,7 +323,11 @@ void cell_manager_comprehensive_map_add(struct cell_manager *pthis, const struct
     if (node != NULL) {
         *existing_cell_id = node->cell_id;
         free(key);
-        return;
+        return 0;
+    }
+    if (HASH_COUNT(pthis->comprehensive_tag_id_map) >= pthis->max_cell_num) {
+        free(key);
+        return -1;
     }
 
     node = (struct cell_hash_node *)malloc(sizeof(struct cell_hash_node));
@@ -333,6 +336,7 @@ void cell_manager_comprehensive_map_add(struct cell_manager *pthis, const struct
     node->cell_id = cell_id;
     HASH_ADD_KEYPTR(hh, pthis->comprehensive_tag_id_map, node->key, node->key_len, node);
     *existing_cell_id = -1;
+    return 0;
 }
 
 int cell_manager_topk_map_add(struct cell_manager *pthis, const struct fieldstat_tag *tag, size_t tag_count, unsigned int count, int cell_id, int *popped_cell_id, int *existing_cell_id)
@@ -345,8 +349,7 @@ int cell_manager_topk_map_add(struct cell_manager *pthis, const struct fieldstat
     int ret = heavy_keeper_with_data_add(pthis->topk_tag_id_map, key, key_size, count, cell_id, popped_cell_id);
 
     if (ret == 1) { // use the original id
-        unsigned int count_dummy = 0;
-        heavy_keeper_query_one(pthis->topk_tag_id_map, key, key_size, &count_dummy, existing_cell_id);
+        heavy_keeper_query_one(pthis->topk_tag_id_map, key, key_size, NULL, existing_cell_id);
         free(key);
         return 1;
     }
@@ -371,11 +374,11 @@ int cell_manager_topk_map_add(struct cell_manager *pthis, const struct fieldstat
 
 int cell_manager_add_cell(struct cell_manager *pthis, const struct fieldstat_tag *tag, size_t tag_count)
 {
-    if (HASH_COUNT(pthis->comprehensive_tag_id_map) >= pthis->max_cell_num) {
+    int existing_cell_id = -1;
+    int ret = cell_manager_comprehensive_map_add(pthis, tag, tag_count, pthis->next_cell_id, &existing_cell_id);
+    if (ret == -1) {
         return -1;
     }
-    int existing_cell_id = -1;
-    cell_manager_comprehensive_map_add(pthis, tag, tag_count, pthis->next_cell_id, &existing_cell_id);
     if (existing_cell_id != -1) {
         return existing_cell_id;
     }

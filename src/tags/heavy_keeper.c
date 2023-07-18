@@ -309,11 +309,14 @@ struct heavy_keeper_result *heavy_keeper_query(struct heavy_keeper *hk) {
 
 int heavy_keeper_query_one(struct heavy_keeper *hk, const char *key, size_t key_len, unsigned int *count_out, int *cube_id_out)
 {
-    unsigned int count = sorted_set_get_member_score(hk->top_K_heap, key, key_len);
-    if (count == 0) {
-        return -1;
+    if (count_out != NULL) {
+        unsigned int count = sorted_set_get_member_score(hk->top_K_heap, key, key_len);
+        if (count == 0) {
+            *count_out = 0;
+            return -1;
+        }
+        *count_out = count;
     }
-    *count_out = count;
 
     if (cube_id_out == NULL) {
         return 0;
@@ -321,6 +324,7 @@ int heavy_keeper_query_one(struct heavy_keeper *hk, const char *key, size_t key_
 
     int **pst_data_in_rec = (int **)sorted_set_get_pointer_to_user_data(hk->top_K_heap, key, key_len);
     if (pst_data_in_rec == NULL) {
+        *cube_id_out = -1;
         return -1;
     }
     *cube_id_out = **pst_data_in_rec;

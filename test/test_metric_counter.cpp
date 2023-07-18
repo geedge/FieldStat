@@ -186,9 +186,79 @@ TEST(metric_test_counter, serialization_and_merge_gauge_twice_with_reset)
     fieldstat_free(instance_total);
 }
 
+TEST(metric_test_counter, performance_test_on_1_cells_1000000_times)
+{
+    // getchar();
+    struct fieldstat *instance = fieldstat_new();
+    fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    fieldstat_register_counter(instance, 0, "test", 0);
+    int cell_id = fieldstat_cube_add(instance, 0, &TEST_TAG_DOUBLE, 1, 1);
+    clock_t start = clock();
+    for (size_t i = 0; i < 1000000; i++) {
+        fieldstat_counter_incrby(instance, 0, 0, cell_id, 1);
+    }
+    clock_t end = clock();
+    double seconds = (double)(end - start) / CLOCKS_PER_SEC;
+    printf("performance_test_on_1_cells_1000000_times time cost: %f\n", seconds);
+    EXPECT_TRUE(seconds < 1); // 1 = 0.000001 * 1000000
+    fieldstat_free(instance);
+}
 
-// todo performance
+TEST(metric_test_counter, performance_test_on_60000_cells_comprehensive_1000000_times)
+{
+    int cell_count = 60000;
+    struct fieldstat_tag tags[cell_count];
+    for (int i = 0; i < cell_count; i++) {
+        tags[i] = TEST_TAG_INT;
+        tags[i].value_int = i;
+    }
+    // getchar();
+    struct fieldstat *instance = fieldstat_new();
+    fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, cell_count);
+    fieldstat_register_counter(instance, 0, "test", 0);
 
+    clock_t start = clock();
+    for (size_t i = 0; i < 1000000; i++) {
+        int cell_id = fieldstat_cube_add(instance, 0, &tags[i % cell_count], 1, 1);
+        if (cell_id < 0) {
+            printf("cell_id < 0\n");
+            continue;
+        }
+        fieldstat_counter_incrby(instance, 0, 0, cell_id, 1);
+    }
+    clock_t end = clock();
+    double seconds = (double)(end - start) / CLOCKS_PER_SEC;
+    printf("performance_test_on_60000_cells_comprehensive_1000000_times time cost: %f\n", seconds);
+    EXPECT_TRUE(seconds < 1); // 1 = 0.000001 * 1000000
+    fieldstat_free(instance);
+}
+
+TEST(metric_test_counter, performance_test_on_1000_cells_topk_1000000_times)
+{
+    int cell_count = 60000;
+    struct fieldstat_tag tags[cell_count];
+    for (int i = 0; i < cell_count; i++) {
+        tags[i] = TEST_TAG_INT;
+        tags[i].value_int = i;
+    }
+    getchar();
+    struct fieldstat *instance = fieldstat_new();
+    fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_TOPK, cell_count);
+    fieldstat_register_counter(instance, 0, "test", 0);
+
+    clock_t start = clock();
+    for (size_t i = 0; i < 1000000; i++) {
+        int cell_id = fieldstat_cube_add(instance, 0, &tags[i % cell_count], 1, 1);
+        if (cell_id != -1)
+            fieldstat_counter_incrby(instance, 0, 0, cell_id, 1);
+    }
+    clock_t end = clock();
+    double seconds = (double)(end - start) / CLOCKS_PER_SEC;
+    EXPECT_TRUE(seconds < 1); // 1 = 0.000001 * 1000000
+    printf("performance_test_on_1000_cells_topk_1000000_times time cost: %f\n", seconds);
+    exit(0);
+    fieldstat_free(instance);
+}
 
 int main(int argc, char *argv[]) 
 {

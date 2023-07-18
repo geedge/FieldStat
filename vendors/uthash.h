@@ -89,6 +89,11 @@ do {                                                                            
 
 #ifndef HASH_FUNCTION
 #define HASH_FUNCTION(keyptr,keylen,hashv) HASH_JEN(keyptr, keylen, hashv)
+// #define HASH_FUNCTION(keyptr,keylen,hashv) HASH_SFH(keyptr, keylen, hashv)
+// #define HASH_FUNCTION(keyptr,keylen,hashv) HASH_OAT(keyptr, keylen, hashv)
+// #define HASH_FUNCTION(keyptr,keylen,hashv) HASH_SAX(keyptr, keylen, hashv)
+// #define HASH_FUNCTION(keyptr,keylen,hashv) HASH_FNV(keyptr, keylen, hashv)
+// #define HASH_FUNCTION(keyptr,keylen,hashv) HASH_BER(keyptr, keylen, hashv)
 #endif
 
 #ifndef HASH_KEYCMP
