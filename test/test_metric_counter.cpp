@@ -21,7 +21,7 @@ struct fieldstat *test_init_standard_instance_one_cube_one_metric_one_cell_count
 void test_assert_standard_instance(struct fieldstat *instance)
 {
     int *ret_cube_id_arr = NULL;
-    size_t n_cube = 0;
+    int n_cube = 0;
     fieldstat_get_cubes(instance, &ret_cube_id_arr, &n_cube);
     EXPECT_EQ(n_cube, 1);
     int ret_cell_id = ret_cube_id_arr[0];

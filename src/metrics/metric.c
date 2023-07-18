@@ -287,8 +287,6 @@ struct metric_measure_data *metric_scheme_hll_deserialize(const char *blob, size
 
 struct metric_measure_data *metric_scheme_histogram_new(const struct metric_parameter *para)
 {
-    printf("metric_scheme_histogram_new enter\n");
-
     struct hdr_histogram* tmp_p_hdr = NULL;
     int ret = hdr_init((int64_t)para->hdr.lowest_trackable_value, (int64_t)para->hdr.highest_trackable_value, para->hdr.significant_figures, &tmp_p_hdr);
 	if (ret != 0) {
@@ -393,7 +391,7 @@ struct metric_parameter *construct_parameters(enum metric_type type, ...)
             paras->hdr.significant_figures = va_arg(ap, int);
             break;
         default:
-            printf("construct_parameters: unknown type\n");
+            printf("ERR: construct_parameters: unknown type\n");
             assert(0);
     }
     va_end(ap);
@@ -707,7 +705,6 @@ int metric_serialize(const struct metric *pthis, char **blob, size_t *blob_size)
 
 struct metric *metric_deserialize(const char *blob, size_t blob_size)
 {
-    printf("metric_deserialize enter\n");
     mpack_tree_t tree;
     mpack_tree_init_data(&tree, blob, blob_size);
     mpack_tree_parse(&tree);
@@ -743,17 +740,16 @@ struct metric *metric_deserialize(const char *blob, size_t blob_size)
 
 bool metric_info_check_is_equal(struct metric_info *info1, struct metric_info *info2)
 {
-    printf("dest para: %d  src para %d\n", info1->paras->counter.type, info2->paras->counter.type);
     if (info1->type != info2->type) {
-        printf("Error: metric_info_check_is_equal: metric type not equal\n");
+        printf("ERR: metric_info_check_is_equal: metric type not equal\n");
         return false;
     }
     if (strcmp(info1->name, info2->name) != 0) {
-        printf("Error: metric_info_check_is_equal: metric name not equal\n");
+        printf("ERR: metric_info_check_is_equal: metric name not equal\n");
         return false;
     }
     if (memcmp(info1->paras, info2->paras, sizeof(struct metric_parameter)) != 0) {
-        printf("Error: metric_info_check_is_equal: metric paras not equal\n");
+        printf("ERR: metric_info_check_is_equal: metric paras not equal\n");
         return false;
     }
     return true;
@@ -761,16 +757,14 @@ bool metric_info_check_is_equal(struct metric_info *info1, struct metric_info *i
 
 int metric_merge_or_copy_cell(struct metric *dest, const struct metric *src, int dest_cell_id, int src_cell_id)
 {
-    printf("metric_merge_or_copy_cell enter\n");
-    // if (metric_info_check_is_equal(dest->info, src->info) == false) {
-    //     // fixme: 说是这里的para没有初始化？但是我打debug是ok的
-    //     printf("Error: metric_merge_or_copy_cell: metric info not equal\n");
-    //     return -1;
-    // }
+    if (metric_info_check_is_equal(dest->info, src->info) == false) {
+        printf("ERR: metric_merge_or_copy_cell: metric info not equal\n");
+        return -1;
+    }
 
     struct metric_measure_data *src_data = metric_find_one_cell(src, src_cell_id);
     if (src_data == NULL) {
-        printf("metric_merge_or_copy_cell: src cell not exist\n");
+        printf("ERR: metric_merge_or_copy_cell: src cell not exist\n");
         return -1;
     }
 
@@ -780,7 +774,7 @@ int metric_merge_or_copy_cell(struct metric *dest, const struct metric *src, int
         int ret = dest->scheme->copy(dest_data, src_data);
         if (ret == -1) {
             dest->scheme->del(dest_data);
-            printf("copy failed\n");
+            printf("ERR: metric_merge_or_copy_cell copy failed\n");
             return -1;
         }
         metric_add_one_cell(dest, dest_cell_id, dest_data);
@@ -803,7 +797,7 @@ void metric_get_plain_blob(const struct metric *pthis, int cell_id, char **blob,
 void metric_rearrange_cell_id(struct metric *pthis, int *original_id, int *final_id, size_t n_id)
 {
     if (!pthis->is_topk) {
-        printf("metric_rearrange_cell_id: comprehensive mode, should not happen\n");
+        printf("ERR: metric_rearrange_cell_id: comprehensive mode, should not happen\n");
         return;
     }
     if (n_id == 0) {
@@ -831,7 +825,7 @@ void metric_rearrange_cell_id(struct metric *pthis, int *original_id, int *final
 void metric_delete_cell(struct metric *pthis, int cell_id)
 {
     if (!pthis->is_topk) {
-        printf("metric_delete_cell: data_array is not NULL, should not happen\n");
+        printf("ERR: metric_delete_cell: data_array is not NULL, should not happen\n");
         return;
     }
     struct cell_id_data_map *node;
@@ -839,7 +833,6 @@ void metric_delete_cell(struct metric *pthis, int cell_id)
     if (node == NULL) {
         return;
     }
-    // printf("metric_delete_cell: find cell_id %d\n", cell_id);
     HASH_DEL(pthis->data_map, node);
     pthis->scheme->del(node->data);
     free(node);
@@ -893,7 +886,7 @@ long long metric_counter_get(const struct metric *pthis, int cell_id)
 {
     struct metric_measure_data *data = metric_find_one_cell(pthis, cell_id);
     if (data == NULL) {
-        printf("metric_counter_get cell id %d does not exist\n", cell_id);
+        printf("ERR: metric_counter_get cell id %d does not exist\n", cell_id);
         return -1;
     }
     struct metric_counter_or_gauge *counter = data->counter;
@@ -919,7 +912,7 @@ double metric_hll_get(const struct metric *pthis, int cell_id)
 {
     struct metric_measure_data *data = metric_find_one_cell(pthis, cell_id);
     if (data == NULL) {
-        printf("metric_hll_get cell id %d does not exist\n", cell_id);
+        printf("ERR: metric_hll_get cell id %d does not exist\n", cell_id);
         return -1;
     }
     return ST_hyperloglog_count(data->hll);
@@ -939,7 +932,7 @@ int metric_histogram_record(struct metric *pthis, int cell_id, long long value)
     
     bool ret = hdr_record_value(data->hdr, value);
     if (!ret) {
-        printf("metric_histogram_record: hdr_record_value failed\n");
+        printf("ERR: metric_histogram_record: hdr_record_value failed\n");
         return -1;
     }
     return 0;
@@ -949,7 +942,7 @@ long long metric_histogram_value_at_percentile(const struct metric *pthis, int c
 {
     struct metric_measure_data *data = metric_find_one_cell(pthis, cell_id);
     if (data == NULL) {
-        printf("metric_histogram_value_at_percentile cell id %d does not exist\n", cell_id);
+        printf("ERR: metric_histogram_value_at_percentile cell id %d does not exist\n", cell_id);
         return -1;
     }
     return hdr_value_at_percentile(data->hdr, percentile);
@@ -972,7 +965,7 @@ long long metric_histogram_count_le_value(const struct metric *pthis, int cell_i
 {
     struct metric_measure_data *data = metric_find_one_cell(pthis, cell_id);
     if (data == NULL) {
-        printf("metric_histogram_count_le_value cell id %d does not exist\n", cell_id);
+        printf("ERR: metric_histogram_count_le_value cell id %d does not exist\n", cell_id);
         return -1;
     }
     return hdr_count_le_value(data->hdr, value);
@@ -986,7 +979,6 @@ void metric_get_cell_ids(const struct metric *pthis, int **cell_ids, size_t *cel
     if (!pthis->is_topk) {
         size_t n_id_max = pthis->n_array_item;
         if (n_id_max == 0) {
-            printf("metric_get_cell_ids no cell ids\n");
             *cell_ids = NULL;
             *cell_id_count = 0;
             return;
@@ -1001,7 +993,6 @@ void metric_get_cell_ids(const struct metric *pthis, int **cell_ids, size_t *cel
         }
         
         if (n_id == 0) {
-            printf("metric_get_cell_ids no cell ids\n");
             *cell_ids = NULL;
             *cell_id_count = 0;
             free(tmp_id_container);
@@ -1017,7 +1008,6 @@ void metric_get_cell_ids(const struct metric *pthis, int **cell_ids, size_t *cel
 
     *cell_id_count = HASH_COUNT(pthis->data_map);
     if (*cell_id_count == 0) {
-        printf("metric_get_cell_ids no cell ids\n");
         *cell_ids = NULL;
         return;
     }

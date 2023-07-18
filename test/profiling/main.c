@@ -56,11 +56,11 @@ void try_hash_compound_key()
 {
     struct fieldstat_tag tag1 = {"key1", TAG_INTEGER, {.value_int = 100}};
     struct fieldstat_tag tag2 = {"key2", TAG_DOUBLE, {.value_double = 100.0}};
-    struct fieldstat_tag tag3 = {"key3", TAG_CSTRING, {.value_str = {'1', '2', '3', '\0'}}};
+    struct fieldstat_tag tag3 = {"key3", TAG_CSTRING, {.value_str = "123"}};
     struct fieldstat_tag tag_arr[] = {
         {"key1", TAG_INTEGER, {.value_int = 100}},
         {"key2", TAG_DOUBLE, {.value_double = 100.0}},
-        {"key3", TAG_CSTRING, {.value_str = {'1', '2', '3', '\0'}}},
+        {"key3", TAG_CSTRING, {.value_str = "123"}},
     };
 
     bin_print_struct(&tag1, sizeof(tag1));
@@ -69,14 +69,33 @@ void try_hash_compound_key()
     bin_print_struct(tag_arr, sizeof(tag_arr));
 }
 
+void performance_cube_add_comprehensive()
+{
+    printf("counter_performance\n");
+    struct fieldstat_tag tags[64000];
+    for (int i = 0; i < 64000; i++) {
+        tags[i] = TEST_TAG_INT;
+        tags[i].value_int = i;
+    }
+    getchar();
+    struct fieldstat *instance = fieldstat_new();
+    fieldstat_register_cube(instance, &TEST_TAG_INT, 1, SAMPLING_MODE_COMPREHENSIVE, 64000);
+    fieldstat_register_counter(instance, 0, "test", 0);
+    for (int i = 0; i < 64000; i++) {
+        (void)fieldstat_cube_add(instance, 0, &tags[i], 1, 1);
+    }
+    fieldstat_free(instance);
+}
+
 void topk_K_100_tag_2()
 {
+    printf("topk_K_100_tag_2\n");
     getchar();
     struct fieldstat *instance = fieldstat_new();
     fieldstat_register_cube(instance, &TEST_TAG_INT, 1, SAMPLING_MODE_TOPK, 1000);
     fieldstat_register_counter(instance, 0, "test", 0);
     struct fieldstat_tag server_ip_tag = {"server_ip", TAG_CSTRING, {.value_str = "192.168.0.1"}};
-    char client_ip[] = "123.123.123.123";
+    char client_ip[] = "123.123.123.123.1234";
     struct fieldstat_tag client_ip_tag = {"client_ip", TAG_CSTRING, {.value_str = client_ip}};
     struct fieldstat_tag *total = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * 2);
     for (int i = 0; i < 10000; i++) {
@@ -99,5 +118,6 @@ void topk_K_100_tag_2()
 
 int main () {
     // try_hash_compound_key();
-    topk_K_100_tag_2();
+    // topk_K_100_tag_2();
+    performance_cube_add_comprehensive();
 }

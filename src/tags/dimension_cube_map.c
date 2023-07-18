@@ -219,7 +219,6 @@ void cell_manager_free(struct cell_manager *pthis)
     cell_manager_tag_cube_map_free(pthis);
 
     if (pthis->sampling_mode == SAMPLING_MODE_TOPK) {
-        printf("cell_manager_free going to call free heavy_keeper\n");
         heavy_keeper_free(pthis->topk_tag_id_map);
     } else {
         cell_manager_comprehensive_tag_id_map_free(pthis);
@@ -234,7 +233,6 @@ int cell_manager_get_tag_by_cell_id(const struct cell_manager *pthis, int cell_i
     struct tag_cube_map *node = NULL;
     HASH_FIND_INT(hash_hdr, &cell_id, node);
     if (node == NULL) {
-        printf("cell_manager_get_tag_by_cell_id exit, id: %d, not found\n", cell_id);
         return -1;
     }
 
@@ -273,7 +271,6 @@ int cell_manager_get_cell_id_by_tag(const struct cell_manager *pthis, const stru
         struct cell_hash_node *node = NULL;
         HASH_FIND(hh, pthis->comprehensive_tag_id_map, key, key_size, node);
         if (node == NULL) {
-            printf("cell_manager_get_cell_id_by_tag find comprehensive, not found\n");
             cell_id = -1;
         } else {
             cell_id = node->cell_id;
@@ -308,8 +305,6 @@ void cell_manager_comprehensive_map_add(struct cell_manager *pthis, const struct
     size_t key_size = 0;
     build_dynamic_cell_key(tag, tag_count, &key, &key_size);
 
-    printf("cell_manager_comprehensive_map_add enter, dynamic key: %s, key_size: %zu, cell_id: %d\n", key, key_size, cell_id);
-
     struct cell_hash_node *node = (struct cell_hash_node *)malloc(sizeof(struct cell_hash_node));
     node->key = key;
     node->key_len = key_size;
@@ -332,6 +327,7 @@ int cell_manager_topk_map_add(struct cell_manager *pthis, const struct fieldstat
     if (*popped_cell_id != -1) {
         struct tag_cube_map *node = NULL;
         HASH_FIND_INT(pthis->id_tag_map, popped_cell_id, node);
+
         if (node != NULL) {
             HASH_DEL(pthis->id_tag_map, node);
             fieldtag_list_free(node->tags, node->n_tags);
@@ -343,10 +339,6 @@ int cell_manager_topk_map_add(struct cell_manager *pthis, const struct fieldstat
 
 int cell_manager_add_cell(struct cell_manager *pthis, const struct fieldstat_tag *tag, size_t tag_count)
 {
-    if (pthis->sampling_mode == SAMPLING_MODE_TOPK) {
-        printf("cell_manager_add_cell enter, sampling mode is topk\n");
-        return -1;
-    }
     if (HASH_COUNT(pthis->comprehensive_tag_id_map) >= pthis->max_cell_num) {
         return -1;
     }
@@ -363,16 +355,13 @@ int cell_manager_add_cell(struct cell_manager *pthis, const struct fieldstat_tag
 
 int cell_manager_add_cell_topk(struct cell_manager *pthis, const struct fieldstat_tag *tag, size_t tag_count, unsigned int count, int *popped_cell_id)
 {
-    if (pthis->sampling_mode == SAMPLING_MODE_COMPREHENSIVE) {
-        printf("cell_manager_add_cell_topk enter, sampling mode is comprehensive\n");
-        return -1;
-    }
     int ret = cell_manager_topk_map_add(pthis, tag, tag_count, count, pthis->next_cell_id, popped_cell_id);
     if (ret == -1) {
         return -1;
     }
     if (ret == 1) {
-        return cell_manager_get_cell_id_by_tag(pthis, tag, tag_count);
+        int ret_cell_id = cell_manager_get_cell_id_by_tag(pthis, tag, tag_count);
+        return ret_cell_id;
     }
 
     cell_manager_id_tag_map_add(pthis, pthis->next_cell_id, tag, tag_count);
@@ -448,8 +437,7 @@ void fieldtag_list_serialize(const struct fieldstat_tag *tag_list, size_t tag_nu
     mpack_finish_array(&writer);
 
     if (mpack_writer_destroy(&writer) != mpack_ok) {
-        fprintf(stderr, "mpack writer fieldtag_list_serialize destroy failed\n");
-        exit(1);
+        printf("ERR mpack writer fieldtag_list_serialize destroy failed\n");
     }
 
     fieldtag_list_free(tag_list_sorted, tag_num);
@@ -589,7 +577,6 @@ struct cell_manager *cell_manager_deserialize(const char *blob, size_t blob_size
         cell_manager_id_tag_map_add(pthis, cell_id, tag_list, n_tag);
         if (mode == SAMPLING_MODE_COMPREHENSIVE) {
             cell_manager_comprehensive_map_add(pthis, tag_list, n_tag, cell_id);
-            printf("cell_manager_deserialize add a cell %d, tag key(0): %s\n", cell_id, tag_list[0].key);
         }
 
         if (cell_id > cell_id_max) {

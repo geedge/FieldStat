@@ -1,6 +1,4 @@
 
-// 大规模序列化测试
-
 #include <gtest/gtest.h>
 #include <random>
 #include "cjson/cJSON.h"
@@ -162,11 +160,6 @@ void topk_standard_oper(std::function<void(Fieldstat_tag_list_wrapper *, unsigne
 
 void topk_init_with_field_name(struct fieldstat *instance, const char * field_name[TEST_METRIC_NUM], unsigned int test_expected_big_count)
 {
-    // gen 2 tag_lists
-    const size_t tags_count = 2;
-    Fieldstat_tag_list_wrapper *tags[tags_count];
-    fill_random_tag(tags, tags_count);
-
     int cube_id = fieldstat_register_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_TOPK, TEST_TOPK_STANDARD_K);
     int m1 = fieldstat_register_counter(instance, cube_id, field_name[0], 0);
     int m2 = fieldstat_register_counter(instance, cube_id, field_name[1], 0);
@@ -174,6 +167,7 @@ void topk_init_with_field_name(struct fieldstat *instance, const char * field_na
     std::function<void(Fieldstat_tag_list_wrapper *, unsigned int *)> topk_add = [instance, cube_id, m1, m2](
             Fieldstat_tag_list_wrapper *my_tags, unsigned int counts[TEST_METRIC_NUM]) {
                 int cell_id = fieldstat_cube_add(instance, cube_id, my_tags->get_tag(), my_tags->get_tag_count(), counts[0]);
+                printf("cell id is: %d\n", cell_id);
                 if (cell_id >= 0) {
                     fieldstat_counter_incrby(instance, cube_id, m1, cell_id, counts[0]);
                     fieldstat_counter_incrby(instance, cube_id, m2, cell_id, counts[1]);
@@ -196,15 +190,11 @@ TEST(export_test, cjson_export_with_fixed_tag_and_many_metrics_on_one_cube_of_co
 
     // new instance
     struct fieldstat *instance = fieldstat_new();
-    printf("finish fieldstat_new\n");
     int cube_id = fieldstat_register_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, tag_list_num);
-    printf("finish fieldstat_register_cube\n");
     int id_counter = fieldstat_register_counter(instance, cube_id, "counter", 0);
-    printf("finish fieldstat_register_counter\n");
     int id_gauge = fieldstat_register_hll(instance, cube_id, "gauge", g_hll_standard->cfg.precision);
     int id_histogram = fieldstat_register_histogram(instance, cube_id, "histogram",
         g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
-    printf("finish fieldstat_register_counter, fieldstat_register_hll, fieldstat_register_histogram\n");
 
     Fieldstat_tag_list_wrapper *tags[tag_list_num];
     fill_random_tag(tags, tag_list_num);
@@ -213,11 +203,8 @@ TEST(export_test, cjson_export_with_fixed_tag_and_many_metrics_on_one_cube_of_co
         const struct fieldstat_tag *tag_tmp = tags[j]->get_tag();
         size_t tag_count = tags[j]->get_tag_count();
         int cell_id = fieldstat_cube_add(instance, cube_id, tag_tmp, tag_count, 1);
-        printf("cell_id: %d\n", cell_id);
-        tags[j]->print_tag_list();
-        printf("------------------------------------\n");
+
         fieldstat_counter_incrby(instance, cube_id, id_counter, cell_id, 1);
-        printf("finish fieldstat_counter_incrby\n");
         for (size_t i = 0; i < OPER_NUM; i++){
             fieldstat_hll_add(instance, cube_id, id_gauge, cell_id, g_hll_standard_oper[i].c_str(), g_hll_standard_oper[i].length());
             fieldstat_histogram_record(instance, cube_id, id_histogram, cell_id, g_histogram_standard_oper[i]);
@@ -288,9 +275,9 @@ TEST(export_test, cjson_export_on_one_cube_of_topk_sampling)
         const char *metric_name[TEST_METRIC_NUM] = {"topk1", "topk2"};
         test_check_if_metric_topk_correct(metrics, (const char **)metric_name, test_expected_big_count, TEST_METRIC_NUM);
     }
+    cJSON_Delete(root_arr);
 
     fieldstat_free(instance);
-    cJSON_Delete(root_arr);
 }
 
 TEST(export_test, empty_fieldstat_export_null) {

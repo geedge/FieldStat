@@ -133,7 +133,7 @@ TEST(unit_test_serialize, serialize_and_deserialize_fieldstat_instance)
     free(blob);
 
     int *ret_cube_id_arr = NULL;
-    size_t n_cube = 0;
+    int n_cube = 0;
     fieldstat_get_cubes(instance2, &ret_cube_id_arr, &n_cube);
     int ret_cell_id = ret_cube_id_arr[0];
     free(ret_cube_id_arr);

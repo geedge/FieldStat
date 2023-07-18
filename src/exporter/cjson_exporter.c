@@ -131,12 +131,7 @@ struct cell_iter *cell_iter_new(const struct fieldstat *instance) {
     memset(iter, 0, sizeof(struct cell_iter));
     iter->instance = instance;
     fieldstat_get_cubes(instance, &iter->cube_ids, &iter->n_cube);
-    printf("cell_iter_new number of cube_ids: %d\n", iter->n_cube);
-    printf("ids are: \n");
-    for (int i = 0; i < iter->n_cube; i++) {
-        printf("%d ", iter->cube_ids[i]);
-    }
-    printf("\n");
+
     iter->curr_cube_idx = -1;
     iter->curr_metric_id = -1;
 
@@ -181,7 +176,6 @@ int cell_iter_next_nonempty_cube(struct cell_iter *iter) {
         iter->max_metric_id = metric_id_max_next;
         iter->curr_metric_id = -1;
 
-        printf("cell_iter_next_nonempty_cube curr cube idx: %d, cube_id_next: %d\n", iter->curr_cube_idx, cube_id_next);
         return 1;
     }
 
@@ -218,7 +212,6 @@ int cell_iter_next(struct cell_iter *iter) {
     if (iter->curr_cube_idx == -1) { // first time
         while (cell_iter_next_nonempty_cube(iter)) {
             if (cell_iter_next_nonempty_metric(iter)) {
-                printf("initial iter, find cube: %d, metric: %d, cell: %d\n", iter->cube_ids[iter->curr_cube_idx], iter->curr_metric_id, iter->curr_cell_idx);
                 return 1;
             }
         }
@@ -226,23 +219,19 @@ int cell_iter_next(struct cell_iter *iter) {
     }
 
     if (cell_iter_next_cell(iter)) {
-        printf("iter cell,  find cube id: %d, metric: %d, cell: %d\n", iter->cube_ids[iter->curr_cube_idx], iter->curr_metric_id, iter->curr_cell_idx);
         return 1;
     }
 
     cell_iter_free_cell_records(iter);
     if (cell_iter_next_nonempty_metric(iter)) {
-        printf("iter new metric, old cube, find cube: %d, metric: %d, cell: %d\n", iter->cube_ids[iter->curr_cube_idx], iter->curr_metric_id, iter->curr_cell_idx);
         return 1;
     }
 
     while (cell_iter_next_nonempty_cube(iter)) {
         if (cell_iter_next_nonempty_metric(iter)) {
-            printf("iter new cube,  find cube: %d, metric: %d, cell: %d\n", iter->cube_ids[iter->curr_cube_idx], iter->curr_metric_id, iter->curr_cell_idx);
             return 1;
         }
     }
-    printf("iter fin normally\n");
     return 0;
 }
 
@@ -375,7 +364,6 @@ void cjson_map_add_new_pair_for_one_loop(struct cjson_map **map_head_in, struct 
     cell_iter_read_tag_list(iter, &tag_list, &tag_list_len);
     cJSON *cjson_tags = cJSON_CreateObject(); // when this cjson_tags is added to a new map entry, it is freed when the map is freed
     for (int i = 0; i < tag_list_len; i++) {
-        // printf("cjson_map_add_new_pair_for_one_loop, add tag: %s\n", tag_list[i].key);
         kv_pair_add_to_cjson(&tag_list[i], cjson_tags);
     }
     kv_pair_free_list(tag_list, tag_list_len);
@@ -446,21 +434,17 @@ void fieldstat_json_exporter_write_global_tags(const struct fieldstat_json_expor
 */
 char *fieldstat_json_exporter_export(const struct fieldstat_json_exporter *exporter)
 {
-    printf("fieldstat_json_exporter_export enter\n");
     const struct fieldstat *instance = exporter->instance;
     int *cube_id_dummy;
     int cube_id_len;
     fieldstat_get_cubes(instance, &cube_id_dummy, &cube_id_len);
     if (cube_id_len == 0) {
-        printf("fieldstat_json_exporter_export no cubes\n");
-
         return NULL;
     }
     free(cube_id_dummy);
 
     struct cjson_map *map_head = hash_map_read_tag_and_field(instance);
     if (map_head == NULL) {
-        printf("fieldstat_json_exporter_export no map_head\n");
         return NULL;
     }
 

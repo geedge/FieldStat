@@ -252,7 +252,7 @@ static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_
 
 void heavy_keeper_add(struct heavy_keeper *heavy_keeper, const char *key, size_t key_len, unsigned int count) {
     if (key_len == 0) {
-        printf("key_len should not be 0\n");
+        printf("ERR: key_len should not be 0\n");
         return;
     }
 
@@ -274,7 +274,7 @@ int heavy_keeper_with_data_add(struct heavy_keeper *hk, const char *key, size_t 
         return 0;
     }
     // use the original id
-    return -2;
+    return 1;
 }
 
 struct heavy_keeper_result *heavy_keeper_query(struct heavy_keeper *hk) {
@@ -439,7 +439,7 @@ int heavy_keeper_merge(struct heavy_keeper *hk, const struct heavy_keeper *src) 
     if (hk->params.array_num != src->params.array_num ||
         hk->params.max_bucket_num != src->params.max_bucket_num ||
         hk->K != src->K) {
-        printf("ERROR: parameters of two merged heavy keeper must be the same\n");
+        printf("ERR: parameters of two merged heavy keeper must be the same\n");
         return -1;
     }
 
