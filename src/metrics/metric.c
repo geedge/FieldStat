@@ -738,30 +738,8 @@ struct metric *metric_deserialize(const char *blob, size_t blob_size)
     return metric_out;
 }
 
-bool metric_info_check_is_equal(struct metric_info *info1, struct metric_info *info2)
-{
-    if (info1->type != info2->type) {
-        printf("ERR: metric_info_check_is_equal: metric type not equal\n");
-        return false;
-    }
-    if (strcmp(info1->name, info2->name) != 0) {
-        printf("ERR: metric_info_check_is_equal: metric name not equal\n");
-        return false;
-    }
-    if (memcmp(info1->paras, info2->paras, sizeof(struct metric_parameter)) != 0) {
-        printf("ERR: metric_info_check_is_equal: metric paras not equal\n");
-        return false;
-    }
-    return true;
-}
-
 int metric_merge_or_copy_cell(struct metric *dest, const struct metric *src, int dest_cell_id, int src_cell_id)
 {
-    if (metric_info_check_is_equal(dest->info, src->info) == false) {
-        printf("ERR: metric_merge_or_copy_cell: metric info not equal\n");
-        return -1;
-    }
-
     struct metric_measure_data *src_data = metric_find_one_cell(src, src_cell_id);
     if (src_data == NULL) {
         printf("ERR: metric_merge_or_copy_cell: src cell not exist\n");

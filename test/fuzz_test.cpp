@@ -97,7 +97,7 @@ TEST(Fuzz_test, fuzz_test)
     cube_ids[CUBE_NUM - 2] = -1;
     cube_ids[CUBE_NUM - 1] = -1;
 
-    getchar(); // todo: remove this line
+    // getchar(); // todo: remove this line
     clock_t start = clock();
 
     for (int i = 0; i < TEST_ROUND; i++) {
@@ -163,7 +163,7 @@ TEST(Fuzz_test, fuzz_test)
         delete shared_tag[i];
     }
 
-    exit(0); // todo: 测完删了
+    // exit(0); // todo: 测完删了
 
     printf("czzzz test (dest)----------------\n");
     int *cubes;

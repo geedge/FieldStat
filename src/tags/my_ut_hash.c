@@ -30,9 +30,9 @@ void convert_fieldstat_tag_to_my_hash_tag(const struct fieldstat_tag *src, struc
     switch (src->type)
     {
     case TAG_INTEGER:
-        value = (unsigned char *)malloc(sizeof(int));
-        memcpy(value, &(src->value_int), sizeof(int));
-        dst->value_len = sizeof(int);
+        value = (unsigned char *)malloc(sizeof(long long));
+        memcpy(value, &(src->value_int), sizeof(long long));
+        dst->value_len = sizeof(long long);
         break;
     case TAG_DOUBLE:
         value = (unsigned char *)malloc(sizeof(double));

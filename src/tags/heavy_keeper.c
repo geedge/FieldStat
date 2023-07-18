@@ -11,7 +11,6 @@
 
 #include "minheap/heap.h"
 #include "mpack/mpack.h"
-#include "uthash.h"
 #include "xxhash/xxhash.h"
 #include "cjson/cJSON.h"
 

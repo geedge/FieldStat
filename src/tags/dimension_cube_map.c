@@ -117,6 +117,8 @@ static void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_t
     size_t remain_key_size = tmp_key_size;
     size_t total_key_size = tmp_key_size;
     char *dynamic_mem = (char *)malloc(remain_key_size);
+    size_t key_len;
+    size_t val_len;
 
 	for(i = 0; i < (int)n_tags; i++)
 	{
@@ -124,13 +126,25 @@ static void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_t
 		switch(tag->type)
 		{
 			case 0:
-				used_len = snprintf(one_time_key, tmp_key_size, "%s%lld", tag->key, tag->value_int);
+                key_len = strlen(tag->key);
+                val_len = sizeof(long long);
+                used_len = key_len + val_len;
+                memcpy(one_time_key, tag->key, key_len);
+                memcpy(one_time_key + key_len, &tag->value_int, val_len);
 				break;
 			case 1:
-				used_len = snprintf(one_time_key, tmp_key_size, "%s%lf", tag->key, tag->value_double);
+                key_len = strlen(tag->key);
+                val_len = sizeof(double);
+                used_len = key_len + val_len;
+                memcpy(one_time_key, tag->key, key_len);
+                memcpy(one_time_key + key_len, &tag->value_double, val_len);
 				break;
 			case 2:
-				used_len = snprintf(one_time_key, tmp_key_size, "%s%s", tag->key, tag->value_str);
+                key_len = strlen(tag->key);
+                val_len = strlen(tag->value_str);
+                used_len = key_len + val_len;
+                memcpy(one_time_key, tag->key, key_len);
+                memcpy(one_time_key + key_len, tag->value_str, val_len);
 				break;
 			default:
 				assert(0);
@@ -299,31 +313,49 @@ int cell_manager_get_count_by_tag(const struct cell_manager *pthis, const struct
     return count;
 }
 
-void cell_manager_comprehensive_map_add(struct cell_manager *pthis, const struct fieldstat_tag *tag, size_t tag_count, int cell_id)
+void cell_manager_comprehensive_map_add(struct cell_manager *pthis, const struct fieldstat_tag *tag, size_t tag_count, int cell_id, int *existing_cell_id)
 {
     char *key = NULL;
     size_t key_size = 0;
     build_dynamic_cell_key(tag, tag_count, &key, &key_size);
 
-    struct cell_hash_node *node = (struct cell_hash_node *)malloc(sizeof(struct cell_hash_node));
+    struct cell_hash_node *node = NULL;
+    HASH_FIND(hh, pthis->comprehensive_tag_id_map, key, key_size, node);
+    if (node != NULL) {
+        *existing_cell_id = node->cell_id;
+        free(key);
+        return;
+    }
+
+    node = (struct cell_hash_node *)malloc(sizeof(struct cell_hash_node));
     node->key = key;
     node->key_len = key_size;
     node->cell_id = cell_id;
     HASH_ADD_KEYPTR(hh, pthis->comprehensive_tag_id_map, node->key, node->key_len, node);
+    *existing_cell_id = -1;
 }
 
-int cell_manager_topk_map_add(struct cell_manager *pthis, const struct fieldstat_tag *tag, size_t tag_count, unsigned int count, int cell_id, int *popped_cell_id)
+int cell_manager_topk_map_add(struct cell_manager *pthis, const struct fieldstat_tag *tag, size_t tag_count, unsigned int count, int cell_id, int *popped_cell_id, int *existing_cell_id)
 {
     char *key = NULL;
     size_t key_size = 0;
     build_dynamic_cell_key(tag, tag_count, &key, &key_size);
+    *existing_cell_id = -1;
 
     int ret = heavy_keeper_with_data_add(pthis->topk_tag_id_map, key, key_size, count, cell_id, popped_cell_id);
+
+    if (ret == 1) { // use the original id
+        unsigned int count_dummy = 0;
+        heavy_keeper_query_one(pthis->topk_tag_id_map, key, key_size, &count_dummy, existing_cell_id);
+        free(key);
+        return 1;
+    }
     free(key);
 
     if (ret == -1) {
         return -1;
     }
+
     if (*popped_cell_id != -1) {
         struct tag_cube_map *node = NULL;
         HASH_FIND_INT(pthis->id_tag_map, popped_cell_id, node);
@@ -342,12 +374,11 @@ int cell_manager_add_cell(struct cell_manager *pthis, const struct fieldstat_tag
     if (HASH_COUNT(pthis->comprehensive_tag_id_map) >= pthis->max_cell_num) {
         return -1;
     }
-    int existing_cell_id = cell_manager_get_cell_id_by_tag(pthis, tag, tag_count);
+    int existing_cell_id = -1;
+    cell_manager_comprehensive_map_add(pthis, tag, tag_count, pthis->next_cell_id, &existing_cell_id);
     if (existing_cell_id != -1) {
         return existing_cell_id;
     }
-
-    cell_manager_comprehensive_map_add(pthis, tag, tag_count, pthis->next_cell_id);
 
     cell_manager_id_tag_map_add(pthis, pthis->next_cell_id, tag, tag_count);
     return pthis->next_cell_id++;
@@ -355,12 +386,12 @@ int cell_manager_add_cell(struct cell_manager *pthis, const struct fieldstat_tag
 
 int cell_manager_add_cell_topk(struct cell_manager *pthis, const struct fieldstat_tag *tag, size_t tag_count, unsigned int count, int *popped_cell_id)
 {
-    int ret = cell_manager_topk_map_add(pthis, tag, tag_count, count, pthis->next_cell_id, popped_cell_id);
+    int ret_cell_id = -1;
+    int ret = cell_manager_topk_map_add(pthis, tag, tag_count, count, pthis->next_cell_id, popped_cell_id, &ret_cell_id);
     if (ret == -1) {
         return -1;
     }
     if (ret == 1) {
-        int ret_cell_id = cell_manager_get_cell_id_by_tag(pthis, tag, tag_count);
         return ret_cell_id;
     }
 
@@ -576,7 +607,8 @@ struct cell_manager *cell_manager_deserialize(const char *blob, size_t blob_size
         fieldtag_list_deserialize(tag_blob, tag_blob_size, &tag_list, &n_tag);
         cell_manager_id_tag_map_add(pthis, cell_id, tag_list, n_tag);
         if (mode == SAMPLING_MODE_COMPREHENSIVE) {
-            cell_manager_comprehensive_map_add(pthis, tag_list, n_tag, cell_id);
+            int dummy;
+            cell_manager_comprehensive_map_add(pthis, tag_list, n_tag, cell_id, &dummy);
         }
 
         if (cell_id > cell_id_max) {
