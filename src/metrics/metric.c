@@ -92,7 +92,6 @@ struct metric {
 /*                                 id cell map                                */
 /* -------------------------------------------------------------------------- */
 inline struct metric_measure_data *metric_find_one_cell(const struct metric *pthis, int id) {
-
     if (id >= pthis->max_n_array_item) {
         return NULL;
     }
@@ -414,7 +413,7 @@ void metric_free(struct metric *pthis)
 {
     metric_info_free(pthis->info);
 
-    for (int i = 0; i < pthis->n_array_item; i++) {
+    for (size_t i = 0; i < pthis->n_array_item; i++) {
         if (pthis->data_array[i] == NULL) {
             continue;
         }
@@ -425,7 +424,7 @@ void metric_free(struct metric *pthis)
 }
 
 void metric_reset(struct metric *pthis) {
-    for (int i = 0; i < pthis->max_n_array_item; i++) {
+    for (int i = 0; i < pthis->n_array_item; i++) {
         if (pthis->data_array[i] == NULL) {
             continue;
         }
@@ -731,27 +730,26 @@ void metric_rearrange_cell_id(struct metric *pthis, int *original_id, int *final
     int valid_id_count = 0;
     struct metric_measure_data **data_array = pthis->data_array;
     for (int i = 0; i < n_id; i++) {
-        struct metric_measure_data *data = data_array[original_id[i]];
+        struct metric_measure_data *data = metric_find_one_cell(pthis, original_id[i]);
         if (data == NULL) {
             printf("ERR: metric_rearrange_cell_id: cell_id %d not exist\n", original_id[i]);
             continue;
         }
         tmp_node_arr[valid_id_count++] = data;
-        pthis->data_array[original_id[i]] = NULL;
+        data_array[original_id[i]] = NULL;
     }
     for (int i = 0; i < pthis->n_array_item; i++) {
         if (data_array[i] != NULL) {
             printf("ERR: metric_rearrange_cell_id: cell_id %d not in original_id\n", i);
         }
     }
-    // memset(data_array, 0, sizeof(struct metric_measure_data *) * pthis->max_n_array_item);
 
     for (int i = 0; i < valid_id_count; i++) {
         if (final_id[i] >= pthis->max_n_array_item) {
             printf("ERR: metric_rearrange_cell_id: final_id %d exceed max_n_array_item %zu\n", final_id[i], pthis->max_n_array_item);
             continue;
         }
-        data_array[final_id[i]] = tmp_node_arr[i];
+        metric_add_one_cell(pthis, final_id[i], tmp_node_arr[i]);
     }
 }
 
