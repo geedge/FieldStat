@@ -643,18 +643,21 @@ int fieldstat_cube_merge_comprehensive(struct fs_cube *dest, const struct fs_cub
     size_t tag_count_src;
     struct metric_name_id_map *name_id_map_dest = NULL;
     name_id_map_init(&name_id_map_dest, dest);
+    struct metric *metrics_src;
+    struct metric *metrics_dest;
 
-    for (int metric_id_src = 0; metric_id_src < src->n_metric; metric_id_src ++) {
-        const char *name_src = metric_get_name(src->metrics[metric_id_src]);
-        int metric_id_dest = name_id_map_get_id_by_name(name_id_map_dest, name_src);
+    for (int metric_id_src = 0; metric_id_src < src->n_metric; metric_id_src++) {
+        metrics_src = src->metrics[metric_id_src];
+        int metric_id_dest = name_id_map_get_id_by_name(name_id_map_dest, metric_get_name(metrics_src));
         if (metric_id_dest == -1) { // metric not exist in dest, new an empty metric
-            struct metric *metric_dup = metric_copy_structure(src->metrics[metric_id_src]);
+            struct metric *metric_dup = metric_copy_structure(metrics_src);
             metric_id_dest = append_metric_to_cube(dest, metric_dup);
         }
-        metric_get_cell_ids(src->metrics[metric_id_src], &cell_ids_from_metric_src, &cell_id_count_src);
+        metric_get_cell_ids(metrics_src, &cell_ids_from_metric_src, &cell_id_count_src);
         if (cell_id_count_src == 0) { // no cell in this metric
             continue;
         }
+        metrics_dest = dest->metrics[metric_id_dest];
 
         for (int j = 0; j < cell_id_count_src; j ++) {
             int cell_id_from_metric_src = cell_ids_from_metric_src[j];
@@ -662,7 +665,7 @@ int fieldstat_cube_merge_comprehensive(struct fs_cube *dest, const struct fs_cub
 
             int cell_id_tmp_dest = cell_manager_get_cell_id_by_tag(cell_manager_dest, tags_src, tag_count_src);
             if (cell_id_tmp_dest != -1) {
-                if (metric_merge_or_copy_cell(dest->metrics[metric_id_dest], src->metrics[metric_id_src], cell_id_tmp_dest, cell_id_from_metric_src) != 0) {
+                if (metric_merge_or_copy_cell(metrics_dest, metrics_src, cell_id_tmp_dest, cell_id_from_metric_src) != 0) {
                     goto ERR;
                 }
                 fieldtag_list_free(tags_src, tag_count_src);
@@ -675,7 +678,7 @@ int fieldstat_cube_merge_comprehensive(struct fs_cube *dest, const struct fs_cub
                 tags_src = NULL;
                 break;
             }
-            if (metric_merge_or_copy_cell(dest->metrics[metric_id_dest], src->metrics[metric_id_src], cell_id_tmp_dest, cell_id_from_metric_src) != 0) {
+            if (metric_merge_or_copy_cell(metrics_dest, metrics_src, cell_id_tmp_dest, cell_id_from_metric_src) != 0) {
                 goto ERR;
             }
             fieldtag_list_free(tags_src, tag_count_src);
@@ -699,10 +702,6 @@ ERR:
     return -1;
 }
 
-// for every cell in src:
-// if cell not in dest, copy it to dest
-
-
 // dest cube manager   |   merged cube manager | src cube manager    |  operation
 //  -----              |   -----               | -----               |  -----
 // exist               |           exist       |       exist         |  merge cell_src and cell_dest and change id of cell_dest to cell_final_id
@@ -713,7 +712,6 @@ ERR:
 // non                            exist                non           |  -- (impossible case)
 // non                            non                  exist         |  no operation
 // non                            non                  non           |  no operation
-
 int fieldstat_cube_merge_topk(struct fs_cube *dest, const struct fs_cube *src)
 {
     struct cell_manager *cell_manager_final = cell_manager_new(SAMPLING_MODE_TOPK, dest->max_n_cell);
@@ -729,6 +727,8 @@ int fieldstat_cube_merge_topk(struct fs_cube *dest, const struct fs_cube *src)
     struct fieldstat_tag *tags_src;
     size_t tag_count_dest;
     size_t tag_count_src;
+    struct metric *metrics_src;
+    struct metric *metrics_dest;
     name_id_map_init(&name_id_map_src, src);
     name_id_map_init(&name_id_map_dest, dest);
 
@@ -745,7 +745,8 @@ int fieldstat_cube_merge_topk(struct fs_cube *dest, const struct fs_cube *src)
     int existing_cell_id_arr_in_final[dest->max_n_cell];
     int existing_cell_id_arr_in_dest[dest->max_n_cell];
     for (int metric_id_dest = 0; metric_id_dest < dest->n_metric; metric_id_dest++) {
-        metric_get_cell_ids(dest->metrics[metric_id_dest], &cell_ids_dest, &cell_id_count_dest);
+        metrics_dest = dest->metrics[metric_id_dest];
+        metric_get_cell_ids(metrics_dest, &cell_ids_dest, &cell_id_count_dest);
         if (cell_id_count_dest == 0) { // no cell in metric
             continue;
         }
@@ -762,7 +763,7 @@ int fieldstat_cube_merge_topk(struct fs_cube *dest, const struct fs_cube *src)
     
             int cell_id_tmp_final = cell_manager_get_cell_id_by_tag(cell_manager_final, tags_dest, tag_count_dest);
             if (cell_id_tmp_final == -1) { // delete cell_dest
-                metric_delete_cell(dest->metrics[metric_id_dest], cell_id_in_metric_dest);
+                metric_delete_cell(metrics_dest, cell_id_in_metric_dest);
                 fieldtag_list_free(tags_dest, tag_count_dest);
                 continue;
             }
@@ -775,7 +776,7 @@ int fieldstat_cube_merge_topk(struct fs_cube *dest, const struct fs_cube *src)
         }
 
         // change id
-        metric_rearrange_cell_id(dest->metrics[metric_id_dest], existing_cell_id_arr_in_dest, existing_cell_id_arr_in_final, n_existing_cell_id);
+        metric_rearrange_cell_id(metrics_dest, existing_cell_id_arr_in_dest, existing_cell_id_arr_in_final, n_existing_cell_id);
 
         free(cell_ids_dest);
         cell_ids_dest = NULL;
@@ -788,17 +789,19 @@ int fieldstat_cube_merge_topk(struct fs_cube *dest, const struct fs_cube *src)
     // exist               |           exist       |       exist         |  merge cell_src and cell_dest (and change id of cell_dest to cell_final_id)
     // non                 |         exist        |        exist         |  copy cell_src to cell_dest, set its id to cell_final_id
     for (int metric_id_src = 0; metric_id_src < src->n_metric; metric_id_src ++) {
-        metric_get_cell_ids(src->metrics[metric_id_src], &cell_ids_from_metric_src, &cell_id_count_src);
+        metrics_src = src->metrics[metric_id_src];
+        metric_get_cell_ids(metrics_src, &cell_ids_from_metric_src, &cell_id_count_src);
         if (cell_id_count_src == 0) { // no cell in this metric
             continue;
         }
-        const char *name_src = metric_get_name(src->metrics[metric_id_src]);
+        const char *name_src = metric_get_name(metrics_src);
         int metric_id_dest = name_id_map_get_id_by_name(name_id_map_dest, name_src);
 
         if (metric_id_dest == -1) { // metric not exist in dest, new an empty metric
-            struct metric *metric_dup = metric_copy_structure(src->metrics[metric_id_src]);
+            struct metric *metric_dup = metric_copy_structure(metrics_src);
             metric_id_dest = append_metric_to_cube(dest, metric_dup);
         }
+        metrics_dest = dest->metrics[metric_id_dest];
 
         for (int j = 0; j < cell_id_count_src; j ++) {
             int cell_id_from_metric_src = cell_ids_from_metric_src[j];
@@ -816,7 +819,7 @@ int fieldstat_cube_merge_topk(struct fs_cube *dest, const struct fs_cube *src)
             // start to merge cell, if the cell id is not in dest, we need to copy it to dest, 
             // since the cells in dest has been rearranged, cell_id_tmp_final is the final cell id in dest.
             // for ids to be copied, their ids is of course different from those to be merged, which is exactly cells still in dest. So all the copied cells have vacant ids in metric_dest.
-            if (metric_merge_or_copy_cell(dest->metrics[metric_id_dest], src->metrics[metric_id_src], cell_id_tmp_final, cell_id_from_metric_src) != 0) {
+            if (metric_merge_or_copy_cell(metrics_dest, metrics_src, cell_id_tmp_final, cell_id_from_metric_src) != 0) {
                 goto ERR;
             }
             fieldtag_list_free(tags_src, tag_count_src);
