@@ -1,4 +1,6 @@
+#include "my_ut_hash_inner.h"
 #include "my_ut_hash.h"
+
 
 #define USING_BASE_HASH HASH_JEN
 

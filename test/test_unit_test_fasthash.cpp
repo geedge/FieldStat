@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 #include "fieldstat.h"
 #include "utils.hpp"
+#include "tags/my_ut_hash_inner.h"
 #include "tags/my_ut_hash.h"
 
 struct testing_hash {

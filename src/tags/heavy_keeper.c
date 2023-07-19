@@ -202,7 +202,7 @@ static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_
     unsigned int user_data_cube_id = 0;
     struct sorted_set *summary = heavy_keeper->top_K_heap;
     unsigned int FP = hash_xxhash_flow_id(key, key_len, FP_HASH_KEY);
-    unsigned nMin = sorted_set_get_min_score(summary);
+    unsigned nMin = sorted_set_get_min_count(summary);
     unsigned maxv = 0;
 
     for (int j = 0; j < heavy_keeper->params.array_num; j++) {
@@ -213,7 +213,7 @@ static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_
             // The flows whose counts are both larger than nmin and not in min-heap must have the same xxhash value, where its FP stored in bucket represents another flowid,
             // In this case, the sketch won't be updated. This flow is expected to be taken into account in another array,
             // where its FP is different from the one it should collided with so element flows won't be missed.
-            if (bucket->count > nMin && sorted_set_get_member_score(summary, key, key_len) == 0) {
+            if (bucket->count > nMin && sorted_set_get_count(summary, key, key_len) == 0) {
                     continue;
             }
             bucket->count = count_add(bucket->count, count);
@@ -233,7 +233,7 @@ static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_
         }
     }
 
-    unsigned int tmp_cnt = sorted_set_get_member_score(summary, key, key_len);
+    unsigned int tmp_cnt = sorted_set_get_count(summary, key, key_len);
     if (tmp_cnt == 0) {  // the flow is not in sorted set
         if ((maxv - nMin <= count && maxv != nMin) || sorted_set_cardinality(summary) != heavy_keeper->K) {
             int insert_ret = sorted_set_insert_and_record_popped_back(summary, key, key_len, maxv, &user_data_cube_id, sizeof(unsigned int));
@@ -310,7 +310,7 @@ struct heavy_keeper_result *heavy_keeper_query(struct heavy_keeper *hk) {
 int heavy_keeper_query_one(struct heavy_keeper *hk, const char *key, size_t key_len, unsigned int *count_out, int *cube_id_out)
 {
     if (count_out != NULL) {
-        unsigned int count = sorted_set_get_member_score(hk->top_K_heap, key, key_len);
+        unsigned int count = sorted_set_get_count(hk->top_K_heap, key, key_len);
         if (count == 0) {
             *count_out = 0;
             return -1;
@@ -417,7 +417,7 @@ void heavy_keeper_merge_sorted_set(struct heavy_keeper *dest, const struct heavy
         flow_id_str = vals[i];
         flow_id_len = val_lens[i] - 1;
 
-        if (sorted_set_get_member_score(new_rec, flow_id_str, flow_id_len) != 0) {
+        if (sorted_set_get_count(new_rec, flow_id_str, flow_id_len) != 0) {
             continue;
         }
 
