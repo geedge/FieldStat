@@ -18,7 +18,6 @@ void fill_random_tag_of_length_1_to_3(Fieldstat_tag_list_wrapper *tags[], int ta
     {
         Fieldstat_tag_list_wrapper *tmp = new Fieldstat_tag_list_wrapper(dist, rand() % 3 + 1);
         tags[i] = tmp;
-        tags[i]->print_tag_list();
     }
 }
 

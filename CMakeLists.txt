@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 2.8.8)
 
+message("-- CMAKE_C_COMPILER: ${CMAKE_C_COMPILER_ID}")
+
 set(lib_name fieldstat4)
 
 #the path where you install the cppcheck
@@ -25,6 +27,7 @@ set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} -Wall)
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 	set(CMAKE_INSTALL_PREFIX "/opt/MESA" CACHE PATH "default install path" FORCE)
 endif()
+
 
 find_program(CMAKE_CXX_CPPCHECK NAMES cppcheck HINTS ${CPP_BIN_PATH})
 if (CMAKE_CXX_CPPCHECK)
@@ -124,17 +127,5 @@ endif()
 add_library(${lib_name}_static STATIC ${SRC})
 set_target_properties(${lib_name}_static PROPERTIES OUTPUT_NAME ${lib_name})
 
-install(TARGETS ${lib_name}_shared LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib COMPONENT LIBRARIES)
-install(TARGETS ${lib_name}_static LIBRARY ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib COMPONENT LIBRARIES)
-install(FILES inc/fieldstat.h   DESTINATION   ${CMAKE_INSTALL_PREFIX}/include/MESA COMPONENT HEADER)
-
-
-# include(Package)
-
-# file(GLOB DEMO	
-#     "test/*.c"
-#     "test/*.cpp"
-# )
-
-# add_executable(demo ${DEMO})
-# target_link_libraries(demo  pthread ${lib_name}_static)
+install(TARGETS ${lib_name}_shared LIBRARY DESTINATION ${PROJECT_SOURCE_DIR}/lib COMPONENT LIBRARIES)
+install(TARGETS ${lib_name}_static LIBRARY ARCHIVE DESTINATION ${PROJECT_SOURCE_DIR}/lib COMPONENT LIBRARIES)

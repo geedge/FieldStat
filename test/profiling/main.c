@@ -78,13 +78,39 @@ void performance_cube_add_comprehensive()
         tags[i].value_int = i;
     }
     getchar();
+    clock_t start, end;
     struct fieldstat *instance = fieldstat_new();
     fieldstat_register_cube(instance, &TEST_TAG_INT, 1, SAMPLING_MODE_COMPREHENSIVE, 64000);
     fieldstat_register_counter(instance, 0, "test", 0);
+    start = clock();
     for (int i = 0; i < 64000; i++) {
         (void)fieldstat_cube_add(instance, 0, &tags[i], 1, 1);
     }
+    end = clock();
+    printf("time: %f\n", (double)(end - start) / CLOCKS_PER_SEC);
+
     fieldstat_free(instance);
+}
+
+extern void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_tags, char **out_key, size_t *out_key_size);
+void build_dynamic_cell_key_performance()
+{
+    struct fieldstat_tag tags[100000];
+    for (int i = 0; i < 100000; i++) {
+        tags[i] = TEST_TAG_INT;
+        tags[i].value_int = i;
+    }
+    char *key;
+    size_t key_size;
+    clock_t start, end;
+    start = clock();
+    printf("start\n");
+    for (int i = 0; i < 100000; i++) {
+        build_dynamic_cell_key(&tags[i], 1, &key, &key_size);
+        free(key);
+    }
+    end = clock();
+    printf("time: %f\n", (double)(end - start) / CLOCKS_PER_SEC);
 }
 
 void topk_K_100_tag_2()
@@ -143,5 +169,6 @@ int topk_get_max_cell_id(int K, int *tag_vals, int n_tag)
 int main () {
     // try_hash_compound_key();
     // topk_K_100_tag_2();
-    performance_cube_add_comprehensive();
+    // performance_cube_add_comprehensive();
+    build_dynamic_cell_key_performance();
 }

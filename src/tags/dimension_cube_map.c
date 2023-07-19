@@ -71,7 +71,7 @@ void fieldtag_list_free(struct fieldstat_tag *kv_pairs, size_t n_pairs)
     free(kv_pairs);
 }
 
-static void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_tags, char **out_key, size_t *out_key_size)
+void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_tags, char **out_key, size_t *out_key_size)
 {
 	int i = 0;
 	int used_len = 0;

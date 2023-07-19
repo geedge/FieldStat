@@ -107,7 +107,6 @@ void fill_random_tag(Fieldstat_tag_list_wrapper *tags[], int tag_list_num)
     {
         Fieldstat_tag_list_wrapper *tmp = new Fieldstat_tag_list_wrapper(dist, i + 1);
         tags[i] = tmp;
-        tags[i]->print_tag_list();
     }
 }
 
@@ -167,7 +166,6 @@ void topk_init_with_field_name(struct fieldstat *instance, const char * field_na
     std::function<void(Fieldstat_tag_list_wrapper *, unsigned int *)> topk_add = [instance, cube_id, m1, m2](
             Fieldstat_tag_list_wrapper *my_tags, unsigned int counts[TEST_METRIC_NUM]) {
                 int cell_id = fieldstat_cube_add(instance, cube_id, my_tags->get_tag(), my_tags->get_tag_count(), counts[0]);
-                printf("cell id is: %d\n", cell_id);
                 if (cell_id >= 0) {
                     fieldstat_counter_incrby(instance, cube_id, m1, cell_id, counts[0]);
                     fieldstat_counter_incrby(instance, cube_id, m2, cell_id, counts[1]);

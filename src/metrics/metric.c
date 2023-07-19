@@ -92,6 +92,7 @@ struct metric {
 /*                                 id cell map                                */
 /* -------------------------------------------------------------------------- */
 inline struct metric_measure_data *metric_find_one_cell(const struct metric *pthis, int id) {
+
     if (id >= pthis->max_n_array_item) {
         return NULL;
     }
@@ -776,6 +777,7 @@ struct metric_measure_data *metric_find_or_new_cell(struct metric *pthis, int ce
 
     if (data == NULL) {
         data = pthis->scheme->new(pthis->info->paras);
+        printf("metric_find_or_new_cell going to new one cell\n");
         metric_add_one_cell(pthis, cell_id, data);
     }
     return data;
