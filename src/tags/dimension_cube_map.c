@@ -365,6 +365,18 @@ int cell_manager_add_cell_topk(struct cell_manager *pthis, const struct fieldsta
         return ret_cell_id;
     }
 
+/*
+To mitigate the risk of unbounded array size due to potentially infinite growth of cell IDs, a maximum limit is set for cell IDs in the metric.
+This limit is configured as 5 times the value of K. Even in the worst-case scenario of malicious attacks, this prevents excessive memory usage.
+Even though there is a small possibility of not counting certain flows due to the limit, it is expected that the unallocated IDs would correspond to mouse flows, 
+    which would have minimal impact on accuracy.
+The number 5 was determined through experiment, where multiple tests were conducted, randomly generating flows by which cells are determined.
+    The observed stable cell ID count did not exceed 3 times the value of K. Therefore, a conservative value of 5 was chosen.
+*/
+    if (pthis->next_cell_id >= pthis->max_cell_num * 5) { // max int is much larger, no risk of overflow
+        return -1;
+    }
+
     cell_manager_id_tag_map_add(pthis, pthis->next_cell_id, tag, tag_count);
     return pthis->next_cell_id++;
 }

@@ -147,28 +147,54 @@ int my_cmp_int(const void *a, const void *b)
     return *(int *)a - *(int *)b;
 }
 
-int topk_get_max_cell_id(int K, int *tag_vals, int n_tag)
+int topk_and_find_max_cell_id(int K, int *tag_vals, int n_tags)
 {
     struct fieldstat *instance = fieldstat_new();
     fieldstat_register_cube(instance, &TEST_TAG_INT, 1, SAMPLING_MODE_TOPK, K);
     fieldstat_register_counter(instance, 0, "test", 0);
-    struct fieldstat_tag tmp_tag = TEST_TAG_INT;
-
-    for (int i = 0; i < n_tag; i++) {
-        tmp_tag.value_int = tag_vals[i];
-        int cell_id = fieldstat_cube_add(instance, 0, &tmp_tag, 1, 1);
+    struct fieldstat_tag total = TEST_TAG_INT;
+    for (int i = 0; i < n_tags; i++) {
+        total.value_int = tag_vals[i];
+        int cell_id = fieldstat_cube_add(instance, 0, &total, 1, 1);
         if (cell_id == -1) {
             continue;
         }
         fieldstat_counter_incrby(instance, 0, 0, cell_id, 1);
     }
-    
+    int *ret_cell_ids = NULL;
+    struct fieldstat_tag_list *tag_list = NULL;
+    size_t n_cell = 0;
+    fieldstat_get_cells(instance, 0, 0, &ret_cell_ids, &tag_list, &n_cell);
+    qsort(ret_cell_ids, n_cell, sizeof(int), my_cmp_int);
+    int max_cell_id = ret_cell_ids[n_cell - 1];
 
+    free(ret_cell_ids);
+    fieldstat_tag_list_arr_free(tag_list, n_cell);
+    fieldstat_free(instance);
+    return max_cell_id;
+}
+
+void determine_K_factor()
+{    
+    int K[] = {10, 100, 1000, 5000};
+    int tag_vals[100000];
+    for (int test_round = 0; test_round < 5; test_round++) {
+        // set rand seed
+        srand(test_round);
+        for (int i = 0; i < 100000; i++) {
+            tag_vals[i] = rand() % 100000; // purely random
+        }
+        for (int i = 0; i < 4; i++) {
+            int max_cell = topk_and_find_max_cell_id(K[i], tag_vals, 100000);
+            printf("K: %d, max_cell: %d\n", K[i], max_cell);
+        }
+    }
 }
 
 int main () {
     // try_hash_compound_key();
     // topk_K_100_tag_2();
     // performance_cube_add_comprehensive();
-    build_dynamic_cell_key_performance();
+    // build_dynamic_cell_key_performance();
+    determine_K_factor();
 }

@@ -195,7 +195,6 @@ int fieldstat_register_cube(struct fieldstat *instance, const struct fieldstat_t
     return cube_id;
 }
 
-// todo: topk 模式下，针对当前cellid 大小的检测
 int fieldstat_cube_add(struct fieldstat *instance, int cube_id, const struct fieldstat_tag *tags, size_t n_tag, long long increment)
 {
     struct fs_cube *cube = instance->cube[cube_id];
@@ -544,7 +543,7 @@ void cube_push_all_cells_to_another_cell_manager(const struct fs_cube *src, stru
         for (int j = 0; j < cell_id_count_src; j ++) {
             int tmp_ret = cell_manager_get_tag_by_cell_id(cell_manager_src, cell_ids_from_metric_src[j], &tags_src, &tag_count_src);
             if (tmp_ret != 0) {
-                printf("ERR: cube_push_all_cells_to_another_cell_manager: cell_manager_get_tag_by_cell_id failed\n");
+                printf("ERR: cube_push_all_cells_to_another_cell_manager: cell_manager_get_tag_by_cell_id failed, cell id: %d\n", cell_ids_from_metric_src[j]);
                 continue;
             }
             if (src->sampling_mode == SAMPLING_MODE_TOPK) {

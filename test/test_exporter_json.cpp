@@ -39,7 +39,6 @@ void test_check_if_tag_list_is_in_json(cJSON *tag_obj, const Fieldstat_tag_list_
 {
     for (size_t tag_id = 0; tag_id < benchmark->get_tag_count(); tag_id++) {
         cJSON *tag_val = cJSON_GetObjectItem(tag_obj, benchmark->get_tag()[tag_id].key);
-        printf("the tag key is : %s\n", benchmark->get_tag()[tag_id].key);
         EXPECT_NE(tag_val, nullptr);
         if (tag_val->type == cJSON_String) {
             EXPECT_STREQ(tag_val->valuestring, benchmark->get_tag()[tag_id].value_str);

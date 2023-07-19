@@ -705,7 +705,6 @@ int metric_merge_or_copy_cell(struct metric *dest, const struct metric *src, int
             printf("ERR: metric_merge_or_copy_cell copy failed\n");
             return -1;
         }
-        printf("metric_merge_or_copy_cell: going to metric_add_one_cell\n");
         metric_add_one_cell(dest, dest_cell_id, dest_data);
         return 0;
     }
@@ -777,7 +776,6 @@ struct metric_measure_data *metric_find_or_new_cell(struct metric *pthis, int ce
 
     if (data == NULL) {
         data = pthis->scheme->new(pthis->info->paras);
-        printf("metric_find_or_new_cell going to new one cell\n");
         metric_add_one_cell(pthis, cell_id, data);
     }
     return data;

@@ -233,11 +233,6 @@ TEST(metric_test_counter, performance_test_on_60000_cells_comprehensive_1000000_
     fieldstat_free(instance);
 }
 
-int cmpfunc(const void *a, const void *b)
-{
-    return (*(int *)a - *(int *)b);
-}
-
 TEST(metric_test_counter, performance_test_on_1000_cells_topk_1000000_times)
 {
     int cell_count = 60000;
@@ -267,14 +262,6 @@ TEST(metric_test_counter, performance_test_on_1000_cells_topk_1000000_times)
 
     EXPECT_TRUE(seconds < 1); // 1 = 0.000001 * 1000000
     printf("performance_test_on_1000_cells_topk_1000000_times time cost: %f\n", seconds);
-    int *ret_cell_ids = NULL;
-    struct fieldstat_tag_list *tag_list = NULL;
-    size_t n_cell = 0;
-    fieldstat_get_cells(instance, 0, 0, &ret_cell_ids, &tag_list, &n_cell);
-    qsort(ret_cell_ids, n_cell, sizeof(int), cmpfunc);
-    printf("biggest cell id: %d\n", ret_cell_ids[n_cell - 1]);
-    free(ret_cell_ids);
-    fieldstat_tag_list_arr_free(tag_list, n_cell);
 
     fieldstat_free(instance);
 }
