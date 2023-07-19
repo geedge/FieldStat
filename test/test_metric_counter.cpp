@@ -241,9 +241,9 @@ TEST(metric_test_counter, performance_test_on_1000_cells_topk_1000000_times)
         tags[i] = TEST_TAG_INT;
         tags[i].value_int = i;
     }
-    getchar();
+    // getchar();
     struct fieldstat *instance = fieldstat_new();
-    fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_TOPK, cell_count);
+    fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_TOPK, 1000);
     fieldstat_register_counter(instance, 0, "test", 0);
 
     clock_t start = clock();
@@ -256,7 +256,7 @@ TEST(metric_test_counter, performance_test_on_1000_cells_topk_1000000_times)
     double seconds = (double)(end - start) / CLOCKS_PER_SEC;
     EXPECT_TRUE(seconds < 1); // 1 = 0.000001 * 1000000
     printf("performance_test_on_1000_cells_topk_1000000_times time cost: %f\n", seconds);
-    exit(0);
+    // exit(0);
     fieldstat_free(instance);
 }
 
