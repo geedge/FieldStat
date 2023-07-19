@@ -1,11 +1,3 @@
-
-// todo: 
-// cube oper: choose rand existing one, new one, delete one
-// metric: randomly choose one, or gen a new one with counter type
-// cell: randomly gen a tag, add, oper on this one
-// serialize, merge and reset every rand times[0,100]
-
-
 #include <stdio.h>
 #include <gtest/gtest.h>
 #include <functional>
@@ -97,7 +89,6 @@ TEST(Fuzz_test, fuzz_test)
     cube_ids[CUBE_NUM - 2] = -1;
     cube_ids[CUBE_NUM - 1] = -1;
 
-    // getchar(); // todo: remove this line
     clock_t start = clock();
 
     for (int i = 0; i < TEST_ROUND; i++) {
@@ -162,8 +153,6 @@ TEST(Fuzz_test, fuzz_test)
     for (int i = 0; i < CUBE_NUM; i++) {
         delete shared_tag[i];
     }
-
-    // exit(0); // todo: 测完删了
 
     printf("czzzz test (dest)----------------\n");
     int *cubes;

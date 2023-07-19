@@ -66,6 +66,7 @@ struct cell_iter {
     int *cube_ids;
     int n_cube;
     int curr_cube_idx;
+    struct fieldstat_tag_list *shared_tag;
 
     int max_metric_id;
     int curr_metric_id;
@@ -150,6 +151,9 @@ void cell_iter_free_cell_records(struct cell_iter *iter) {
 void cell_iter_free(struct cell_iter *iter) {
     cell_iter_free_cell_records(iter);
 
+    if (iter->shared_tag != NULL) {
+        fieldstat_tag_list_arr_free(iter->shared_tag, 1);
+    }
     free(iter->cube_ids);
 
     free(iter);
@@ -212,6 +216,7 @@ int cell_iter_next(struct cell_iter *iter) {
     if (iter->curr_cube_idx == -1) { // first time
         while (cell_iter_next_nonempty_cube(iter)) {
             if (cell_iter_next_nonempty_metric(iter)) {
+                iter->shared_tag = fieldstat_get_shared_tags(iter->instance, iter->cube_ids[iter->curr_cube_idx]);
                 return 1;
             }
         }
@@ -227,8 +232,12 @@ int cell_iter_next(struct cell_iter *iter) {
         return 1;
     }
 
+    fieldstat_tag_list_arr_free(iter->shared_tag, 1);
+    printf("free shared tag for cube id: %d\n", iter->cube_ids[iter->curr_cube_idx]);
+    iter->shared_tag = NULL;
     while (cell_iter_next_nonempty_cube(iter)) {
         if (cell_iter_next_nonempty_metric(iter)) {
+            iter->shared_tag = fieldstat_get_shared_tags(iter->instance, iter->cube_ids[iter->curr_cube_idx]);
             return 1;
         }
     }
@@ -318,7 +327,7 @@ void tag_list_append_to_tag_object(const struct fieldstat_tag_list *tag_list, cJ
 void cell_iter_read_tag_list(struct cell_iter *iter, struct export_kv_pair **exported_tags, size_t *len_out)
 {
     struct fieldstat_tag_list *tag_list_cell = &iter->tag_list[iter->curr_cell_idx];
-    struct fieldstat_tag_list *tag_arr_shared = fieldstat_get_shared_tags(iter->instance, iter->cube_ids[iter->curr_cube_idx]); // todo: 这里效率太低了，把tag_arr_shared放到iter里，每个cube更新一次
+    struct fieldstat_tag_list *tag_arr_shared = iter->shared_tag;
 
     size_t ret_tag_list_len = tag_list_cell->n_tag + tag_arr_shared->n_tag;
 
@@ -332,8 +341,6 @@ void cell_iter_read_tag_list(struct cell_iter *iter, struct export_kv_pair **exp
     for (int i = 0; i < tag_arr_shared->n_tag; i++) {
         kv_pair_fill_with_tags(tag_list++, &tag_arr_shared->tag[i]);
     }
-
-    fieldstat_tag_list_arr_free(tag_arr_shared, 1);
 }
 
 void cell_iter_add_field_to_field_object(const struct cell_iter *iter, cJSON *obj)

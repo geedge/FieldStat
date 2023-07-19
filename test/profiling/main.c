@@ -116,6 +116,30 @@ void topk_K_100_tag_2()
     getchar();
 }
 
+int my_cmp_int(const void *a, const void *b)
+{
+    return *(int *)a - *(int *)b;
+}
+
+int topk_get_max_cell_id(int K, int *tag_vals, int n_tag)
+{
+    struct fieldstat *instance = fieldstat_new();
+    fieldstat_register_cube(instance, &TEST_TAG_INT, 1, SAMPLING_MODE_TOPK, K);
+    fieldstat_register_counter(instance, 0, "test", 0);
+    struct fieldstat_tag tmp_tag = TEST_TAG_INT;
+
+    for (int i = 0; i < n_tag; i++) {
+        tmp_tag.value_int = tag_vals[i];
+        int cell_id = fieldstat_cube_add(instance, 0, &tmp_tag, 1, 1);
+        if (cell_id == -1) {
+            continue;
+        }
+        fieldstat_counter_incrby(instance, 0, 0, cell_id, 1);
+    }
+    
+
+}
+
 int main () {
     // try_hash_compound_key();
     // topk_K_100_tag_2();

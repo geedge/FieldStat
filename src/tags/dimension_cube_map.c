@@ -1,38 +1,3 @@
-
-
-// TODO: tag naming -> tag
-// todo : 又改回去了，MAX_TAG_KEY_LENGTH 和 MAX_TAG_STRING_VAL_LENGTH不在了
-// todo: 传入的应该是my tag，带length的那种
-// todo: 这个length要放到哈希里，快一点（优化时）
-
-// todo: 修改哈希算法
-
-// todo: topk 里传的也是一个key。
-
-
-// NOTE: 之前讨论的有问题，如果是comprehensive，那确实每个session都只有一个cell_id，但是如果是topk，那么每次add metric前都要更新，不然topk的榜单咋办。
-
-/* -------------------------------------------------------------------------- */
-/*                                讨论怎么分配tag id                                */
-/* -------------------------------------------------------------------------- */
-// /* ----------------------------------- 方案1 ---------------------------------- */
-// 每次id 由fieldstat 分配，每次add topk 都+1，覆盖掉原来的id。
-// 建立cell回收机制，不然cell 越来越多。
-
-// 回收要满足的：
-// heavy keeper 添加的时候，如果pop了元素，把这个元素的data（就是cellid) 返回出来
-
-// 我要能通过这个id找到cell(id 到cell是不是也得是一个哈希。。。有没有巧办法。）
-
-
-// 或者由heavy keeper 自己释放，但是cell的释放还是挺麻烦的，会让代码变得很复杂很恶心。
-
-/* ----------------------------------- 方案2 ---------------------------------- */
-// 不回收了
-// fixme: 当前使用方案2，合理吗
-
-// TODO: 应该是用这个，暂时先拿uthash凑合一下
-// #include "my_ut_hash.h"
 #include <stdio.h>
 #include <assert.h>
 #include <stdlib.h>
@@ -351,11 +316,13 @@ int cell_manager_topk_map_add(struct cell_manager *pthis, const struct fieldstat
     if (ret == 1) { // use the original id
         heavy_keeper_query_one(pthis->topk_tag_id_map, key, key_size, NULL, existing_cell_id);
         free(key);
+        *popped_cell_id = -1;
         return 1;
     }
     free(key);
 
     if (ret == -1) {
+        *popped_cell_id = -1;
         return -1;
     }
 
