@@ -33,7 +33,7 @@ struct fieldstat_tag {
 	const char *key;
     enum fs_tag_type type;
 	union{
-		long long value_longlong; // todo： 改成 value_long_long
+		long long value_longlong;
 		double value_double;
 		const char *value_str;
 	};

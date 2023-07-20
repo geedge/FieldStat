@@ -15,6 +15,8 @@ struct my_hash_tag {
     size_t key_len; // including '\0'
     unsigned char *value;
     size_t value_len; // sizeof(value) if INT or DOUBLE, strlen(value) + 1 if CSTRING
+
+    enum fs_tag_type tag_type; // not used for hash.
 };
 
 struct my_hash_tag_key {
@@ -49,6 +51,7 @@ unsigned int my_tag_hash_func(struct my_hash_tag_key *my_hash_key)
 
 void convert_fieldstat_tag_to_my_hash_tag(const struct fieldstat_tag *src, struct my_hash_tag *dst)
 {
+    dst->tag_type = src->type;
     size_t key_len = strlen(src->key) + 1;
     dst->key = (char *)malloc(key_len);
     memcpy(dst->key, src->key, key_len);
@@ -90,6 +93,7 @@ struct my_hash_tag_key *my_hash_key_convert_from_fieldstat_tag(const struct fiel
     my_hash_key->my_tag = my_hash_tag_arr;
     my_hash_key->n_my_tag = n_src;
     my_hash_key->hashv = 0;
+    my_hash_key->is_hashed = false;
     return my_hash_key;
 }
 
@@ -104,28 +108,46 @@ void my_hash_key_convert_to_fieldstat_tag(const struct my_hash_tag_key *tag_key,
     for (int i = 0; i < ret_n_tag; i++)
     {
         ret_fieldstat_tag->key = strdup(tmp_pst_my_hash_tag->key);
-        ret_fieldstat_tag->type = TAG_CSTRING; // todo: 这里没法复原了，因为my_hash_tag里没有type
-        ret_fieldstat_tag->value_str = (char *)tmp_pst_my_hash_tag->value;
+        ret_fieldstat_tag->type = tmp_pst_my_hash_tag->tag_type;
+
+        switch (tmp_pst_my_hash_tag->tag_type)
+        {
+        case TAG_INTEGER:
+            ret_fieldstat_tag->value_longlong = *((long long *)tmp_pst_my_hash_tag->value);
+            break;
+        case TAG_DOUBLE:
+            ret_fieldstat_tag->value_double = *((double *)tmp_pst_my_hash_tag->value);
+            break;
+        case TAG_CSTRING:
+            ret_fieldstat_tag->value_str = strdup((char *)tmp_pst_my_hash_tag->value);
+            break;
+        default:
+            break;
+        }
+
         ret_fieldstat_tag++;
         tmp_pst_my_hash_tag++;
     }
 }
+
 struct my_hash_tag_key *my_hash_tag_key_copy(const struct my_hash_tag_key *src)
 {
-    //todo: 当前全部拷贝，但是实际上某些调用这个接口的地方可以改成浅拷贝，看性能要求吧
-    // note: 这个函数同时会拷贝hashv，所以尽量用copy，而不是从tag里构造
     struct my_hash_tag_key *dst = (struct my_hash_tag_key *)malloc(sizeof(struct my_hash_tag_key));
     dst->n_my_tag = src->n_my_tag;
+    dst->is_hashed = src->is_hashed;
     dst->hashv = src->hashv;
     dst->my_tag = (struct my_hash_tag *)malloc(sizeof(struct my_hash_tag) * src->n_my_tag);
     for (int i = 0; i < src->n_my_tag; i++)
     {
-        dst->my_tag[i].key_len = src->my_tag[i].key_len;
-        dst->my_tag[i].key = (char *)malloc(src->my_tag[i].key_len + 1);
-        memcpy(dst->my_tag[i].key, src->my_tag[i].key, src->my_tag[i].key_len + 1);
-        dst->my_tag[i].value_len = src->my_tag[i].value_len;
-        dst->my_tag[i].value = (unsigned char *)malloc(src->my_tag[i].value_len);
-        memcpy(dst->my_tag[i].value, src->my_tag[i].value, src->my_tag[i].value_len);
+        struct my_hash_tag *dst_tag = dst->my_tag + i;
+        struct my_hash_tag *src_tag = src->my_tag + i;
+        dst_tag->key_len = src_tag->key_len;
+        dst_tag->key = (char *)malloc(src_tag->key_len);
+        memcpy(dst_tag->key, src_tag->key, src_tag->key_len);
+        dst_tag->value_len = src_tag->value_len;
+        dst_tag->value = (unsigned char *)malloc(src_tag->value_len);
+        memcpy(dst_tag->value, src_tag->value, src_tag->value_len);
+        dst_tag->tag_type = src_tag->tag_type;
     }
 }
 
@@ -174,10 +196,12 @@ unsigned my_hash_tag_key_fnv_hash(const struct my_hash_tag_key *tag, unsigned se
         {
             "k": "tag1",
             "v": "value1"
+            "t":0/1/2
         },
         {
             "k": "tag2",
             "v": "value2"
+            "t":0/1/2
         }
     ],
     "hashed":true,
@@ -201,6 +225,8 @@ void my_hash_tag_key_serialize(const struct my_hash_tag_key *tag, char **blob, s
         mpack_write_bin(&writer, my_hash_tag->key, my_hash_tag->key_len);
         mpack_write_cstr(&writer, "v");
         mpack_write_bin(&writer, my_hash_tag->value, my_hash_tag->value_len);
+        mpack_write_cstr(&writer, "t");
+        mpack_write_u8(&writer, my_hash_tag->tag_type);
         mpack_finish_map(&writer);
     }
     mpack_finish_array(&writer);
@@ -241,6 +267,8 @@ struct my_hash_tag_key *my_hash_tag_key_deserialize(const char *blob, size_t blo
         my_hash_tag->value_len = mpack_node_bin_size(value);
         my_hash_tag->value = (unsigned char *)malloc(my_hash_tag->value_len);
         memcpy(my_hash_tag->value, mpack_node_bin_data(value), my_hash_tag->value_len);
+
+        my_hash_tag->tag_type = mpack_node_u8(mpack_node_map_cstr(tag_node, "t"));
     }
 
     bool is_hashed = mpack_node_bool(mpack_node_map_cstr(root, "hashed"));
