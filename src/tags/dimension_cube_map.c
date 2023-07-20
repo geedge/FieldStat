@@ -54,16 +54,6 @@ void fieldtag_copy(const struct fieldstat_tag *kv_pair, struct fieldstat_tag *de
     }
 }
 
-void fieldtag_clear(struct fieldstat_tag *kv_pair)
-{
-    free((char *)kv_pair->key);
-    if (kv_pair->type == TAG_CSTRING) {
-        free((char *)kv_pair->value_str);
-    }
-}
-
-
-
 void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_tags, char **out_key, size_t *out_key_size)
 {
 	int i = 0;

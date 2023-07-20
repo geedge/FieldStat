@@ -26,7 +26,7 @@ struct heavy_keeper_result {
 // Parameters used in algorithm
 struct heavy_keeper_options{
     int array_num;  // the size of the array. Default value: 4
-                    // Set it by how accurate you want. Value of 4 garentees an accuray more than 90% and around 97% in all tests.
+                    // Set it by how accurate you want. Value of 4 guarantees an accuracy more than 90% and around 97% in all tests.
                     // Not too big because it have an impact on both time and memory efficiency.
     int max_bucket_num; // M2, the maximum number of buckets every array keeps. Default value: k*log(k) and no less than 100. 
                         // Basically, as long as big enough, it won't affect the accuracy significantly.

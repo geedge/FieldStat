@@ -106,8 +106,7 @@ struct heavy_keeper_result *heavy_keeper_result_new(struct heavy_keeper *hk) {
     struct heavy_keeper_result *stats_hd = (struct heavy_keeper_result *)malloc(sizeof(struct heavy_keeper_result));
     memset(stats_hd, 0, sizeof(struct heavy_keeper_result));
     stats_hd->count = (unsigned *)malloc(expected_max_len * sizeof(unsigned));
-    stats_hd->key = (char **)malloc(expected_max_len * sizeof(char *));
-    stats_hd->key_len = (size_t *)malloc(expected_max_len * sizeof(size_t));
+    stats_hd->tags = (struct my_hash_tag_key **)malloc(expected_max_len * sizeof(struct my_hash_tag_key *));
 
     stats_hd->cube_id = (int *)malloc(expected_max_len * sizeof(int));
 
@@ -116,12 +115,11 @@ struct heavy_keeper_result *heavy_keeper_result_new(struct heavy_keeper *hk) {
 
 void heavy_keeper_result_free(struct heavy_keeper_result *stats_hd) {
     for (int i = 0; i < stats_hd->n_key; i++) {
-        free(stats_hd->key[i]);
+        my_hash_tag_key_free(stats_hd->tags[i]);
     }
 
     free(stats_hd->count);
-    free(stats_hd->key);
-    free(stats_hd->key_len);
+    free(stats_hd->tags);
     free(stats_hd->cube_id);
     free(stats_hd);
 }
@@ -151,16 +149,16 @@ bool if_need_to_decay(struct heavy_keeper *hk, struct Bucket *bucket, unsigned c
     return false;
 }
 
-struct Bucket *map_flow_id_hash_to_bucket(struct heavy_keeper *hk, int arrar_index, struct my_hash_tag_key *tag, unsigned int already_hashed_flow_id) {
+struct Bucket *map_flow_id_hash_to_bucket(struct heavy_keeper *hk, int array_index, struct my_hash_tag_key *tag, unsigned int already_hashed_flow_id) {
     int w = hk->params.max_bucket_num;
     int Hsh;
-    if (arrar_index == FP_HASH_KEY) {
+    if (array_index == FP_HASH_KEY) {
         Hsh = already_hashed_flow_id % w;
     } else {
-        Hsh = my_hash_tag_key_fnv_hash(tag, arrar_index) % w;
+        Hsh = my_hash_tag_key_fnv_hash(tag, array_index) % w;
     }
 
-    return &(hk->sketch[arrar_index * w + Hsh]);
+    return &(hk->sketch[array_index * w + Hsh]);
 }
 
 unsigned count_add(unsigned a, unsigned b) {

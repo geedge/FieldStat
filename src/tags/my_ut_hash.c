@@ -93,6 +93,23 @@ struct my_hash_tag_key *my_hash_key_convert_from_fieldstat_tag(const struct fiel
     return my_hash_key;
 }
 
+void my_hash_key_convert_to_fieldstat_tag(const struct my_hash_tag_key *tag_key, struct fieldstat_tag **out, size_t *n_out)
+{
+    size_t ret_n_tag = tag_key->n_my_tag;
+    *n_out = ret_n_tag;
+    struct fieldstat_tag *ret_fieldstat_tag = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * ret_n_tag);
+    *out = ret_fieldstat_tag;
+
+    struct my_hash_tag *tmp_pst_my_hash_tag = tag_key->my_tag;
+    for (int i = 0; i < ret_n_tag; i++)
+    {
+        ret_fieldstat_tag->key = strdup(tmp_pst_my_hash_tag->key);
+        ret_fieldstat_tag->type = TAG_CSTRING; // todo: 这里没法复原了，因为my_hash_tag里没有type
+        ret_fieldstat_tag->value_str = (char *)tmp_pst_my_hash_tag->value;
+        ret_fieldstat_tag++;
+        tmp_pst_my_hash_tag++;
+    }
+}
 struct my_hash_tag_key *my_hash_tag_key_copy(const struct my_hash_tag_key *src)
 {
     //todo: 当前全部拷贝，但是实际上某些调用这个接口的地方可以改成浅拷贝，看性能要求吧
@@ -112,15 +129,16 @@ struct my_hash_tag_key *my_hash_tag_key_copy(const struct my_hash_tag_key *src)
     }
 }
 
-void my_hash_tag_key_free(struct my_hash_tag_key *my_hash_key)
+void my_hash_tag_key_free(struct my_hash_tag_key *tag_key)
 {
-    for (int i = 0; i < my_hash_key->n_my_tag; i++)
+    struct my_hash_tag *my_hash_tag_arr = tag_key->my_tag;
+    for (int i = 0; i < tag_key->n_my_tag; i++)
     {
-        free(my_hash_key->my_tag[i].key);
-        free(my_hash_key->my_tag[i].value);
+        free(my_hash_tag_arr[i].key);
+        free(my_hash_tag_arr[i].value);
     }
-    free(my_hash_key->my_tag);
-    free(my_hash_key);
+    free(tag_key->my_tag);
+    free(tag_key);
 }
 
 // FNV-1a hash (http://www.isthe.com/chongo/tech/comp/fnv/)

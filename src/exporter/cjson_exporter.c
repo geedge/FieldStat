@@ -430,7 +430,7 @@ void fieldstat_json_exporter_write_global_tags(const struct fieldstat_json_expor
         },
         "fields":{
             "c2s_flow":<int counter value>
-            "in_lantency":<blob of histogram>
+            "in_latency":<blob of histogram>
             "client_ip_sketch":<blob of hyperloglog>
         }
         "timestamp":<timestamp long>
