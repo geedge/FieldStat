@@ -40,6 +40,7 @@ struct metric_name_id_map {
     UT_hash_handle hh;
 };
 
+
 struct fieldstat *fieldstat_new()
 {
     struct fieldstat *instance = malloc(sizeof(struct fieldstat));
@@ -398,6 +399,135 @@ int fieldstat_histogram_record(struct fieldstat *instance, int cube_id, int metr
 // /* -------------------------------------------------------------------------- */
 // /*                                serialization                               */
 // /* -------------------------------------------------------------------------- */
+
+void fieldtag_list_free(struct fieldstat_tag *kv_pairs, size_t n_pairs)
+{
+    for (int i = 0; i < (int)n_pairs; i++) {
+        fieldtag_clear(&kv_pairs[i]);
+    }
+    free(kv_pairs);
+}
+
+// todo: 现在cell 的tag没有sorted。想想怎么办，是不是干脆在add的时候sort掉得了
+int my_cmp_tag(const void *a, const void *b)
+{
+    struct fieldstat_tag *aa = (struct fieldstat_tag *)a;
+    struct fieldstat_tag *bb = (struct fieldstat_tag *)b;
+    int key_cmp = strcmp(aa->key, bb->key);
+    if (key_cmp != 0) {
+        return key_cmp;
+    }
+
+    assert(aa->type == bb->type);
+    switch (aa->type) {
+        case TAG_INTEGER:
+            return aa->value_int - bb->value_int;
+        case TAG_DOUBLE:
+            return aa->value_double - bb->value_double;
+        case TAG_CSTRING:
+            return strcmp(aa->value_str, bb->value_str);
+        default:
+            return 0;
+    }
+}
+
+/* 
+    [{
+        "key":<tag key string>
+        "type":0 1 or 2
+        "value":<tag value, can be int(0) double(1) or str(2)>
+    }]
+*/
+void fieldtag_list_serialize(const struct fieldstat_tag *tag_list, size_t tag_num, char **blob, size_t *blob_size)
+{
+    struct fieldstat_tag *tag_list_sorted = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * tag_num);
+    for (int i = 0; i < tag_num; i++) {
+        fieldtag_copy(&tag_list[i], &tag_list_sorted[i]);
+    }
+    // sort tag so that when merge by blob, we can merge cells with the same tags
+    qsort(tag_list_sorted, tag_num, sizeof(struct fieldstat_tag), my_cmp_tag);
+
+    mpack_writer_t writer;
+    mpack_writer_init_growable(&writer, blob, blob_size);
+
+    mpack_start_array(&writer, tag_num);
+    for (int j = 0; j < tag_num; j++) {
+        mpack_start_map(&writer, 3);
+        mpack_write_cstr(&writer, "key");
+        mpack_write_cstr(&writer, tag_list_sorted[j].key);
+        mpack_write_cstr(&writer, "type");
+        mpack_write_i8(&writer, tag_list_sorted[j].type);
+        mpack_write_cstr(&writer, "value");
+        switch (tag_list_sorted[j].type)
+        {
+            case TAG_INTEGER:
+                mpack_write_i64(&writer, tag_list_sorted[j].value_int);
+                break;
+            case TAG_DOUBLE:
+                mpack_write_double(&writer, tag_list_sorted[j].value_double);
+                break;
+            case TAG_CSTRING:
+                mpack_write_cstr(&writer, tag_list_sorted[j].value_str);
+                break;
+            default:
+                assert(0);
+                break;
+        }
+        mpack_finish_map(&writer);
+    }
+    mpack_finish_array(&writer);
+
+    if (mpack_writer_destroy(&writer) != mpack_ok) {
+        printf("ERR mpack writer fieldtag_list_serialize destroy failed\n");
+    }
+
+    fieldtag_list_free(tag_list_sorted, tag_num);
+}
+
+
+void fieldtag_list_deserialize(const char *blob, size_t blob_size, struct fieldstat_tag **tag_list_out, size_t *tag_num_out)
+{
+    mpack_tree_t tree;
+    mpack_tree_init_data(&tree, blob, blob_size);
+    mpack_tree_parse(&tree);
+    mpack_node_t tag_arr = mpack_tree_root(&tree);
+
+    size_t tag_num = mpack_node_array_length(tag_arr);
+
+    struct fieldstat_tag *tag_list = malloc(sizeof(struct fieldstat_tag) * tag_num);
+    for (int j = 0; j < tag_num; j++) {
+        mpack_node_t tag = mpack_node_array_at(tag_arr, j);
+
+        mpack_node_t key = mpack_node_map_cstr(tag, "key");
+        tag_list[j].key = (const char *)malloc(mpack_node_strlen(key) + 1);
+        mpack_node_copy_cstr(key, (char *)tag_list[j].key, mpack_node_strlen(key) + 1);
+        tag_list[j].type = mpack_node_i8(mpack_node_map_cstr(tag, "type"));
+
+        mpack_node_t value = mpack_node_map_cstr(tag, "value");
+
+        switch (tag_list[j].type)
+        {
+            case TAG_INTEGER:
+                tag_list[j].value_int = mpack_node_i64(value);
+                break;
+            case TAG_DOUBLE:
+                tag_list[j].value_double = mpack_node_double(value);
+                break;
+            case TAG_CSTRING:
+                tag_list[j].value_str = (const char *)malloc(mpack_node_strlen(value) + 1);
+                mpack_node_copy_cstr(value, (char *)tag_list[j].value_str, mpack_node_strlen(value) + 1);
+                break;
+            default:
+                assert(0);
+                break;
+        }
+    }
+    *tag_list_out = tag_list;
+    *tag_num_out = tag_num;
+
+    mpack_tree_destroy(&tree);
+}
+
 
 /*
 {
@@ -967,6 +1097,7 @@ void fieldstat_get_cells(const struct fieldstat *instance, int cube_id, int metr
 
     *tag_list = (struct fieldstat_tag_list *)malloc(sizeof(struct fieldstat_tag_list) * (*n_cell));
     for (int i = 0; i < *n_cell; i++) {
+        // todo: cell_manager_get_tag_by_cell_id 返回的现在是一个const指针，额外加一次拷贝。不过说实话，这里应该直接用mykey convert to tag 函数 （还没写）
         if (cell_manager_get_tag_by_cell_id(instance->cube[cube_id]->cell_manager, (*cell_ids)[i], &((*tag_list)[i].tag), &((*tag_list)[i].n_tag)) == -1) {
             printf("ERR: fieldstat_get_cells cell_manager_get_tag_by_cell_id failed\n");
             return;
