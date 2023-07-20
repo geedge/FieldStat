@@ -471,23 +471,6 @@ int heavy_keeper_bucket_serialization(const struct Bucket *b, char **blob, size_
     return 0;
 }
 
-void heavy_keeper_sketch_serialization(const struct heavy_keeper *hk, mpack_writer_t *writer)
-{
-    size_t element_mpack_size = 0;
-    char *element_mpack_buff = NULL;
-    mpack_write_cstr(writer, "sketch");
-
-    mpack_build_array(writer);
-    size_t bucket_len = (size_t)hk->params.array_num * (size_t)hk->params.max_bucket_num;
-    for (size_t i = 0; i < bucket_len; i++) {
-        heavy_keeper_bucket_serialization(&hk->sketch[i], &element_mpack_buff, &element_mpack_size);
-        mpack_write_object_bytes(writer, element_mpack_buff, element_mpack_size);
-        free(element_mpack_buff);
-        element_mpack_size = 0;
-    }
-    mpack_complete_array(writer);
-}
-
 void heavy_keeper_sorted_set_serialization(const struct heavy_keeper *hk, mpack_writer_t *writer)
 {
     size_t element_mpack_size = 0;
@@ -532,7 +515,6 @@ void heavy_keeper_serialization(const struct heavy_keeper *hk, char **blob, size
     size_t sketch_len = hk->params.max_bucket_num * hk->params.array_num;
     mpack_write_bin(&writer, (const char *)hk->sketch, sizeof(struct Bucket) * sketch_len);
 
-    heavy_keeper_sketch_serialization(hk, &writer);
     heavy_keeper_sorted_set_serialization(hk, &writer);
 
     mpack_complete_map(&writer);
@@ -582,6 +564,7 @@ struct heavy_keeper *heavy_keeper_deserialization(const char *blob, size_t size)
     heavy_keeper_sorted_set_deserialization(&root, hk->top_K_heap);
 
     if (mpack_tree_destroy(&tree) != mpack_ok) {
+        printf("ERR: An error occurred in heavy_keeper_deserialization\n");
         return NULL;
     }
     return hk;

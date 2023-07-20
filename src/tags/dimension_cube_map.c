@@ -217,7 +217,7 @@ int cell_manager_comprehensive_map_add(struct cell_manager *pthis, const struct 
 {
     struct tag_id_map *node = NULL;
     if (HASH_COUNT(pthis->comprehensive_tag_id_map) != 0) {
-        node = my_hash_key_list_find(pthis->comprehensive_tag_id_map, pthis->comprehensive_tag_id_map->tag);
+        node = my_hash_key_list_find(pthis->comprehensive_tag_id_map, tag);
     }
 
     if (node != NULL) {

@@ -96,7 +96,7 @@ TEST(Fuzz_test, fuzz_test)
             size_t blob_len;
             fieldstat_serialize(instance, &blob, &blob_len);
             struct fieldstat *instance_tmp = fieldstat_deserialize(blob, blob_len);
-            fieldstat_merge(instance_dest, instance);
+            fieldstat_merge(instance_dest, instance_tmp);
             fieldstat_free(instance_tmp);
             fieldstat_reset(instance);
             free(blob);

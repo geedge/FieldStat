@@ -810,7 +810,6 @@ int fieldstat_cube_merge_comprehensive(struct fs_cube *dest, const struct fs_cub
             continue;
         }
         metrics_dest = dest->metrics[metric_id_dest];
-
         for (int j = 0; j < cell_id_count_src; j ++) {
             int cell_id_from_metric_src = cell_ids_from_metric_src[j];
             const struct my_hash_tag_key *tag_key_src = cell_manager_get_tag_by_cell_id(cell_manager_src, cell_id_from_metric_src);
