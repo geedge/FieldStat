@@ -59,7 +59,7 @@ if (CMAKE_CXX_CPPCHECK)
             "--suppress=*:${PROJECT_SOURCE_DIR}/vendors/mpack/mpack.c"
             "--suppress=*:${PROJECT_SOURCE_DIR}/test/utils.hpp"
             "--suppress=*:${PROJECT_SOURCE_DIR}/test/unit_test_serialize.cpp"
-            "--suppress=*:${PROJECT_SOURCE_DIR}/test/fuzz_test.cpp"
+            "--suppress=*:${PROJECT_SOURCE_DIR}/test/test_fuzz_test.cpp"
             "--suppress=*:${PROJECT_SOURCE_DIR}/test/unit_test_fasthash.cpp"
     )
     set(CMAKE_C_CPPCHECK ${CMAKE_CXX_CPPCHECK})

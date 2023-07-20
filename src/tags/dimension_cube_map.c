@@ -7,14 +7,9 @@
 #include "fieldstat.h"
 #include "tags/dimension_cube_map.h"
 #include "tags/heavy_keeper.h"
-#include "tags/my_ut_hash_inner.h"
+// #include "tags/my_ut_hash_inner.h"
 #include "tags/my_ut_hash.h"
-
-struct tag_id_map {
-    struct my_hash_tag_key *tag;
-    int cell_id;
-    UT_hash_handle hh;
-};
+#include "tags/tag_id_map.h"
 
 struct id_tag_map {
     int cell_id;
@@ -195,8 +190,7 @@ int cell_manager_get_cell_id_by_tag(const struct cell_manager *pthis, const stru
     if (pthis->sampling_mode == SAMPLING_MODE_TOPK) {
         heavy_keeper_query_one(pthis->topk_tag_id_map, tag, NULL, &cell_id);
     } else {
-        struct tag_id_map *node = NULL;
-        HASH_FIND_TAG(pthis->comprehensive_tag_id_map, tag, node);
+        struct tag_id_map *node = my_hash_key_list_find(pthis->comprehensive_tag_id_map, tag);
         if (node == NULL) {
             cell_id = -1;
         } else {
@@ -222,7 +216,10 @@ int cell_manager_get_count_by_tag(const struct cell_manager *pthis, const struct
 int cell_manager_comprehensive_map_add(struct cell_manager *pthis, const struct my_hash_tag_key *tag, int cell_id, int *existing_cell_id)
 {
     struct tag_id_map *node = NULL;
-    HASH_FIND_TAG(pthis->comprehensive_tag_id_map, tag, node);
+    if (HASH_COUNT(pthis->comprehensive_tag_id_map) != 0) {
+        node = my_hash_key_list_find(pthis->comprehensive_tag_id_map, pthis->comprehensive_tag_id_map->tag);
+    }
+
     if (node != NULL) {
         *existing_cell_id = node->cell_id;
         return 0;
@@ -234,7 +231,7 @@ int cell_manager_comprehensive_map_add(struct cell_manager *pthis, const struct 
     node = (struct tag_id_map *)malloc(sizeof(struct tag_id_map));
     node->tag = my_hash_tag_key_copy(tag);
     node->cell_id = cell_id;
-    HASH_ADD_TAG(pthis->comprehensive_tag_id_map, tag, node);
+    my_hash_key_list_add(&pthis->comprehensive_tag_id_map, node);
     *existing_cell_id = -1;
     return 0;
 }

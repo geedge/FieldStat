@@ -6,7 +6,7 @@
 #include "mpack/mpack.h"
 #include "my_ut_hash_inner.h"
 #include "my_ut_hash.h"
-
+#include "tag_id_map.h"
 
 #define USING_BASE_HASH HASH_JEN
 
@@ -26,6 +26,18 @@ struct my_hash_tag_key {
     unsigned int hashv;
 };
 
+void my_hash_key_list_add(struct tag_id_map **tbl, struct tag_id_map *node)
+{
+    HASH_ADD_TAG(*tbl, tag, node);
+}
+
+struct tag_id_map *my_hash_key_list_find(const struct tag_id_map *tbl, const struct my_hash_tag_key *my_hash_key)
+{
+    struct tag_id_map *node = NULL;
+    HASH_FIND_TAG(tbl, my_hash_key, node);
+    return node;
+}
+
 unsigned int my_tag_hash_func(struct my_hash_tag_key *my_hash_key)
 {
     if (my_hash_key->is_hashed) {
@@ -36,7 +48,6 @@ unsigned int my_tag_hash_func(struct my_hash_tag_key *my_hash_key)
     struct my_hash_tag *tmp_pst_hashed_tag = my_hash_key->my_tag;
     for (int i = 0; i < my_hash_key->n_my_tag; i++)
     {
-        printf("the hash key: %s, length: %zu, pst: %p\n", tmp_pst_hashed_tag->key, tmp_pst_hashed_tag->key_len, tmp_pst_hashed_tag->key);
         USING_BASE_HASH(tmp_pst_hashed_tag->key, tmp_pst_hashed_tag->key_len, hashv);
         result = hashv;
         USING_BASE_HASH(tmp_pst_hashed_tag->value, tmp_pst_hashed_tag->value_len, hashv);
@@ -46,7 +57,6 @@ unsigned int my_tag_hash_func(struct my_hash_tag_key *my_hash_key)
     }
     my_hash_key->hashv = result;
     my_hash_key->is_hashed = true;
-    printf("the hash result: %u\n", result);
     return result;
 }
 
@@ -209,7 +219,8 @@ unsigned my_hash_tag_key_fnv_hash(const struct my_hash_tag_key *tag, unsigned se
     struct my_hash_tag *my_hash_tag_arr = tag->my_tag;
     size_t n_tag = tag->n_my_tag;
     size_t key_len, val_len;
-    char *key, *value;
+    char *key;
+    unsigned char *value;
     for (int i = 0; i < n_tag; i++) {
         key_len = my_hash_tag_arr[i].key_len;
         key = my_hash_tag_arr[i].key;
@@ -221,7 +232,7 @@ unsigned my_hash_tag_key_fnv_hash(const struct my_hash_tag_key *tag, unsigned se
         val_len = my_hash_tag_arr[i].value_len;
         value = my_hash_tag_arr[i].value;
         for (int j = 0; j < val_len; j++) {
-            h = h ^ (unsigned char)value[j];
+            h = h ^ value[j];
             h = h * 16777619UL;
         }
     }
@@ -263,7 +274,7 @@ void my_hash_tag_key_serialize(const struct my_hash_tag_key *tag, char **blob, s
         mpack_write_cstr(&writer, "k");
         mpack_write_bin(&writer, my_hash_tag->key, my_hash_tag->key_len);
         mpack_write_cstr(&writer, "v");
-        mpack_write_bin(&writer, my_hash_tag->value, my_hash_tag->value_len);
+        mpack_write_bin(&writer, (const char *)my_hash_tag->value, my_hash_tag->value_len);
         mpack_write_cstr(&writer, "t");
         mpack_write_u8(&writer, my_hash_tag->tag_type);
         mpack_finish_map(&writer);

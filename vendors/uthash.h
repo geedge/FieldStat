@@ -29,7 +29,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <string.h>   /* memcmp, memset, strlen */
 #include <stddef.h>   /* ptrdiff_t */
 #include <stdlib.h>   /* exit */
-#include <stdio.h> // todo: remove this line
 
 #if defined(HASH_DEFINE_OWN_STDINT) && HASH_DEFINE_OWN_STDINT
 /* This codepath is provided for backward compatibility, but I plan to remove it. */
@@ -162,12 +161,10 @@ do {                                                                            
 #define HASH_FIND_BYHASHVALUE(hh,head,keyptr,keylen,hashval,out)                 \
 do {                                                                             \
   (out) = NULL;                                                                  \
-  printf("in HASH_FIND_BYHASHVALUE\n");                                          \
   if (head) {                                                                    \
     unsigned _hf_bkt;                                                            \
     HASH_TO_BKT(hashval, (head)->hh.tbl->num_buckets, _hf_bkt);                  \
     if (HASH_BLOOM_TEST((head)->hh.tbl, hashval) != 0) {                         \
-        printf("Bloom filter hit\n");                                            \
       HASH_FIND_IN_BKT((head)->hh.tbl, hh, (head)->hh.tbl->buckets[ _hf_bkt ], keyptr, keylen, hashval, out); \
     }                                                                            \
   }                                                                              \
@@ -441,7 +438,6 @@ do {                                                                            
 #define HASH_TO_BKT(hashv,num_bkts,bkt)                                          \
 do {                                                                             \
   bkt = ((hashv) & ((num_bkts) - 1U));                                           \
-  printf("in HASH_TO_BKT\n");                                                    \
 } while (0)
 
 /* delete "delptr" from the hash table.
@@ -758,15 +754,12 @@ do {                                                                            
 do {                                                                             \
   if ((head).hh_head != NULL) {                                                  \
     DECLTYPE_ASSIGN(out, ELMT_FROM_HH(tbl, (head).hh_head));                     \
-    printf("hh head not NULL, out: %p\n", out);                                                    \
   } else {                                                                       \
-    printf("hh head NULL, output NULL\n");                                                    \
     (out) = NULL;                                                                \
   }                                                                              \
   while ((out) != NULL) {                                                        \
     if ((out)->hh.hashv == (hashval) && (out)->hh.keylen == (keylen_in)) {       \
       if (HASH_KEYCMP((out)->hh.key, keyptr, keylen_in) == 0) {                  \
-        printf("directly find one\n");                                                    \
         break;                                                                   \
       }                                                                          \
     }                                                                            \

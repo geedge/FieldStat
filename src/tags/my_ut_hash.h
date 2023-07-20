@@ -18,6 +18,7 @@ unsigned my_hash_tag_key_fnv_hash(const struct my_hash_tag_key *tag, unsigned se
 void my_hash_tag_key_serialize(const struct my_hash_tag_key *tag, char **blob, size_t *blob_size);
 struct my_hash_tag_key *my_hash_tag_key_deserialize(const char *blob, size_t blob_size);
 
+
 #ifdef __cplusplus
 }
 #endif

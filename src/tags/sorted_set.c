@@ -3,11 +3,11 @@
 #include <string.h>
 #include <stdio.h>
 
+#include "my_ut_hash_inner.h"
 #include "xxhash/xxhash.h"
 #include "minheap/heap.h"
 
 #include "sorted_set.h"
-#include "my_ut_hash_inner.h"
 #include "my_ut_hash.h"
 
 
