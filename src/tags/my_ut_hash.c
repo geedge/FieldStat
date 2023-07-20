@@ -1,13 +1,32 @@
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "mpack/mpack.h"
 #include "my_ut_hash_inner.h"
 #include "my_ut_hash.h"
 
 
 #define USING_BASE_HASH HASH_JEN
 
+struct my_hash_tag {
+    char *key;
+    size_t key_len; // including '\0'
+    unsigned char *value;
+    size_t value_len; // sizeof(value) if INT or DOUBLE, strlen(value) + 1 if CSTRING
+};
+
+struct my_hash_tag_key {
+    struct my_hash_tag *my_tag;
+    size_t n_my_tag;
+    bool is_hashed;
+    unsigned int hashv;
+};
+
 unsigned int my_tag_hash_func(struct my_hash_tag_key *my_hash_key)
 {
-    if (my_hash_key->hashv != 0)
-    {
+    if (my_hash_key->is_hashed) {
         return my_hash_key->hashv;
     }
     unsigned int hashv = 0;
@@ -24,14 +43,15 @@ unsigned int my_tag_hash_func(struct my_hash_tag_key *my_hash_key)
         tmp_pst_hashed_tag++;
     }
     my_hash_key->hashv = result;
+    my_hash_key->is_hashed = true;
     return result;
 }
 
 void convert_fieldstat_tag_to_my_hash_tag(const struct fieldstat_tag *src, struct my_hash_tag *dst)
 {
-    size_t key_len = strlen(src->key);
-    dst->key = (char *)malloc(key_len + 1);
-    memcpy(dst->key, src->key, key_len + 1);
+    size_t key_len = strlen(src->key) + 1;
+    dst->key = (char *)malloc(key_len);
+    memcpy(dst->key, src->key, key_len);
     dst->key_len = key_len;
     unsigned char *value = NULL;
     switch (src->type)
@@ -47,9 +67,9 @@ void convert_fieldstat_tag_to_my_hash_tag(const struct fieldstat_tag *src, struc
         dst->value_len = sizeof(double);
         break;
     case TAG_CSTRING:{
-        size_t value_len = strlen(src->value_str);
-        value = (unsigned char *)malloc(value_len + 1);
-        memcpy(value, src->value_str, value_len + 1);
+        size_t value_len = strlen(src->value_str) + 1;
+        value = (unsigned char *)malloc(value_len);
+        memcpy(value, src->value_str, value_len);
         dst->value_len = value_len;
         break;
     }
@@ -101,4 +121,119 @@ void my_hash_tag_key_free(struct my_hash_tag_key *my_hash_key)
     }
     free(my_hash_key->my_tag);
     free(my_hash_key);
+}
+
+// FNV-1a hash (http://www.isthe.com/chongo/tech/comp/fnv/)
+unsigned my_hash_tag_key_fnv_hash(const struct my_hash_tag_key *tag, unsigned seed) {
+    uint32_t h = 2166136261UL + (seed * 15);
+
+    struct my_hash_tag *my_hash_tag_arr = tag->my_tag;
+    size_t n_tag = tag->n_my_tag;
+    size_t key_len, val_len;
+    char *key, *value;
+    for (int i = 0; i < n_tag; i++) {
+        key_len = my_hash_tag_arr[i].key_len;
+        key = my_hash_tag_arr[i].key;
+
+        for (int j = 0; j < key_len; j++) {
+            h = h ^ (unsigned char)key[j];
+            h = h * 16777619UL;
+        }
+        val_len = my_hash_tag_arr[i].value_len;
+        value = my_hash_tag_arr[i].value;
+        for (int j = 0; j < val_len; j++) {
+            h = h ^ (unsigned char)value[j];
+            h = h * 16777619UL;
+        }
+    }
+
+    return h;
+}
+
+/*
+{
+    "tags": [
+        {
+            "k": "tag1",
+            "v": "value1"
+        },
+        {
+            "k": "tag2",
+            "v": "value2"
+        }
+    ],
+    "hashed":true,
+    "hashv": 0,
+}
+*/
+
+void my_hash_tag_key_serialize(const struct my_hash_tag_key *tag, char **blob, size_t *blob_size)
+{
+    mpack_writer_t writer;
+    mpack_writer_init_growable(&writer, blob, blob_size);
+    mpack_build_map(&writer);
+
+    mpack_write_cstr(&writer, "tags");
+    mpack_start_array(&writer, tag->n_my_tag);
+    for (int i = 0; i < tag->n_my_tag; i++)
+    {
+        struct my_hash_tag *my_hash_tag = tag->my_tag + i;
+        mpack_start_map(&writer, 2);
+        mpack_write_cstr(&writer, "k");
+        mpack_write_bin(&writer, my_hash_tag->key, my_hash_tag->key_len);
+        mpack_write_cstr(&writer, "v");
+        mpack_write_bin(&writer, my_hash_tag->value, my_hash_tag->value_len);
+        mpack_finish_map(&writer);
+    }
+    mpack_finish_array(&writer);
+
+    mpack_write_cstr(&writer, "hashed");
+    mpack_write_bool(&writer, tag->is_hashed);
+
+    mpack_write_cstr(&writer, "hashv");
+    mpack_write_u32(&writer, tag->hashv);
+
+    mpack_complete_map(&writer);
+    if (mpack_writer_destroy(&writer) != mpack_ok) {
+        printf("ERR: An error occurred in my_hash_tag_key_serialize!\n");
+    }
+}
+
+struct my_hash_tag_key *my_hash_tag_key_deserialize(const char *blob, size_t blob_size)
+{
+    mpack_tree_t tree;
+    mpack_tree_init_data(&tree, blob, blob_size);
+    mpack_tree_parse(&tree);
+    mpack_node_t root = mpack_tree_root(&tree);
+
+    mpack_node_t tags = mpack_node_map_cstr(root, "tags");
+    size_t n_tag = mpack_node_array_length(tags);
+    struct my_hash_tag *my_hash_tag_arr = (struct my_hash_tag *)malloc(sizeof(struct my_hash_tag) * n_tag);
+    for (int i = 0; i < n_tag; i++)
+    {
+        struct my_hash_tag *my_hash_tag = my_hash_tag_arr + i;
+        mpack_node_t tag_node = mpack_node_array_at(tags, i);
+        mpack_node_t value = mpack_node_map_cstr(tag_node, "v");
+        mpack_node_t key = mpack_node_map_cstr(tag_node, "k");
+
+        my_hash_tag->key_len = mpack_node_bin_size(key);
+        my_hash_tag->key = (char *)malloc(my_hash_tag->key_len);
+        memcpy(my_hash_tag->key, mpack_node_bin_data(key), my_hash_tag->key_len);
+
+        my_hash_tag->value_len = mpack_node_bin_size(value);
+        my_hash_tag->value = (unsigned char *)malloc(my_hash_tag->value_len);
+        memcpy(my_hash_tag->value, mpack_node_bin_data(value), my_hash_tag->value_len);
+    }
+
+    bool is_hashed = mpack_node_bool(mpack_node_map_cstr(root, "hashed"));
+    unsigned hashv_val = mpack_node_u32(mpack_node_map_cstr(root, "hashv"));
+
+    struct my_hash_tag_key *my_hash_key = (struct my_hash_tag_key *)malloc(sizeof(struct my_hash_tag_key));
+    my_hash_key->my_tag = my_hash_tag_arr;
+    my_hash_key->n_my_tag = n_tag;
+    my_hash_key->is_hashed = is_hashed;
+    my_hash_key->hashv = hashv_val;
+
+    mpack_tree_destroy(&tree);
+    return my_hash_key;
 }

@@ -311,7 +311,7 @@ int cell_manager_topk_map_add(struct cell_manager *pthis, const struct fieldstat
     build_dynamic_cell_key(tag, tag_count, &key, &key_size);
     *existing_cell_id = -1;
 
-    int ret = heavy_keeper_with_data_add(pthis->topk_tag_id_map, key, key_size, count, cell_id, popped_cell_id);
+    int ret = heavy_keeper_add(pthis->topk_tag_id_map, key, key_size, count, cell_id, popped_cell_id);
 
     if (ret == 1) { // use the original id
         heavy_keeper_query_one(pthis->topk_tag_id_map, key, key_size, NULL, existing_cell_id);

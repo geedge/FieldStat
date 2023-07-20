@@ -46,8 +46,7 @@ extern "C"{
 // Query result
 struct heavy_keeper_result {
     size_t n_key; // number of result
-    char **key; // key[i] is the flow id, i < n_key
-    size_t *key_len; // key_len[i] is the length flow id string, i < n_key
+    struct my_hash_tag_key **tags;
     unsigned *count; // count[i] is the metric count of the corresponding flow id
 
     int *cube_id;
@@ -79,18 +78,9 @@ void heavy_keeper_free(struct heavy_keeper *hk);
 */
 void heavy_keeper_clear(struct heavy_keeper *hk);
 
-/**
- * @brief   Add a flow to the heavy keeper.
- * @param   hk            the pointer to the heavy keeper.
- * @param   key           the flow id string.
- * @param   key_len       the length of the flow id string.
- * @param   count         the count of the flow or its traffic volume in bytes.
- */
-void heavy_keeper_add(struct heavy_keeper *hk, const char *key, size_t key_len, unsigned int count);
-
 // return -1 when the key is not inserted to the heavy keeper(not fail). popped_id_out is -1 if not popped. any other value >= 0 means the id of the popped member.
 // the cube id will give the key if the key is new, in which case return 0, if the key is already in the heavy keeper, return 1.
-int heavy_keeper_with_data_add(struct heavy_keeper *hk, const char *key, size_t key_len, unsigned int count, int cube_id, int *popped_id_out);
+int heavy_keeper_add(struct heavy_keeper *hk, struct my_hash_tag_key *tag, unsigned int count, int cube_id, int *popped_id_out);
 
 /**
  * @brief   Query the top-K flows.The flow id with bigger count ranks at smaller index.
@@ -99,7 +89,7 @@ int heavy_keeper_with_data_add(struct heavy_keeper *hk, const char *key, size_t 
  */
 struct heavy_keeper_result *heavy_keeper_query(struct heavy_keeper *hk);
 
-int heavy_keeper_query_one(struct heavy_keeper *hk, const char *key, size_t key_len, unsigned int *count_out, int *cube_id_out);
+int heavy_keeper_query_one(struct heavy_keeper *hk, struct my_hash_tag_key *tag, unsigned int *count_out, int *cube_id_out);
 
 /**
  * @brief   free a heavy keeper query result.

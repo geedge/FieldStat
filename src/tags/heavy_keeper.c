@@ -15,7 +15,7 @@
 #include "cjson/cJSON.h"
 
 #include "tags/sorted_set.h"
-
+#include "tags/my_ut_hash.h"
 
 struct Bucket {
     unsigned int finger_print;
@@ -151,32 +151,13 @@ bool if_need_to_decay(struct heavy_keeper *hk, struct Bucket *bucket, unsigned c
     return false;
 }
 
-static uint64_t __fnv_1a(const char *key, size_t len, int seed) {
-    // FNV-1a hash (http://www.isthe.com/chongo/tech/comp/fnv/)
-    size_t i;
-    uint32_t h = 2166136261UL + (seed * 15);  // FNV_OFFSET 32 bit with magic number seed
-    for (i = 0; i < len; ++i) {
-        h = h ^ (unsigned char)key[i];
-        h = h * 16777619UL;  // FNV_PRIME 32 bit
-    }
-    return h;
-}
-
-unsigned hash_xxhash_flow_id(const char *key, size_t key_len, unsigned seed) {
-    // XXH64_hash_t res_64 = XXH3_64bits_withSeed(key, key_len + 1, seed);
-    // return res_64 >> 32;
-    // unsigned long int res = XXH32(key, key_len + 1, seed);
-    // return res;
-    return __fnv_1a(key, key_len, seed);
-}
-
-struct Bucket *map_flow_id_hash_to_bucket(struct heavy_keeper *hk, int arrar_index, const char *flow_id, size_t flow_id_len, unsigned int already_hashed_flow_id) {
+struct Bucket *map_flow_id_hash_to_bucket(struct heavy_keeper *hk, int arrar_index, struct my_hash_tag_key *tag, unsigned int already_hashed_flow_id) {
     int w = hk->params.max_bucket_num;
     int Hsh;
     if (arrar_index == FP_HASH_KEY) {
         Hsh = already_hashed_flow_id % w;
     } else {
-        Hsh = hash_xxhash_flow_id(flow_id, flow_id_len, arrar_index) % w;
+        Hsh = my_hash_tag_key_fnv_hash(tag, arrar_index) % w;
     }
 
     return &(hk->sketch[arrar_index * w + Hsh]);
@@ -196,25 +177,25 @@ unsigned my_max(unsigned a, unsigned b) {
     return b;
 }
 
-static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_keeper, const char *key, size_t key_len, unsigned int count)
+static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_keeper, struct my_hash_tag_key *tag, unsigned int count)
 {
     int ret = -1;
     unsigned int user_data_cube_id = 0;
     struct sorted_set *summary = heavy_keeper->top_K_heap;
-    unsigned int FP = hash_xxhash_flow_id(key, key_len, FP_HASH_KEY);
+    unsigned int FP = my_hash_tag_key_fnv_hash(tag, FP_HASH_KEY);
     unsigned nMin = sorted_set_get_min_count(summary);
     unsigned maxv = 0;
 
     for (int j = 0; j < heavy_keeper->params.array_num; j++) {
-        struct Bucket *bucket = map_flow_id_hash_to_bucket(heavy_keeper, j, key, key_len, FP);
+        struct Bucket *bucket = map_flow_id_hash_to_bucket(heavy_keeper, j, tag, FP);
 
         if (bucket->finger_print == FP) {
             // If a flow is not in the min-heap, then the estimated flow size should be no larger than nmin.
-            // The flows whose counts are both larger than nmin and not in min-heap must have the same xxhash value, where its FP stored in bucket represents another flowid,
+            // The flows whose counts are both larger than nmin and not in min-heap must have the same xxhash value, and its FP stored in bucket represents another tag,
             // In this case, the sketch won't be updated. This flow is expected to be taken into account in another array,
-            // where its FP is different from the one it should collided with so element flows won't be missed.
-            if (bucket->count > nMin && sorted_set_get_count(summary, key, key_len) == 0) {
-                    continue;
+            //  where its FP is different from the one it should collided with, so that element flows won't be missed.
+            if (bucket->count > nMin && sorted_set_get_count(summary, tag) == 0) {
+                continue;
             }
             bucket->count = count_add(bucket->count, count);
             maxv = my_max(maxv, bucket->count);
@@ -233,36 +214,27 @@ static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_
         }
     }
 
-    unsigned int tmp_cnt = sorted_set_get_count(summary, key, key_len);
+    unsigned int tmp_cnt = sorted_set_get_count(summary, tag);
     if (tmp_cnt == 0) {  // the flow is not in sorted set
         if ((maxv - nMin <= count && maxv != nMin) || sorted_set_cardinality(summary) != heavy_keeper->K) {
-            int insert_ret = sorted_set_insert_and_record_popped_back(summary, key, key_len, maxv, &user_data_cube_id, sizeof(unsigned int));
+            int insert_ret = sorted_set_insert_and_record_popped_back(summary, tag, maxv, &user_data_cube_id, sizeof(unsigned int));
             if (insert_ret == 2) { // insert success and popped one
                 ret = user_data_cube_id;
             }
         }
     } else {
         if (maxv > tmp_cnt) {
-            sorted_set_incrby(summary, key, key_len, maxv - tmp_cnt);
+            sorted_set_incrby(summary, tag, maxv - tmp_cnt);
         }
     }
     return ret;
 }
 
-void heavy_keeper_add(struct heavy_keeper *heavy_keeper, const char *key, size_t key_len, unsigned int count) {
-    if (key_len == 0) {
-        printf("ERR: key_len should not be 0\n");
-        return;
-    }
-
-    (void)heavy_keeper_add_by_recording_popped_data(heavy_keeper, key, key_len, count);
-}
-
-int heavy_keeper_with_data_add(struct heavy_keeper *hk, const char *key, size_t key_len, unsigned int count, int cube_id, int *popped_id_out)
+int heavy_keeper_add(struct heavy_keeper *hk, struct my_hash_tag_key *tag, unsigned int count, int cube_id, int *popped_id_out)
 {
-    *popped_id_out = heavy_keeper_add_by_recording_popped_data(hk, key, key_len, count);
+    *popped_id_out = heavy_keeper_add_by_recording_popped_data(hk, tag, count);
 
-    int **pst_data_in_rec = (int **)sorted_set_get_pointer_to_user_data(hk->top_K_heap, key, key_len);
+    int **pst_data_in_rec = (int **)sorted_set_get_pointer_to_user_data(hk->top_K_heap, tag);
     if (pst_data_in_rec == NULL) { // the key is not added into sorted set
         return -1;
     }
@@ -280,37 +252,33 @@ struct heavy_keeper_result *heavy_keeper_query(struct heavy_keeper *hk) {
     struct heavy_keeper_result *stats  = heavy_keeper_result_new(hk);
 
     int heap_entry_num = sorted_set_cardinality(hk->top_K_heap);
-    unsigned *keys = (unsigned *)malloc(heap_entry_num * sizeof(unsigned));
-    char **vals = (char **)malloc(heap_entry_num * sizeof(char *));
-    size_t *val_lens = (size_t *)malloc(heap_entry_num * sizeof(size_t));
+    unsigned *cnt_arr = (unsigned *)malloc(heap_entry_num * sizeof(unsigned));
+    struct my_hash_tag_key **tag_arr = (struct my_hash_tag_key **)malloc(heap_entry_num * sizeof(struct my_hash_tag_key *));
     int **user_data = (int **)malloc(heap_entry_num * sizeof(int *));
 
-    sorted_set_dump(hk->top_K_heap, keys, vals, val_lens, (void **)user_data);
+    sorted_set_dump(hk->top_K_heap, cnt_arr, tag_arr, (void **)user_data);
 
     int query_entry_num = heap_entry_num > hk->K ? hk->K : heap_entry_num;
     stats->n_key = query_entry_num;
     int index_q = 0;
     for (int i = query_entry_num - 1; i >= 0; i--) {
-        stats->key[index_q] = (char *)malloc(val_lens[i]);
-        strcpy(stats->key[index_q], vals[i]);
-        stats->count[index_q] = keys[i];
-        stats->key_len[index_q] = val_lens[i] - 1;
+        stats->tags[index_q] = my_hash_tag_key_copy(tag_arr[i]);
+        stats->count[index_q] = cnt_arr[i];
         stats->cube_id[index_q] = *(user_data[i]);
         
         index_q++;
     }
 
-    free(keys);
-    free(vals);
-    free(val_lens);
+    free(cnt_arr);
+    free(tag_arr);
     free(user_data);
     return stats;
 }
 
-int heavy_keeper_query_one(struct heavy_keeper *hk, const char *key, size_t key_len, unsigned int *count_out, int *cube_id_out)
+int heavy_keeper_query_one(struct heavy_keeper *hk, struct my_hash_tag_key *tag, unsigned int *count_out, int *cube_id_out)
 {
     if (count_out != NULL) {
-        unsigned int count = sorted_set_get_count(hk->top_K_heap, key, key_len);
+        unsigned int count = sorted_set_get_count(hk->top_K_heap, tag);
         if (count == 0) {
             *count_out = 0;
             return -1;
@@ -322,7 +290,7 @@ int heavy_keeper_query_one(struct heavy_keeper *hk, const char *key, size_t key_
         return 0;
     }
 
-    int **pst_data_in_rec = (int **)sorted_set_get_pointer_to_user_data(hk->top_K_heap, key, key_len);
+    int **pst_data_in_rec = (int **)sorted_set_get_pointer_to_user_data(hk->top_K_heap, tag);
     if (pst_data_in_rec == NULL) {
         *cube_id_out = -1;
         return -1;
@@ -355,13 +323,13 @@ static void heavy_keeper_merge_sketch(struct heavy_keeper *dest, const struct he
     }
 }
 
-unsigned find_maxv_in_sketch(struct heavy_keeper *hk, const char *flow_id, int flow_id_len) {
+unsigned find_maxv_in_sketch(struct heavy_keeper *hk, const struct my_hash_tag_key *tag) {
     struct Bucket *bucket;
-    unsigned fp = hash_xxhash_flow_id(flow_id, flow_id_len, FP_HASH_KEY);
+    unsigned fp = my_hash_tag_key_fnv_hash(tag, FP_HASH_KEY);
 
     unsigned maxv = 0;
     for (int array_id = 0; array_id < hk->params.array_num; array_id++) {
-        bucket = map_flow_id_hash_to_bucket(hk, array_id, flow_id, flow_id_len, hash_xxhash_flow_id(flow_id, flow_id_len, FP_HASH_KEY));  // hk->sketch is the merge of two. So just check one
+        bucket = map_flow_id_hash_to_bucket(hk, array_id, tag, my_hash_tag_key_fnv_hash(tag, FP_HASH_KEY));  // hk->sketch is the merge of two. So just check one
 
         if (bucket->finger_print == fp) {
             maxv = my_max(maxv, bucket->count);
@@ -371,14 +339,14 @@ unsigned find_maxv_in_sketch(struct heavy_keeper *hk, const char *flow_id, int f
     return maxv;
 }
 
-int insert_to_sorted_set(struct sorted_set *ss, char *flow_id_str, int flow_id_len, unsigned count, unsigned int tag_id) {
-    int if_inserted = sorted_set_insert(ss, flow_id_str, flow_id_len, count);
+int insert_to_sorted_set(struct sorted_set *ss, const struct my_hash_tag_key *tag, unsigned count, unsigned int user_data) {
+    int if_inserted = sorted_set_insert(ss, tag, count);
 
     if (if_inserted) {
-        int **pst_other_count_in_rec = (int **)sorted_set_get_pointer_to_user_data(ss, flow_id_str, flow_id_len);
+        int **pst_other_count_in_rec = (int **)sorted_set_get_pointer_to_user_data(ss, tag);
 
         *pst_other_count_in_rec = (int *)malloc(sizeof(unsigned int));
-        **pst_other_count_in_rec = tag_id;
+        **pst_other_count_in_rec = user_data;
     }
     return if_inserted;
 }
@@ -390,48 +358,38 @@ void heavy_keeper_merge_sorted_set(struct heavy_keeper *dest, const struct heavy
     int size_dest = sorted_set_cardinality(dest->top_K_heap);
     int size_src = sorted_set_cardinality(src->top_K_heap);
     int max_size = size_dest > size_src ? size_dest : size_src;
-    unsigned *keys = (unsigned *)malloc(max_size * sizeof(unsigned));
-    char **vals = (char **)malloc(max_size * sizeof(char *));
-    size_t *val_lens = (size_t *)malloc(max_size * sizeof(size_t));
+    unsigned *count_arr = (unsigned *)malloc(max_size * sizeof(unsigned));
+    struct my_hash_tag_key **tag_arr = (struct my_hash_tag_key **)malloc(max_size * sizeof(struct my_hash_tag_key *));
     unsigned int **user_datas_dummy = (unsigned int **)malloc(max_size * sizeof(unsigned int *));
 
-    sorted_set_dump(dest->top_K_heap, keys, vals, val_lens, (void **)user_datas_dummy);
+    sorted_set_dump(dest->top_K_heap, count_arr, tag_arr, (void **)user_datas_dummy);
     int new_allocated_tag_id = 0; // the merged fieldstat will be assigned with tag_ids independent from the original ones
                                         // it's ok because the corresponding vals are the name of the tag, from which we recover the tags
 
-    char *flow_id_str=NULL;
-    size_t flow_id_len=0;
     for (int i = 0; i < size_dest; i++) {
-        flow_id_str = vals[i];
-        flow_id_len = val_lens[i] - 1;
-
-        unsigned maxv = find_maxv_in_sketch(dest, flow_id_str, flow_id_len);
-        if (insert_to_sorted_set(new_rec, flow_id_str, flow_id_len, maxv, new_allocated_tag_id)) {
+        unsigned maxv = find_maxv_in_sketch(dest, tag_arr[i]);
+        if (insert_to_sorted_set(new_rec, tag_arr[i], maxv, new_allocated_tag_id)) {
             new_allocated_tag_id++;
         }
     }
 
-    sorted_set_dump(src->top_K_heap, keys, vals, val_lens, (void **)user_datas_dummy);
+    sorted_set_dump(src->top_K_heap, count_arr, tag_arr, (void **)user_datas_dummy);
 
     for (int i = 0; i < size_src; i++) {
-        flow_id_str = vals[i];
-        flow_id_len = val_lens[i] - 1;
-
-        if (sorted_set_get_count(new_rec, flow_id_str, flow_id_len) != 0) {
+        if (sorted_set_get_count(new_rec, tag_arr[i]) != 0) {
             continue;
         }
 
         // the dest heavy keeper has been merged, so the maxv is the maxv in the merged sketch, instead of the dest sketch
-        unsigned maxv = find_maxv_in_sketch(dest, flow_id_str, flow_id_len);
+        unsigned maxv = find_maxv_in_sketch(dest, tag_arr[i]);
 
-        if (insert_to_sorted_set(new_rec, flow_id_str, flow_id_len, maxv, new_allocated_tag_id)) {
+        if (insert_to_sorted_set(new_rec, tag_arr[i], maxv, new_allocated_tag_id)) {
             new_allocated_tag_id++;
         }
     }
 
-    free(keys);
-    free(vals);
-    free(val_lens);
+    free(count_arr);
+    free(tag_arr);
     free(user_datas_dummy);
 
     sorted_set_free(dest->top_K_heap);
@@ -458,12 +416,10 @@ int heavy_keeper_merge(struct heavy_keeper *hk, const struct heavy_keeper *src) 
     {
     "type": "topk"
     "K": <value_of_K>,
-    “sketch": [{"FP":<finger_print>, "C":counter}, ...]
-    "primary_id":<primary_metric int>
-    "metric_name": [<metric_name1>, <metric_name2>, ...]
+    “sketch": [{"FP":<finger_print>, "C":counter}, ...],
     "ss": [
         {
-            "member": <field_string>,
+            "tag": <serialized_tag_bin>,
             "score": <primary_score>,
             "id":<cell_id>
         },
@@ -474,15 +430,21 @@ int heavy_keeper_merge(struct heavy_keeper *hk, const struct heavy_keeper *src) 
     }
 }
 ***********************************************************************************/
-int heavy_keeper_sorted_set_member_serialization(const char *val, size_t val_len, unsigned int score, unsigned int cell_id, char **blob, size_t *blob_sz) {
+int heavy_keeper_sorted_set_member_serialization(struct my_hash_tag_key *tag, unsigned int score, unsigned int cell_id, char **blob, size_t *blob_sz) {
     mpack_writer_t writer;
     mpack_writer_init_growable(&writer, blob, blob_sz);
-
     mpack_build_map(&writer);
-    mpack_write_cstr(&writer, "member");
-    mpack_write_str(&writer, val, val_len - 1);
+
+    mpack_write_cstr(&writer, "tag");
+    char *tag_blob;
+    size_t tag_blob_sz;
+    my_hash_tag_key_serialize(tag, &tag_blob, &tag_blob_sz);
+    mpack_write_bin(&writer, tag_blob, tag_blob_sz);
+    free(tag_blob);
+
     mpack_write_cstr(&writer, "score");
     mpack_write_u32(&writer, score);
+
     mpack_write_cstr(&writer, "id");
     mpack_write_u32(&writer, cell_id);
 
@@ -541,13 +503,12 @@ void heavy_keeper_sorted_set_serialization(const struct heavy_keeper *hk, mpack_
     }
 
     unsigned *key_score = (unsigned *)malloc(heap_entry_num * sizeof(unsigned));
-    char **vals = (char **)malloc(heap_entry_num * sizeof(char *));
-    size_t *val_lens = (size_t *)malloc(heap_entry_num * sizeof(size_t));
+    struct my_hash_tag_key **tag_arr = (struct my_hash_tag_key **)malloc(heap_entry_num * sizeof(struct my_hash_tag_key *));
     unsigned int **user_data = (unsigned int **)malloc(heap_entry_num * sizeof(unsigned int *));
-    sorted_set_dump(hk->top_K_heap, key_score, vals, val_lens, (void **)user_data);
+    sorted_set_dump(hk->top_K_heap, key_score, tag_arr, (void **)user_data);
     mpack_build_array(writer);
     for (size_t i = 0; i < heap_entry_num; i++) {
-        heavy_keeper_sorted_set_member_serialization(vals[i], val_lens[i], key_score[i], *user_data[i], &element_mpack_buff, &element_mpack_size);
+        heavy_keeper_sorted_set_member_serialization(tag_arr[i], key_score[i], *user_data[i], &element_mpack_buff, &element_mpack_size);
         mpack_write_object_bytes(writer, element_mpack_buff, element_mpack_size);
         free(element_mpack_buff);
         element_mpack_size = 0;
@@ -555,8 +516,7 @@ void heavy_keeper_sorted_set_serialization(const struct heavy_keeper *hk, mpack_
     mpack_complete_array(writer);
 
     free(key_score);
-    free(vals);
-    free(val_lens);
+    free(tag_arr);
     free(user_data);
 }
 
@@ -574,7 +534,7 @@ void heavy_keeper_serialization(const struct heavy_keeper *hk, char **blob, size
     size_t sketch_len = hk->params.max_bucket_num * hk->params.array_num;
     mpack_write_bin(&writer, (const char *)hk->sketch, sizeof(struct Bucket) * sketch_len);
 
-    // heavy_keeper_sketch_serialization(hk, &writer);
+    heavy_keeper_sketch_serialization(hk, &writer);
     heavy_keeper_sorted_set_serialization(hk, &writer);
 
     mpack_complete_map(&writer);
@@ -590,16 +550,19 @@ void heavy_keeper_sorted_set_deserialization(mpack_node_t *root, struct sorted_s
     size_t sorted_set_size = mpack_node_array_length(array_sorted_set);
     for (size_t i = 0; i < sorted_set_size; i++) {
         item = mpack_node_array_at(array_sorted_set, i);
-        mpack_node_t flow_id_str = mpack_node_map_cstr(item, "member");
-        const char *val = mpack_node_str(flow_id_str);
-        size_t val_len = mpack_node_strlen(flow_id_str);
+
+        mpack_node_t tag_bin_node = mpack_node_map_cstr(item, "tag");
+        const char *tag_blob = mpack_node_bin_data(tag_bin_node);
+        size_t tag_blob_len = mpack_node_bin_size(tag_bin_node);
+        struct my_hash_tag_key *tag = my_hash_tag_key_deserialize(tag_blob, tag_blob_len);
+
         unsigned int score = mpack_node_u32(mpack_node_map_cstr(item, "score"));
 
         unsigned int *id = (unsigned int *)malloc(sizeof(unsigned int)); // will be freed with sorted set
         *id = mpack_node_u32(mpack_node_map_cstr(item, "id"));
 
-        sorted_set_insert(out, val, val_len, score);
-        sorted_set_insert_user_data(out, val, val_len, (void *)id);
+        sorted_set_insert(out, tag, score);
+        sorted_set_insert_user_data(out, tag, (void *)id);
     }
 }
 

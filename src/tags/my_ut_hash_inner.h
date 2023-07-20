@@ -6,18 +6,10 @@ extern "C"
 {
 #endif
 
-struct my_hash_tag {
-    char *key;
-    size_t key_len;
-    unsigned char *value;
-    size_t value_len;
-};
+#include <stdbool.h>
+#include <stddef.h>
 
-struct my_hash_tag_key {
-    struct my_hash_tag *my_tag;
-    size_t n_my_tag;
-    unsigned int hashv;
-};
+struct my_hash_tag_key;
 
 unsigned int my_tag_hash_func(struct my_hash_tag_key *my_hash_key);
 
