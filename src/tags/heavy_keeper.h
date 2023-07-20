@@ -7,35 +7,6 @@
 TOP K using heavykeeper algorithm. 
 Author: Chen Zizhan 
 Time: 2023/4/26
-
-# usage example
-struct heavy_keeper *hk = heavy_keeper_new(K, NULL);
-
-// or: run heavykeeper with user defined params: 
-// heavy_keeper_options params = {5, 1000, 1.5};
-// struct heavy_keeper *hk = heavy_keeper_new(K, &params);
-
-const char flow_id[] = "any string representing url, ip, etc";
-unsigned count = 1; // if count the number of session/packet/... 
-// Or: if sum up the total traffic volume in bytes
-// unsigned count = 700;
-
-heavy_keeper_add(hk, flow_id, strlen(flow_id), count);
-// repeat update for every flow ... ... ... ... 
-// ...........................
-struct heavy_keeper_result* stats = heavy_keeper_result_new(K);
-heavy_keeper_query(hk, stats);
-
-heavy_keeper_free(hk);
-
-use the stats variable
-For example :
-  for (int i = 0; i < stats->n_key; i++) {
-      printf("top %d flow id is: %s, its count: #llu", i, stats->key[i], stats->count[i]);
-  }
-
-heavy_keeper_result_free(stats);
-
 ---------------------------------------------------------------------------------------------*/
 
 #ifdef __cplusplus

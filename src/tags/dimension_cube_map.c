@@ -3,20 +3,21 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "uthash.h"
 #include "mpack/mpack.h"
 #include "fieldstat.h"
 #include "tags/dimension_cube_map.h"
 #include "tags/heavy_keeper.h"
+#include "tags/my_ut_hash_inner.h"
+#include "tags/my_ut_hash.h"
 
-struct cell_hash_node {
+struct tag_id_map {
     char *key; // kv_pair of tags
     size_t key_len; // exclude '\0'
     int cell_id;
     UT_hash_handle hh;
 };
 
-struct tag_cube_map {
+struct id_tag_map {
     int cell_id;
     struct fieldstat_tag *tags;
     size_t n_tags;
@@ -26,9 +27,9 @@ struct tag_cube_map {
 struct cell_manager {
     union {
         struct heavy_keeper *topk_tag_id_map;
-        struct cell_hash_node *comprehensive_tag_id_map;
+        struct tag_id_map *comprehensive_tag_id_map;
     };
-    struct tag_cube_map *id_tag_map;
+    struct id_tag_map *id_tag_map;
     enum sampling_mode sampling_mode;
     int max_cell_num;
     int next_cell_id; // only used in comprehensive mode
@@ -161,8 +162,8 @@ struct cell_manager *cell_manager_new(enum sampling_mode sampling_mode, int max_
 
 void cell_manager_tag_cube_map_free(struct cell_manager *pthis)
 {
-    struct tag_cube_map *node = NULL;
-    struct tag_cube_map *tmp = NULL;
+    struct id_tag_map *node = NULL;
+    struct id_tag_map *tmp = NULL;
     HASH_ITER(hh, pthis->id_tag_map, node, tmp) {
         HASH_DEL(pthis->id_tag_map, node);
         fieldtag_list_free(node->tags, node->n_tags);
@@ -172,8 +173,8 @@ void cell_manager_tag_cube_map_free(struct cell_manager *pthis)
 
 void cell_manager_comprehensive_tag_id_map_free(struct cell_manager *pthis)
 {
-    struct cell_hash_node *node = NULL;
-    struct cell_hash_node *tmp = NULL;
+    struct tag_id_map *node = NULL;
+    struct tag_id_map *tmp = NULL;
     HASH_ITER(hh, pthis->comprehensive_tag_id_map, node, tmp) {
         HASH_DEL(pthis->comprehensive_tag_id_map, node);
         free(node->key);
@@ -208,8 +209,8 @@ void cell_manager_free(struct cell_manager *pthis)
 
 int cell_manager_get_tag_by_cell_id(const struct cell_manager *pthis, int cell_id, struct fieldstat_tag **tag_out, size_t *tag_count_out)
 {
-    struct tag_cube_map *hash_hdr = pthis->id_tag_map;
-    struct tag_cube_map *node = NULL;
+    struct id_tag_map *hash_hdr = pthis->id_tag_map;
+    struct id_tag_map *node = NULL;
     HASH_FIND_INT(hash_hdr, &cell_id, node);
     if (node == NULL) {
         return -1;
@@ -225,7 +226,7 @@ int cell_manager_get_tag_by_cell_id(const struct cell_manager *pthis, int cell_i
 
 void cell_manager_id_tag_map_add(struct cell_manager *pthis, int cell_id, const struct fieldstat_tag tags[], size_t n_tags)
 {
-    struct tag_cube_map *node = (struct tag_cube_map *)malloc(sizeof(struct tag_cube_map));
+    struct id_tag_map *node = (struct id_tag_map *)malloc(sizeof(struct id_tag_map));
     node->cell_id = cell_id;
     node->tags = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * n_tags);
     for (int i = 0; i < (int)n_tags; i++) {
@@ -246,7 +247,7 @@ int cell_manager_get_cell_id_by_tag(const struct cell_manager *pthis, const stru
     if (pthis->sampling_mode == SAMPLING_MODE_TOPK) {
         heavy_keeper_query_one(pthis->topk_tag_id_map, key, key_size, NULL, &cell_id);
     } else {
-        struct cell_hash_node *node = NULL;
+        struct tag_id_map *node = NULL;
         HASH_FIND(hh, pthis->comprehensive_tag_id_map, key, key_size, node);
         if (node == NULL) {
             cell_id = -1;
@@ -283,7 +284,7 @@ int cell_manager_comprehensive_map_add(struct cell_manager *pthis, const struct 
     size_t key_size = 0;
     build_dynamic_cell_key(tag, tag_count, &key, &key_size);
 
-    struct cell_hash_node *node = NULL;
+    struct tag_id_map *node = NULL;
     HASH_FIND(hh, pthis->comprehensive_tag_id_map, key, key_size, node);
     if (node != NULL) {
         *existing_cell_id = node->cell_id;
@@ -295,7 +296,7 @@ int cell_manager_comprehensive_map_add(struct cell_manager *pthis, const struct 
         return -1;
     }
 
-    node = (struct cell_hash_node *)malloc(sizeof(struct cell_hash_node));
+    node = (struct tag_id_map *)malloc(sizeof(struct tag_id_map));
     node->key = key;
     node->key_len = key_size;
     node->cell_id = cell_id;
@@ -327,7 +328,7 @@ int cell_manager_topk_map_add(struct cell_manager *pthis, const struct fieldstat
     }
 
     if (*popped_cell_id != -1) {
-        struct tag_cube_map *node = NULL;
+        struct id_tag_map *node = NULL;
         HASH_FIND_INT(pthis->id_tag_map, popped_cell_id, node);
 
         if (node != NULL) {
@@ -531,8 +532,8 @@ int cell_manager_serialize(const struct cell_manager *pthis, char **blob, size_t
     
     mpack_write_cstr(&writer, "id_tag_map");
     mpack_build_array(&writer);
-    struct tag_cube_map *node = NULL;
-    struct tag_cube_map *tmp = NULL;
+    struct id_tag_map *node = NULL;
+    struct id_tag_map *tmp = NULL;
     HASH_ITER(hh, pthis->id_tag_map, node, tmp) {
         mpack_build_map(&writer);
         mpack_write_cstr(&writer, "id");
