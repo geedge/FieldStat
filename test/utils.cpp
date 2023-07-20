@@ -41,7 +41,7 @@ Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(const struct fieldstat_ta
         switch (tag_list->tag[i].type)
         {
             case TAG_INTEGER:
-                tag_list_c.tag[i].value_int = tag_list->tag[i].value_int;
+                tag_list_c.tag[i].value_longlong = tag_list->tag[i].value_longlong;
                 break;
             case TAG_DOUBLE:
                 tag_list_c.tag[i].value_double = tag_list->tag[i].value_double;
@@ -61,7 +61,7 @@ Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(const char * key, int val
     tag_list_c.n_tag = 1;
     tag_list_c.tag[0].key = strdup(key);
     tag_list_c.tag[0].type = TAG_INTEGER;
-    tag_list_c.tag[0].value_int = value;
+    tag_list_c.tag[0].value_longlong = value;
 }
 
 Fieldstat_tag_list_wrapper::~Fieldstat_tag_list_wrapper() {
@@ -86,7 +86,7 @@ Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(std::uniform_int_distribu
         if (rand_ret == 0)
         {
             tag_list_c.tag[i].type = TAG_INTEGER;
-            tag_list_c.tag[i].value_int = static_cast<long long>(dist(rng));
+            tag_list_c.tag[i].value_longlong = static_cast<long long>(dist(rng));
         }
         else if (rand_ret == 1)
         {
@@ -118,7 +118,7 @@ Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(const Fieldstat_tag_list_
         switch (tag_list->tag[i].type)
         {
             case TAG_INTEGER:
-                tag_list_c.tag[i].value_int = tag_list->tag[i].value_int;
+                tag_list_c.tag[i].value_longlong = tag_list->tag[i].value_longlong;
                 break;
             case TAG_DOUBLE:
                 tag_list_c.tag[i].value_double = tag_list->tag[i].value_double;
@@ -157,7 +157,7 @@ void Fieldstat_tag_list_wrapper::print_tag_list() const
         switch (tag_list_c.tag[i].type)
         {
             case TAG_INTEGER:
-                printf("tag_list_c.tag[%zu].value_int: %lld\n", i, tag_list_c.tag[i].value_int);
+                printf("tag_list_c.tag[%zu].value_longlong: %lld\n", i, tag_list_c.tag[i].value_longlong);
                 break;
             case TAG_DOUBLE:
                 printf("tag_list_c.tag[%zu].value_double: %lf\n", i, tag_list_c.tag[i].value_double);
@@ -187,7 +187,7 @@ bool Fieldstat_tag_list_wrapper::operator==(const Fieldstat_tag_list_wrapper &ta
         }
         switch (tag_list_c.tag[i].type) {
             case TAG_INTEGER:
-                if (tag_list_c.tag[i].value_int != tag_list->tag[i].value_int) {
+                if (tag_list_c.tag[i].value_longlong != tag_list->tag[i].value_longlong) {
                     return false;
                 }
                 break;

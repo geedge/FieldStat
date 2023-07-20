@@ -20,20 +20,20 @@ struct hdr_histogram *g_histogram_standard;
 #define TEST_TOPK_STANDARD_K 5
 #define TEST_METRIC_NUM 2
 const struct fieldstat_tag TEST_TAG_GLOBAL[3] = {
-    {"test_tag_global 1", .type = TAG_INTEGER, .value_int = 1},
+    {"test_tag_global 1", .type = TAG_INTEGER, .value_longlong = 1},
     {"test_tag_global 2", .type = TAG_DOUBLE, .value_double = 2.2},
     {"test_tag_global 3", .type = TAG_CSTRING, .value_str = "string3"}};
 
 const struct fieldstat_tag TEST_TAG_SHARED1[3] = {
-    {"test_tag_shared 1", .type = TAG_INTEGER, .value_int = 3},
+    {"test_tag_shared 1", .type = TAG_INTEGER, .value_longlong = 3},
     {"test_tag_shared 2", .type = TAG_DOUBLE, .value_double = 0.2},
     {"test_tag_shared 3", .type = TAG_CSTRING, .value_str = "1string"}};
 const struct fieldstat_tag TEST_TAG_SHARED2[3] = {
-    {"test_tag_shared 11", .type = TAG_INTEGER, .value_int = 4},
+    {"test_tag_shared 11", .type = TAG_INTEGER, .value_longlong = 4},
     {"test_tag_shared 22", .type = TAG_DOUBLE, .value_double = 0.3},
     {"test_tag_shared 33", .type = TAG_CSTRING, .value_str = "2string"}};
 const struct fieldstat_tag TEST_TAG_SHARED3[1] = {
-    {"test_tag_shared 3", .type = TAG_INTEGER, .value_int = 5}};
+    {"test_tag_shared 3", .type = TAG_INTEGER, .value_longlong = 5}};
 
 void test_check_if_tag_list_is_in_json(cJSON *tag_obj, const Fieldstat_tag_list_wrapper *benchmark)
 {
@@ -44,7 +44,7 @@ void test_check_if_tag_list_is_in_json(cJSON *tag_obj, const Fieldstat_tag_list_
             EXPECT_STREQ(tag_val->valuestring, benchmark->get_tag()[tag_id].value_str);
         } else {
             if (benchmark->get_tag()[tag_id].type == TAG_INTEGER) {
-                EXPECT_EQ(tag_val->valueint, benchmark->get_tag()[tag_id].value_int);
+                EXPECT_EQ(tag_val->valueint, benchmark->get_tag()[tag_id].value_longlong);
             } else {
                 EXPECT_NEAR(tag_val->valuedouble, benchmark->get_tag()[tag_id].value_double, 0.0001);
             }

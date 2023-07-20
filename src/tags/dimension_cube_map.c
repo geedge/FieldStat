@@ -40,7 +40,7 @@ void fieldtag_copy(const struct fieldstat_tag *kv_pair, struct fieldstat_tag *de
     switch(kv_pair->type)
     {
         case TAG_INTEGER:
-            dest->value_int = kv_pair->value_int;
+            dest->value_longlong = kv_pair->value_longlong;
             break;
         case TAG_DOUBLE:
             dest->value_double = kv_pair->value_double;
@@ -78,7 +78,7 @@ void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_tags, ch
                 val_len = sizeof(long long);
                 used_len = key_len + val_len;
                 memcpy(one_time_key, tag->key, key_len);
-                memcpy(one_time_key + key_len, &tag->value_int, val_len);
+                memcpy(one_time_key + key_len, &tag->value_longlong, val_len);
 				break;
 			case 1:
                 key_len = strlen(tag->key);

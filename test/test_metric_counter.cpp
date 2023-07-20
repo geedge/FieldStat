@@ -210,7 +210,7 @@ TEST(metric_test_counter, performance_test_on_60000_cells_comprehensive_1000000_
     struct fieldstat_tag tags[cell_count];
     for (int i = 0; i < cell_count; i++) {
         tags[i] = TEST_TAG_INT;
-        tags[i].value_int = i;
+        tags[i].value_longlong = i;
     }
     // getchar();
     struct fieldstat *instance = fieldstat_new();
@@ -239,11 +239,11 @@ TEST(metric_test_counter, performance_test_on_1000_cells_topk_1000000_times)
     struct fieldstat_tag tags[cell_count];
     for (int i = 0; i < cell_count; i++) {
         tags[i] = TEST_TAG_INT;
-        // tags[i].value_int = rand() % 10000;
+        // tags[i].value_longlong = rand() % 10000;
         if (rand()%2)
-            tags[i].value_int = i;
+            tags[i].value_longlong = i;
         else
-            tags[i].value_int = rand() % 1000;
+            tags[i].value_longlong = rand() % 1000;
     }
     struct fieldstat *instance = fieldstat_new();
     fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_TOPK, 1000);

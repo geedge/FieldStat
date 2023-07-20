@@ -8,7 +8,7 @@
 #define ADD_OPER_NUM 1000000
 #define MAX_STRING_KEY_LEN 10
 
-const struct fieldstat_tag TEST_TAG_INT = {"INT key_", TAG_INTEGER, {.value_int = 100}};
+const struct fieldstat_tag TEST_TAG_INT = {"INT key_", TAG_INTEGER, {.value_longlong = 100}};
 
 
 static char *rand_string(char *str, size_t size)
@@ -54,11 +54,11 @@ void bin_print_struct(void *obj, size_t sizeof_obj)
 
 void try_hash_compound_key()
 {
-    struct fieldstat_tag tag1 = {"key1", TAG_INTEGER, {.value_int = 100}};
+    struct fieldstat_tag tag1 = {"key1", TAG_INTEGER, {.value_longlong = 100}};
     struct fieldstat_tag tag2 = {"key2", TAG_DOUBLE, {.value_double = 100.0}};
     struct fieldstat_tag tag3 = {"key3", TAG_CSTRING, {.value_str = "123"}};
     struct fieldstat_tag tag_arr[] = {
-        {"key1", TAG_INTEGER, {.value_int = 100}},
+        {"key1", TAG_INTEGER, {.value_longlong = 100}},
         {"key2", TAG_DOUBLE, {.value_double = 100.0}},
         {"key3", TAG_CSTRING, {.value_str = "123"}},
     };
@@ -75,7 +75,7 @@ void performance_cube_add_comprehensive()
     struct fieldstat_tag tags[64000];
     for (int i = 0; i < 64000; i++) {
         tags[i] = TEST_TAG_INT;
-        tags[i].value_int = i;
+        tags[i].value_longlong = i;
     }
     getchar();
     clock_t start, end;
@@ -98,7 +98,7 @@ void build_dynamic_cell_key_performance()
     struct fieldstat_tag tags[100000];
     for (int i = 0; i < 100000; i++) {
         tags[i] = TEST_TAG_INT;
-        tags[i].value_int = i;
+        tags[i].value_longlong = i;
     }
     char *key;
     size_t key_size;
@@ -154,7 +154,7 @@ int topk_and_find_max_cell_id(int K, int *tag_vals, int n_tags)
     fieldstat_register_counter(instance, 0, "test", 0);
     struct fieldstat_tag total = TEST_TAG_INT;
     for (int i = 0; i < n_tags; i++) {
-        total.value_int = tag_vals[i];
+        total.value_longlong = tag_vals[i];
         int cell_id = fieldstat_cube_add(instance, 0, &total, 1, 1);
         if (cell_id == -1) {
             continue;

@@ -50,7 +50,7 @@ struct export_kv_pair {
 	char *key;
     enum fs_tag_type type;
 	union{
-		long long value_int;
+		long long value_longlong;
 		double value_double;
 		char *value_str;
 	};
@@ -103,7 +103,7 @@ void kv_pair_fill_with_tags(struct export_kv_pair *dest, const struct fieldstat_
     dest->type = src->type;
     switch (src->type) {
         case TAG_INTEGER:
-            dest->value_int = src->value_int;
+            dest->value_longlong = src->value_longlong;
             break;
         case TAG_DOUBLE:
             dest->value_double = src->value_double;
@@ -257,7 +257,7 @@ struct export_kv_pair *cell_query_with_iter(const struct cell_iter *iter) {
     switch (cell_iter_get_type(iter)) {
         case METRIC_TYPE_COUNTER:
             ret->type = TAG_INTEGER;
-            ret->value_int = fieldstat_counter_get(iter->instance, iter->cube_ids[iter->curr_cube_idx], iter->curr_metric_id, iter->cell_ids[iter->curr_cell_idx]);
+            ret->value_longlong = fieldstat_counter_get(iter->instance, iter->cube_ids[iter->curr_cube_idx], iter->curr_metric_id, iter->cell_ids[iter->curr_cell_idx]);
             break;
         case METRIC_TYPE_HLL:
         case METRIC_TYPE_HISTOGRAM:
@@ -277,7 +277,7 @@ void kv_pair_add_to_cjson(const struct export_kv_pair *pairs, cJSON *cjson_pair)
     switch (pairs->type)
     {
         case TAG_INTEGER:
-            cJSON_AddNumberToObject(cjson_pair, pairs->key, pairs->value_int);
+            cJSON_AddNumberToObject(cjson_pair, pairs->key, pairs->value_longlong);
             break;
         case TAG_DOUBLE:
             cJSON_AddNumberToObject(cjson_pair, pairs->key, pairs->value_double);
@@ -309,7 +309,7 @@ void tag_list_append_to_tag_object(const struct fieldstat_tag_list *tag_list, cJ
         switch (pairs.type)
         {
             case TAG_INTEGER:
-                pairs.value_int = tag_list->tag[i].value_int;
+                pairs.value_longlong = tag_list->tag[i].value_longlong;
                 break;
             case TAG_DOUBLE:
                 pairs.value_double = tag_list->tag[i].value_double;
@@ -513,7 +513,7 @@ void fieldstat_json_exporter_set_global_tag(struct fieldstat_json_exporter *expo
         switch (tag->type)
         {
         case TAG_INTEGER:
-            tag->value_int = tag_list[i].value_int;
+            tag->value_longlong = tag_list[i].value_longlong;
             break;
         case TAG_CSTRING:
             tag->value_str = strdup(tag_list[i].value_str);

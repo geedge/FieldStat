@@ -153,7 +153,7 @@ void fieldstat_cube_info_init(struct fs_cube *cube, const struct fieldstat_tag *
         switch (dest_tag->type)
         {
         case TAG_INTEGER:
-            dest_tag->value_int = shared_tags[i].value_int;
+            dest_tag->value_longlong = shared_tags[i].value_longlong;
             break;
         case TAG_CSTRING:
             dest_tag->value_str = strdup(shared_tags[i].value_str);
@@ -431,7 +431,7 @@ int my_cmp_tag(const void *a, const void *b)
     assert(aa->type == bb->type);
     switch (aa->type) {
         case TAG_INTEGER:
-            return aa->value_int - bb->value_int;
+            return aa->value_longlong - bb->value_longlong;
         case TAG_DOUBLE:
             return aa->value_double - bb->value_double;
         case TAG_CSTRING:
@@ -471,7 +471,7 @@ void fieldtag_list_serialize(const struct fieldstat_tag *tag_list, size_t tag_nu
         switch (tag_list_sorted[j].type)
         {
             case TAG_INTEGER:
-                mpack_write_i64(&writer, tag_list_sorted[j].value_int);
+                mpack_write_i64(&writer, tag_list_sorted[j].value_longlong);
                 break;
             case TAG_DOUBLE:
                 mpack_write_double(&writer, tag_list_sorted[j].value_double);
@@ -518,7 +518,7 @@ void fieldtag_list_deserialize(const char *blob, size_t blob_size, struct fields
         switch (tag_list[j].type)
         {
             case TAG_INTEGER:
-                tag_list[j].value_int = mpack_node_i64(value);
+                tag_list[j].value_longlong = mpack_node_i64(value);
                 break;
             case TAG_DOUBLE:
                 tag_list[j].value_double = mpack_node_double(value);
@@ -1116,7 +1116,7 @@ struct fieldstat_tag_list *fieldstat_get_shared_tags(const struct fieldstat *ins
         tag_dest->type = tag_src->type;
         switch (tag_src->type) {
             case TAG_INTEGER:
-                tag_dest->value_int = tag_src->value_int;
+                tag_dest->value_longlong = tag_src->value_longlong;
                 break;
             case TAG_CSTRING:
                 tag_dest->value_str = strdup(tag_src->value_str);

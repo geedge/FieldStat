@@ -17,7 +17,7 @@ TEST(unit_test_serialize, serialize_and_deserialize_tag_list)
 
     EXPECT_STREQ(tag_list->key, TEST_TAG_INT.key);
     EXPECT_EQ(tag_list->type, TEST_TAG_INT.type);
-    EXPECT_EQ(tag_list->value_int, TEST_TAG_INT.value_int);
+    EXPECT_EQ(tag_list->value_longlong, TEST_TAG_INT.value_longlong);
 
     free(blob);
     free((char *)tag_list->key);
@@ -36,7 +36,7 @@ void test_cell_manager_read_tag_and_comp_with_standard(struct cell_manager *cm, 
         EXPECT_EQ(tag_list_tested[i].type, tag_list[i].type);
         if (tag_list[i].type == TAG_INTEGER)
         {
-            EXPECT_EQ(tag_list_tested[i].value_int, tag_list[i].value_int);
+            EXPECT_EQ(tag_list_tested[i].value_longlong, tag_list[i].value_longlong);
         }
         else if (tag_list[i].type == TAG_DOUBLE)
         {
