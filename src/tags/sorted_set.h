@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stddef.h>
+#include "my_ut_hash.h"
 
 #ifdef __cplusplus
 extern "C"{

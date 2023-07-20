@@ -149,7 +149,7 @@ bool if_need_to_decay(struct heavy_keeper *hk, struct Bucket *bucket, unsigned c
     return false;
 }
 
-struct Bucket *map_flow_id_hash_to_bucket(struct heavy_keeper *hk, int array_index, struct my_hash_tag_key *tag, unsigned int already_hashed_flow_id) {
+struct Bucket *map_flow_id_hash_to_bucket(struct heavy_keeper *hk, int array_index, const struct my_hash_tag_key *tag, unsigned int already_hashed_flow_id) {
     int w = hk->params.max_bucket_num;
     int Hsh;
     if (array_index == FP_HASH_KEY) {
@@ -175,7 +175,7 @@ unsigned my_max(unsigned a, unsigned b) {
     return b;
 }
 
-static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_keeper, struct my_hash_tag_key *tag, unsigned int count)
+static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_keeper, const struct my_hash_tag_key *tag, unsigned int count)
 {
     int ret = -1;
     unsigned int user_data_cube_id = 0;
@@ -228,7 +228,7 @@ static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_
     return ret;
 }
 
-int heavy_keeper_add(struct heavy_keeper *hk, struct my_hash_tag_key *tag, unsigned int count, int cube_id, int *popped_id_out)
+int heavy_keeper_add(struct heavy_keeper *hk, const struct my_hash_tag_key *tag, unsigned int count, int cube_id, int *popped_id_out)
 {
     *popped_id_out = heavy_keeper_add_by_recording_popped_data(hk, tag, count);
 
@@ -273,7 +273,7 @@ struct heavy_keeper_result *heavy_keeper_query(struct heavy_keeper *hk) {
     return stats;
 }
 
-int heavy_keeper_query_one(struct heavy_keeper *hk, struct my_hash_tag_key *tag, unsigned int *count_out, int *cube_id_out)
+int heavy_keeper_query_one(struct heavy_keeper *hk, const struct my_hash_tag_key *tag, unsigned int *count_out, int *cube_id_out)
 {
     if (count_out != NULL) {
         unsigned int count = sorted_set_get_count(hk->top_K_heap, tag);

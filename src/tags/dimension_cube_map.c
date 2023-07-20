@@ -33,27 +33,6 @@ struct cell_manager {
     int next_cell_id; // only used in comprehensive mode
 };
 
-void fieldtag_copy(const struct fieldstat_tag *kv_pair, struct fieldstat_tag *dest)
-{
-    dest->key = strdup(kv_pair->key);
-    dest->type = kv_pair->type;
-    switch(kv_pair->type)
-    {
-        case TAG_INTEGER:
-            dest->value_longlong = kv_pair->value_longlong;
-            break;
-        case TAG_DOUBLE:
-            dest->value_double = kv_pair->value_double;
-            break;
-        case TAG_CSTRING:
-            dest->value_str = strdup(kv_pair->value_str);
-            break;
-        default:
-            assert(0);
-            break;
-    }
-}
-
 void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_tags, char **out_key, size_t *out_key_size)
 {
 	int i = 0;

@@ -418,6 +418,26 @@ void fieldtag_list_free(struct fieldstat_tag *tags, size_t n_tags)
     free(tags);
 }
 
+void fieldtag_copy(const struct fieldstat_tag *kv_pair, struct fieldstat_tag *dest)
+{
+    dest->key = strdup(kv_pair->key);
+    dest->type = kv_pair->type;
+    switch(kv_pair->type)
+    {
+        case TAG_INTEGER:
+            dest->value_longlong = kv_pair->value_longlong;
+            break;
+        case TAG_DOUBLE:
+            dest->value_double = kv_pair->value_double;
+            break;
+        case TAG_CSTRING:
+            dest->value_str = strdup(kv_pair->value_str);
+            break;
+        default:
+            assert(0);
+            break;
+    }
+}
 // todo: 现在cell 的tag没有sorted。想想怎么办，是不是干脆在add的时候sort掉得了
 int my_cmp_tag(const void *a, const void *b)
 {
@@ -922,7 +942,7 @@ int fieldstat_cube_merge_topk(struct fs_cube *dest, const struct fs_cube *src)
 
         for (int j = 0; j < cell_id_count_src; j ++) {
             int cell_id_from_metric_src = cell_ids_from_metric_src[j];
-            const struct my_hash_tag_key *tag_key_src = cell_manager_get_tag_by_cell_id(cell_manager_src, cell_ids_from_metric_src);
+            const struct my_hash_tag_key *tag_key_src = cell_manager_get_tag_by_cell_id(cell_manager_src, cell_id_from_metric_src);
             if (tag_key_src == NULL) {
                 printf("ERR: cell_id %d not exist in src\n", cell_id_from_metric_src);
                 continue;
@@ -1018,7 +1038,7 @@ int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
     cell_manager_free(tag_cube_id_map);
     for (int i = 0; i < instance->valid_cube_arr_length; i++) {
         if (cube_key_arr[i] != NULL) {
-            my_hash_key_free(cube_key_arr[i]);
+            my_hash_tag_key_free(cube_key_arr[i]);
         }
     }
 
@@ -1079,7 +1099,7 @@ void fieldstat_get_cells(const struct fieldstat *instance, int cube_id, int metr
         return;
     }
 
-    int n_cell_ret = 0;
+    size_t n_cell_ret = 0;
     metric_get_cell_ids(metric, cell_ids, &n_cell_ret);
     *n_cell = n_cell_ret;
     if (n_cell_ret == 0) {

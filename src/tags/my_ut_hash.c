@@ -46,7 +46,41 @@ unsigned int my_tag_hash_func(struct my_hash_tag_key *my_hash_key)
     }
     my_hash_key->hashv = result;
     my_hash_key->is_hashed = true;
+    printf("the hash result: %u\n", result);
     return result;
+}
+
+int my_hash_tag_cmp(const struct my_hash_tag_key *a, const struct my_hash_tag_key *b)
+{
+    if (a->is_hashed && b->is_hashed) {
+        if (a->hashv != b->hashv) {
+            return 1;
+        }
+        // if equal, must continue to compare, because hash collision may happen.
+    }
+
+    if (a->n_my_tag != b->n_my_tag) {
+        return 1;
+    }
+    struct my_hash_tag *a_tag = a->my_tag;
+    struct my_hash_tag *b_tag = b->my_tag;
+    for (int i = 0; i < a->n_my_tag; i++) {
+        if (a_tag->key_len != b_tag->key_len) {
+            return 1;
+        }
+        if (memcmp(a_tag->key, b_tag->key, a_tag->key_len) != 0) {
+            return 1;
+        }
+        if (a_tag->value_len != b_tag->value_len) {
+            return 1;
+        }
+        if (memcmp(a_tag->value, b_tag->value, a_tag->value_len) != 0) {
+            return 1;
+        }
+        a_tag++;
+        b_tag++;
+    }
+    return 0;
 }
 
 void convert_fieldstat_tag_to_my_hash_tag(const struct fieldstat_tag *src, struct my_hash_tag *dst)
@@ -113,10 +147,10 @@ void my_hash_key_convert_to_fieldstat_tag(const struct my_hash_tag_key *tag_key,
         switch (tmp_pst_my_hash_tag->tag_type)
         {
         case TAG_INTEGER:
-            ret_fieldstat_tag->value_longlong = *((long long *)tmp_pst_my_hash_tag->value);
+            memcpy(&(ret_fieldstat_tag->value_longlong), tmp_pst_my_hash_tag->value, sizeof(long long));
             break;
         case TAG_DOUBLE:
-            ret_fieldstat_tag->value_double = *((double *)tmp_pst_my_hash_tag->value);
+            memcpy(&(ret_fieldstat_tag->value_double), tmp_pst_my_hash_tag->value, sizeof(double));
             break;
         case TAG_CSTRING:
             ret_fieldstat_tag->value_str = strdup((char *)tmp_pst_my_hash_tag->value);
@@ -141,14 +175,19 @@ struct my_hash_tag_key *my_hash_tag_key_copy(const struct my_hash_tag_key *src)
     {
         struct my_hash_tag *dst_tag = dst->my_tag + i;
         struct my_hash_tag *src_tag = src->my_tag + i;
+    
         dst_tag->key_len = src_tag->key_len;
         dst_tag->key = (char *)malloc(src_tag->key_len);
         memcpy(dst_tag->key, src_tag->key, src_tag->key_len);
+    
         dst_tag->value_len = src_tag->value_len;
         dst_tag->value = (unsigned char *)malloc(src_tag->value_len);
         memcpy(dst_tag->value, src_tag->value, src_tag->value_len);
+    
         dst_tag->tag_type = src_tag->tag_type;
     }
+
+    return dst;
 }
 
 void my_hash_tag_key_free(struct my_hash_tag_key *tag_key)
