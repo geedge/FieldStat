@@ -151,7 +151,9 @@ void my_hash_key_convert_to_fieldstat_tag(const struct my_hash_tag_key *tag_key,
     struct my_hash_tag *tmp_pst_my_hash_tag = tag_key->my_tag;
     for (int i = 0; i < ret_n_tag; i++)
     {
-        ret_fieldstat_tag->key = strdup(tmp_pst_my_hash_tag->key);
+        ret_fieldstat_tag->key = (char *)malloc(tmp_pst_my_hash_tag->key_len);
+        memcpy((char *)ret_fieldstat_tag->key, tmp_pst_my_hash_tag->key, tmp_pst_my_hash_tag->key_len);
+
         ret_fieldstat_tag->type = tmp_pst_my_hash_tag->tag_type;
 
         switch (tmp_pst_my_hash_tag->tag_type)
@@ -163,7 +165,8 @@ void my_hash_key_convert_to_fieldstat_tag(const struct my_hash_tag_key *tag_key,
             memcpy(&(ret_fieldstat_tag->value_double), tmp_pst_my_hash_tag->value, sizeof(double));
             break;
         case TAG_CSTRING:
-            ret_fieldstat_tag->value_str = strdup((char *)tmp_pst_my_hash_tag->value);
+            ret_fieldstat_tag->value_str = (char *)malloc(tmp_pst_my_hash_tag->value_len);
+            memcpy((char *)ret_fieldstat_tag->value_str, tmp_pst_my_hash_tag->value, tmp_pst_my_hash_tag->value_len);
             break;
         default:
             break;
@@ -270,7 +273,7 @@ void my_hash_tag_key_serialize(const struct my_hash_tag_key *tag, char **blob, s
     for (int i = 0; i < tag->n_my_tag; i++)
     {
         struct my_hash_tag *my_hash_tag = tag->my_tag + i;
-        mpack_start_map(&writer, 2);
+        mpack_start_map(&writer, 3);
         mpack_write_cstr(&writer, "k");
         mpack_write_bin(&writer, my_hash_tag->key, my_hash_tag->key_len);
         mpack_write_cstr(&writer, "v");
@@ -313,12 +316,30 @@ struct my_hash_tag_key *my_hash_tag_key_deserialize(const char *blob, size_t blo
         my_hash_tag->key_len = mpack_node_bin_size(key);
         my_hash_tag->key = (char *)malloc(my_hash_tag->key_len);
         memcpy(my_hash_tag->key, mpack_node_bin_data(key), my_hash_tag->key_len);
+        printf("the bin data key: %s\n", mpack_node_bin_data(key));
 
         my_hash_tag->value_len = mpack_node_bin_size(value);
         my_hash_tag->value = (unsigned char *)malloc(my_hash_tag->value_len);
         memcpy(my_hash_tag->value, mpack_node_bin_data(value), my_hash_tag->value_len);
 
         my_hash_tag->tag_type = mpack_node_u8(mpack_node_map_cstr(tag_node, "t"));
+
+        if (my_hash_tag->tag_type == 0)
+        {
+            printf("int value: %lld\n", *(long long *)my_hash_tag->value);
+        }
+        else if (my_hash_tag->tag_type == 1)
+        {
+            printf("double value: %f\n", *(double *)my_hash_tag->value);
+        }
+        else if (my_hash_tag->tag_type == 2)
+        {
+            printf("string value: %s\n", my_hash_tag->value);
+        }
+        else
+        {
+            printf("the tag type is %d\n", my_hash_tag->tag_type);
+        }
     }
 
     bool is_hashed = mpack_node_bool(mpack_node_map_cstr(root, "hashed"));

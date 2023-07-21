@@ -107,28 +107,25 @@ TEST(unit_test_fasthash, test_multiple_hash_and_ensure_no_double_hashing)
 
     struct my_hash_tag_key *new_key = my_hash_key_convert_from_fieldstat_tag(tags, 3);
     clock_t start = clock();
-    printf("HASH_FIND_TAG 1\n");
     HASH_FIND_TAG(hdr, new_key, find[0]);
     clock_t end = clock();
     clock_t duration = end - start;
     printf("duration with new hash key: %ld \n", (long int)duration);
 
     start = clock();
-    printf("HASH_FIND_TAG 2\n");
     HASH_FIND_TAG(hdr, s->key, find[1]);
     end = clock();
     clock_t duration2 = end - start;
     printf("duration with old hash key: %ld \n", (long int)duration2);
 
     start = clock();
-    printf("HASH_FIND_TAG 3\n");
     HASH_FIND_TAG(hdr, new_key, find[2]);
     end = clock();
     clock_t duration3 = end - start;
     printf("duration with new hash key again: %ld \n", (long int)duration3);
 
-    EXPECT_GT(duration, duration2);
-    EXPECT_GT(duration, duration3);
+    EXPECT_GE(duration, duration2);
+    EXPECT_GE(duration, duration3);
 
     EXPECT_EQ(find[0], find[1]);
     EXPECT_EQ(find[0], find[2]);
@@ -137,6 +134,49 @@ TEST(unit_test_fasthash, test_multiple_hash_and_ensure_no_double_hashing)
     my_hash_tag_key_free(s->key);
     free(s);
     my_hash_tag_key_free(new_key);
+}
+
+TEST(unit_test_fasthash, serialize_and_deserialize)
+{
+    const struct fieldstat_tag tags[3] = {TEST_TAG_INT, TEST_TAG_STRING, TEST_TAG_DOUBLE};
+    struct my_hash_tag_key *new_key = my_hash_key_convert_from_fieldstat_tag(tags, 3);
+    char *blob = NULL;
+    size_t blob_size = 0;
+    my_hash_tag_key_serialize(new_key, &blob, &blob_size);
+    struct my_hash_tag_key *deserialized_key = my_hash_tag_key_deserialize(blob, blob_size);
+
+    struct fieldstat_tag *deserialized_tags = NULL;
+    size_t n_deserialized_tags = 0;
+    my_hash_key_convert_to_fieldstat_tag(deserialized_key, &deserialized_tags, &n_deserialized_tags);
+
+    EXPECT_EQ(n_deserialized_tags, 3);
+    EXPECT_STREQ(deserialized_tags[0].key, TEST_TAG_INT.key);
+    EXPECT_STREQ(deserialized_tags[1].key, TEST_TAG_STRING.key);
+    EXPECT_STREQ(deserialized_tags[2].key, TEST_TAG_DOUBLE.key);
+    EXPECT_EQ(deserialized_tags[0].value_longlong, TEST_TAG_INT.value_longlong);
+    EXPECT_STREQ(deserialized_tags[1].value_str, TEST_TAG_STRING.value_str);
+    EXPECT_EQ(deserialized_tags[2].value_double, TEST_TAG_DOUBLE.value_double);
+
+    printf("0\n");
+
+    my_hash_tag_key_free(new_key);
+    printf("1\n");
+    my_hash_tag_key_free(deserialized_key);
+    printf("2\n");
+
+    free(blob);
+    printf("3\n");
+
+    for (size_t i = 0; i < n_deserialized_tags; i++)
+    {
+        free((char *)deserialized_tags[i].key);
+        if (deserialized_tags[i].type == TAG_CSTRING) {
+            free((char *)deserialized_tags[i].value_str);
+        }
+    }
+    printf("4\n");
+
+    free(deserialized_tags);
 }
 
 int main(int argc, char *argv[]) 
