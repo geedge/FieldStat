@@ -76,11 +76,10 @@ void heavy_keeper_result_free(struct heavy_keeper_result *stats_hd);
  */
 int heavy_keeper_merge(struct heavy_keeper *hk, const struct heavy_keeper *src);
 
-/**
- * @brief   Merge all replicas of a heavy keeper to my replica, and delete all the others, so as to save memory. This function is only safe to use when the hk is not merged to the others. 
- * @param   hk            the pointer to the heavy keeper.
- */
-void heavy_keeper_replicas_all_join_to_mine(struct heavy_keeper *hk);
+/*
+    Equal to heavy_keeper_merge, with empty dest, but much faster.
+*/
+struct heavy_keeper *heavy_keeper_copy(const struct heavy_keeper *src);
 
 /**
  * @brief   Serialize a heavy keeper.
@@ -97,6 +96,7 @@ void heavy_keeper_serialization(const struct heavy_keeper *hk, char **blob, size
  * @returns a pointer to the heavy keeper.
 */
 struct heavy_keeper *heavy_keeper_deserialization(const char *blob, size_t size);
+
 
 /**
  * @brief   Get the "K" parameter of the heavy keeper.

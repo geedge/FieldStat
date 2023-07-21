@@ -90,6 +90,8 @@ unsigned sorted_set_get_count(const struct sorted_set *ss, const struct tag_hash
 */
 void sorted_set_dump(const struct sorted_set *ss, unsigned *scores_out, struct tag_hash_key **tags_out, void **user_data_out);
 
+struct sorted_set *sorted_set_copy(const struct sorted_set *ss);
+
 #ifdef __cplusplus 
 }//end extern "C"
 #endif

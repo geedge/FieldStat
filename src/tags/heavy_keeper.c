@@ -404,6 +404,18 @@ int heavy_keeper_merge(struct heavy_keeper *hk, const struct heavy_keeper *src) 
     return 0;
 }
 
+struct heavy_keeper *heavy_keeper_copy(const struct heavy_keeper *src)
+{
+    struct heavy_keeper *hk = (struct heavy_keeper *)malloc(sizeof(struct heavy_keeper));
+    hk->params = src->params;
+    hk->K = src->K;
+    hk->sketch = (struct Bucket *)malloc(hk->params.array_num * hk->params.max_bucket_num * sizeof(struct Bucket));
+    memcpy(hk->sketch, src->sketch, hk->params.array_num * hk->params.max_bucket_num * sizeof(struct Bucket));
+
+    hk->top_K_heap = sorted_set_copy(src->top_K_heap);
+    return hk;
+}
+
 
 /******************************* serialization *******************************/
 /*Serialize the heavy keeper to a mpack string which is equivalent to a JSON

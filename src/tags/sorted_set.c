@@ -80,6 +80,25 @@ void my_entry_set_index(int index, void *a)
     ((heap_entry *)a)->index = index;
 }
 
+void *my_entry_copy(const void *a)
+{
+    heap_entry *entry = (heap_entry *)a;
+    heap_entry *new_entry = (heap_entry *)malloc(sizeof(heap_entry));
+
+    unsigned *tmp_cnt = (unsigned *)malloc(sizeof(unsigned));
+    *tmp_cnt = *(unsigned *)entry->key;
+    new_entry->key = tmp_cnt;
+
+    struct entry_data *data_src = sorted_set_entry_get_data(entry);
+    struct entry_data *data_dst = entry_data_construct(data_src->key);
+    data_dst->user_data = (int *)malloc(sizeof(int));
+    *(int *)data_dst->user_data = *(int *)data_src->user_data;
+
+    new_entry->value = data_dst;
+    my_entry_set_index(entry->index, new_entry);
+    return new_entry;
+}
+
 struct sorted_set *sorted_set_new(int set_size)
 {
     struct sorted_set *ret = (struct sorted_set *)malloc(sizeof(struct sorted_set));
@@ -344,4 +363,13 @@ void sorted_set_dump(const struct sorted_set *ss, unsigned *scores_out, struct t
         user_data_out[i] = tmp_nodes[i].val->user_data;
     }
     free(tmp_nodes);
+}
+
+struct sorted_set *sorted_set_copy(const struct sorted_set *ss)
+{
+    struct sorted_set *ret = sorted_set_new(ss->heap->max_size);
+    sorted_set_hook_function_of_free_user_data(ret, ss->free_user_data_func);
+    min_heap_copy(ret->heap, ss->heap, my_entry_copy);
+
+    return ret;
 }

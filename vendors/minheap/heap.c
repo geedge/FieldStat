@@ -13,6 +13,7 @@ int init_heap(struct minheap *heap, int max_size, minheap_cmp cmp, minheap_getin
 	heap->max_size = max_size;
 	heap->cur_size = 0;
 	heap->nodes = malloc(sizeof(void *) * max_size);
+    memset(heap->nodes, 0, sizeof(void *) * max_size);
 	if (!heap->nodes)
 		return (-1);
 	assert(cmp);
@@ -123,4 +124,17 @@ static void min_heap_shift_down_(min_heap_t* s, unsigned hole_index, void* node)
 	}
 	s->nodes[hole_index] = node;
 	s->set(hole_index, s->nodes[hole_index]);			
+}
+
+typedef void *(*minheap_copy_node)(const void *node);
+
+void min_heap_copy(min_heap_t *dst, const min_heap_t *src, minheap_copy_node copy_func)
+{
+    for (int i = 0; i < src->max_size; i++) {
+        if (src->nodes[i] == NULL) {
+            dst->nodes[i] = NULL;
+            continue;
+        }
+        dst->nodes[i] = copy_func(src->nodes[i]);
+    }
 }
