@@ -996,14 +996,12 @@ int fieldstat_cube_merge(struct fs_cube *dest, const struct fs_cube *src)
 
 int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
 {
-    printf("fieldstat_merge enter\n");
     // tag_cube_id_map use cube shared tag as key, find cubes. Is is not a cell manager.
     struct cell_manager *tag_cube_id_map = cell_manager_new(SAMPLING_MODE_COMPREHENSIVE,
         instance->valid_cube_arr_length + src->valid_cube_arr_length); // todo: 这个长度没必要这么长吧
 
     for (int i = 0; i < instance->valid_cube_arr_length; i++) {
         if (instance->cube[i] == NULL) {
-            printf("cube not exist in dest, %d\n", i);
             continue;
         }
         struct my_hash_tag_key *shared_tag_key = my_hash_key_convert_from_fieldstat_tag(instance->cube[i]->shared_tags, instance->cube[i]->n_shared_tags);
@@ -1015,7 +1013,6 @@ int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
     for (int i = 0; i < src->valid_cube_arr_length; i++) {
         struct fs_cube *cube_src = src->cube[i];
         if (cube_src == NULL) {
-            printf("cube not exist in src, %d\n", i);
             continue;
         }
         // tag_cube_id_map is actually an manager of cubes, so it's cube id instead of cell id that returned
@@ -1027,7 +1024,6 @@ int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
             struct fs_cube *copied_cube = fieldstat_cube_dup(cube_src);
             (void)fieldstat_append_cube_to_instance(instance, copied_cube);
         } else {
-            printf("find cube in dest, %d\n", cube_id_tmp);
             if (instance->cube[cube_id_tmp]->sampling_mode != cube_src->sampling_mode) {
                 printf("ERR: cube sampling mode not match\n");
                 ret = -1;

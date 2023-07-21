@@ -387,51 +387,53 @@ TEST(unit_test_merge, new_too_many_cells_on_multiple_metric_given_source_cube_re
     fieldstat_free(instance_dest);
 }
 
-// TEST(unit_test_merge, performance_test_when_comprehensive_sampling)
-// {   
-//     const int INSTANCE_NUM = 100;
-//     const int MAX_CELL_NUM = 65536;
-//     const int DIMENSION_TOTAL = 100000;
-//     Fieldstat_tag_list_wrapper *tags[DIMENSION_TOTAL];
-//     for (int i = 0; i < DIMENSION_TOTAL; i++)
-//     {
-//         tags[i] = new Fieldstat_tag_list_wrapper("my key", i);
-//     }
+TEST(unit_test_merge, performance_test_when_comprehensive_sampling)
+{   
+    const int INSTANCE_NUM = 100;
+    const int MAX_CELL_NUM = 65536;
+    const int DIMENSION_TOTAL = 100000;
+    Fieldstat_tag_list_wrapper *tags[DIMENSION_TOTAL];
+    for (int i = 0; i < DIMENSION_TOTAL; i++)
+    {
+        tags[i] = new Fieldstat_tag_list_wrapper("my key", i);
+    }
 
-//     struct fieldstat *instances[INSTANCE_NUM];
-//     for (int i = 0; i < INSTANCE_NUM; i++) {
-//         // printf("procing %d\n", i);
-//         struct fieldstat *tmp_i = fieldstat_new();
-//         int cube_id = fieldstat_register_cube(tmp_i, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, MAX_CELL_NUM);
-//         int metric_id = fieldstat_register_counter(tmp_i, cube_id, "metric name", false);
-//         for (int j = 0; j < MAX_CELL_NUM; j++) {
-//             int cell_id = fieldstat_cube_add(tmp_i, cube_id, tags[rand() % DIMENSION_TOTAL]->get_tag(), 1, 1);
+    struct fieldstat *instances[INSTANCE_NUM];
+    for (int i = 0; i < INSTANCE_NUM; i++) {
+        // printf("procing %d\n", i);
+        struct fieldstat *tmp_i = fieldstat_new();
+        int cube_id = fieldstat_register_cube(tmp_i, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, MAX_CELL_NUM);
+        int metric_id = fieldstat_register_counter(tmp_i, cube_id, "metric name", false);
+        for (int j = 0; j < MAX_CELL_NUM; j++) {
+            int cell_id = fieldstat_cube_add(tmp_i, cube_id, tags[rand() % DIMENSION_TOTAL]->get_tag(), 1, 1);
 
-//             fieldstat_counter_incrby(tmp_i, cube_id, metric_id, cell_id, 1);
-//         }
-//         instances[i] = tmp_i;
-//     }
+            fieldstat_counter_incrby(tmp_i, cube_id, metric_id, cell_id, 1);
+        }
+        instances[i] = tmp_i;
+    }
     
-//     struct fieldstat *instance_dest = fieldstat_new();
+    struct fieldstat *instance_dest = fieldstat_new();
 
-//     clock_t start = clock();
-//     for (int i = 0; i < INSTANCE_NUM; i++) {
-//         fieldstat_merge(instance_dest, instances[i]);
-//     }
-//     clock_t end = clock();
+    getchar();
+    clock_t start = clock();
+    for (int i = 0; i < INSTANCE_NUM; i++) {
+        fieldstat_merge(instance_dest, instances[i]);
+    }
+    clock_t end = clock();
+    exit(0);
 
-//     double elapsed_secs = double(end - start) / CLOCKS_PER_SEC;
-//     printf("performance_test_when_comprehensive_sampling elapsed_secs: %f\n", elapsed_secs);
-//     EXPECT_TRUE(elapsed_secs < 0.2); // fixme: approximately around 100 cube(templates), 10 metrics. So 0.005s finish it.
+    double elapsed_secs = double(end - start) / CLOCKS_PER_SEC;
+    printf("performance_test_when_comprehensive_sampling elapsed_secs: %f\n", elapsed_secs);
+    EXPECT_TRUE(elapsed_secs < 0.2); // fixme: approximately around 100 cube(templates), 10 metrics. So 0.005s finish it.
 
-//     fieldstat_free(instance_dest);
-//     for (int i = 0; i < INSTANCE_NUM; i++) {
-//         fieldstat_free(instances[i]);
-//     }
-//     for (int i = 0; i < DIMENSION_TOTAL; i++) {
-//         delete tags[i];
-//     }
-// }
+    fieldstat_free(instance_dest);
+    for (int i = 0; i < INSTANCE_NUM; i++) {
+        fieldstat_free(instances[i]);
+    }
+    for (int i = 0; i < DIMENSION_TOTAL; i++) {
+        delete tags[i];
+    }
+}
 
 // TEST(unit_test_merge, performance_test_when_topk_sampling){
 

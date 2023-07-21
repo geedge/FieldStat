@@ -316,30 +316,12 @@ struct my_hash_tag_key *my_hash_tag_key_deserialize(const char *blob, size_t blo
         my_hash_tag->key_len = mpack_node_bin_size(key);
         my_hash_tag->key = (char *)malloc(my_hash_tag->key_len);
         memcpy(my_hash_tag->key, mpack_node_bin_data(key), my_hash_tag->key_len);
-        printf("the bin data key: %s\n", mpack_node_bin_data(key));
 
         my_hash_tag->value_len = mpack_node_bin_size(value);
         my_hash_tag->value = (unsigned char *)malloc(my_hash_tag->value_len);
         memcpy(my_hash_tag->value, mpack_node_bin_data(value), my_hash_tag->value_len);
 
         my_hash_tag->tag_type = mpack_node_u8(mpack_node_map_cstr(tag_node, "t"));
-
-        if (my_hash_tag->tag_type == 0)
-        {
-            printf("int value: %lld\n", *(long long *)my_hash_tag->value);
-        }
-        else if (my_hash_tag->tag_type == 1)
-        {
-            printf("double value: %f\n", *(double *)my_hash_tag->value);
-        }
-        else if (my_hash_tag->tag_type == 2)
-        {
-            printf("string value: %s\n", my_hash_tag->value);
-        }
-        else
-        {
-            printf("the tag type is %d\n", my_hash_tag->tag_type);
-        }
     }
 
     bool is_hashed = mpack_node_bool(mpack_node_map_cstr(root, "hashed"));

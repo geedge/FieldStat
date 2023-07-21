@@ -233,7 +233,6 @@ int cell_iter_next(struct cell_iter *iter) {
     }
 
     fieldstat_tag_list_arr_free(iter->shared_tag, 1);
-    printf("free shared tag for cube id: %d\n", iter->cube_ids[iter->curr_cube_idx]);
     iter->shared_tag = NULL;
     while (cell_iter_next_nonempty_cube(iter)) {
         if (cell_iter_next_nonempty_metric(iter)) {

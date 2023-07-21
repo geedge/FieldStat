@@ -543,6 +543,7 @@ void heavy_keeper_sorted_set_deserialization(mpack_node_t *root, struct sorted_s
 
         sorted_set_insert(out, tag, score);
         sorted_set_insert_user_data(out, tag, (void *)id);
+        my_hash_tag_key_free(tag);
     }
 }
 
