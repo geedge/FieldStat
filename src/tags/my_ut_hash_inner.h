@@ -9,18 +9,18 @@ extern "C"
 #include <stdbool.h>
 #include <stddef.h>
 
-struct my_hash_tag_key;
+struct tag_hash_key;
 
-unsigned int my_tag_hash_func(struct my_hash_tag_key *my_hash_key);
+unsigned int tag_hash_key_cal_hash_value(struct tag_hash_key *my_hash_key);
 // return 1 if not equal, 0 if equal
-int my_hash_tag_cmp(const struct my_hash_tag_key *a, const struct my_hash_tag_key *b);
+int tag_hash_key_cmp(const struct tag_hash_key *a, const struct tag_hash_key *b);
 
 // cover the original HASH_FUNCTION
 #define HASH_FUNCTION(keyptr, keylen, hashv) { \
-    hashv = my_tag_hash_func((struct my_hash_tag_key *)keyptr); \
+    hashv = tag_hash_key_cal_hash_value((struct tag_hash_key *)keyptr); \
     }
 
-#define HASH_KEYCMP(a, b, n) (my_hash_tag_cmp((const struct my_hash_tag_key *)a, (const struct my_hash_tag_key *)b))
+#define HASH_KEYCMP(a, b, n) (tag_hash_key_cmp((const struct tag_hash_key *)a, (const struct tag_hash_key *)b))
 
 
 #include "uthash.h"

@@ -17,7 +17,7 @@ extern "C"{
 // Query result
 struct heavy_keeper_result {
     size_t n_key; // number of result
-    struct my_hash_tag_key **tags;
+    struct tag_hash_key **tags;
     unsigned *count; // count[i] is the metric count of the corresponding flow id
 
     int *cube_id;
@@ -51,7 +51,7 @@ void heavy_keeper_clear(struct heavy_keeper *hk);
 
 // return -1 when the key is not inserted to the heavy keeper(not fail). popped_id_out is -1 if not popped. any other value >= 0 means the id of the popped member.
 // the cube id will give the key if the key is new, in which case return 0, if the key is already in the heavy keeper, return 1.
-int heavy_keeper_add(struct heavy_keeper *hk, const struct my_hash_tag_key *tag, unsigned int count, int cube_id, int *popped_id_out);
+int heavy_keeper_add(struct heavy_keeper *hk, const struct tag_hash_key *tag, unsigned int count, int cube_id, int *popped_id_out);
 
 /**
  * @brief   Query the top-K flows.The flow id with bigger count ranks at smaller index.
@@ -60,7 +60,7 @@ int heavy_keeper_add(struct heavy_keeper *hk, const struct my_hash_tag_key *tag,
  */
 struct heavy_keeper_result *heavy_keeper_query(struct heavy_keeper *hk);
 
-int heavy_keeper_query_one(struct heavy_keeper *hk, const struct my_hash_tag_key *tag, unsigned int *count_out, int *cube_id_out);
+int heavy_keeper_query_one(struct heavy_keeper *hk, const struct tag_hash_key *tag, unsigned int *count_out, int *cube_id_out);
 
 /**
  * @brief   free a heavy keeper query result.

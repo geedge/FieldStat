@@ -10,6 +10,9 @@
 
 #define USING_BASE_HASH HASH_JEN
 
+int simple_hash_cnt = 0;
+int hash_cnt = 0;
+
 struct my_hash_tag {
     char *key;
     size_t key_len; // including '\0'
@@ -19,7 +22,7 @@ struct my_hash_tag {
     enum fs_tag_type tag_type; // not used for hash.
 };
 
-struct my_hash_tag_key {
+struct tag_hash_key {
     struct my_hash_tag *my_tag;
     size_t n_my_tag;
     bool is_hashed;
@@ -31,18 +34,20 @@ void my_hash_key_list_add(struct tag_id_map **tbl, struct tag_id_map *node)
     HASH_ADD_TAG(*tbl, tag, node);
 }
 
-struct tag_id_map *my_hash_key_list_find(const struct tag_id_map *tbl, const struct my_hash_tag_key *my_hash_key)
+struct tag_id_map *my_hash_key_list_find(const struct tag_id_map *tbl, const struct tag_hash_key *my_hash_key)
 {
     struct tag_id_map *node = NULL;
     HASH_FIND_TAG(tbl, my_hash_key, node);
     return node;
 }
 
-unsigned int my_tag_hash_func(struct my_hash_tag_key *my_hash_key)
+unsigned int tag_hash_key_cal_hash_value(struct tag_hash_key *my_hash_key)
 {
     if (my_hash_key->is_hashed) {
+        simple_hash_cnt++;
         return my_hash_key->hashv;
     }
+    hash_cnt++;
     unsigned int hashv = 0;
     unsigned int result = 0;
     struct my_hash_tag *tmp_pst_hashed_tag = my_hash_key->my_tag;
@@ -60,7 +65,7 @@ unsigned int my_tag_hash_func(struct my_hash_tag_key *my_hash_key)
     return result;
 }
 
-int my_hash_tag_cmp(const struct my_hash_tag_key *a, const struct my_hash_tag_key *b)
+int tag_hash_key_cmp(const struct tag_hash_key *a, const struct tag_hash_key *b)
 {
     if (a->is_hashed && b->is_hashed) {
         if (a->hashv != b->hashv) {
@@ -126,14 +131,14 @@ void convert_fieldstat_tag_to_my_hash_tag(const struct fieldstat_tag *src, struc
     dst->value = value;
 }
 
-struct my_hash_tag_key *my_hash_key_convert_from_fieldstat_tag(const struct fieldstat_tag *src, size_t n_src)
+struct tag_hash_key *tag_hash_key_construct_with_fieldstat_tag(const struct fieldstat_tag *src, size_t n_src)
 {
     struct my_hash_tag *my_hash_tag_arr = (struct my_hash_tag *)malloc(sizeof(struct my_hash_tag) * n_src);
     for (int i = 0; i < n_src; i++) {
         convert_fieldstat_tag_to_my_hash_tag(src + i, my_hash_tag_arr + i);
     }
 
-    struct my_hash_tag_key *my_hash_key = (struct my_hash_tag_key *)malloc(sizeof(struct my_hash_tag_key));
+    struct tag_hash_key *my_hash_key = (struct tag_hash_key *)malloc(sizeof(struct tag_hash_key));
     my_hash_key->my_tag = my_hash_tag_arr;
     my_hash_key->n_my_tag = n_src;
     my_hash_key->hashv = 0;
@@ -141,7 +146,7 @@ struct my_hash_tag_key *my_hash_key_convert_from_fieldstat_tag(const struct fiel
     return my_hash_key;
 }
 
-void my_hash_key_convert_to_fieldstat_tag(const struct my_hash_tag_key *tag_key, struct fieldstat_tag **out, size_t *n_out)
+void tag_hash_key_convert_to_fieldstat_tag(const struct tag_hash_key *tag_key, struct fieldstat_tag **out, size_t *n_out)
 {
     size_t ret_n_tag = tag_key->n_my_tag;
     *n_out = ret_n_tag;
@@ -177,9 +182,9 @@ void my_hash_key_convert_to_fieldstat_tag(const struct my_hash_tag_key *tag_key,
     }
 }
 
-struct my_hash_tag_key *my_hash_tag_key_copy(const struct my_hash_tag_key *src)
+struct tag_hash_key *tag_hash_key_copy(const struct tag_hash_key *src)
 {
-    struct my_hash_tag_key *dst = (struct my_hash_tag_key *)malloc(sizeof(struct my_hash_tag_key));
+    struct tag_hash_key *dst = (struct tag_hash_key *)malloc(sizeof(struct tag_hash_key));
     dst->n_my_tag = src->n_my_tag;
     dst->is_hashed = src->is_hashed;
     dst->hashv = src->hashv;
@@ -203,7 +208,7 @@ struct my_hash_tag_key *my_hash_tag_key_copy(const struct my_hash_tag_key *src)
     return dst;
 }
 
-void my_hash_tag_key_free(struct my_hash_tag_key *tag_key)
+void tag_hash_key_free(struct tag_hash_key *tag_key)
 {
     struct my_hash_tag *my_hash_tag_arr = tag_key->my_tag;
     for (int i = 0; i < tag_key->n_my_tag; i++)
@@ -216,7 +221,7 @@ void my_hash_tag_key_free(struct my_hash_tag_key *tag_key)
 }
 
 // FNV-1a hash (http://www.isthe.com/chongo/tech/comp/fnv/)
-unsigned my_hash_tag_key_fnv_hash(const struct my_hash_tag_key *tag, unsigned seed) {
+unsigned tag_hash_key_cal_fnv_hash(const struct tag_hash_key *tag, unsigned seed) {
     uint32_t h = 2166136261UL + (seed * 15);
 
     struct my_hash_tag *my_hash_tag_arr = tag->my_tag;
@@ -262,7 +267,7 @@ unsigned my_hash_tag_key_fnv_hash(const struct my_hash_tag_key *tag, unsigned se
 }
 */
 
-void my_hash_tag_key_serialize(const struct my_hash_tag_key *tag, char **blob, size_t *blob_size)
+void tag_hash_key_serialize(const struct tag_hash_key *tag, char **blob, size_t *blob_size)
 {
     mpack_writer_t writer;
     mpack_writer_init_growable(&writer, blob, blob_size);
@@ -292,11 +297,11 @@ void my_hash_tag_key_serialize(const struct my_hash_tag_key *tag, char **blob, s
 
     mpack_complete_map(&writer);
     if (mpack_writer_destroy(&writer) != mpack_ok) {
-        printf("ERR: An error occurred in my_hash_tag_key_serialize!\n");
+        printf("ERR: An error occurred in tag_hash_key_serialize!\n");
     }
 }
 
-struct my_hash_tag_key *my_hash_tag_key_deserialize(const char *blob, size_t blob_size)
+struct tag_hash_key *tag_hash_key_deserialize(const char *blob, size_t blob_size)
 {
     mpack_tree_t tree;
     mpack_tree_init_data(&tree, blob, blob_size);
@@ -327,7 +332,7 @@ struct my_hash_tag_key *my_hash_tag_key_deserialize(const char *blob, size_t blo
     bool is_hashed = mpack_node_bool(mpack_node_map_cstr(root, "hashed"));
     unsigned hashv_val = mpack_node_u32(mpack_node_map_cstr(root, "hashv"));
 
-    struct my_hash_tag_key *my_hash_key = (struct my_hash_tag_key *)malloc(sizeof(struct my_hash_tag_key));
+    struct tag_hash_key *my_hash_key = (struct tag_hash_key *)malloc(sizeof(struct tag_hash_key));
     my_hash_key->my_tag = my_hash_tag_arr;
     my_hash_key->n_my_tag = n_tag;
     my_hash_key->is_hashed = is_hashed;
@@ -335,4 +340,21 @@ struct my_hash_tag_key *my_hash_tag_key_deserialize(const char *blob, size_t blo
 
     mpack_tree_destroy(&tree);
     return my_hash_key;
+}
+
+
+int tmp_get_hash_count()
+{
+    return hash_cnt;
+}
+
+int tmp_get_simple_hash_count()
+{
+    return simple_hash_cnt;
+}
+
+void reset_hash_count()
+{
+    hash_cnt = 0;
+    simple_hash_cnt = 0;
 }

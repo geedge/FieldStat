@@ -9,7 +9,7 @@
 #include "mpack/mpack.h"
 #include "fieldstat.h"
 #include "metrics/metric.h"
-#include "tags/dimension_cube_map.h"
+#include "tags/cell_manager.h"
 
 struct fs_cube {
     enum sampling_mode sampling_mode;
@@ -209,7 +209,7 @@ int fieldstat_cube_add(struct fieldstat *instance, int cube_id, const struct fie
     }
 
     int ret = -1;
-    struct my_hash_tag_key *tag_key = my_hash_key_convert_from_fieldstat_tag(tags, n_tag);
+    struct tag_hash_key *tag_key = tag_hash_key_construct_with_fieldstat_tag(tags, n_tag);
     if (cube->sampling_mode == SAMPLING_MODE_COMPREHENSIVE) {
         ret = cell_manager_add_cell(cube->cell_manager, tag_key);
     } else {
@@ -222,7 +222,7 @@ int fieldstat_cube_add(struct fieldstat *instance, int cube_id, const struct fie
         }
     }
 
-    my_hash_tag_key_free(tag_key);
+    tag_hash_key_free(tag_key);
 
     return ret;
 }
@@ -699,7 +699,7 @@ void cube_push_all_cells_to_another_cell_manager(const struct fs_cube *src, stru
             continue;
         }
         for (int j = 0; j < cell_id_count_src; j ++) {
-            const struct my_hash_tag_key *tag_key_src = cell_manager_get_tag_by_cell_id(cell_manager_src, cell_ids_from_metric_src[j]);
+            const struct tag_hash_key *tag_key_src = cell_manager_get_tag_by_cell_id(cell_manager_src, cell_ids_from_metric_src[j]);
             if (tag_key_src == NULL) {
                 printf("ERR: cube_push_all_cells_to_another_cell_manager: cell_manager_get_tag_by_cell_id failed, cell id: %d\n", cell_ids_from_metric_src[j]);
                 continue;
@@ -735,7 +735,7 @@ struct fs_cube *fieldstat_cube_dup(const struct fs_cube *cube)
         for (int j = 0; j < cell_id_count_src; j++) {
             int cell_id = cell_ids_from_metric_src[j];
             
-            const struct my_hash_tag_key *tag_key_src = cell_manager_get_tag_by_cell_id(cm_src, cell_id);
+            const struct tag_hash_key *tag_key_src = cell_manager_get_tag_by_cell_id(cm_src, cell_id);
             if (tag_key_src == NULL) {
                 printf("ERR: fieldstat_cube_dup: cell_manager_get_tag_by_cell_id failed\n");
                 continue;
@@ -812,7 +812,7 @@ int fieldstat_cube_merge_comprehensive(struct fs_cube *dest, const struct fs_cub
         metrics_dest = dest->metrics[metric_id_dest];
         for (int j = 0; j < cell_id_count_src; j ++) {
             int cell_id_from_metric_src = cell_ids_from_metric_src[j];
-            const struct my_hash_tag_key *tag_key_src = cell_manager_get_tag_by_cell_id(cell_manager_src, cell_id_from_metric_src);
+            const struct tag_hash_key *tag_key_src = cell_manager_get_tag_by_cell_id(cell_manager_src, cell_id_from_metric_src);
 
             int cell_id_tmp_dest = cell_manager_get_cell_id_by_tag(cell_manager_dest, tag_key_src);
             if (cell_id_tmp_dest != -1) {
@@ -894,7 +894,7 @@ int fieldstat_cube_merge_topk(struct fs_cube *dest, const struct fs_cube *src)
         for (int j = 0; j < cell_id_count_dest; j ++) {
             int cell_id_in_metric_dest = cell_ids_dest[j];
 
-            const struct my_hash_tag_key *tag_key_dest = cell_manager_get_tag_by_cell_id(cell_manager_dest, cell_id_in_metric_dest);
+            const struct tag_hash_key *tag_key_dest = cell_manager_get_tag_by_cell_id(cell_manager_dest, cell_id_in_metric_dest);
             if (tag_key_dest == NULL) {
                 printf("ERR: cell_id %d not exist in dest\n", cell_id_in_metric_dest);
                 continue;
@@ -941,7 +941,7 @@ int fieldstat_cube_merge_topk(struct fs_cube *dest, const struct fs_cube *src)
 
         for (int j = 0; j < cell_id_count_src; j ++) {
             int cell_id_from_metric_src = cell_ids_from_metric_src[j];
-            const struct my_hash_tag_key *tag_key_src = cell_manager_get_tag_by_cell_id(cell_manager_src, cell_id_from_metric_src);
+            const struct tag_hash_key *tag_key_src = cell_manager_get_tag_by_cell_id(cell_manager_src, cell_id_from_metric_src);
             if (tag_key_src == NULL) {
                 printf("ERR: cell_id %d not exist in src\n", cell_id_from_metric_src);
                 continue;
@@ -1004,9 +1004,9 @@ int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
         if (instance->cube[i] == NULL) {
             continue;
         }
-        struct my_hash_tag_key *shared_tag_key = my_hash_key_convert_from_fieldstat_tag(instance->cube[i]->shared_tags, instance->cube[i]->n_shared_tags);
+        struct tag_hash_key *shared_tag_key = tag_hash_key_construct_with_fieldstat_tag(instance->cube[i]->shared_tags, instance->cube[i]->n_shared_tags);
         cell_manager_add_cell(tag_cube_id_map, shared_tag_key);
-        my_hash_tag_key_free(shared_tag_key);
+        tag_hash_key_free(shared_tag_key);
     }
 
     int ret = 0;
@@ -1016,9 +1016,9 @@ int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
             continue;
         }
         // tag_cube_id_map is actually an manager of cubes, so it's cube id instead of cell id that returned
-        struct my_hash_tag_key *shared_tag_src = my_hash_key_convert_from_fieldstat_tag(cube_src->shared_tags, cube_src->n_shared_tags);
+        struct tag_hash_key *shared_tag_src = tag_hash_key_construct_with_fieldstat_tag(cube_src->shared_tags, cube_src->n_shared_tags);
         int cube_id_tmp = cell_manager_get_cell_id_by_tag(tag_cube_id_map, shared_tag_src);
-        my_hash_tag_key_free(shared_tag_src);
+        tag_hash_key_free(shared_tag_src);
 
         if (cube_id_tmp == -1) {
             struct fs_cube *copied_cube = fieldstat_cube_dup(cube_src);
@@ -1105,12 +1105,12 @@ void fieldstat_get_cells(const struct fieldstat *instance, int cube_id, int metr
     struct fieldstat_tag_list *tag_list_ret = (struct fieldstat_tag_list *)malloc(sizeof(struct fieldstat_tag_list) * n_cell_ret);
     *tag_list = tag_list_ret;
     for (int i = 0; i < n_cell_ret; i++) {
-        const struct my_hash_tag_key *tag_key = cell_manager_get_tag_by_cell_id(instance->cube[cube_id]->cell_manager, (*cell_ids)[i]);
+        const struct tag_hash_key *tag_key = cell_manager_get_tag_by_cell_id(instance->cube[cube_id]->cell_manager, (*cell_ids)[i]);
         if (tag_key == NULL) {
             printf("ERR: fieldstat_get_cells cell_manager_get_tag_by_cell_id failed\n");
             return;
         }
-        my_hash_key_convert_to_fieldstat_tag(tag_key, &(tag_list_ret[i].tag), &(tag_list_ret[i].n_tag));
+        tag_hash_key_convert_to_fieldstat_tag(tag_key, &(tag_list_ret[i].tag), &(tag_list_ret[i].n_tag));
     }
 }
 

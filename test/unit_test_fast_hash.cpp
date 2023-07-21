@@ -10,7 +10,7 @@
 // #include "tags/sorted_set.h"
 
 struct testing_hash {
-    struct my_hash_tag_key *key;
+    struct tag_hash_key *key;
     int value;
     UT_hash_handle hh;
 };
@@ -20,10 +20,10 @@ TEST(unit_test_fasthash, simple_add_and_find_when_length_is_1_given_different_ty
     struct testing_hash *hdr = NULL;
     struct testing_hash *s = NULL;
 
-    struct my_hash_tag_key *keys[3];
-    keys[0] = my_hash_key_convert_from_fieldstat_tag(&TEST_TAG_INT, 1);
-    keys[1] = my_hash_key_convert_from_fieldstat_tag(&TEST_TAG_DOUBLE, 1);
-    keys[2] = my_hash_key_convert_from_fieldstat_tag(&TEST_TAG_STRING, 1);
+    struct tag_hash_key *keys[3];
+    keys[0] = tag_hash_key_construct_with_fieldstat_tag(&TEST_TAG_INT, 1);
+    keys[1] = tag_hash_key_construct_with_fieldstat_tag(&TEST_TAG_DOUBLE, 1);
+    keys[2] = tag_hash_key_construct_with_fieldstat_tag(&TEST_TAG_STRING, 1);
 
     s = (struct testing_hash *)malloc(sizeof(struct testing_hash));
     s->key = keys[0];
@@ -60,9 +60,9 @@ TEST(unit_test_fasthash, simple_add_and_find_when_length_is_1_given_different_ty
     HASH_DEL(hdr, find);
     free(find);
 
-    my_hash_tag_key_free(keys[0]);
-    my_hash_tag_key_free(keys[1]);
-    my_hash_tag_key_free(keys[2]);
+    tag_hash_key_free(keys[0]);
+    tag_hash_key_free(keys[1]);
+    tag_hash_key_free(keys[2]);
 }
 
 TEST(unit_test_fasthash, simple_add_and_find_when_length_is_3_of_different_types)
@@ -73,7 +73,7 @@ TEST(unit_test_fasthash, simple_add_and_find_when_length_is_3_of_different_types
 
     const struct fieldstat_tag tags[3] = {TEST_TAG_INT, TEST_TAG_STRING, TEST_TAG_DOUBLE};
 
-    s->key = my_hash_key_convert_from_fieldstat_tag(tags, 3);
+    s->key = tag_hash_key_construct_with_fieldstat_tag(tags, 3);
     s->value = 321;
     HASH_ADD_TAG(hdr, key, s);
     printf("add finish \n");
@@ -85,7 +85,7 @@ TEST(unit_test_fasthash, simple_add_and_find_when_length_is_3_of_different_types
 
     HASH_DEL(hdr, find);
 
-    my_hash_tag_key_free(s->key);
+    tag_hash_key_free(s->key);
     free(s);
 }
 
@@ -99,13 +99,13 @@ TEST(unit_test_fasthash, test_multiple_hash_and_ensure_no_double_hashing)
 
     const struct fieldstat_tag tags[3] = {TEST_TAG_INT, TEST_TAG_STRING, TEST_TAG_DOUBLE};
 
-    s->key = my_hash_key_convert_from_fieldstat_tag(tags, 3);
+    s->key = tag_hash_key_construct_with_fieldstat_tag(tags, 3);
     s->value = 321;
     printf("call hash add tag\n");
     HASH_ADD_TAG(hdr, key, s);
     printf("add finish \n");
 
-    struct my_hash_tag_key *new_key = my_hash_key_convert_from_fieldstat_tag(tags, 3);
+    struct tag_hash_key *new_key = tag_hash_key_construct_with_fieldstat_tag(tags, 3);
     clock_t start = clock();
     HASH_FIND_TAG(hdr, new_key, find[0]);
     clock_t end = clock();
@@ -131,23 +131,23 @@ TEST(unit_test_fasthash, test_multiple_hash_and_ensure_no_double_hashing)
     EXPECT_EQ(find[0], find[2]);
 
     HASH_DEL(hdr, find[0]);
-    my_hash_tag_key_free(s->key);
+    tag_hash_key_free(s->key);
     free(s);
-    my_hash_tag_key_free(new_key);
+    tag_hash_key_free(new_key);
 }
 
 TEST(unit_test_fasthash, serialize_and_deserialize)
 {
     const struct fieldstat_tag tags[3] = {TEST_TAG_INT, TEST_TAG_STRING, TEST_TAG_DOUBLE};
-    struct my_hash_tag_key *new_key = my_hash_key_convert_from_fieldstat_tag(tags, 3);
+    struct tag_hash_key *new_key = tag_hash_key_construct_with_fieldstat_tag(tags, 3);
     char *blob = NULL;
     size_t blob_size = 0;
-    my_hash_tag_key_serialize(new_key, &blob, &blob_size);
-    struct my_hash_tag_key *deserialized_key = my_hash_tag_key_deserialize(blob, blob_size);
+    tag_hash_key_serialize(new_key, &blob, &blob_size);
+    struct tag_hash_key *deserialized_key = tag_hash_key_deserialize(blob, blob_size);
 
     struct fieldstat_tag *deserialized_tags = NULL;
     size_t n_deserialized_tags = 0;
-    my_hash_key_convert_to_fieldstat_tag(deserialized_key, &deserialized_tags, &n_deserialized_tags);
+    tag_hash_key_convert_to_fieldstat_tag(deserialized_key, &deserialized_tags, &n_deserialized_tags);
 
     EXPECT_EQ(n_deserialized_tags, 3);
     EXPECT_STREQ(deserialized_tags[0].key, TEST_TAG_INT.key);
@@ -159,9 +159,9 @@ TEST(unit_test_fasthash, serialize_and_deserialize)
 
     printf("0\n");
 
-    my_hash_tag_key_free(new_key);
+    tag_hash_key_free(new_key);
     printf("1\n");
-    my_hash_tag_key_free(deserialized_key);
+    tag_hash_key_free(deserialized_key);
     printf("2\n");
 
     free(blob);

@@ -387,6 +387,12 @@ TEST(unit_test_merge, new_too_many_cells_on_multiple_metric_given_source_cube_re
     fieldstat_free(instance_dest);
 }
 
+extern "C" {
+extern int tmp_get_hash_count();
+extern int tmp_get_simple_hash_count();
+void reset_hash_count();
+}
+
 TEST(unit_test_merge, performance_test_when_comprehensive_sampling)
 {   
     const int INSTANCE_NUM = 100;
@@ -413,17 +419,19 @@ TEST(unit_test_merge, performance_test_when_comprehensive_sampling)
     }
     
     struct fieldstat *instance_dest = fieldstat_new();
-
-    getchar();
+    reset_hash_count();
+    // getchar();
     clock_t start = clock();
     for (int i = 0; i < INSTANCE_NUM; i++) {
         fieldstat_merge(instance_dest, instances[i]);
     }
     clock_t end = clock();
-    exit(0);
+    // exit(0);
 
     double elapsed_secs = double(end - start) / CLOCKS_PER_SEC;
     printf("performance_test_when_comprehensive_sampling elapsed_secs: %f\n", elapsed_secs);
+    printf("get hash count: %d\n", tmp_get_hash_count());
+    printf("get simple hash count: %d\n", tmp_get_simple_hash_count());
     EXPECT_TRUE(elapsed_secs < 0.2); // fixme: approximately around 100 cube(templates), 10 metrics. So 0.005s finish it.
 
     fieldstat_free(instance_dest);

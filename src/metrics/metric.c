@@ -10,7 +10,7 @@
 
 #include "metric.h"
 #include "fieldstat.h"
-#include "tags/dimension_cube_map.h"
+#include "tags/cell_manager.h"
 #include "hdr/hdr_histogram.h"
 #include "hdr/hdr_histogram_log.h"
 #include "st_hyperloglog.h"
