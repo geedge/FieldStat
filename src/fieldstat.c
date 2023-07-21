@@ -26,18 +26,25 @@ struct fs_cube {
     size_t max_n_metric;
 };
 
+struct metric_name_id_map {
+    char *name;
+    int id;
+    UT_hash_handle hh;
+};
+
+struct merge_util {
+    struct cell_manager *shared_tag_cube_manager;
+    struct metric_name_id_map *metric_name_id_map;
+};
+
 struct fieldstat {
     struct fs_cube **cube;
     unsigned long *cube_version; // increase from 0 every time the cube is deleted
     unsigned long cell_version; // increase from 0 every time fieldstat_reset is called
     size_t valid_cube_arr_length;
     size_t max_n_cube;
-};
 
-struct metric_name_id_map {
-    char *name;
-    int id;
-    UT_hash_handle hh;
+    struct merge_util *merge_util;
 };
 
 
@@ -46,7 +53,7 @@ struct fieldstat *fieldstat_new()
     struct fieldstat *instance = malloc(sizeof(struct fieldstat));
     memset(instance, 0, sizeof(struct fieldstat));
 
-    instance->max_n_cube = 5;
+    instance->max_n_cube = 100;
     instance->cube = malloc(sizeof(struct fs_cube *) * instance->max_n_cube);
     memset(instance->cube, 0, sizeof(struct fs_cube *) * instance->max_n_cube);
     instance->cube_version = malloc(sizeof(unsigned long) * instance->max_n_cube);
@@ -401,164 +408,6 @@ int fieldstat_histogram_record(struct fieldstat *instance, int cube_id, int metr
 // /* -------------------------------------------------------------------------- */
 // /*                                serialization                               */
 // /* -------------------------------------------------------------------------- */
-
-void fieldtag_clear(struct fieldstat_tag *tag)
-{
-    free((char *)tag->key);
-    if (tag->type == TAG_CSTRING) {
-        free((char *)tag->value_str);
-    }
-}
-
-void fieldtag_list_free(struct fieldstat_tag *tags, size_t n_tags)
-{
-    for (int i = 0; i < (int)n_tags; i++) {
-        fieldtag_clear(&tags[i]);
-    }
-    free(tags);
-}
-
-void fieldtag_copy(const struct fieldstat_tag *kv_pair, struct fieldstat_tag *dest)
-{
-    dest->key = strdup(kv_pair->key);
-    dest->type = kv_pair->type;
-    switch(kv_pair->type)
-    {
-        case TAG_INTEGER:
-            dest->value_longlong = kv_pair->value_longlong;
-            break;
-        case TAG_DOUBLE:
-            dest->value_double = kv_pair->value_double;
-            break;
-        case TAG_CSTRING:
-            dest->value_str = strdup(kv_pair->value_str);
-            break;
-        default:
-            assert(0);
-            break;
-    }
-}
-// todo: 现在cell 的tag没有sorted。想想怎么办，是不是干脆在add的时候sort掉得了
-int my_cmp_tag(const void *a, const void *b)
-{
-    struct fieldstat_tag *aa = (struct fieldstat_tag *)a;
-    struct fieldstat_tag *bb = (struct fieldstat_tag *)b;
-    int key_cmp = strcmp(aa->key, bb->key);
-    if (key_cmp != 0) {
-        return key_cmp;
-    }
-
-    assert(aa->type == bb->type);
-    switch (aa->type) {
-        case TAG_INTEGER:
-            return aa->value_longlong - bb->value_longlong;
-        case TAG_DOUBLE:
-            return aa->value_double - bb->value_double;
-        case TAG_CSTRING:
-            return strcmp(aa->value_str, bb->value_str);
-        default:
-            return 0;
-    }
-}
-
-/* 
-    [{
-        "key":<tag key string>
-        "type":0 1 or 2
-        "value":<tag value, can be int(0) double(1) or str(2)>
-    }]
-*/
-void fieldtag_list_serialize(const struct fieldstat_tag *tag_list, size_t tag_num, char **blob, size_t *blob_size)
-{
-    struct fieldstat_tag *tag_list_sorted = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * tag_num);
-    for (int i = 0; i < tag_num; i++) {
-        fieldtag_copy(&tag_list[i], &tag_list_sorted[i]);
-    }
-    // sort tag so that when merge by blob, we can merge cells with the same tags
-    qsort(tag_list_sorted, tag_num, sizeof(struct fieldstat_tag), my_cmp_tag);
-
-    mpack_writer_t writer;
-    mpack_writer_init_growable(&writer, blob, blob_size);
-
-    mpack_start_array(&writer, tag_num);
-    for (int j = 0; j < tag_num; j++) {
-        mpack_start_map(&writer, 3);
-        mpack_write_cstr(&writer, "key");
-        mpack_write_cstr(&writer, tag_list_sorted[j].key);
-        mpack_write_cstr(&writer, "type");
-        mpack_write_i8(&writer, tag_list_sorted[j].type);
-        mpack_write_cstr(&writer, "value");
-        switch (tag_list_sorted[j].type)
-        {
-            case TAG_INTEGER:
-                mpack_write_i64(&writer, tag_list_sorted[j].value_longlong);
-                break;
-            case TAG_DOUBLE:
-                mpack_write_double(&writer, tag_list_sorted[j].value_double);
-                break;
-            case TAG_CSTRING:
-                mpack_write_cstr(&writer, tag_list_sorted[j].value_str);
-                break;
-            default:
-                assert(0);
-                break;
-        }
-        mpack_finish_map(&writer);
-    }
-    mpack_finish_array(&writer);
-
-    if (mpack_writer_destroy(&writer) != mpack_ok) {
-        printf("ERR mpack writer fieldtag_list_serialize destroy failed\n");
-    }
-
-    fieldtag_list_free(tag_list_sorted, tag_num);
-}
-
-
-void fieldtag_list_deserialize(const char *blob, size_t blob_size, struct fieldstat_tag **tag_list_out, size_t *tag_num_out)
-{
-    mpack_tree_t tree;
-    mpack_tree_init_data(&tree, blob, blob_size);
-    mpack_tree_parse(&tree);
-    mpack_node_t tag_arr = mpack_tree_root(&tree);
-
-    size_t tag_num = mpack_node_array_length(tag_arr);
-
-    struct fieldstat_tag *tag_list = malloc(sizeof(struct fieldstat_tag) * tag_num);
-    for (int j = 0; j < tag_num; j++) {
-        mpack_node_t tag = mpack_node_array_at(tag_arr, j);
-
-        mpack_node_t key = mpack_node_map_cstr(tag, "key");
-        tag_list[j].key = (const char *)malloc(mpack_node_strlen(key) + 1);
-        mpack_node_copy_cstr(key, (char *)tag_list[j].key, mpack_node_strlen(key) + 1);
-        tag_list[j].type = mpack_node_i8(mpack_node_map_cstr(tag, "type"));
-
-        mpack_node_t value = mpack_node_map_cstr(tag, "value");
-
-        switch (tag_list[j].type)
-        {
-            case TAG_INTEGER:
-                tag_list[j].value_longlong = mpack_node_i64(value);
-                break;
-            case TAG_DOUBLE:
-                tag_list[j].value_double = mpack_node_double(value);
-                break;
-            case TAG_CSTRING:
-                tag_list[j].value_str = (const char *)malloc(mpack_node_strlen(value) + 1);
-                mpack_node_copy_cstr(value, (char *)tag_list[j].value_str, mpack_node_strlen(value) + 1);
-                break;
-            default:
-                assert(0);
-                break;
-        }
-    }
-    *tag_list_out = tag_list;
-    *tag_num_out = tag_num;
-
-    mpack_tree_destroy(&tree);
-}
-
-
 /*
 {
     "ver": <EXPORT_VER>
@@ -687,6 +536,14 @@ struct fieldstat *fieldstat_deserialize(const char *blob, size_t blob_size)
 /* -------------------------------------------------------------------------- */
 /*                                    merge                                   */
 /* -------------------------------------------------------------------------- */
+
+void fieldstat_merge_init_utils(struct fieldstat *instance)
+{
+    struct merge_util *util = instance->merge_util;
+    util->shared_tag_cube_manager = cell_manager_new(SAMPLING_MODE_COMPREHENSIVE, INT_MAX); // for SAMPLING_MODE_COMPREHENSIVE map, max_n_cell will not cause any effect.
+                                                                                        // Just make sure shared_tag_cube_manager is big enough.
+    util->metric_name_id_map = NULL;
+}
 
 void cube_push_all_cells_to_another_cell_manager(const struct fs_cube *src, struct cell_manager *cell_manager_aim)
 {
@@ -859,7 +716,6 @@ int fieldstat_cube_merge_topk(struct fs_cube *dest, const struct fs_cube *src)
     struct cell_manager *cell_manager_final = cell_manager_new(SAMPLING_MODE_TOPK, dest->max_n_cell);
     struct cell_manager *cell_manager_src = src->cell_manager;
     struct cell_manager *cell_manager_dest = dest->cell_manager;
-    struct metric_name_id_map *name_id_map_src = NULL;
     struct metric_name_id_map *name_id_map_dest = NULL;
     int *cell_ids_dest;
     size_t cell_id_count_dest;
@@ -867,7 +723,6 @@ int fieldstat_cube_merge_topk(struct fs_cube *dest, const struct fs_cube *src)
     size_t cell_id_count_src;
     struct metric *metrics_src;
     struct metric *metrics_dest;
-    name_id_map_init(&name_id_map_src, src);
     name_id_map_init(&name_id_map_dest, dest);
 
     // merge cell manager
@@ -967,14 +822,12 @@ int fieldstat_cube_merge_topk(struct fs_cube *dest, const struct fs_cube *src)
     dest->cell_manager = cell_manager_final;
 
     name_id_map_free(name_id_map_dest);
-    name_id_map_free(name_id_map_src);
 
     return 0;
 
 ERR:
     printf("ERR: fieldstat_cube_merge_topk failed\n");
     name_id_map_free(name_id_map_dest);
-    name_id_map_free(name_id_map_src);
     cell_manager_free(cell_manager_final);
 
     if (cell_ids_from_metric_src != NULL) {
@@ -998,7 +851,7 @@ int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
 {
     // tag_cube_id_map use cube shared tag as key, find cubes. Is is not a cell manager.
     struct cell_manager *tag_cube_id_map = cell_manager_new(SAMPLING_MODE_COMPREHENSIVE,
-        instance->valid_cube_arr_length + src->valid_cube_arr_length); // todo: 这个长度没必要这么长吧
+        instance->valid_cube_arr_length); // todo: 这个长度没必要这么长吧
 
     for (int i = 0; i < instance->valid_cube_arr_length; i++) {
         if (instance->cube[i] == NULL) {

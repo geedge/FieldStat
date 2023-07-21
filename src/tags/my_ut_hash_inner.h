@@ -22,7 +22,6 @@ int tag_hash_key_cmp(const struct tag_hash_key *a, const struct tag_hash_key *b)
 
 #define HASH_KEYCMP(a, b, n) (tag_hash_key_cmp((const struct tag_hash_key *)a, (const struct tag_hash_key *)b))
 
-
 #include "uthash.h"
 
 #define HASH_ADD_TAG(head,fieldname,add)                                \
@@ -32,8 +31,6 @@ int tag_hash_key_cmp(const struct tag_hash_key *a, const struct tag_hash_key *b)
   HASH_FIND(hh, head, keyptr, 1, out)
 
 
-
-// todo: define HASH_KEYCMP
 
 #ifdef __cplusplus
 }

@@ -2,39 +2,99 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
+#include <string.h>
 
 #include "mpack/mpack.h"
 #include "my_ut_hash_inner.h"
 #include "my_ut_hash.h"
 #include "tag_id_map.h"
 
-#define USING_BASE_HASH HASH_JEN
+// #define USING_BASE_HASH HASH_JEN
+#define USING_BASE_HASH HASH_SFH
 
 int simple_hash_cnt = 0;
 int hash_cnt = 0;
 
-struct my_hash_tag {
-    char *key;
-    size_t key_len; // including '\0'
-    unsigned char *value;
-    size_t value_len; // sizeof(value) if INT or DOUBLE, strlen(value) + 1 if CSTRING
+void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_tags, char **out_key, size_t *out_key_size)
+{
+	int i = 0;
+	int used_len = 0;
+	struct fieldstat_tag *tag = NULL;
 
-    enum fs_tag_type tag_type; // not used for hash.
-};
+    char one_time_key[1024] = {0};
+    size_t tmp_key_size = sizeof(one_time_key);
+    size_t remain_key_size = tmp_key_size;
+    size_t total_key_size = tmp_key_size;
+    char *dynamic_mem = (char *)malloc(remain_key_size);
+    size_t key_len;
+    size_t val_len;
+
+	for(i = 0; i < (int)n_tags; i++)
+	{
+		tag = (struct fieldstat_tag *)&tags[i];
+		switch(tag->type)
+		{
+			case 0:
+                key_len = strlen(tag->key);
+                val_len = sizeof(long long);
+                used_len = key_len + val_len;
+                memcpy(one_time_key, tag->key, key_len);
+                memcpy(one_time_key + key_len, &tag->value_longlong, val_len);
+				break;
+			case 1:
+                key_len = strlen(tag->key);
+                val_len = sizeof(double);
+                used_len = key_len + val_len;
+                memcpy(one_time_key, tag->key, key_len);
+                memcpy(one_time_key + key_len, &tag->value_double, val_len);
+				break;
+			case 2:
+                key_len = strlen(tag->key);
+                val_len = strlen(tag->value_str);
+                used_len = key_len + val_len;
+                memcpy(one_time_key, tag->key, key_len);
+                memcpy(one_time_key + key_len, tag->value_str, val_len);
+				break;
+			default:
+				assert(0);
+				break;
+		}
+        
+        if (used_len >= remain_key_size) {
+            total_key_size += tmp_key_size;
+            dynamic_mem = (char *)realloc(dynamic_mem, total_key_size);
+            remain_key_size += tmp_key_size;
+        }
+
+        memcpy(dynamic_mem + total_key_size - remain_key_size, one_time_key, used_len);
+        remain_key_size -= used_len;
+	}
+
+    *out_key = (char *)malloc(total_key_size - remain_key_size + 1);
+    memcpy(*out_key, dynamic_mem, total_key_size - remain_key_size);
+    (*out_key)[total_key_size - remain_key_size] = '\0';
+    *out_key_size = total_key_size - remain_key_size; // not include '\0'
+
+    free(dynamic_mem);
+}
 
 struct tag_hash_key {
-    struct my_hash_tag *my_tag;
+    char *compound_key;
+    size_t compound_key_len; // excluding '\0'
+    
+    struct fieldstat_tag *tags; // not used for hash, just to recover the original tags.
     size_t n_my_tag;
     bool is_hashed;
     unsigned int hashv;
 };
 
-void my_hash_key_list_add(struct tag_id_map **tbl, struct tag_id_map *node)
+inline void my_hash_key_list_add(struct tag_id_map **tbl, struct tag_id_map *node)
 {
     HASH_ADD_TAG(*tbl, tag, node);
 }
 
-struct tag_id_map *my_hash_key_list_find(const struct tag_id_map *tbl, const struct tag_hash_key *my_hash_key)
+inline struct tag_id_map *my_hash_key_list_find(const struct tag_id_map *tbl, const struct tag_hash_key *my_hash_key)
 {
     struct tag_id_map *node = NULL;
     HASH_FIND_TAG(tbl, my_hash_key, node);
@@ -49,101 +109,205 @@ unsigned int tag_hash_key_cal_hash_value(struct tag_hash_key *my_hash_key)
     }
     hash_cnt++;
     unsigned int hashv = 0;
-    unsigned int result = 0;
-    struct my_hash_tag *tmp_pst_hashed_tag = my_hash_key->my_tag;
-    for (int i = 0; i < my_hash_key->n_my_tag; i++)
-    {
-        USING_BASE_HASH(tmp_pst_hashed_tag->key, tmp_pst_hashed_tag->key_len, hashv);
-        result = hashv;
-        USING_BASE_HASH(tmp_pst_hashed_tag->value, tmp_pst_hashed_tag->value_len, hashv);
-        result += hashv;
+    USING_BASE_HASH(my_hash_key->compound_key, my_hash_key->compound_key_len, hashv);
 
-        tmp_pst_hashed_tag++;
-    }
-    my_hash_key->hashv = result;
+    my_hash_key->hashv = hashv;
     my_hash_key->is_hashed = true;
-    return result;
+    return hashv;
 }
 
 int tag_hash_key_cmp(const struct tag_hash_key *a, const struct tag_hash_key *b)
 {
-    if (a->is_hashed && b->is_hashed) {
-        if (a->hashv != b->hashv) {
-            return 1;
-        }
-        // if equal, must continue to compare, because hash collision may happen.
-    }
-
     if (a->n_my_tag != b->n_my_tag) {
         return 1;
     }
-    struct my_hash_tag *a_tag = a->my_tag;
-    struct my_hash_tag *b_tag = b->my_tag;
-    for (int i = 0; i < a->n_my_tag; i++) {
-        if (a_tag->key_len != b_tag->key_len) {
-            return 1;
-        }
-        if (memcmp(a_tag->key, b_tag->key, a_tag->key_len) != 0) {
-            return 1;
-        }
-        if (a_tag->value_len != b_tag->value_len) {
-            return 1;
-        }
-        if (memcmp(a_tag->value, b_tag->value, a_tag->value_len) != 0) {
-            return 1;
-        }
-        a_tag++;
-        b_tag++;
+    if (a->compound_key_len != b->compound_key_len) {
+        return 1;
+    }
+    if (memcmp(a->compound_key, b->compound_key, a->compound_key_len) != 0) {
+        return 1;
     }
     return 0;
 }
 
-void convert_fieldstat_tag_to_my_hash_tag(const struct fieldstat_tag *src, struct my_hash_tag *dst)
+/* -------------------------------------------------------------------------- */
+/*                                  fieldtag                                  */
+/* -------------------------------------------------------------------------- */
+
+void fieldtag_copy(struct fieldstat_tag *dest, const struct fieldstat_tag *src)
 {
-    dst->tag_type = src->type;
-    size_t key_len = strlen(src->key) + 1;
-    dst->key = (char *)malloc(key_len);
-    memcpy(dst->key, src->key, key_len);
-    dst->key_len = key_len;
-    unsigned char *value = NULL;
-    switch (src->type)
+    dest->key = strdup(src->key);
+    dest->type = src->type;
+    switch(src->type)
     {
-    case TAG_INTEGER:
-        value = (unsigned char *)malloc(sizeof(long long));
-        memcpy(value, &(src->value_longlong), sizeof(long long));
-        dst->value_len = sizeof(long long);
-        break;
-    case TAG_DOUBLE:
-        value = (unsigned char *)malloc(sizeof(double));
-        memcpy(value, &(src->value_double), sizeof(double));
-        dst->value_len = sizeof(double);
-        break;
-    case TAG_CSTRING:{
-        size_t value_len = strlen(src->value_str) + 1;
-        value = (unsigned char *)malloc(value_len);
-        memcpy(value, src->value_str, value_len);
-        dst->value_len = value_len;
-        break;
+        case TAG_INTEGER:
+            dest->value_longlong = src->value_longlong;
+            break;
+        case TAG_DOUBLE:
+            dest->value_double = src->value_double;
+            break;
+        case TAG_CSTRING:
+            dest->value_str = strdup(src->value_str);
+            break;
+        default:
+            assert(0);
+            break;
     }
-    default:
-        break;
+}
+
+inline void fieldtag_clear(struct fieldstat_tag *tag)
+{
+    free((char *)tag->key);
+    if (tag->type == TAG_CSTRING) {
+        free((char *)tag->value_str);
     }
-    dst->value = value;
+}
+
+void fieldtag_list_free(struct fieldstat_tag *tags, size_t n_tags)
+{
+    for (int i = 0; i < (int)n_tags; i++) {
+        fieldtag_clear(&tags[i]);
+    }
+    free(tags);
+}
+
+// todo: 现在cell 的tag没有sorted。想想怎么办，是不是干脆在add的时候sort掉得了
+int my_cmp_tag(const void *a, const void *b)
+{
+    struct fieldstat_tag *aa = (struct fieldstat_tag *)a;
+    struct fieldstat_tag *bb = (struct fieldstat_tag *)b;
+    int key_cmp = strcmp(aa->key, bb->key);
+    if (key_cmp != 0) {
+        return key_cmp;
+    }
+
+    switch (aa->type) {
+        case TAG_INTEGER:
+            return aa->value_longlong - bb->value_longlong;
+        case TAG_DOUBLE:
+            return aa->value_double - bb->value_double;
+        case TAG_CSTRING:
+            return strcmp(aa->value_str, bb->value_str);
+        default:
+            return 0;
+    }
+}
+
+/* 
+    [{
+        "key":<tag key string>
+        "type":0 1 or 2
+        "value":<tag value, can be int(0) double(1) or str(2)>
+    }]
+*/
+void fieldtag_list_serialize(const struct fieldstat_tag *tag_list, size_t tag_num, char **blob, size_t *blob_size)
+{
+    struct fieldstat_tag *tag_list_sorted = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * tag_num);
+    for (int i = 0; i < tag_num; i++) {
+        fieldtag_copy(&tag_list_sorted[i], &tag_list[i]);
+    }
+    // sort tag so that when merge by blob, we can merge cells with the same tags
+    qsort(tag_list_sorted, tag_num, sizeof(struct fieldstat_tag), my_cmp_tag);
+
+    mpack_writer_t writer;
+    mpack_writer_init_growable(&writer, blob, blob_size);
+
+    mpack_start_array(&writer, tag_num);
+    for (int j = 0; j < tag_num; j++) {
+        mpack_start_map(&writer, 3);
+        mpack_write_cstr(&writer, "key");
+        mpack_write_cstr(&writer, tag_list_sorted[j].key);
+        mpack_write_cstr(&writer, "type");
+        mpack_write_i8(&writer, tag_list_sorted[j].type);
+        mpack_write_cstr(&writer, "value");
+        switch (tag_list_sorted[j].type)
+        {
+            case TAG_INTEGER:
+                mpack_write_i64(&writer, tag_list_sorted[j].value_longlong);
+                break;
+            case TAG_DOUBLE:
+                mpack_write_double(&writer, tag_list_sorted[j].value_double);
+                break;
+            case TAG_CSTRING:
+                mpack_write_cstr(&writer, tag_list_sorted[j].value_str);
+                break;
+            default:
+                assert(0);
+                break;
+        }
+        mpack_finish_map(&writer);
+    }
+    mpack_finish_array(&writer);
+
+    if (mpack_writer_destroy(&writer) != mpack_ok) {
+        printf("ERR mpack writer fieldtag_list_serialize destroy failed\n");
+    }
+
+    fieldtag_list_free(tag_list_sorted, tag_num);
+}
+
+void fieldtag_list_deserialize(const char *blob, size_t blob_size, struct fieldstat_tag **tag_list_out, size_t *tag_num_out)
+{
+    mpack_tree_t tree;
+    mpack_tree_init_data(&tree, blob, blob_size);
+    mpack_tree_parse(&tree);
+    mpack_node_t tag_arr = mpack_tree_root(&tree);
+
+    size_t tag_num = mpack_node_array_length(tag_arr);
+
+    struct fieldstat_tag *tag_list = malloc(sizeof(struct fieldstat_tag) * tag_num);
+    for (int j = 0; j < tag_num; j++) {
+        mpack_node_t tag = mpack_node_array_at(tag_arr, j);
+
+        mpack_node_t key = mpack_node_map_cstr(tag, "key");
+        tag_list[j].key = (const char *)malloc(mpack_node_strlen(key) + 1);
+        mpack_node_copy_cstr(key, (char *)tag_list[j].key, mpack_node_strlen(key) + 1);
+        tag_list[j].type = mpack_node_i8(mpack_node_map_cstr(tag, "type"));
+
+        mpack_node_t value = mpack_node_map_cstr(tag, "value");
+
+        switch (tag_list[j].type)
+        {
+            case TAG_INTEGER:
+                tag_list[j].value_longlong = mpack_node_i64(value);
+                break;
+            case TAG_DOUBLE:
+                tag_list[j].value_double = mpack_node_double(value);
+                break;
+            case TAG_CSTRING:
+                tag_list[j].value_str = (const char *)malloc(mpack_node_strlen(value) + 1);
+                mpack_node_copy_cstr(value, (char *)tag_list[j].value_str, mpack_node_strlen(value) + 1);
+                break;
+            default:
+                assert(0);
+                break;
+        }
+    }
+    *tag_list_out = tag_list;
+    *tag_num_out = tag_num;
+
+    mpack_tree_destroy(&tree);
 }
 
 struct tag_hash_key *tag_hash_key_construct_with_fieldstat_tag(const struct fieldstat_tag *src, size_t n_src)
 {
-    struct my_hash_tag *my_hash_tag_arr = (struct my_hash_tag *)malloc(sizeof(struct my_hash_tag) * n_src);
+    struct tag_hash_key *ret_hash_key = (struct tag_hash_key *)malloc(sizeof(struct tag_hash_key));
+
+    char *compound_key = NULL;
+    size_t compound_key_len = 0;
+    build_dynamic_cell_key(src, n_src, &compound_key, &compound_key_len);
+    ret_hash_key->compound_key = compound_key;
+    ret_hash_key->compound_key_len = compound_key_len;
+
+    ret_hash_key->tags = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * n_src);
     for (int i = 0; i < n_src; i++) {
-        convert_fieldstat_tag_to_my_hash_tag(src + i, my_hash_tag_arr + i);
+        fieldtag_copy(&ret_hash_key->tags[i], &src[i]);
     }
 
-    struct tag_hash_key *my_hash_key = (struct tag_hash_key *)malloc(sizeof(struct tag_hash_key));
-    my_hash_key->my_tag = my_hash_tag_arr;
-    my_hash_key->n_my_tag = n_src;
-    my_hash_key->hashv = 0;
-    my_hash_key->is_hashed = false;
-    return my_hash_key;
+    ret_hash_key->n_my_tag = n_src;
+    ret_hash_key->hashv = 0;
+    ret_hash_key->is_hashed = false;
+    return ret_hash_key;
 }
 
 void tag_hash_key_convert_to_fieldstat_tag(const struct tag_hash_key *tag_key, struct fieldstat_tag **out, size_t *n_out)
@@ -153,32 +317,8 @@ void tag_hash_key_convert_to_fieldstat_tag(const struct tag_hash_key *tag_key, s
     struct fieldstat_tag *ret_fieldstat_tag = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * ret_n_tag);
     *out = ret_fieldstat_tag;
 
-    struct my_hash_tag *tmp_pst_my_hash_tag = tag_key->my_tag;
-    for (int i = 0; i < ret_n_tag; i++)
-    {
-        ret_fieldstat_tag->key = (char *)malloc(tmp_pst_my_hash_tag->key_len);
-        memcpy((char *)ret_fieldstat_tag->key, tmp_pst_my_hash_tag->key, tmp_pst_my_hash_tag->key_len);
-
-        ret_fieldstat_tag->type = tmp_pst_my_hash_tag->tag_type;
-
-        switch (tmp_pst_my_hash_tag->tag_type)
-        {
-        case TAG_INTEGER:
-            memcpy(&(ret_fieldstat_tag->value_longlong), tmp_pst_my_hash_tag->value, sizeof(long long));
-            break;
-        case TAG_DOUBLE:
-            memcpy(&(ret_fieldstat_tag->value_double), tmp_pst_my_hash_tag->value, sizeof(double));
-            break;
-        case TAG_CSTRING:
-            ret_fieldstat_tag->value_str = (char *)malloc(tmp_pst_my_hash_tag->value_len);
-            memcpy((char *)ret_fieldstat_tag->value_str, tmp_pst_my_hash_tag->value, tmp_pst_my_hash_tag->value_len);
-            break;
-        default:
-            break;
-        }
-
-        ret_fieldstat_tag++;
-        tmp_pst_my_hash_tag++;
+    for (int i = 0; i < ret_n_tag; i++) {
+        fieldtag_copy(&ret_fieldstat_tag[i], &tag_key->tags[i]);
     }
 }
 
@@ -188,21 +328,13 @@ struct tag_hash_key *tag_hash_key_copy(const struct tag_hash_key *src)
     dst->n_my_tag = src->n_my_tag;
     dst->is_hashed = src->is_hashed;
     dst->hashv = src->hashv;
-    dst->my_tag = (struct my_hash_tag *)malloc(sizeof(struct my_hash_tag) * src->n_my_tag);
-    for (int i = 0; i < src->n_my_tag; i++)
-    {
-        struct my_hash_tag *dst_tag = dst->my_tag + i;
-        struct my_hash_tag *src_tag = src->my_tag + i;
-    
-        dst_tag->key_len = src_tag->key_len;
-        dst_tag->key = (char *)malloc(src_tag->key_len);
-        memcpy(dst_tag->key, src_tag->key, src_tag->key_len);
-    
-        dst_tag->value_len = src_tag->value_len;
-        dst_tag->value = (unsigned char *)malloc(src_tag->value_len);
-        memcpy(dst_tag->value, src_tag->value, src_tag->value_len);
-    
-        dst_tag->tag_type = src_tag->tag_type;
+    dst->compound_key_len = src->compound_key_len;
+    dst->compound_key = (char *)malloc(dst->compound_key_len);
+    memcpy(dst->compound_key, src->compound_key, dst->compound_key_len);
+
+    dst->tags = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * dst->n_my_tag);
+    for (int i = 0; i < dst->n_my_tag; i++) {
+        fieldtag_copy(&dst->tags[i], &src->tags[i]);
     }
 
     return dst;
@@ -210,57 +342,29 @@ struct tag_hash_key *tag_hash_key_copy(const struct tag_hash_key *src)
 
 void tag_hash_key_free(struct tag_hash_key *tag_key)
 {
-    struct my_hash_tag *my_hash_tag_arr = tag_key->my_tag;
-    for (int i = 0; i < tag_key->n_my_tag; i++)
-    {
-        free(my_hash_tag_arr[i].key);
-        free(my_hash_tag_arr[i].value);
-    }
-    free(tag_key->my_tag);
+    fieldtag_list_free(tag_key->tags, tag_key->n_my_tag);
+    free(tag_key->compound_key);
+
     free(tag_key);
 }
 
 // FNV-1a hash (http://www.isthe.com/chongo/tech/comp/fnv/)
 unsigned tag_hash_key_cal_fnv_hash(const struct tag_hash_key *tag, unsigned seed) {
-    uint32_t h = 2166136261UL + (seed * 15);
-
-    struct my_hash_tag *my_hash_tag_arr = tag->my_tag;
-    size_t n_tag = tag->n_my_tag;
-    size_t key_len, val_len;
-    char *key;
-    unsigned char *value;
-    for (int i = 0; i < n_tag; i++) {
-        key_len = my_hash_tag_arr[i].key_len;
-        key = my_hash_tag_arr[i].key;
-
-        for (int j = 0; j < key_len; j++) {
-            h = h ^ (unsigned char)key[j];
-            h = h * 16777619UL;
-        }
-        val_len = my_hash_tag_arr[i].value_len;
-        value = my_hash_tag_arr[i].value;
-        for (int j = 0; j < val_len; j++) {
-            h = h ^ value[j];
-            h = h * 16777619UL;
-        }
+    const char *key = tag->compound_key;
+    size_t len = tag->compound_key_len;
+    size_t i;
+    uint32_t h = 2166136261UL + (seed * 15);  // FNV_OFFSET 32 bit with magic number seed
+    for (i = 0; i < len; ++i) {
+        h = h ^ (unsigned char)key[i];
+        h = h * 16777619UL;  // FNV_PRIME 32 bit
     }
-
     return h;
 }
 
 /*
 {
     "tags": [
-        {
-            "k": "tag1",
-            "v": "value1"
-            "t":0/1/2
-        },
-        {
-            "k": "tag2",
-            "v": "value2"
-            "t":0/1/2
-        }
+        <fieldstat tag serialized result>
     ],
     "hashed":true,
     "hashv": 0,
@@ -274,20 +378,11 @@ void tag_hash_key_serialize(const struct tag_hash_key *tag, char **blob, size_t 
     mpack_build_map(&writer);
 
     mpack_write_cstr(&writer, "tags");
-    mpack_start_array(&writer, tag->n_my_tag);
-    for (int i = 0; i < tag->n_my_tag; i++)
-    {
-        struct my_hash_tag *my_hash_tag = tag->my_tag + i;
-        mpack_start_map(&writer, 3);
-        mpack_write_cstr(&writer, "k");
-        mpack_write_bin(&writer, my_hash_tag->key, my_hash_tag->key_len);
-        mpack_write_cstr(&writer, "v");
-        mpack_write_bin(&writer, (const char *)my_hash_tag->value, my_hash_tag->value_len);
-        mpack_write_cstr(&writer, "t");
-        mpack_write_u8(&writer, my_hash_tag->tag_type);
-        mpack_finish_map(&writer);
-    }
-    mpack_finish_array(&writer);
+    char *blob_tag;
+    size_t blob_size_tag;
+    fieldtag_list_serialize(tag->tags, tag->n_my_tag, &blob_tag, &blob_size_tag);
+    mpack_write_bin(&writer, blob_tag, blob_size_tag);
+    free(blob_tag);
 
     mpack_write_cstr(&writer, "hashed");
     mpack_write_bool(&writer, tag->is_hashed);
@@ -309,39 +404,30 @@ struct tag_hash_key *tag_hash_key_deserialize(const char *blob, size_t blob_size
     mpack_node_t root = mpack_tree_root(&tree);
 
     mpack_node_t tags = mpack_node_map_cstr(root, "tags");
-    size_t n_tag = mpack_node_array_length(tags);
-    struct my_hash_tag *my_hash_tag_arr = (struct my_hash_tag *)malloc(sizeof(struct my_hash_tag) * n_tag);
-    for (int i = 0; i < n_tag; i++)
-    {
-        struct my_hash_tag *my_hash_tag = my_hash_tag_arr + i;
-        mpack_node_t tag_node = mpack_node_array_at(tags, i);
-        mpack_node_t value = mpack_node_map_cstr(tag_node, "v");
-        mpack_node_t key = mpack_node_map_cstr(tag_node, "k");
-
-        my_hash_tag->key_len = mpack_node_bin_size(key);
-        my_hash_tag->key = (char *)malloc(my_hash_tag->key_len);
-        memcpy(my_hash_tag->key, mpack_node_bin_data(key), my_hash_tag->key_len);
-
-        my_hash_tag->value_len = mpack_node_bin_size(value);
-        my_hash_tag->value = (unsigned char *)malloc(my_hash_tag->value_len);
-        memcpy(my_hash_tag->value, mpack_node_bin_data(value), my_hash_tag->value_len);
-
-        my_hash_tag->tag_type = mpack_node_u8(mpack_node_map_cstr(tag_node, "t"));
-    }
+    struct fieldstat_tag *fieldstat_tag_arr;
+    size_t n_tag;
+    fieldtag_list_deserialize(mpack_node_bin_data(tags), mpack_node_bin_size(tags), &fieldstat_tag_arr, &n_tag);
 
     bool is_hashed = mpack_node_bool(mpack_node_map_cstr(root, "hashed"));
     unsigned hashv_val = mpack_node_u32(mpack_node_map_cstr(root, "hashv"));
+    
+    char *compound_key;
+    size_t compound_key_len;
+    build_dynamic_cell_key(fieldstat_tag_arr, n_tag, &compound_key, &compound_key_len);
 
-    struct tag_hash_key *my_hash_key = (struct tag_hash_key *)malloc(sizeof(struct tag_hash_key));
-    my_hash_key->my_tag = my_hash_tag_arr;
-    my_hash_key->n_my_tag = n_tag;
-    my_hash_key->is_hashed = is_hashed;
-    my_hash_key->hashv = hashv_val;
+    struct tag_hash_key *ret_hash_key = (struct tag_hash_key *)malloc(sizeof(struct tag_hash_key));
+    ret_hash_key->compound_key = compound_key;
+    ret_hash_key->compound_key_len = compound_key_len;
+    ret_hash_key->tags = fieldstat_tag_arr;
+    ret_hash_key->n_my_tag = n_tag;
+    ret_hash_key->is_hashed = is_hashed;
+    ret_hash_key->hashv = hashv_val;
 
     mpack_tree_destroy(&tree);
-    return my_hash_key;
+    return ret_hash_key;
 }
 
+// todo: delete them
 
 int tmp_get_hash_count()
 {
