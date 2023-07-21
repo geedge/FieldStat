@@ -577,26 +577,8 @@ struct fs_cube *fieldstat_cube_dup(const struct fs_cube *cube)
     cube_dup->cell_manager = cm_dup;
 
     for (int i = 0; i < cube->n_metric; i ++) {
-        struct metric *metric_dup = metric_copy_structure(cube->metrics[i]);
-        // todo: copy metric
-
-        int *cell_ids_from_metric_src;  
-        size_t cell_id_count_src;
-
-        metric_get_cell_ids(cube->metrics[i], &cell_ids_from_metric_src, &cell_id_count_src);
-        for (int j = 0; j < cell_id_count_src; j++) {
-            int cell_id = cell_ids_from_metric_src[j];
-            
-            const struct tag_hash_key *tag_key_src = cell_manager_get_tag_by_cell_id(cm_src, cell_id);
-            if (tag_key_src == NULL) {
-                printf("ERR: fieldstat_cube_dup: cell_manager_get_tag_by_cell_id failed\n");
-                continue;
-            }
-            int cell_id_dest = cell_manager_get_cell_id_by_tag(cm_dup, tag_key_src);
-            metric_merge_or_copy_cell(metric_dup, cube->metrics[i], cell_id_dest, cell_id);
-        }
+        struct metric *metric_dup = metric_copy(cube->metrics[i]);
         append_metric_to_cube(cube_dup, metric_dup);
-        free(cell_ids_from_metric_src);
     }
     return cube_dup;
 }

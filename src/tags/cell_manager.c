@@ -367,7 +367,7 @@ struct cell_manager *cell_manager_copy(const struct cell_manager *src)
 
     if (src->sampling_mode == SAMPLING_MODE_TOPK) {
         pthis->topk_tag_id_map = heavy_keeper_with_data_new(heavy_keeper_get_config_K(src->topk_tag_id_map));
-        heavy_keeper_merge(pthis->topk_tag_id_map, src->topk_tag_id_map); // todo: 另外写一个copy 函数
+        heavy_keeper_merge(pthis->topk_tag_id_map, src->topk_tag_id_map); // todo: 另外写一个copy 函数, 要保证sorted set 里的 cell id 也是copy 过去的
     }
     pthis->next_cell_id = src->next_cell_id;
     return pthis;

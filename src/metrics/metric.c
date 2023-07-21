@@ -458,6 +458,22 @@ struct metric *metric_copy_structure(const struct metric *src)
     return dst;
 }
 
+struct metric *metric_copy(const struct metric *src)
+{
+    struct metric *dst = metric_copy_structure(src);
+    dst->n_array_item = src->n_array_item;
+
+    for (int i = 0; i < src->n_array_item; i++) {
+        if (src->data_array[i] == NULL) {
+            continue;
+        }
+        struct metric_measure_data *dest_data = src->scheme->new(src->info->paras);
+        src->scheme->copy(dest_data, src->data_array[i]);
+        dst->data_array[i] = dest_data;
+    }
+    return dst;
+}
+
 /*
 
 ---------------------------------- counter ---------------------------------- 
