@@ -152,6 +152,10 @@ int cell_manager_get_count_by_tag(const struct cell_manager *pthis, const struct
 
 int cell_manager_comprehensive_map_add(struct cell_manager *pthis, const struct tag_hash_key *tag, int cell_id, int *existing_cell_id)
 {
+    if (HASH_COUNT(pthis->comprehensive_tag_id_map) >= pthis->max_cell_num) {
+        return -1;
+    }
+
     struct tag_id_map *node = NULL;
     if (HASH_COUNT(pthis->comprehensive_tag_id_map) != 0) {
         node = my_hash_key_list_find(pthis->comprehensive_tag_id_map, tag);
@@ -160,9 +164,6 @@ int cell_manager_comprehensive_map_add(struct cell_manager *pthis, const struct 
     if (node != NULL) {
         *existing_cell_id = node->cell_id;
         return 0;
-    }
-    if (HASH_COUNT(pthis->comprehensive_tag_id_map) >= pthis->max_cell_num) {
-        return -1;
     }
 
     node = (struct tag_id_map *)malloc(sizeof(struct tag_id_map));
@@ -343,5 +344,31 @@ struct cell_manager *cell_manager_deserialize(const char *blob, size_t blob_size
     pthis->next_cell_id = cell_id_max + 1;
 
     mpack_tree_destroy(&tree);
+    return pthis;
+}
+
+struct cell_manager *cell_manager_copy(const struct cell_manager *src)
+{
+    struct cell_manager *pthis = cell_manager_new_without_map(src->sampling_mode, src->max_cell_num);
+
+    // copy id_tag_map
+    struct id_tag_map *node = NULL;
+    struct id_tag_map *tmp = NULL;
+    HASH_ITER(hh, src->id_tag_map, node, tmp) {
+        cell_manager_id_tag_map_add(pthis, node->cell_id, node->tag);
+
+        if (src->sampling_mode == SAMPLING_MODE_COMPREHENSIVE) {
+            struct tag_id_map *tmp_node = (struct tag_id_map *)malloc(sizeof(struct tag_id_map));
+            tmp_node->tag = tag_hash_key_copy(node->tag);
+            tmp_node->cell_id = node->cell_id;
+            my_hash_key_list_add(&pthis->comprehensive_tag_id_map, tmp_node);
+        }
+    }
+
+    if (src->sampling_mode == SAMPLING_MODE_TOPK) {
+        pthis->topk_tag_id_map = heavy_keeper_with_data_new(heavy_keeper_get_config_K(src->topk_tag_id_map));
+        heavy_keeper_merge(pthis->topk_tag_id_map, src->topk_tag_id_map); // todo: 另外写一个copy 函数
+    }
+    pthis->next_cell_id = src->next_cell_id;
     return pthis;
 }

@@ -89,12 +89,12 @@ struct tag_hash_key {
     unsigned int hashv;
 };
 
-inline void my_hash_key_list_add(struct tag_id_map **tbl, struct tag_id_map *node)
+void my_hash_key_list_add(struct tag_id_map **tbl, struct tag_id_map *node)
 {
     HASH_ADD_TAG(*tbl, tag, node);
 }
 
-inline struct tag_id_map *my_hash_key_list_find(const struct tag_id_map *tbl, const struct tag_hash_key *my_hash_key)
+struct tag_id_map *my_hash_key_list_find(const struct tag_id_map *tbl, const struct tag_hash_key *my_hash_key)
 {
     struct tag_id_map *node = NULL;
     HASH_FIND_TAG(tbl, my_hash_key, node);

@@ -7,5 +7,5 @@ struct tag_id_map {
     UT_hash_handle hh;
 };
 
-extern inline void my_hash_key_list_add(struct tag_id_map **tbl, struct tag_id_map *node);
-extern inline struct tag_id_map *my_hash_key_list_find(const struct tag_id_map *tbl, const struct tag_hash_key *my_hash_key);
+void my_hash_key_list_add(struct tag_id_map **tbl, struct tag_id_map *node);
+struct tag_id_map *my_hash_key_list_find(const struct tag_id_map *tbl, const struct tag_hash_key *my_hash_key);

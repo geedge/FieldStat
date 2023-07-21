@@ -95,6 +95,10 @@ int fieldstat_unregister_cube(struct fieldstat *instance, int cube_id)
         printf("ERR: cube_id is out of range\n");
         return -1;
     }
+    if (instance->shared_tag_cube_manager != NULL) {
+        printf("ERR: cannot unregister cube when the instance is used for merging\n");
+        return -1;
+    }
     fieldstat_cube_free(instance, cube_id);
     instance->cube[cube_id] = NULL;
     instance->cube_version[cube_id]++;
@@ -567,13 +571,14 @@ struct fs_cube *fieldstat_cube_dup(const struct fs_cube *cube)
 {
     struct fs_cube *cube_dup = malloc(sizeof(struct fs_cube));
     fieldstat_cube_info_init(cube_dup, cube->shared_tags, cube->n_shared_tags, cube->sampling_mode, cube->max_n_cell);
-    struct cell_manager *cm_dup = cell_manager_new(cube->sampling_mode, cube->max_n_cell);
     struct cell_manager *cm_src = cube->cell_manager;
-    cube_push_all_cells_to_another_cell_manager(cube, cm_dup);
+
+    struct cell_manager *cm_dup = cell_manager_copy(cm_src);
     cube_dup->cell_manager = cm_dup;
 
     for (int i = 0; i < cube->n_metric; i ++) {
         struct metric *metric_dup = metric_copy_structure(cube->metrics[i]);
+        // todo: copy metric
 
         int *cell_ids_from_metric_src;  
         size_t cell_id_count_src;

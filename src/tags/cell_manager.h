@@ -10,6 +10,7 @@ struct cell_manager;
 
 void cell_manager_free(struct cell_manager *pthis);
 struct cell_manager *cell_manager_new(enum sampling_mode sampling_mode, int max_cell_num);
+struct cell_manager *cell_manager_copy(const struct cell_manager *src);
 void cell_manager_reset(struct cell_manager *pthis);
 
 int cell_manager_get_cell_id_by_tag(const struct cell_manager *pthis, const struct tag_hash_key *tag);

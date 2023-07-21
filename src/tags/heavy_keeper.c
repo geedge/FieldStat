@@ -372,15 +372,12 @@ void heavy_keeper_merge_sorted_set(struct heavy_keeper *dest, const struct heavy
     }
 
     sorted_set_dump(src->top_K_heap, count_arr, tag_arr, (void **)user_datas_dummy);
-
     for (int i = 0; i < size_src; i++) {
         if (sorted_set_get_count(new_rec, tag_arr[i]) != 0) {
             continue;
         }
-
         // the dest heavy keeper has been merged, so the maxv is the maxv in the merged sketch, instead of the dest sketch
         unsigned maxv = find_maxv_in_sketch(dest, tag_arr[i]);
-
         if (insert_to_sorted_set(new_rec, tag_arr[i], maxv, new_allocated_tag_id)) {
             new_allocated_tag_id++;
         }
