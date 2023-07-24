@@ -329,8 +329,9 @@ struct tag_hash_key *tag_hash_key_copy(const struct tag_hash_key *src)
     dst->is_hashed = src->is_hashed;
     dst->hashv = src->hashv;
     dst->compound_key_len = src->compound_key_len;
-    dst->compound_key = (char *)malloc(dst->compound_key_len);
+    dst->compound_key = (char *)malloc(dst->compound_key_len + 1);
     memcpy(dst->compound_key, src->compound_key, dst->compound_key_len);
+    dst->compound_key[dst->compound_key_len] = '\0';
 
     dst->tags = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * dst->n_my_tag);
     for (int i = 0; i < dst->n_my_tag; i++) {

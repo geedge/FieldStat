@@ -761,10 +761,6 @@ void metric_rearrange_cell_id(struct metric *pthis, int *original_id, int *final
     }
 
     for (int i = 0; i < valid_id_count; i++) {
-        if (final_id[i] >= pthis->max_n_array_item) {
-            printf("ERR: metric_rearrange_cell_id: final_id %d exceed max_n_array_item %zu\n", final_id[i], pthis->max_n_array_item);
-            continue;
-        }
         metric_add_one_cell(pthis, final_id[i], tmp_node_arr[i]);
     }
 }

@@ -11,21 +11,18 @@
 #include "tags/my_ut_hash.h"
 #include "tags/tag_id_map.h"
 
-struct id_tag_map {
-    int cell_id;
-    struct tag_hash_key *tag;
-    UT_hash_handle hh;
-};
-
 struct cell_manager {
     union {
         struct heavy_keeper *topk_tag_id_map;
         struct tag_id_map *comprehensive_tag_id_map;
     };
-    struct id_tag_map *id_tag_map;
+    struct tag_hash_key **id_tag_array;
+    int id_tag_array_len;
+    int max_cell_id;
+
     enum sampling_mode sampling_mode;
     int max_cell_num;
-    int next_cell_id; // only used in comprehensive mode
+    int next_cell_id;
 };
 
 struct cell_manager *cell_manager_new_without_map(enum sampling_mode sampling_mode, int max_cell_num)
@@ -36,6 +33,11 @@ struct cell_manager *cell_manager_new_without_map(enum sampling_mode sampling_mo
     cell_manager->sampling_mode = sampling_mode;
     cell_manager->max_cell_num = max_cell_num;
     cell_manager->next_cell_id = 0;
+
+    cell_manager->id_tag_array_len = max_cell_num;
+    cell_manager->id_tag_array = (struct tag_hash_key **)malloc(sizeof(struct tag_hash_key *) * cell_manager->id_tag_array_len);
+    memset(cell_manager->id_tag_array, 0, sizeof(struct tag_hash_key *) * cell_manager->id_tag_array_len);
+    cell_manager->max_cell_id = -1;
 
     return cell_manager;
 }
@@ -55,13 +57,15 @@ struct cell_manager *cell_manager_new(enum sampling_mode sampling_mode, int max_
 
 void cell_manager_tag_cube_map_free(struct cell_manager *pthis)
 {
-    struct id_tag_map *node = NULL;
-    struct id_tag_map *tmp = NULL;
-    HASH_ITER(hh, pthis->id_tag_map, node, tmp) {
-        HASH_DEL(pthis->id_tag_map, node);
-        tag_hash_key_free(node->tag);
-        free(node);
+    struct tag_hash_key *node = NULL;
+    for (int i = 0; i <= pthis->max_cell_id; i++) {
+        node = pthis->id_tag_array[i];
+        if (node == NULL) {
+            continue;
+        }
+        tag_hash_key_free(node);
     }
+    free(pthis->id_tag_array);
 }
 
 void cell_manager_comprehensive_tag_id_map_free(struct cell_manager *pthis)
@@ -85,6 +89,9 @@ void cell_manager_reset(struct cell_manager *pthis)
     }
 
     cell_manager_tag_cube_map_free(pthis);
+    pthis->max_cell_id = -1;
+    pthis->id_tag_array = (struct tag_hash_key **)malloc(sizeof(struct tag_hash_key *) * pthis->id_tag_array_len);
+    memset(pthis->id_tag_array, 0, sizeof(struct tag_hash_key *) * pthis->id_tag_array_len);
 }
 
 void cell_manager_free(struct cell_manager *pthis)
@@ -102,22 +109,34 @@ void cell_manager_free(struct cell_manager *pthis)
 
 const struct tag_hash_key *cell_manager_get_tag_by_cell_id(const struct cell_manager *pthis, int cell_id)
 {
-    struct id_tag_map *hash_hdr = pthis->id_tag_map;
-    struct id_tag_map *node = NULL;
-    HASH_FIND_INT(hash_hdr, &cell_id, node);
+    struct tag_hash_key *node = pthis->id_tag_array[cell_id];
     if (node == NULL) {
         return NULL;
     }
 
-    return node->tag;
+    return node;
 }
 
-void cell_manager_id_tag_map_add(struct cell_manager *pthis, int cell_id, const struct tag_hash_key *tag)
+void cell_manager_id_tag_array_add(struct cell_manager *pthis, int cell_id, const struct tag_hash_key *tag)
 {
-    struct id_tag_map *node = (struct id_tag_map *)malloc(sizeof(struct id_tag_map));
-    node->cell_id = cell_id;
-    node->tag = tag_hash_key_copy(tag);
-    HASH_ADD_INT(pthis->id_tag_map, cell_id, node);
+    if (cell_id >= pthis->id_tag_array_len) {
+        int new_len = pthis->id_tag_array_len;
+        while (cell_id >= new_len) {
+            new_len *= 2;
+        }
+        struct tag_hash_key **new_array = (struct tag_hash_key **)malloc(sizeof(struct tag_hash_key *) * new_len);
+        memset(new_array, 0, sizeof(struct tag_hash_key *) * new_len);
+        memcpy(new_array, pthis->id_tag_array, sizeof(struct tag_hash_key *) * pthis->id_tag_array_len);
+        free(pthis->id_tag_array);
+        pthis->id_tag_array = new_array;
+        pthis->id_tag_array_len = new_len;
+    }
+
+    pthis->id_tag_array[cell_id] = tag_hash_key_copy(tag);
+
+    if (cell_id > pthis->max_cell_id) {
+        pthis->max_cell_id = cell_id;
+    }
 }
 
 int cell_manager_get_cell_id_by_tag(const struct cell_manager *pthis, const struct tag_hash_key *tag)
@@ -152,7 +171,9 @@ int cell_manager_get_count_by_tag(const struct cell_manager *pthis, const struct
 
 int cell_manager_comprehensive_map_add(struct cell_manager *pthis, const struct tag_hash_key *tag, int cell_id, int *existing_cell_id)
 {
+    printf("cell_manager_comprehensive_map_add\n");
     if (HASH_COUNT(pthis->comprehensive_tag_id_map) >= pthis->max_cell_num) {
+        printf("cell_manager_comprehensive_map_add: HASH_COUNT(pthis->comprehensive_tag_id_map) >= pthis->max_cell_num\n");
         return -1;
     }
 
@@ -163,6 +184,7 @@ int cell_manager_comprehensive_map_add(struct cell_manager *pthis, const struct 
 
     if (node != NULL) {
         *existing_cell_id = node->cell_id;
+        printf("cell_manager_comprehensive_map_add: node != NULL\n");
         return 0;
     }
 
@@ -191,14 +213,8 @@ int cell_manager_topk_map_add(struct cell_manager *pthis, const struct tag_hash_
     }
 
     if (*popped_cell_id != -1) { // popped one, then add the new one with new id
-        struct id_tag_map *node = NULL;
-        HASH_FIND_INT(pthis->id_tag_map, popped_cell_id, node);
-
-        if (node != NULL) {
-            HASH_DEL(pthis->id_tag_map, node);
-            tag_hash_key_free(node->tag);
-            free(node);
-        }
+        tag_hash_key_free(pthis->id_tag_array[*popped_cell_id]);
+        pthis->id_tag_array[*popped_cell_id] = NULL;
     }
     return ret;
 }
@@ -214,7 +230,7 @@ int cell_manager_add_cell(struct cell_manager *pthis, const struct tag_hash_key 
         return existing_cell_id;
     }
 
-    cell_manager_id_tag_map_add(pthis, pthis->next_cell_id, tag);
+    cell_manager_id_tag_array_add(pthis, pthis->next_cell_id, tag);
     return pthis->next_cell_id++;
 }
 
@@ -241,7 +257,7 @@ The number 5 was determined through experiment, where multiple tests were conduc
         return -1;
     }
 
-    cell_manager_id_tag_map_add(pthis, pthis->next_cell_id, tag);
+    cell_manager_id_tag_array_add(pthis, pthis->next_cell_id, tag);
     return pthis->next_cell_id++;
 }
 
@@ -251,7 +267,7 @@ The number 5 was determined through experiment, where multiple tests were conduc
     "mode":<sampling mode int8>
     "max_n_cell":<max cell number int32>
 
-    "id_tag_map": [{
+    "id_tag_array": [{
         "id": <id in cell manager>,
         "tags": [<my_tag_key serialized bin blob,...]
     "topk_map": <topk_serializing_blob>
@@ -267,23 +283,25 @@ int cell_manager_serialize(const struct cell_manager *pthis, char **blob, size_t
     mpack_write_cstr(&writer, "max_n_cell");
     mpack_write_i32(&writer, pthis->max_cell_num);
     
-    mpack_write_cstr(&writer, "id_tag_map");
+    mpack_write_cstr(&writer, "id_tag_array");
     mpack_build_array(&writer);
-    struct id_tag_map *node = NULL;
-    struct id_tag_map *tmp = NULL;
-    HASH_ITER(hh, pthis->id_tag_map, node, tmp) {
+    
+    for (int i = 0; i <= pthis->max_cell_id; i++) {
+        if (pthis->id_tag_array[i] == NULL) {
+            continue;
+        }
         mpack_build_map(&writer);
         mpack_write_cstr(&writer, "id");
-        mpack_write_int(&writer, node->cell_id);
+        mpack_write_int(&writer, i);
         mpack_write_cstr(&writer, "tags");
         char *tag_blob = NULL;
         size_t tag_blob_size = 0;
-        tag_hash_key_serialize(node->tag, &tag_blob, &tag_blob_size);
+        tag_hash_key_serialize(pthis->id_tag_array[i], &tag_blob, &tag_blob_size);
         mpack_write_bin(&writer, tag_blob, tag_blob_size);
         free(tag_blob);
         mpack_complete_map(&writer);
     }
-    mpack_complete_array(&writer); // id_tag_map
+    mpack_complete_array(&writer); // id_tag_array
 
     if (pthis->sampling_mode == SAMPLING_MODE_TOPK) {
         mpack_write_cstr(&writer, "topk_map");
@@ -313,17 +331,17 @@ struct cell_manager *cell_manager_deserialize(const char *blob, size_t blob_size
     int max_n_cell = mpack_node_i32(mpack_node_map_cstr(root, "max_n_cell"));
     struct cell_manager *pthis = cell_manager_new_without_map(mode, max_n_cell);
 
-    mpack_node_t id_tag_map = mpack_node_map_cstr(root, "id_tag_map");
-    int n_cell = mpack_node_array_length(id_tag_map);
+    mpack_node_t id_tag_array = mpack_node_map_cstr(root, "id_tag_array");
+    int n_cell = mpack_node_array_length(id_tag_array);
     int cell_id_max = -1;
     for (int i = 0; i < n_cell; i++) {
-        mpack_node_t cell = mpack_node_array_at(id_tag_map, i);
+        mpack_node_t cell = mpack_node_array_at(id_tag_array, i);
         int cell_id = mpack_node_i32(mpack_node_map_cstr(cell, "id"));
         mpack_node_t tags_node = mpack_node_map_cstr(cell, "tags");
         const char *tag_blob = mpack_node_bin_data(tags_node);
         size_t tag_blob_size = mpack_node_bin_size(tags_node);
         struct tag_hash_key *tag = tag_hash_key_deserialize(tag_blob, tag_blob_size);
-        cell_manager_id_tag_map_add(pthis, cell_id, tag);
+        cell_manager_id_tag_array_add(pthis, cell_id, tag);
         if (mode == SAMPLING_MODE_COMPREHENSIVE) {
             int dummy;
             cell_manager_comprehensive_map_add(pthis, tag, cell_id, &dummy);
@@ -351,16 +369,18 @@ struct cell_manager *cell_manager_copy(const struct cell_manager *src)
 {
     struct cell_manager *pthis = cell_manager_new_without_map(src->sampling_mode, src->max_cell_num);
 
-    // copy id_tag_map
-    struct id_tag_map *node = NULL;
-    struct id_tag_map *tmp = NULL;
-    HASH_ITER(hh, src->id_tag_map, node, tmp) {
-        cell_manager_id_tag_map_add(pthis, node->cell_id, node->tag);
+    // copy id_tag_array
+    for (int i = 0; i <= src->max_cell_id; i++) {
+        struct tag_hash_key *tag = src->id_tag_array[i];
+        if (tag == NULL) {
+            continue;
+        }
+        cell_manager_id_tag_array_add(pthis, i, tag);
 
         if (src->sampling_mode == SAMPLING_MODE_COMPREHENSIVE) {
             struct tag_id_map *tmp_node = (struct tag_id_map *)malloc(sizeof(struct tag_id_map));
-            tmp_node->tag = tag_hash_key_copy(node->tag);
-            tmp_node->cell_id = node->cell_id;
+            tmp_node->tag = tag_hash_key_copy(tag);
+            tmp_node->cell_id = i;
             my_hash_key_list_add(&pthis->comprehensive_tag_id_map, tmp_node);
         }
     }
