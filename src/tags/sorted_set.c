@@ -369,7 +369,15 @@ struct sorted_set *sorted_set_copy(const struct sorted_set *ss)
 {
     struct sorted_set *ret = sorted_set_new(ss->heap->max_size);
     sorted_set_hook_function_of_free_user_data(ret, ss->free_user_data_func);
-    min_heap_copy(ret->heap, ss->heap, my_entry_copy);
+    
+    for (int i = 0; i < ss->heap->cur_size; i++) {
+        heap_entry *entry = (heap_entry *)ss->heap->nodes[i];
+        struct entry_data *data = sorted_set_entry_get_data(entry);
+        sorted_set_insert(ret, data->key, sorted_set_entry_get_count(entry));
+        int *new_user_data = (int *)malloc(sizeof(int));
+        *new_user_data = *(int *)data->user_data;
+        sorted_set_insert_user_data(ret, data->key, new_user_data);
+    }
 
     return ret;
 }

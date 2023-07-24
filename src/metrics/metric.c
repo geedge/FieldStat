@@ -939,11 +939,9 @@ void metric_get_cell_ids(const struct metric *pthis, int **cell_ids, size_t *cel
         free(tmp_id_container);
         return;
     }
-    
+
     *cell_id_count = n_id;
-    *cell_ids = (int *)malloc(sizeof(int) * n_id);
-    memcpy(*cell_ids, tmp_id_container, sizeof(int) * n_id);
-    free(tmp_id_container);
+    *cell_ids = tmp_id_container;
 }
 
 const char *metric_get_name(const struct metric *metrics)

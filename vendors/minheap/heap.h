@@ -6,7 +6,6 @@
 typedef bool (*minheap_cmp)(void *a, void *b);
 typedef int (*minheap_getindex)(void *a);
 typedef void (*minheap_setindex)(int index, void *a);	
-typedef void *(*minheap_copy_node)(const void *node);
 
 typedef struct minheap
 {
@@ -34,5 +33,4 @@ void *pop_heap(struct minheap *heap);
 int adjust_heap_node(struct minheap *heap, void *node);
 int erase_heap_node(struct minheap* heap, void *node);
 
-void min_heap_copy(min_heap_t *dst, const min_heap_t *src, minheap_copy_node copy_func);
 #endif /* MINHEAP_H */

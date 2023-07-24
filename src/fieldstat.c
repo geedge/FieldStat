@@ -645,7 +645,7 @@ int fieldstat_cube_merge_comprehensive(struct fs_cube *dest, const struct fs_cub
         }
         metrics_dest = dest->metrics[metric_id_dest];
         for (int j = 0; j < cell_id_count_src; j ++) {
-            int cell_id_from_metric_src = cell_ids_from_metric_src[j];
+            int cell_id_from_metric_src = cell_ids_from_metric_src[j];            
             const struct tag_hash_key *tag_key_src = cell_manager_get_tag_by_cell_id(cell_manager_src, cell_id_from_metric_src);
 
             int cell_id_tmp_dest = cell_manager_get_cell_id_by_tag(cell_manager_dest, tag_key_src);
@@ -690,7 +690,6 @@ ERR:
 // non                            non                  non           |  no operation
 int fieldstat_cube_merge_topk(struct fs_cube *dest, const struct fs_cube *src)
 {
-    struct cell_manager *cell_manager_final = cell_manager_new(SAMPLING_MODE_TOPK, dest->max_n_cell);
     struct cell_manager *cell_manager_src = src->cell_manager;
     struct cell_manager *cell_manager_dest = dest->cell_manager;
     struct metric_name_id_map *name_id_map_dest = NULL;
@@ -703,8 +702,8 @@ int fieldstat_cube_merge_topk(struct fs_cube *dest, const struct fs_cube *src)
     name_id_map_init(&name_id_map_dest, dest);
 
     // merge cell manager
+    struct cell_manager *cell_manager_final = cell_manager_copy(cell_manager_dest);
     cube_push_all_cells_to_another_cell_manager(src, cell_manager_final);
-    cube_push_all_cells_to_another_cell_manager(dest, cell_manager_final);
 
     // dest cube manager   |   merged cube manager | src cube manager    |  operation
     //  -----              |   -----               | -----               |  -----
@@ -840,7 +839,7 @@ int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
                 continue;
             }
             struct tag_hash_key *shared_tag_key = tag_hash_key_construct_with_fieldstat_tag(cube_dest->shared_tags, instance->cube[i]->n_shared_tags);
-            cell_manager_add_cell(tag_cube_id_map, shared_tag_key); // todo: 额外的分配内存，调用次数一般
+            cell_manager_add_cell(tag_cube_id_map, shared_tag_key);
             tag_hash_key_free(shared_tag_key);
         }
     }

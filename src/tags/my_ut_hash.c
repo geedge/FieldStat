@@ -305,8 +305,8 @@ struct tag_hash_key *tag_hash_key_construct_with_fieldstat_tag(const struct fiel
     }
 
     ret_hash_key->n_my_tag = n_src;
-    ret_hash_key->hashv = 0;
     ret_hash_key->is_hashed = false;
+    (void)tag_hash_key_cal_hash_value(ret_hash_key); // record hash value
     return ret_hash_key;
 }
 
@@ -443,4 +443,9 @@ void reset_hash_count()
 {
     hash_cnt = 0;
     simple_hash_cnt = 0;
+}
+
+const char *tag_hash_key_get_compound_key(const struct tag_hash_key *tag)
+{
+    return tag->compound_key;
 }
