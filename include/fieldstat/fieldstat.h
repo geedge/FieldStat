@@ -42,6 +42,7 @@ struct fieldstat_tag {
 struct fieldstat;
 struct fieldstat *fieldstat_new();
 void fieldstat_free(struct fieldstat *instance);
+struct fieldstat *fieldstat_dup(const struct fieldstat *instance);
 
 /*
     * @brief add an cube to this instance. Cube represents an template with a user-defined set of cells and metrics.

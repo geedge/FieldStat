@@ -234,14 +234,16 @@ int cell_manager_add_cell(struct cell_manager *pthis, const struct tag_hash_key 
     return pthis->next_cell_id++;
 }
 
-int cell_manager_add_cell_topk(struct cell_manager *pthis, const struct tag_hash_key *tag, unsigned int count, int *popped_cell_id)
+int cell_manager_add_cell_topk(struct cell_manager *pthis, const struct tag_hash_key *tag, unsigned int count, int *popped_cell_id, int *existing_cell_id)
 {
     int ret_cell_id = -1;
+    *existing_cell_id = -1;
     int ret = cell_manager_topk_map_add(pthis, tag, count, pthis->next_cell_id, popped_cell_id, &ret_cell_id);
     if (ret == -1) {
         return -1;
     }
     if (ret == 1) {
+        *existing_cell_id = ret_cell_id;
         return ret_cell_id;
     }
 
@@ -375,6 +377,7 @@ struct cell_manager *cell_manager_copy(const struct cell_manager *src)
         if (tag == NULL) {
             continue;
         }
+        printf("cell_manager_copy new node: i=%d, tag=%s\n", i, tag_hash_key_get_compound_key(tag));
         cell_manager_id_tag_array_add(pthis, i, tag);
 
         if (src->sampling_mode == SAMPLING_MODE_COMPREHENSIVE) {
@@ -390,4 +393,11 @@ struct cell_manager *cell_manager_copy(const struct cell_manager *src)
     }
     pthis->next_cell_id = src->next_cell_id;
     return pthis;
+}
+
+const struct tag_hash_key **cell_manager_dump(const struct cell_manager *pthis, int *array_len)
+{
+    *array_len = pthis->max_cell_id + 1;
+
+    return pthis->id_tag_array;
 }

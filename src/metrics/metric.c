@@ -707,8 +707,7 @@ int metric_merge_or_copy_cell(struct metric *dest, const struct metric *src, int
 {
     struct metric_measure_data *src_data = metric_find_one_cell(src, src_cell_id);
     if (src_data == NULL) {
-        printf("ERR: metric_merge_or_copy_cell: src cell not exist\n");
-        return -1;
+        return 1;
     }
 
     struct metric_measure_data *dest_data = metric_find_one_cell(dest, dest_cell_id);
