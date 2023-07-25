@@ -43,7 +43,7 @@ endfunction()
 
 # add_unit_test(test_exporter_json)
 # add_unit_test(test_fuzz_test)
-# add_unit_test(test_merge)
+add_unit_test(test_merge)
 # add_unit_test(test_metric_counter)
 # add_unit_test(test_metric_histogram)
 # add_unit_test(test_metric_hll)

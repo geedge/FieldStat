@@ -275,7 +275,7 @@ TEST(unit_test_cell_manager, merge_topk_to_full_one)
     EXPECT_EQ(cell_id_added[2], cell_id_2[9]); // shared key
     EXPECT_EQ(cell_id_old[0], cell_id_1[0]); // key_1 in cm1
     EXPECT_EQ(cell_id_old[1], cell_id_1[1]); // key_1 in cm1
-    EXPECT_EQ(cell_id_old[2], cell_id_1[2]); // key_1 in cm1
+    EXPECT_EQ(cell_id_old[2], cell_id_1[2]); // key_shared in cm1
 
     auto test_result = test_query_cell_manager_content(cm2);
     // join keys2 to keys1

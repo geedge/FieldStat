@@ -271,7 +271,7 @@ struct heavy_keeper_result *heavy_keeper_query(struct heavy_keeper *hk) {
     return stats;
 }
 
-int heavy_keeper_query_one(struct heavy_keeper *hk, const struct tag_hash_key *tag, unsigned int *count_out, int *cube_id_out)
+int heavy_keeper_query_one(struct heavy_keeper *hk, const struct tag_hash_key *tag, unsigned int *count_out, int *cell_id_out)
 {
     if (count_out != NULL) {
         unsigned int count = sorted_set_get_count(hk->top_K_heap, tag);
@@ -282,16 +282,16 @@ int heavy_keeper_query_one(struct heavy_keeper *hk, const struct tag_hash_key *t
         *count_out = count;
     }
 
-    if (cube_id_out == NULL) {
+    if (cell_id_out == NULL) {
         return 0;
     }
 
     int **pst_data_in_rec = (int **)sorted_set_get_pointer_to_user_data(hk->top_K_heap, tag);
     if (pst_data_in_rec == NULL) {
-        *cube_id_out = -1;
+        *cell_id_out = -1;
         return -1;
     }
-    *cube_id_out = **pst_data_in_rec;
+    *cell_id_out = **pst_data_in_rec;
 
     return 0;
 }

@@ -169,6 +169,7 @@ int cell_manager_get_count_by_tag(const struct cell_manager *pthis, const struct
     return count;
 }
 
+//todo: 这个函数deserialzie 里还用了，之后改一下那边，删了这个函数
 int cell_manager_comprehensive_map_add(struct cell_manager *pthis, const struct tag_hash_key *tag, int cell_id, int *existing_cell_id)
 {
     printf("cell_manager_comprehensive_map_add\n");
@@ -196,39 +197,24 @@ int cell_manager_comprehensive_map_add(struct cell_manager *pthis, const struct 
     return 0;
 }
 
-int cell_manager_topk_map_add(struct cell_manager *pthis, const struct tag_hash_key *tag, unsigned int count, int cell_id, int *popped_cell_id, int *existing_cell_id)
-{
-    *existing_cell_id = -1;
-
-    int ret = heavy_keeper_add(pthis->topk_tag_id_map, tag, count, cell_id, popped_cell_id);
-    if (ret == 1) { // use the original id
-        heavy_keeper_query_one(pthis->topk_tag_id_map, tag, NULL, existing_cell_id);
-        *popped_cell_id = -1;
-        return 1;
-    }
-
-    if (ret == -1) { // didn't add
-        *popped_cell_id = -1;
-        return -1;
-    }
-
-    if (*popped_cell_id != -1) { // popped one, then add the new one with new id
-        tag_hash_key_free(pthis->id_tag_array[*popped_cell_id]);
-        pthis->id_tag_array[*popped_cell_id] = NULL;
-    }
-    return ret;
-}
-
 int cell_manager_add_cell(struct cell_manager *pthis, const struct tag_hash_key *tag)
 {
-    int existing_cell_id = -1;
-    int ret = cell_manager_comprehensive_map_add(pthis, tag, pthis->next_cell_id, &existing_cell_id);
-    if (ret == -1) {
+    if (HASH_COUNT(pthis->comprehensive_tag_id_map) >= pthis->max_cell_num) {
+        printf("cell_manager_add_cell: HASH_COUNT(pthis->comprehensive_tag_id_map) >= pthis->max_cell_num\n");
         return -1;
     }
-    if (existing_cell_id != -1) {
-        return existing_cell_id;
+    struct tag_id_map *node = NULL;
+    if (HASH_COUNT(pthis->comprehensive_tag_id_map) != 0) {
+        node = my_hash_key_list_find(pthis->comprehensive_tag_id_map, tag);
     }
+    if (node != NULL) {
+        return node->cell_id;
+    }
+
+    node = (struct tag_id_map *)malloc(sizeof(struct tag_id_map));
+    node->tag = tag_hash_key_copy(tag);
+    node->cell_id = pthis->next_cell_id;
+    my_hash_key_list_add(&pthis->comprehensive_tag_id_map, node);
 
     cell_manager_id_tag_array_add(pthis, pthis->next_cell_id, tag);
     return pthis->next_cell_id++;
@@ -236,27 +222,32 @@ int cell_manager_add_cell(struct cell_manager *pthis, const struct tag_hash_key 
 
 int cell_manager_add_cell_topk(struct cell_manager *pthis, const struct tag_hash_key *tag, unsigned int count, int *popped_cell_id, int *existing_cell_id)
 {
-    int ret_cell_id = -1;
-    *existing_cell_id = -1;
-    int ret = cell_manager_topk_map_add(pthis, tag, count, pthis->next_cell_id, popped_cell_id, &ret_cell_id);
-    if (ret == -1) {
+    int ret = heavy_keeper_add(pthis->topk_tag_id_map, tag, count, pthis->next_cell_id, popped_cell_id);
+    if (ret == -1) { // didn't add
+        *existing_cell_id = -1;
+        *popped_cell_id = -1;
         return -1;
     }
-    if (ret == 1) {
-        *existing_cell_id = ret_cell_id;
-        return ret_cell_id;
-    }
 
+    if (ret == 1) { // use the original id
+        heavy_keeper_query_one(pthis->topk_tag_id_map, tag, NULL, existing_cell_id);
+        *popped_cell_id = -1;
+        return 1;
+    }
+    /* -------------------------------- new cell added-------------------------------- */
 /*
 To mitigate the risk of unbounded array size due to potentially infinite growth of cell IDs, a maximum limit is set for cell IDs in the metric.
 This limit is configured as 5 times the value of K. Even in the worst-case scenario of malicious attacks, this prevents excessive memory usage.
 Even though there is a small possibility of not counting certain flows due to the limit, it is expected that the unallocated IDs would correspond to mouse flows, 
     which would have minimal impact on accuracy.
 The number 5 was determined through experiment, where multiple tests were conducted, randomly generating flows by which cells are determined.
-    The observed stable cell ID count did not exceed 3 times the value of K. Therefore, a conservative value of 5 was chosen.
-*/
+    The observed stable cell ID count did not exceed 3 times the value of K. Therefore, a conservative value of 5 was chosen.*/
     if (pthis->next_cell_id >= pthis->max_cell_num * 5) { // max int is much larger, no risk of overflow
         return -1;
+    }
+
+    if (*popped_cell_id != -1) { // popped one, then add the new one with new id
+        pthis->id_tag_array[*popped_cell_id] = NULL;
     }
 
     cell_manager_id_tag_array_add(pthis, pthis->next_cell_id, tag);
@@ -408,5 +399,6 @@ void cell_manager_merge_topk(struct cell_manager *dest, const struct cell_manage
     heavy_keeper_merge_recording_id_details(dest->topk_tag_id_map, src->topk_tag_id_map, 
         cell_id_popped, n_cell_id_popped, cell_id_old, cell_id_added, n_cell_id_added);
     
-    // todo: id tag array delete and rearrange
+    // struct heavy_keeper_result *result = heavy_keeper_query(dest->topk_tag_id_map);
+    // todo: 更新 id tag array, 注意不用针对tag 来做free和copy
 }
