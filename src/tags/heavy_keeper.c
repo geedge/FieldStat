@@ -258,13 +258,11 @@ struct heavy_keeper_result *heavy_keeper_query(struct heavy_keeper *hk) {
 
     int query_entry_num = heap_entry_num > hk->K ? hk->K : heap_entry_num;
     stats->n_key = query_entry_num;
-    int index_q = 0;
-    for (int i = query_entry_num - 1; i >= 0; i--) {
-        stats->tags[index_q] = tag_hash_key_copy(tag_arr[i]);
-        stats->count[index_q] = cnt_arr[i];
-        stats->cube_id[index_q] = *(user_data[i]);
-        
-        index_q++;
+
+    for (int i = 0; i < query_entry_num; i++) {
+        stats->tags[i] = tag_hash_key_copy(tag_arr[i]);
+        stats->count[i] = cnt_arr[i];
+        stats->cube_id[i] = *(user_data[i]);
     }
 
     free(cnt_arr);
@@ -354,13 +352,15 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
     int **cell_id_in_src_before_merge_out, int **cell_id_in_dest_corresponding_out, int *cell_id_in_src_before_merge_len_out) 
 {
     struct sorted_set *new_rec = sorted_set_new(dest->K); // merging result
-    struct sorted_set *ss_dest = dest->top_K_heap; // original ss in dest
-    struct sorted_set *ss_src = src->top_K_heap; // the ss to be merged
     sorted_set_hook_function_of_free_user_data(new_rec, free);
 
+    struct sorted_set *ss_dest = dest->top_K_heap; // original ss in dest
+    struct sorted_set *ss_src = src->top_K_heap; // the ss to be merged
     int size_dest = sorted_set_cardinality(ss_dest);
     int size_src = sorted_set_cardinality(ss_src);
     int max_size = size_dest > size_src ? size_dest : size_src;
+
+    printf("size_dest: %d, size_src: %d\n", size_dest, size_src);
     unsigned *count_arr = (unsigned *)malloc(max_size * sizeof(unsigned));
     struct tag_hash_key **tag_arr = (struct tag_hash_key **)malloc(max_size * sizeof(struct tag_hash_key *));
     int **user_datas = (int **)malloc(max_size * sizeof(int *));
@@ -372,6 +372,9 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
     int cell_id_in_src_before_merge_len = 0;
     int cell_id_in_dest_corresponding[dest->K]; // length == cell_id_in_src_before_merge_len
     int new_alloc_id = -1; // used for alloc for new tags from src
+
+
+    /* ------------------------------ merge dest ------------------------------ */
     for (int i = 0; i < size_dest; i++) {
         unsigned maxv = find_maxv_in_sketch(dest, tag_arr[i]);
         struct tag_hash_key *tag = tag_arr[i];
@@ -381,6 +384,8 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
         int **pst_cell_id_final = (int **)sorted_set_get_pointer_to_user_data(new_rec, tag);
         *pst_cell_id_final = (int *)malloc(sizeof(unsigned int));
         **pst_cell_id_final = *pst_cell_id_dest;
+
+        printf("inserted tag in dest, tag: %s, id: %d\n", tag_hash_key_get_compound_key(tag), *pst_cell_id_dest);
 
         if (new_alloc_id < *pst_cell_id_dest) {
             new_alloc_id = *pst_cell_id_dest;
@@ -400,6 +405,8 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
             cell_id_in_src_before_merge[cell_id_in_src_before_merge_len] = cell_id_src;
             cell_id_in_dest_corresponding[cell_id_in_src_before_merge_len] = **pst_cell_id_dest;
             cell_id_in_src_before_merge_len++;
+
+            printf("inserted tag in both dest and src, tag: %s, id in src: %d, id in dest: %d\n", tag_hash_key_get_compound_key(tag), cell_id_src, **pst_cell_id_dest);
             continue;
         }
         // the dest heavy keeper has been merged, so the maxv is the maxv in the merged sketch, instead of the dest sketch
@@ -411,15 +418,15 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
         } 
         if (tmp_ret == 1 || tmp_ret == 2) { // insert success
             int **pst_cell_id_final = (int **)sorted_set_get_pointer_to_user_data(new_rec, tag);
-            if (pst_cell_id_final != NULL) {
-                printf("ERR: pst_cell_id_final has been alloced a cell id\n");
-            }
             *pst_cell_id_final = (int *)malloc(sizeof(unsigned int));
             **pst_cell_id_final = new_alloc_id;
         
             cell_id_in_src_before_merge[cell_id_in_src_before_merge_len] = cell_id_src;
             cell_id_in_dest_corresponding[cell_id_in_src_before_merge_len] = new_alloc_id;
+            cell_id_in_src_before_merge_len++;
             new_alloc_id++;
+
+            printf("inserted tag in src, tag: %s, id in src: %d, id in dest: %d\n", tag_hash_key_get_compound_key(tag), cell_id_src, **pst_cell_id_final);
         }
     }
 

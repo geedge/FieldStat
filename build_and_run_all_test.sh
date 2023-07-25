@@ -1,6 +1,6 @@
 scriptfolder=`pwd`
 cd build
-cmake ..
+cmake -DCMAKE_BUILD_TYPE=Release .. 
 make
 cd test
 for f in *test*; do

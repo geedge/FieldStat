@@ -405,7 +405,7 @@ const struct tag_hash_key **cell_manager_dump(const struct cell_manager *pthis, 
 void cell_manager_merge_topk(struct cell_manager *dest, const struct cell_manager *src, 
     int **cell_id_popped, int *n_cell_id_popped, int **cell_id_old, int **cell_id_added, int *n_cell_id_added)
 {
-    heavy_keeper_merge_recording_id_details(dest->topk_tag_id_map, dest->topk_tag_id_map, 
+    heavy_keeper_merge_recording_id_details(dest->topk_tag_id_map, src->topk_tag_id_map, 
         cell_id_popped, n_cell_id_popped, cell_id_old, cell_id_added, n_cell_id_added);
     
     // todo: id tag array delete and rearrange

@@ -339,9 +339,9 @@ int cmp_tmp_heap_node(const void *a, const void *b)
     tmp_heap_node *bb = (tmp_heap_node *)b;
 
     if (aa->key < bb->key) {
-        return -1;
-    } else if (aa->key > bb->key) {
         return 1;
+    } else if (aa->key > bb->key) {
+        return -1;
     } else {
         return 0;
     }
