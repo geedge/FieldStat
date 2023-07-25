@@ -31,11 +31,11 @@ struct hash_node {
     UT_hash_handle hh;
 };
 
-struct entry_data *entry_data_construct(const struct tag_hash_key *tag)
+struct entry_data *entry_data_construct(struct tag_hash_key *tag)
 {
     struct entry_data *entry_data = (struct entry_data *)malloc(sizeof(struct entry_data));
 
-    entry_data->key = tag_hash_key_copy(tag);
+    entry_data->key = tag;
     entry_data->user_data = NULL;
     return entry_data;
 }
@@ -78,25 +78,6 @@ static int my_entry_get_index(void *a)
 void my_entry_set_index(int index, void *a)
 {
     ((heap_entry *)a)->index = index;
-}
-
-void *my_entry_copy(const void *a)
-{
-    heap_entry *entry = (heap_entry *)a;
-    heap_entry *new_entry = (heap_entry *)malloc(sizeof(heap_entry));
-
-    unsigned *tmp_cnt = (unsigned *)malloc(sizeof(unsigned));
-    *tmp_cnt = *(unsigned *)entry->key;
-    new_entry->key = tmp_cnt;
-
-    struct entry_data *data_src = sorted_set_entry_get_data(entry);
-    struct entry_data *data_dst = entry_data_construct(data_src->key);
-    data_dst->user_data = (int *)malloc(sizeof(int));
-    *(int *)data_dst->user_data = *(int *)data_src->user_data;
-
-    new_entry->value = data_dst;
-    my_entry_set_index(entry->index, new_entry);
-    return new_entry;
 }
 
 struct sorted_set *sorted_set_new(int set_size)
@@ -209,7 +190,7 @@ bool sorted_set_check_is_full(const struct sorted_set *ss)
     return ss->heap->cur_size >= ss->heap->max_size;
 }
 
-void sorted_set_insert_to_available_heap(struct sorted_set *ss, const struct tag_hash_key *tag, unsigned cnt)
+void sorted_set_insert_to_available_heap(struct sorted_set *ss, struct tag_hash_key *tag, unsigned cnt)
 {
     unsigned *tmp_cnt = (unsigned *)malloc(sizeof(unsigned));
     *tmp_cnt = cnt;
@@ -228,7 +209,7 @@ void sorted_set_insert_to_available_heap(struct sorted_set *ss, const struct tag
     ss->hash_tbl = hash_tbl;
 }
 
-int sorted_set_insert(struct sorted_set *ss, const struct tag_hash_key *tag, unsigned cnt)
+int sorted_set_insert(struct sorted_set *ss, struct tag_hash_key *tag, unsigned cnt)
 {
     if (sorted_set_check_is_full(ss)) {
         if (cnt <= sorted_set_get_min_count(ss)) {
@@ -240,7 +221,7 @@ int sorted_set_insert(struct sorted_set *ss, const struct tag_hash_key *tag, uns
     return 1;
 }
 
-int sorted_set_insert_and_record_popped_back(struct sorted_set *ss, const struct tag_hash_key *tag, unsigned cnt, void *popped_user_data, size_t popped_user_data_size)
+int sorted_set_insert_and_record_popped_back(struct sorted_set *ss, struct tag_hash_key *tag, unsigned cnt, void *popped_user_data, size_t popped_user_data_size)
 {
     bool popped = false;
     if (sorted_set_check_is_full(ss)) {
@@ -295,7 +276,8 @@ void sorted_set_incrby(struct sorted_set *ss, const struct tag_hash_key *tag, un
 {
     heap_entry *entry = sorted_set_find_entry(ss, tag);
     if (entry == NULL) {
-        sorted_set_insert(ss, tag, count);
+        printf("ERR: sorted_set_incrby: tag not found. The program will new an entry and continue, but it is not expected.\n");
+        sorted_set_insert(ss, (struct tag_hash_key *)tag, count);
         return;
     }
     sorted_set_entry_set_key(ss, entry, sorted_set_entry_get_count(entry) + count);

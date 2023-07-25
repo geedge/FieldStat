@@ -29,15 +29,16 @@ void sorted_set_hook_function_of_free_user_data(struct sorted_set *ss, void (*fr
 
 /** 
  * @brief insert a new entry into the sorted set. The minimum entry will be popped if the list is full.
+ * @param tag the pointer to the tag, user should alloc it, when the entry is popped out, the tag will be freed. If the tag is not inserted to the sorted set, user should free it.
  * @return 0 if the entry is not inserted because the sorted set is full and the score of the entry is less than the minimum score in the sorted set. Otherwise, return 1.
 */
-int sorted_set_insert(struct sorted_set *ss, const struct tag_hash_key *tag, unsigned cnt);
+int sorted_set_insert(struct sorted_set *ss, struct tag_hash_key *tag, unsigned cnt);
 
 /*
   @return 0 if the entry is not inserted because the sorted set is full. return 2 if some data is popped out. Otherwise, return 1.
   @param popped_user_data user should alloc it, popped_user_data_size is equal to the size of the user data memory.
 */
-int sorted_set_insert_and_record_popped_back(struct sorted_set *ss, const struct tag_hash_key *tag, unsigned cnt, void *popped_user_data, size_t popped_user_data_size);
+int sorted_set_insert_and_record_popped_back(struct sorted_set *ss, struct tag_hash_key *tag, unsigned cnt, void *popped_user_data, size_t popped_user_data_size);
 
 /**
  * @brief pop out the minumum-score entry from the sorted set.

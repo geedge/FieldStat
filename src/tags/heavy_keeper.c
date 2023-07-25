@@ -108,19 +108,15 @@ struct heavy_keeper_result *heavy_keeper_result_new(struct heavy_keeper *hk) {
     stats_hd->count = (unsigned *)malloc(expected_max_len * sizeof(unsigned));
     stats_hd->tags = (struct tag_hash_key **)malloc(expected_max_len * sizeof(struct tag_hash_key *));
 
-    stats_hd->cube_id = (int *)malloc(expected_max_len * sizeof(int));
+    stats_hd->cell_id = (int *)malloc(expected_max_len * sizeof(int));
 
     return stats_hd;
 }
 
 void heavy_keeper_result_free(struct heavy_keeper_result *stats_hd) {
-    for (int i = 0; i < stats_hd->n_key; i++) {
-        tag_hash_key_free(stats_hd->tags[i]);
-    }
-
     free(stats_hd->count);
     free(stats_hd->tags);
-    free(stats_hd->cube_id);
+    free(stats_hd->cell_id);
     free(stats_hd);
 }
 
@@ -175,7 +171,7 @@ unsigned my_max(unsigned a, unsigned b) {
     return b;
 }
 
-static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_keeper, const struct tag_hash_key *tag, unsigned int count)
+static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_keeper, struct tag_hash_key *tag, unsigned int count)
 {
     int ret = -1;
     unsigned int user_data_cube_id = 0;
@@ -225,10 +221,11 @@ static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_
             sorted_set_incrby(summary, tag, maxv - tmp_cnt);
         }
     }
+
     return ret;
 }
 
-int heavy_keeper_add(struct heavy_keeper *hk, const struct tag_hash_key *tag, unsigned int count, int cube_id, int *popped_id_out)
+int heavy_keeper_add(struct heavy_keeper *hk, struct tag_hash_key *tag, unsigned int count, int cube_id, int *popped_id_out)
 {
     *popped_id_out = heavy_keeper_add_by_recording_popped_data(hk, tag, count);
 
@@ -258,11 +255,11 @@ struct heavy_keeper_result *heavy_keeper_query(struct heavy_keeper *hk) {
 
     int query_entry_num = heap_entry_num > hk->K ? hk->K : heap_entry_num;
     stats->n_key = query_entry_num;
-
+    // todo: 能直接把dump 的结果拿过来
     for (int i = 0; i < query_entry_num; i++) {
-        stats->tags[i] = tag_hash_key_copy(tag_arr[i]);
+        stats->tags[i] = tag_arr[i];
         stats->count[i] = cnt_arr[i];
-        stats->cube_id[i] = *(user_data[i]);
+        stats->cell_id[i] = *(user_data[i]);
     }
 
     free(cnt_arr);
@@ -335,18 +332,6 @@ unsigned find_maxv_in_sketch(struct heavy_keeper *hk, const struct tag_hash_key 
     return maxv;
 }
 
-int insert_to_sorted_set(struct sorted_set *ss, const struct tag_hash_key *tag, unsigned count, unsigned int user_data) {
-    int if_inserted = sorted_set_insert(ss, tag, count);
-
-    if (if_inserted) {
-        int **pst_other_count_in_rec = (int **)sorted_set_get_pointer_to_user_data(ss, tag);
-
-        *pst_other_count_in_rec = (int *)malloc(sizeof(unsigned int));
-        **pst_other_count_in_rec = user_data;
-    }
-    return if_inserted;
-}
-
 void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *dest, const struct heavy_keeper *src, 
     int **cell_id_popped_from_dest_when_merge_src_out, int *cell_id_popped_from_dest_when_merge_src_len_out,
     int **cell_id_in_src_before_merge_out, int **cell_id_in_dest_corresponding_out, int *cell_id_in_src_before_merge_len_out) 
@@ -377,15 +362,15 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
     /* ------------------------------ merge dest ------------------------------ */
     for (int i = 0; i < size_dest; i++) {
         unsigned maxv = find_maxv_in_sketch(dest, tag_arr[i]);
-        struct tag_hash_key *tag = tag_arr[i];
+        struct tag_hash_key *tag_final = tag_hash_key_copy(tag_arr[i]);
         int *pst_cell_id_dest = user_datas[i];
 
-        sorted_set_insert(new_rec, tag, maxv);
-        int **pst_cell_id_final = (int **)sorted_set_get_pointer_to_user_data(new_rec, tag);
+        sorted_set_insert(new_rec, tag_final, maxv);
+        int **pst_cell_id_final = (int **)sorted_set_get_pointer_to_user_data(new_rec, tag_final);
         *pst_cell_id_final = (int *)malloc(sizeof(unsigned int));
         **pst_cell_id_final = *pst_cell_id_dest;
 
-        printf("inserted tag in dest, tag: %s, id: %d\n", tag_hash_key_get_compound_key(tag), *pst_cell_id_dest);
+        printf("inserted tag in dest, tag: %s, id: %d\n", tag_hash_key_get_compound_key(tag_final), *pst_cell_id_dest);
 
         if (new_alloc_id < *pst_cell_id_dest) {
             new_alloc_id = *pst_cell_id_dest;
@@ -397,8 +382,8 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
     new_alloc_id++; // the new id should be larger than the largest id in dest
 
     for (int i = 0; i < size_src; i++) {
-        struct tag_hash_key *tag = tag_arr[i];
-        int **pst_cell_id_dest = (int **)sorted_set_get_pointer_to_user_data(ss_dest, tag);
+        struct tag_hash_key *tag_src = tag_arr[i];
+        int **pst_cell_id_dest = (int **)sorted_set_get_pointer_to_user_data(ss_dest, tag_src);
         int cell_id_src = *user_datas[i];
     
         if (pst_cell_id_dest != NULL) {  // the tag is in both dest and src, so has been processed in the previous loop. Just record some info
@@ -406,18 +391,19 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
             cell_id_in_dest_corresponding[cell_id_in_src_before_merge_len] = **pst_cell_id_dest;
             cell_id_in_src_before_merge_len++;
 
-            printf("inserted tag in both dest and src, tag: %s, id in src: %d, id in dest: %d\n", tag_hash_key_get_compound_key(tag), cell_id_src, **pst_cell_id_dest);
+            printf("inserted tag in both dest and src, tag: %s, id in src: %d, id in dest: %d\n", tag_hash_key_get_compound_key(tag_src), cell_id_src, **pst_cell_id_dest);
             continue;
         }
         // the dest heavy keeper has been merged, so the maxv is the maxv in the merged sketch, instead of the dest sketch
-        unsigned maxv = find_maxv_in_sketch(dest, tag);
+        unsigned maxv = find_maxv_in_sketch(dest, tag_src);
         int popped_id;
-        int tmp_ret = sorted_set_insert_and_record_popped_back(new_rec, tag, maxv, &popped_id, sizeof(int));
-        if (tmp_ret == 2) { // insert success and popped one
+        struct tag_hash_key *tag_final = tag_hash_key_copy(tag_src);
+        int tmp_ret = sorted_set_insert_and_record_popped_back(new_rec, tag_final, maxv, &popped_id, sizeof(int));
+        if (tmp_ret == 2) { // insert success and popped one. the previous tag_final is already freed by sorted_set
             cell_id_popped_from_dest_when_merge_src[cell_id_popped_from_dest_when_merge_src_len++] = popped_id;
         } 
-        if (tmp_ret == 1 || tmp_ret == 2) { // insert success
-            int **pst_cell_id_final = (int **)sorted_set_get_pointer_to_user_data(new_rec, tag);
+        if (tmp_ret != 0) { // insert success
+            int **pst_cell_id_final = (int **)sorted_set_get_pointer_to_user_data(new_rec, tag_final);
             *pst_cell_id_final = (int *)malloc(sizeof(unsigned int));
             **pst_cell_id_final = new_alloc_id;
         
@@ -426,7 +412,9 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
             cell_id_in_src_before_merge_len++;
             new_alloc_id++;
 
-            printf("inserted tag in src, tag: %s, id in src: %d, id in dest: %d\n", tag_hash_key_get_compound_key(tag), cell_id_src, **pst_cell_id_final);
+            printf("inserted tag in src, tag: %s, id in src: %d, id in dest: %d\n", tag_hash_key_get_compound_key(tag_src), cell_id_src, **pst_cell_id_final);
+        } else {
+            tag_hash_key_free(tag_final);
         }
     }
 

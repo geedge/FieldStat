@@ -245,6 +245,7 @@ int fieldstat_register_cube(struct fieldstat *instance, const struct fieldstat_t
     return cube_id;
 }
 
+// todo: 仅添加的话不用更新维护id tag map，merge 的时候和序列化的时候才需要
 int fieldstat_cube_add(struct fieldstat *instance, int cube_id, const struct fieldstat_tag *tags, size_t n_tag, long long increment)
 {
     struct fs_cube *cube = instance->cube[cube_id];
