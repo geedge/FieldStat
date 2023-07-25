@@ -651,6 +651,13 @@ int fieldstat_cube_merge_topk(struct fs_cube *dest, const struct fs_cube *src, i
 {
     struct cell_manager *cell_manager_src = src->cell_manager;
     struct cell_manager *cell_manager_dest = dest->cell_manager;
+    int *cell_id_added;
+    int *cell_id_old;
+    int n_cell_id_added = 0;
+    int *cell_id_popped = 0;
+    int n_cell_id_popped = 0;
+    // todo: merge cell manager
+    cell_manager_merge_topk(cell_manager_dest, cell_manager_src, &cell_id_popped, &n_cell_id_popped, &cell_id_old, &cell_id_added, &n_cell_id_added);
 
     // merge cell manager
     int arr_len_src = 0;
@@ -660,13 +667,6 @@ int fieldstat_cube_merge_topk(struct fs_cube *dest, const struct fs_cube *src, i
     // tag_arr_dest_tmp will change, so we need to copy it
     struct tag_hash_key **tag_arr_dest = malloc(sizeof(struct tag_hash_key *) * (arr_len_dest));
     memcpy(tag_arr_dest, tag_arr_dest_tmp, sizeof(struct tag_hash_key *) * (arr_len_dest));
-
-    int cell_id_added[arr_len_src]; // the id of cells after they are added to dest
-    int cell_id_old[arr_len_src]; // the id of correspondng cells in src
-    int n_cell_id_added = 0;
-
-    int cell_id_popped[arr_len_src]; // the id of cells in dest before but popped after merge
-    int n_cell_id_popped = 0;
 
     for (int cell_id_src = 0; cell_id_src < arr_len_src; cell_id_src++) {
         const struct tag_hash_key *tag_src = tag_arr_src[cell_id_src];

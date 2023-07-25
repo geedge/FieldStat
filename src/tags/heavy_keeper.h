@@ -68,13 +68,9 @@ int heavy_keeper_query_one(struct heavy_keeper *hk, const struct tag_hash_key *t
  */
 void heavy_keeper_result_free(struct heavy_keeper_result *stats_hd);
 
-/**
- * @brief   Merge two heavy keeper.
- * @param   hk            the pointer to the heavy keeper.
- * @param   hk_merged     the pointer to the heavy keeper to be merged. Must have the same params with hk.
- * @returns 0 if success, -1 if failed.
- */
-int heavy_keeper_merge(struct heavy_keeper *hk, const struct heavy_keeper *src);
+int heavy_keeper_merge_recording_id_details(struct heavy_keeper *dest, const struct heavy_keeper *src,
+    int **cell_id_popped_from_dest_when_merge_src_out, int *cell_id_popped_from_dest_when_merge_src_len_out,
+    int **cell_id_in_src_before_merge_out, int **cell_id_in_dest_corresponding_out, int *cell_id_in_src_before_merge_len_out);
 
 /*
     Equal to heavy_keeper_merge, with empty dest, but much faster.

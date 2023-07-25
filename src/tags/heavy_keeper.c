@@ -349,58 +349,113 @@ int insert_to_sorted_set(struct sorted_set *ss, const struct tag_hash_key *tag, 
     return if_inserted;
 }
 
-void heavy_keeper_merge_sorted_set(struct heavy_keeper *dest, const struct heavy_keeper *src) {
-    struct sorted_set *new_rec = sorted_set_new(dest->K);
+void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *dest, const struct heavy_keeper *src, 
+    int **cell_id_popped_from_dest_when_merge_src_out, int *cell_id_popped_from_dest_when_merge_src_len_out,
+    int **cell_id_in_src_before_merge_out, int **cell_id_in_dest_corresponding_out, int *cell_id_in_src_before_merge_len_out) 
+{
+    struct sorted_set *new_rec = sorted_set_new(dest->K); // merging result
+    struct sorted_set *ss_dest = dest->top_K_heap; // original ss in dest
+    struct sorted_set *ss_src = src->top_K_heap; // the ss to be merged
     sorted_set_hook_function_of_free_user_data(new_rec, free);
 
-    int size_dest = sorted_set_cardinality(dest->top_K_heap);
-    int size_src = sorted_set_cardinality(src->top_K_heap);
+    int size_dest = sorted_set_cardinality(ss_dest);
+    int size_src = sorted_set_cardinality(ss_src);
     int max_size = size_dest > size_src ? size_dest : size_src;
     unsigned *count_arr = (unsigned *)malloc(max_size * sizeof(unsigned));
     struct tag_hash_key **tag_arr = (struct tag_hash_key **)malloc(max_size * sizeof(struct tag_hash_key *));
-    unsigned int **user_datas_dummy = (unsigned int **)malloc(max_size * sizeof(unsigned int *));
+    int **user_datas = (int **)malloc(max_size * sizeof(int *));
 
-    sorted_set_dump(dest->top_K_heap, count_arr, tag_arr, (void **)user_datas_dummy);
-    int new_allocated_tag_id = 0; // the merged fieldstat will be assigned with tag_ids independent from the original ones
-                                        // it's ok because the corresponding vals are the name of the tag, from which we recover the tags
-
+    sorted_set_dump(ss_dest, count_arr, tag_arr, (void **)user_datas);
+    int cell_id_popped_from_dest_when_merge_src[dest->K];
+    int cell_id_popped_from_dest_when_merge_src_len = 0;
+    int cell_id_in_src_before_merge[dest->K];
+    int cell_id_in_src_before_merge_len = 0;
+    int cell_id_in_dest_corresponding[dest->K]; // length == cell_id_in_src_before_merge_len
+    int new_alloc_id = -1; // used for alloc for new tags from src
     for (int i = 0; i < size_dest; i++) {
         unsigned maxv = find_maxv_in_sketch(dest, tag_arr[i]);
-        if (insert_to_sorted_set(new_rec, tag_arr[i], maxv, new_allocated_tag_id)) {
-            new_allocated_tag_id++;
+        struct tag_hash_key *tag = tag_arr[i];
+        int *pst_cell_id_dest = user_datas[i];
+
+        sorted_set_insert(new_rec, tag, maxv);
+        int **pst_cell_id_final = (int **)sorted_set_get_pointer_to_user_data(new_rec, tag);
+        *pst_cell_id_final = (int *)malloc(sizeof(unsigned int));
+        **pst_cell_id_final = *pst_cell_id_dest;
+
+        if (new_alloc_id < *pst_cell_id_dest) {
+            new_alloc_id = *pst_cell_id_dest;
         }
     }
 
-    sorted_set_dump(src->top_K_heap, count_arr, tag_arr, (void **)user_datas_dummy);
+    /* ------------------------------ merge source ------------------------------ */
+    sorted_set_dump(ss_src, count_arr, tag_arr, (void **)user_datas);
+    new_alloc_id++; // the new id should be larger than the largest id in dest
+
     for (int i = 0; i < size_src; i++) {
-        if (sorted_set_get_count(new_rec, tag_arr[i]) != 0) {
+        struct tag_hash_key *tag = tag_arr[i];
+        int **pst_cell_id_dest = (int **)sorted_set_get_pointer_to_user_data(ss_dest, tag);
+        int cell_id_src = *user_datas[i];
+    
+        if (pst_cell_id_dest != NULL) {  // the tag is in both dest and src, so has been processed in the previous loop. Just record some info
+            cell_id_in_src_before_merge[cell_id_in_src_before_merge_len] = cell_id_src;
+            cell_id_in_dest_corresponding[cell_id_in_src_before_merge_len] = **pst_cell_id_dest;
+            cell_id_in_src_before_merge_len++;
             continue;
         }
         // the dest heavy keeper has been merged, so the maxv is the maxv in the merged sketch, instead of the dest sketch
-        unsigned maxv = find_maxv_in_sketch(dest, tag_arr[i]);
-        if (insert_to_sorted_set(new_rec, tag_arr[i], maxv, new_allocated_tag_id)) {
-            new_allocated_tag_id++;
+        unsigned maxv = find_maxv_in_sketch(dest, tag);
+        int popped_id;
+        int tmp_ret = sorted_set_insert_and_record_popped_back(new_rec, tag, maxv, &popped_id, sizeof(int));
+        if (tmp_ret == 2) { // insert success and popped one
+            cell_id_popped_from_dest_when_merge_src[cell_id_popped_from_dest_when_merge_src_len++] = popped_id;
+        } 
+        if (tmp_ret == 1 || tmp_ret == 2) { // insert success
+            int **pst_cell_id_final = (int **)sorted_set_get_pointer_to_user_data(new_rec, tag);
+            if (pst_cell_id_final != NULL) {
+                printf("ERR: pst_cell_id_final has been alloced a cell id\n");
+            }
+            *pst_cell_id_final = (int *)malloc(sizeof(unsigned int));
+            **pst_cell_id_final = new_alloc_id;
+        
+            cell_id_in_src_before_merge[cell_id_in_src_before_merge_len] = cell_id_src;
+            cell_id_in_dest_corresponding[cell_id_in_src_before_merge_len] = new_alloc_id;
+            new_alloc_id++;
         }
     }
 
     free(count_arr);
     free(tag_arr);
-    free(user_datas_dummy);
-
+    free(user_datas);
     sorted_set_free(dest->top_K_heap);
+
     dest->top_K_heap = new_rec;
+
+    *cell_id_popped_from_dest_when_merge_src_out = (int *)malloc(cell_id_popped_from_dest_when_merge_src_len * sizeof(int));
+    memcpy(*cell_id_popped_from_dest_when_merge_src_out, cell_id_popped_from_dest_when_merge_src, cell_id_popped_from_dest_when_merge_src_len * sizeof(int));
+    *cell_id_popped_from_dest_when_merge_src_len_out = cell_id_popped_from_dest_when_merge_src_len;
+    *cell_id_in_src_before_merge_out = (int *)malloc(cell_id_in_src_before_merge_len * sizeof(int));
+    memcpy(*cell_id_in_src_before_merge_out, cell_id_in_src_before_merge, cell_id_in_src_before_merge_len * sizeof(int));
+    *cell_id_in_src_before_merge_len_out = cell_id_in_src_before_merge_len;
+    *cell_id_in_dest_corresponding_out = (int *)malloc(cell_id_in_src_before_merge_len * sizeof(int));
+    memcpy(*cell_id_in_dest_corresponding_out, cell_id_in_dest_corresponding, cell_id_in_src_before_merge_len * sizeof(int));
 }
 
-int heavy_keeper_merge(struct heavy_keeper *hk, const struct heavy_keeper *src) {
-    if (hk->params.array_num != src->params.array_num ||
-        hk->params.max_bucket_num != src->params.max_bucket_num ||
-        hk->K != src->K) {
+
+int heavy_keeper_merge_recording_id_details(struct heavy_keeper *dest, const struct heavy_keeper *src,
+    int **cell_id_popped_from_dest_when_merge_src_out, int *cell_id_popped_from_dest_when_merge_src_len_out,
+    int **cell_id_in_src_before_merge_out, int **cell_id_in_dest_corresponding_out, int *cell_id_in_src_before_merge_len_out)
+{
+    if (dest->params.array_num != src->params.array_num ||
+        dest->params.max_bucket_num != src->params.max_bucket_num ||
+        dest->K != src->K) {
         printf("ERR: parameters of two merged heavy keeper must be the same\n");
         return -1;
     }
 
-    heavy_keeper_merge_sketch(hk, src);
-    heavy_keeper_merge_sorted_set(hk, src);
+    heavy_keeper_merge_sketch(dest, src);
+    heavy_keeper_merge_sorted_set_recording_id_details(dest, src,
+        cell_id_popped_from_dest_when_merge_src_out, cell_id_popped_from_dest_when_merge_src_len_out,
+        cell_id_in_src_before_merge_out, cell_id_in_dest_corresponding_out, cell_id_in_src_before_merge_len_out);
     return 0;
 }
 
@@ -578,14 +633,6 @@ struct heavy_keeper *heavy_keeper_deserialization(const char *blob, size_t size)
         return NULL;
     }
     return hk;
-}
-
-void heavy_keeper_merge_blob(struct heavy_keeper *hk, const char *blob, size_t blob_sz)
-{
-	struct heavy_keeper *to_merge=heavy_keeper_deserialization(blob, blob_sz);
-	heavy_keeper_merge(hk, to_merge);
-	heavy_keeper_free(to_merge);
-	return;
 }
 
 int heavy_keeper_get_config_K(struct heavy_keeper *hk)
