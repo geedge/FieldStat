@@ -611,15 +611,6 @@ int fieldstat_cube_merge_comprehensive(struct fs_cube *dest, const struct fs_cub
     // merge cell manager
     int arr_len_src = 0;
     const struct tag_hash_key **tag_arr_src = cell_manager_dump(cell_manager_src, &arr_len_src);
-    printf("fieldstat_cube_merge_comprehensive, dump result: %d\n", arr_len_src);
-    for (int i = 0; i < arr_len_src; i++) {
-        if (tag_arr_src[i] == NULL) {
-            printf("fieldstat_cube_merge_comprehensive, tag_arr_src[%d] is NULL\n", i);
-            continue;
-        }
-        printf("fieldstat_cube_merge_comprehensive, tag_arr_src[%d]: %s\n", i, tag_hash_key_get_compound_key(tag_arr_src[i]));
-    }
-
     for (int cell_id_src = 0; cell_id_src < arr_len_src; cell_id_src++) {
         const struct tag_hash_key *tag_src = tag_arr_src[cell_id_src];
         if (tag_src == NULL) {
@@ -630,10 +621,8 @@ int fieldstat_cube_merge_comprehensive(struct fs_cube *dest, const struct fs_cub
 
         int cell_id_final = cell_manager_add_cell(cell_manager_dest, tag_src);
         if (cell_id_final == -1) { // dest is full
-            printf("fieldstat_cube_merge_comprehensive, dest is full\n");
             break;
         }
-        printf("fieldstat_cube_merge_comprehensive, cell_id_final: %d, cell_id_src %d\n", cell_id_final, cell_id_src);
         for (int metric_id_src = 0; metric_id_src < src->n_metric; metric_id_src++) {
             int metric_id_dest = metric_id_src_dest_map[metric_id_src];
             int tmp_ret = metric_merge_or_copy_cell(dest->metrics[metric_id_dest], src->metrics[metric_id_src], cell_id_final, cell_id_src);
@@ -657,65 +646,34 @@ int fieldstat_cube_merge_topk(struct fs_cube *dest, const struct fs_cube *src, i
     int n_cell_id_added = 0;
     int *cell_id_popped = 0;
     int n_cell_id_popped = 0;
-    // todo: merge cell manager
+
     cell_manager_merge_topk(cell_manager_dest, cell_manager_src, &cell_id_popped, &n_cell_id_popped, &cell_id_old, &cell_id_added, &n_cell_id_added);
-
-    // merge cell manager
-    int arr_len_src = 0;
-    int arr_len_dest = 0;
-    const struct tag_hash_key **tag_arr_src = cell_manager_dump(cell_manager_src, &arr_len_src);
-    const struct tag_hash_key **tag_arr_dest_tmp = cell_manager_dump(cell_manager_dest, &arr_len_dest);
-    // tag_arr_dest_tmp will change, so we need to copy it
-    struct tag_hash_key **tag_arr_dest = malloc(sizeof(struct tag_hash_key *) * (arr_len_dest));
-    memcpy(tag_arr_dest, tag_arr_dest_tmp, sizeof(struct tag_hash_key *) * (arr_len_dest));
-
-    for (int cell_id_src = 0; cell_id_src < arr_len_src; cell_id_src++) {
-        const struct tag_hash_key *tag_src = tag_arr_src[cell_id_src];
-        if (tag_src == NULL) {
-            continue;
-        }
-
-        int count = cell_manager_get_count_by_tag(cell_manager_src, tag_src);
-        int popped_id = -1;
-        int existing_id = -1;
-        int cell_id_final = cell_manager_add_cell_topk(cell_manager_dest, tag_src, count, &popped_id, &existing_id);
-        if (cell_id_final == -1) { // the cell does not rank in topk
-            continue;
-        }
-        if (popped_id != -1) {
-            cell_id_popped[n_cell_id_popped++] = popped_id;
-            continue;
-        }
-        // todo: 实际上都是cell_id_final
-        if (existing_id != -1) { // merge
-            cell_id_added[n_cell_id_added] = existing_id;
-        } else { // copy
-            cell_id_added[n_cell_id_added] = cell_id_final;
-        }
-        cell_id_old[n_cell_id_added++] = cell_id_src;
-    }
-
-    for (int i = 0; i < n_cell_id_popped;i++) {
-        int id = cell_id_popped[i];
-        if (id >= arr_len_dest || tag_arr_dest[id] == NULL) { // cell_id_popped[i] is not in dest, its generated when merge src to dest, inserted and then popped
-            continue;
-        }
-        for (int j = 0; j < dest->n_metric; j++) {
-            metric_delete_cell(dest->metrics[j], id);
-        }
-    }
 
     for (int i = 0; i < n_cell_id_added; i++) {
         int tmp_id_dest = cell_id_added[i];
         int tmp_id_src = cell_id_old[i];
+        printf("fieldstat_cube_merge_topk, cell_id_added[%d]: %d, cell_id_old[%d]: %d\n", i, tmp_id_dest, i, tmp_id_src);
 
         for (int j = 0; j < src->n_metric; j++) {
             int metric_id_dest = metric_id_src_dest_map[j];
             metric_merge_or_copy_cell(dest->metrics[metric_id_dest], src->metrics[j], tmp_id_dest, tmp_id_src);
         }
     }
+    // chances are that: a cell exists in both dest and src, but it is not in final. In this case, these cells are merged and popped.
+    // Since all cells are counter, which is easy to merge, we just delete these cells after merging them.
+    // todo: 返回的值包括新添加和old， 并且把merge or copy 分开
+    for (int i = 0; i < n_cell_id_popped;i++) {
+        int id = cell_id_popped[i];
+        printf("fieldstat_cube_merge_topk, cell_id_popped[%d]: %d\n", i, id);
 
-    free(tag_arr_dest);
+        for (int j = 0; j < dest->n_metric; j++) {
+            metric_delete_cell(dest->metrics[j], id);
+        }
+    }
+
+    free(cell_id_popped);
+    free(cell_id_added);
+    free(cell_id_old);
 
     return 0;
 }
@@ -778,8 +736,6 @@ int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
 
         struct tag_hash_key *shared_tag_key_src = tag_hash_key_construct_with_fieldstat_tag(cube_src->shared_tags, cube_src->n_shared_tags);
         int cube_id_tmp = cell_manager_get_cell_id_by_tag(tag_cube_id_map, shared_tag_key_src);
-        printf("cell_manager_get_cell_id_by_tag 3: %d\n", cube_id_tmp);
-
         if (cube_id_tmp == -1) {
             struct fs_cube *copied_cube = fieldstat_cube_dup(cube_src);
             (void)fieldstat_append_cube_to_instance(instance, copied_cube);
@@ -857,6 +813,7 @@ void fieldstat_get_cells(const struct fieldstat *instance, int cube_id, int metr
 
     size_t n_cell_ret = 0;
     metric_get_cell_ids(metric, cell_ids, &n_cell_ret);
+    printf("fieldstat_get_cells, number of cells in metric: %zu\n", n_cell_ret);
     *n_cell = n_cell_ret;
     if (n_cell_ret == 0) {
         *tag_list = NULL;
@@ -868,8 +825,8 @@ void fieldstat_get_cells(const struct fieldstat *instance, int cube_id, int metr
     for (int i = 0; i < n_cell_ret; i++) {
         const struct tag_hash_key *tag_key = cell_manager_get_tag_by_cell_id(instance->cube[cube_id]->cell_manager, (*cell_ids)[i]);
         if (tag_key == NULL) {
-            printf("ERR: fieldstat_get_cells cell_manager_get_tag_by_cell_id failed\n");
-            return;
+            printf("ERR: fieldstat_get_cells cell_manager_get_tag_by_cell_id failed, cube id: %d, metric id: %d,  cell id: %d\n", cube_id, metric_id, (*cell_ids)[i]);
+            continue;
         }
         tag_hash_key_convert_to_fieldstat_tag(tag_key, &(tag_list_ret[i].tag), &(tag_list_ret[i].n_tag));
     }

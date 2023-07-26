@@ -64,6 +64,16 @@ Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(const char * key, int val
     tag_list_c.tag[0].value_longlong = value;
 }
 
+Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(const char * key, const char *value)
+{
+    tag_list_c.tag = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag));
+    tag_list_c.n_tag = 1;
+    tag_list_c.tag[0].key = strdup(key);
+    tag_list_c.tag[0].type = TAG_CSTRING;
+    tag_list_c.tag[0].value_str = strdup(value);
+}
+
+
 Fieldstat_tag_list_wrapper::~Fieldstat_tag_list_wrapper() {
     for (size_t i = 0; i < tag_list_c.n_tag; i++) {
         free((char *)tag_list_c.tag[i].key);

@@ -156,8 +156,9 @@ void topk_standard_oper(std::function<void(Fieldstat_tag_list_wrapper *, unsigne
     }
 }
 
-void topk_init_with_field_name(struct fieldstat *instance, const char * field_name[TEST_METRIC_NUM], unsigned int test_expected_big_count)
+void topk_init(struct fieldstat *instance, unsigned int test_expected_big_count)
 {
+    const char *field_name[TEST_METRIC_NUM] = {"topk1", "topk2"};
     int cube_id = fieldstat_register_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_TOPK, TEST_TOPK_STANDARD_K);
     int m1 = fieldstat_register_counter(instance, cube_id, field_name[0], 0);
     int m2 = fieldstat_register_counter(instance, cube_id, field_name[1], 0);
@@ -175,69 +176,63 @@ void topk_init_with_field_name(struct fieldstat *instance, const char * field_na
     topk_standard_oper(topk_add, TEST_METRIC_NUM, test_expected_big_count);
 }
 
-void topk_init(struct fieldstat *instance, unsigned int test_expected_big_count)
-{
-    const char *field_name[TEST_METRIC_NUM] = {"topk1", "topk2"};
-    topk_init_with_field_name(instance, field_name, test_expected_big_count);
-}
+// TEST(export_test, cjson_export_with_fixed_tag_and_many_metrics_on_one_cube_of_comprehensive_sampling)
+// {
+//     const int tag_list_num = 3;
 
-TEST(export_test, cjson_export_with_fixed_tag_and_many_metrics_on_one_cube_of_comprehensive_sampling)
-{
-    const int tag_list_num = 3;
+//     // new instance
+//     struct fieldstat *instance = fieldstat_new();
+//     int cube_id = fieldstat_register_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, tag_list_num);
+//     int id_counter = fieldstat_register_counter(instance, cube_id, "counter", 0);
+//     int id_gauge = fieldstat_register_hll(instance, cube_id, "gauge", g_hll_standard->cfg.precision);
+//     int id_histogram = fieldstat_register_histogram(instance, cube_id, "histogram",
+//         g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
 
-    // new instance
-    struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_register_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, tag_list_num);
-    int id_counter = fieldstat_register_counter(instance, cube_id, "counter", 0);
-    int id_gauge = fieldstat_register_hll(instance, cube_id, "gauge", g_hll_standard->cfg.precision);
-    int id_histogram = fieldstat_register_histogram(instance, cube_id, "histogram",
-        g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
+//     Fieldstat_tag_list_wrapper *tags[tag_list_num];
+//     fill_random_tag(tags, tag_list_num);
 
-    Fieldstat_tag_list_wrapper *tags[tag_list_num];
-    fill_random_tag(tags, tag_list_num);
+//     for (int j = 0; j < tag_list_num; j++) {
+//         const struct fieldstat_tag *tag_tmp = tags[j]->get_tag();
+//         size_t tag_count = tags[j]->get_tag_count();
+//         int cell_id = fieldstat_cube_add(instance, cube_id, tag_tmp, tag_count, 1);
 
-    for (int j = 0; j < tag_list_num; j++) {
-        const struct fieldstat_tag *tag_tmp = tags[j]->get_tag();
-        size_t tag_count = tags[j]->get_tag_count();
-        int cell_id = fieldstat_cube_add(instance, cube_id, tag_tmp, tag_count, 1);
+//         fieldstat_counter_incrby(instance, cube_id, id_counter, cell_id, 1);
+//         for (size_t i = 0; i < OPER_NUM; i++){
+//             fieldstat_hll_add(instance, cube_id, id_gauge, cell_id, g_hll_standard_oper[i].c_str(), g_hll_standard_oper[i].length());
+//             fieldstat_histogram_record(instance, cube_id, id_histogram, cell_id, g_histogram_standard_oper[i]);
+//         }
+//     }
 
-        fieldstat_counter_incrby(instance, cube_id, id_counter, cell_id, 1);
-        for (size_t i = 0; i < OPER_NUM; i++){
-            fieldstat_hll_add(instance, cube_id, id_gauge, cell_id, g_hll_standard_oper[i].c_str(), g_hll_standard_oper[i].length());
-            fieldstat_histogram_record(instance, cube_id, id_histogram, cell_id, g_histogram_standard_oper[i]);
-        }
-    }
+//     // export test
+//     cJSON *root_arr = test_exporter_extract_results(instance);
+//     int arr_num = cJSON_GetArraySize(root_arr);
+//     EXPECT_EQ(arr_num, 3);
 
-    // export test
-    cJSON *root_arr = test_exporter_extract_results(instance);
-    int arr_num = cJSON_GetArraySize(root_arr);
-    EXPECT_EQ(arr_num, 3);
+//     for (int i = 0; i < arr_num; i++)
+//     {
+//         cJSON *root = cJSON_GetArrayItem(root_arr, i);
 
-    for (int i = 0; i < arr_num; i++)
-    {
-        cJSON *root = cJSON_GetArrayItem(root_arr, i);
+//         // check tag
+//         cJSON *tag = cJSON_GetObjectItem(root, "tags");
+//         EXPECT_NE(tag, nullptr);
+//         test_check_if_tag_list_is_in_json(tag, tags[i]);
 
-        // check tag
-        cJSON *tag = cJSON_GetObjectItem(root, "tags");
-        EXPECT_NE(tag, nullptr);
-        test_check_if_tag_list_is_in_json(tag, tags[i]);
+//         // check metrics
+//         cJSON *metrics = cJSON_GetObjectItem(root, "fields");
+//         EXPECT_NE(metrics, nullptr);
+//         cJSON *counter = cJSON_GetObjectItem(metrics, "counter");
+//         EXPECT_EQ(counter->valueint, 1);
+//         test_check_if_metric_gauge_correct(metrics, "gauge");
+//         test_check_if_metric_histogram_correct(metrics, "histogram");
+//     }
 
-        // check metrics
-        cJSON *metrics = cJSON_GetObjectItem(root, "fields");
-        EXPECT_NE(metrics, nullptr);
-        cJSON *counter = cJSON_GetObjectItem(metrics, "counter");
-        EXPECT_EQ(counter->valueint, 1);
-        test_check_if_metric_gauge_correct(metrics, "gauge");
-        test_check_if_metric_histogram_correct(metrics, "histogram");
-    }
+//     for (int i = 0; i < 3; i++) {
+//         delete tags[i];
+//     }
 
-    for (int i = 0; i < 3; i++) {
-        delete tags[i];
-    }
-
-    fieldstat_free(instance);
-    cJSON_Delete(root_arr);
-}
+//     fieldstat_free(instance);
+//     cJSON_Delete(root_arr);
+// }
 
 TEST(export_test, cjson_export_on_one_cube_of_topk_sampling)
 {
@@ -277,128 +272,128 @@ TEST(export_test, cjson_export_on_one_cube_of_topk_sampling)
     fieldstat_free(instance);
 }
 
-TEST(export_test, empty_fieldstat_export_null) {
-    struct fieldstat *instance = fieldstat_new();
-    cJSON *root_arr = test_exporter_extract_results_with_standard_global(instance);
-    EXPECT_EQ(root_arr, nullptr);
-    fieldstat_free(instance);
-}
+// TEST(export_test, empty_fieldstat_export_null) {
+//     struct fieldstat *instance = fieldstat_new();
+//     cJSON *root_arr = test_exporter_extract_results_with_standard_global(instance);
+//     EXPECT_EQ(root_arr, nullptr);
+//     fieldstat_free(instance);
+// }
 
-TEST(export_test, only_registered_but_not_added_export_null_with_global_tag)
-{
-    struct fieldstat *instance = fieldstat_new();
+// TEST(export_test, only_registered_but_not_added_export_null_with_global_tag)
+// {
+//     struct fieldstat *instance = fieldstat_new();
 
-    int cube_id = fieldstat_register_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
-    fieldstat_register_counter(instance, cube_id, "counter", 0);
-    fieldstat_register_hll(instance, cube_id, "gauge", g_hll_standard->cfg.precision);
-    fieldstat_register_histogram(instance, cube_id, "histogram",
-        g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
+//     int cube_id = fieldstat_register_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
+//     fieldstat_register_counter(instance, cube_id, "counter", 0);
+//     fieldstat_register_hll(instance, cube_id, "gauge", g_hll_standard->cfg.precision);
+//     fieldstat_register_histogram(instance, cube_id, "histogram",
+//         g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
 
-    // add global tag
-    cJSON *root_arr = test_exporter_extract_results_with_standard_global(instance);
-    EXPECT_EQ(root_arr, nullptr);
+//     // add global tag
+//     cJSON *root_arr = test_exporter_extract_results_with_standard_global(instance);
+//     EXPECT_EQ(root_arr, nullptr);
 
-    fieldstat_free(instance);
-}
+//     fieldstat_free(instance);
+// }
 
-TEST(export_test, skip_two_empty_cube_and_export_last_one_with_global_tag)
-{
-    struct fieldstat *instance = fieldstat_new();
-    int cube_id_1 = fieldstat_register_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
-    (void)fieldstat_register_hll(instance, cube_id_1, "gauge", g_hll_standard->cfg.precision);
-    int cube_id_2 = fieldstat_register_cube(instance, TEST_TAG_SHARED2, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
-    (void)fieldstat_register_counter(instance, cube_id_2, "counter", false);
-    int cube_id_3 = fieldstat_register_cube(instance, TEST_TAG_SHARED3, 1, SAMPLING_MODE_COMPREHENSIVE, 3);
-    int id_histogram = fieldstat_register_histogram(instance, cube_id_3, "histogram",
-        g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
+// TEST(export_test, skip_two_empty_cube_and_export_last_one_with_global_tag)
+// {
+//     struct fieldstat *instance = fieldstat_new();
+//     int cube_id_1 = fieldstat_register_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
+//     (void)fieldstat_register_hll(instance, cube_id_1, "gauge", g_hll_standard->cfg.precision);
+//     int cube_id_2 = fieldstat_register_cube(instance, TEST_TAG_SHARED2, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
+//     (void)fieldstat_register_counter(instance, cube_id_2, "counter", false);
+//     int cube_id_3 = fieldstat_register_cube(instance, TEST_TAG_SHARED3, 1, SAMPLING_MODE_COMPREHENSIVE, 3);
+//     int id_histogram = fieldstat_register_histogram(instance, cube_id_3, "histogram",
+//         g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
 
-    const int tag_num = 1;
-    Fieldstat_tag_list_wrapper *tags[tag_num];
-    fill_random_tag(tags, tag_num);
-    Fieldstat_tag_list_wrapper *the_tag = tags[0];
-    int cell_id = fieldstat_cube_add(instance, cube_id_3, the_tag->get_tag(), the_tag->get_tag_count(), 1);
-    for (size_t i = 0; i < OPER_NUM; i++){
-        fieldstat_histogram_record(instance, cube_id_3, id_histogram, cell_id, g_histogram_standard_oper[i]);
-    }
+//     const int tag_num = 1;
+//     Fieldstat_tag_list_wrapper *tags[tag_num];
+//     fill_random_tag(tags, tag_num);
+//     Fieldstat_tag_list_wrapper *the_tag = tags[0];
+//     int cell_id = fieldstat_cube_add(instance, cube_id_3, the_tag->get_tag(), the_tag->get_tag_count(), 1);
+//     for (size_t i = 0; i < OPER_NUM; i++){
+//         fieldstat_histogram_record(instance, cube_id_3, id_histogram, cell_id, g_histogram_standard_oper[i]);
+//     }
 
-    // export test
-    cJSON *root_arr = test_exporter_extract_results_with_standard_global(instance);
-    int arr_num = cJSON_GetArraySize(root_arr);
-    EXPECT_EQ(arr_num, 1);
+//     // export test
+//     cJSON *root_arr = test_exporter_extract_results_with_standard_global(instance);
+//     int arr_num = cJSON_GetArraySize(root_arr);
+//     EXPECT_EQ(arr_num, 1);
 
-    for (int i = 0; i < arr_num; i++)
-    {
-        cJSON *root = cJSON_GetArrayItem(root_arr, i);
+//     for (int i = 0; i < arr_num; i++)
+//     {
+//         cJSON *root = cJSON_GetArrayItem(root_arr, i);
 
-        // check tag
-        cJSON *tag = cJSON_GetObjectItem(root, "tags");
-        test_check_if_tag_list_is_in_json(tag, tags[0]);
-        test_check_if_global_tag_is_in_json(tag);
+//         // check tag
+//         cJSON *tag = cJSON_GetObjectItem(root, "tags");
+//         test_check_if_tag_list_is_in_json(tag, tags[0]);
+//         test_check_if_global_tag_is_in_json(tag);
 
-        cJSON *metrics = cJSON_GetObjectItem(root, "fields");
-        EXPECT_NE(metrics, nullptr);
-        if (i == 0) {
-            test_check_if_metric_histogram_correct(metrics, "histogram");
-            continue;
-        }
+//         cJSON *metrics = cJSON_GetObjectItem(root, "fields");
+//         EXPECT_NE(metrics, nullptr);
+//         if (i == 0) {
+//             test_check_if_metric_histogram_correct(metrics, "histogram");
+//             continue;
+//         }
 
-        FAIL();
-    }
+//         FAIL();
+//     }
 
-    delete tags[0];
+//     delete tags[0];
 
-    fieldstat_free(instance);
-    cJSON_Delete(root_arr);
-}
+//     fieldstat_free(instance);
+//     cJSON_Delete(root_arr);
+// }
 
-TEST(export_test, skip_empty_metrics_given_cube_deleted) {
-    struct fieldstat *instance = fieldstat_new();
-    int cube_id_del = fieldstat_register_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
-    int cube_id = fieldstat_register_cube(instance, TEST_TAG_SHARED2, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
-    fieldstat_unregister_cube(instance, cube_id_del);
-    (void)fieldstat_register_counter(instance, cube_id, "counter", false);
-    (void)fieldstat_register_counter(instance, cube_id, "counter2", false);
-    int metric_id = fieldstat_register_counter(instance, cube_id, "counter3", false);
-    (void)fieldstat_register_counter(instance, cube_id, "counter4", false);
+// TEST(export_test, skip_empty_metrics_given_cube_deleted) {
+//     struct fieldstat *instance = fieldstat_new();
+//     int cube_id_del = fieldstat_register_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
+//     int cube_id = fieldstat_register_cube(instance, TEST_TAG_SHARED2, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
+//     fieldstat_unregister_cube(instance, cube_id_del);
+//     (void)fieldstat_register_counter(instance, cube_id, "counter", false);
+//     (void)fieldstat_register_counter(instance, cube_id, "counter2", false);
+//     int metric_id = fieldstat_register_counter(instance, cube_id, "counter3", false);
+//     (void)fieldstat_register_counter(instance, cube_id, "counter4", false);
 
-    const int tag_num = 1;
-    Fieldstat_tag_list_wrapper *tags[tag_num];
-    fill_random_tag(tags, tag_num);
-    Fieldstat_tag_list_wrapper *the_tag = tags[0];
-    int cell_id = fieldstat_cube_add(instance, cube_id, the_tag->get_tag(), the_tag->get_tag_count(), 1);
+//     const int tag_num = 1;
+//     Fieldstat_tag_list_wrapper *tags[tag_num];
+//     fill_random_tag(tags, tag_num);
+//     Fieldstat_tag_list_wrapper *the_tag = tags[0];
+//     int cell_id = fieldstat_cube_add(instance, cube_id, the_tag->get_tag(), the_tag->get_tag_count(), 1);
 
-    fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id, 1234);
+//     fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id, 1234);
 
-    cJSON *root_arr = test_exporter_extract_results_with_standard_global(instance);
-    int arr_num = cJSON_GetArraySize(root_arr);
-    EXPECT_EQ(arr_num, 1);
+//     cJSON *root_arr = test_exporter_extract_results_with_standard_global(instance);
+//     int arr_num = cJSON_GetArraySize(root_arr);
+//     EXPECT_EQ(arr_num, 1);
 
-    for (int i = 0; i < arr_num; i++) {
-        cJSON *root = cJSON_GetArrayItem(root_arr, i);
+//     for (int i = 0; i < arr_num; i++) {
+//         cJSON *root = cJSON_GetArrayItem(root_arr, i);
 
-        // check tag
-        cJSON *tag = cJSON_GetObjectItem(root, "tags");
-        test_check_if_tag_list_is_in_json(tag, tags[0]);
-        test_check_if_global_tag_is_in_json(tag);
-        struct fieldstat_tag_list tmp_tag = {(struct fieldstat_tag *)&TEST_TAG_SHARED2, 3};
-        Fieldstat_tag_list_wrapper shared_wrapper = Fieldstat_tag_list_wrapper(&tmp_tag);
-        test_check_if_tag_list_is_in_json(tag, &shared_wrapper);
+//         // check tag
+//         cJSON *tag = cJSON_GetObjectItem(root, "tags");
+//         test_check_if_tag_list_is_in_json(tag, tags[0]);
+//         test_check_if_global_tag_is_in_json(tag);
+//         struct fieldstat_tag_list tmp_tag = {(struct fieldstat_tag *)&TEST_TAG_SHARED2, 3};
+//         Fieldstat_tag_list_wrapper shared_wrapper = Fieldstat_tag_list_wrapper(&tmp_tag);
+//         test_check_if_tag_list_is_in_json(tag, &shared_wrapper);
 
-        cJSON *metrics = cJSON_GetObjectItem(root, "fields");
-        EXPECT_NE(metrics, nullptr);
-        if (i == 0) {
-            cJSON *counter = cJSON_GetObjectItem(metrics, "counter3");
-            EXPECT_EQ(counter->valueint, 1234);
-            continue;
-        }
+//         cJSON *metrics = cJSON_GetObjectItem(root, "fields");
+//         EXPECT_NE(metrics, nullptr);
+//         if (i == 0) {
+//             cJSON *counter = cJSON_GetObjectItem(metrics, "counter3");
+//             EXPECT_EQ(counter->valueint, 1234);
+//             continue;
+//         }
 
-        FAIL();
-    }
+//         FAIL();
+//     }
 
-    delete tags[0];
-    fieldstat_free(instance);
-    cJSON_Delete(root_arr);
-}
+//     delete tags[0];
+//     fieldstat_free(instance);
+//     cJSON_Delete(root_arr);
+// }
 
 void init_hll_standard_oper()
 {

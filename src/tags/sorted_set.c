@@ -355,7 +355,8 @@ struct sorted_set *sorted_set_copy(const struct sorted_set *ss)
     for (int i = 0; i < ss->heap->cur_size; i++) {
         heap_entry *entry = (heap_entry *)ss->heap->nodes[i];
         struct entry_data *data = sorted_set_entry_get_data(entry);
-        sorted_set_insert(ret, data->key, sorted_set_entry_get_count(entry));
+        struct tag_hash_key *new_key = tag_hash_key_copy(data->key);
+        sorted_set_insert(ret, new_key, sorted_set_entry_get_count(entry));
         int *new_user_data = (int *)malloc(sizeof(int));
         *new_user_data = *(int *)data->user_data;
         sorted_set_insert_user_data(ret, data->key, new_user_data);

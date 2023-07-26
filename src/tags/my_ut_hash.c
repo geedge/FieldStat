@@ -100,6 +100,7 @@ struct tag_id_map *my_hash_key_list_find(const struct tag_id_map *tbl, const str
     return node;
 }
 
+// todo: 这个函数弃用
 unsigned int tag_hash_key_cal_hash_value(struct tag_hash_key *my_hash_key)
 {
     simple_hash_cnt++;
@@ -108,9 +109,6 @@ unsigned int tag_hash_key_cal_hash_value(struct tag_hash_key *my_hash_key)
 
 int tag_hash_key_cmp(const struct tag_hash_key *a, const struct tag_hash_key *b)
 {
-    if (a->n_my_tag != b->n_my_tag) {
-        return 1;
-    }
     if (a->compound_key_len != b->compound_key_len) {
         return 1;
     }

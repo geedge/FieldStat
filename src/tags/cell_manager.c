@@ -72,8 +72,9 @@ void cell_manager_reset(struct cell_manager *pthis)
         heavy_keeper_clear(pthis->topk_tag_id_map);
     } else {
         cell_manager_comprehensive_tag_id_map_free(pthis);
-        pthis->next_cell_id = 0;
     }
+
+    pthis->next_cell_id = 0;
 
     free(pthis->id_tag_array);
     pthis->max_cell_id = -1;
@@ -159,7 +160,6 @@ int cell_manager_get_count_by_tag(const struct cell_manager *pthis, const struct
 int cell_manager_add_cell(struct cell_manager *pthis, const struct tag_hash_key *tag)
 {
     if (HASH_COUNT(pthis->comprehensive_tag_id_map) >= pthis->max_cell_num) {
-        printf("cell_manager_add_cell: HASH_COUNT(pthis->comprehensive_tag_id_map) >= pthis->max_cell_num\n");
         return -1;
     }
     struct tag_id_map *node = NULL;
@@ -192,26 +192,27 @@ int cell_manager_add_cell_topk(struct cell_manager *pthis, const struct tag_hash
 
     if (ret == 1) { // use the original id
         heavy_keeper_query_one(pthis->topk_tag_id_map, tag, NULL, existing_cell_id);
+
         *popped_cell_id = -1;
         tag_hash_key_free(tag_copy);
-        return 1;
+        return *existing_cell_id;
     }
     /* -------------------------------- new cell added-------------------------------- */
 /*
 To mitigate the risk of unbounded array size due to potentially infinite growth of cell IDs, a maximum limit is set for cell IDs in the metric.
-This limit is configured as 5 times the value of K. Even in the worst-case scenario of malicious attacks, this prevents excessive memory usage.
+This limit is configured as 8 times the value of K. Even in the worst-case scenario of malicious attacks, this prevents excessive memory usage.
 Even though there is a small possibility of not counting certain flows due to the limit, it is expected that the unallocated IDs would correspond to mouse flows, 
     which would have minimal impact on accuracy.
-The number 5 was determined through experiment, where multiple tests were conducted, randomly generating flows by which cells are determined.
-    The observed stable cell ID count did not exceed 3 times the value of K. Therefore, a conservative value of 5 was chosen.*/
-    if (pthis->next_cell_id >= pthis->max_cell_num * 5) { // max int is much larger, no risk of overflow
+The number 8 was determined through experiment, where multiple tests were conducted, randomly generating flows by which cells are determined.
+    The observed stable cell ID count did not exceed 3 times the value of K. Therefore, a conservative value of 8 was chosen.*/
+    if (pthis->next_cell_id >= pthis->max_cell_num * 8) { // max int is much larger, no risk of overflow
+        printf("ERR: the number of cells exceeds the limit when topk get bad flows\n");
         return -1;
     }
 
     if (*popped_cell_id != -1) { // popped, no need to free the tag
         pthis->id_tag_array[*popped_cell_id] = NULL;
     }
-
     cell_manager_id_tag_array_add(pthis, pthis->next_cell_id, tag_copy);
     return pthis->next_cell_id++;
 }

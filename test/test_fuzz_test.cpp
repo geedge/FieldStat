@@ -102,6 +102,7 @@ TEST(Fuzz_test, fuzz_test)
             free(blob);
         }
         int cube_id = rand() % CUBE_NUM;
+        // int cube_id = 0;
         if (cube_ids[cube_id] != -1) {
             if (cube_is_topk[cube_id]) {
                 Fieldstat_tag_list_wrapper * tmp = tag_list_wrapper[rand() % CELL_NUM];

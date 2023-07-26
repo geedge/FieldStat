@@ -116,13 +116,16 @@ void kv_pair_fill_with_tags(struct export_kv_pair *dest, const struct fieldstat_
     }
 }
 
-long get_current_time()
+long long get_current_time()
 {
-    time_t currentTime;
-    time(&currentTime);
+    struct timeval current_time;
+    gettimeofday(&current_time, NULL);
+    long long time_stamp_in_ms = current_time.tv_sec * 1000LL + current_time.tv_usec / 1000;
 
-    return currentTime;
+    return time_stamp_in_ms;
 }
+
+// todo cjson support long long
 
 /* -------------------------------------------------------------------------- */
 /*                                    iter                                    */
@@ -345,6 +348,7 @@ void cell_iter_read_tag_list(struct cell_iter *iter, struct export_kv_pair **exp
 void cell_iter_add_field_to_field_object(const struct cell_iter *iter, cJSON *obj)
 {
     struct export_kv_pair *field = cell_query_with_iter(iter);
+    printf("cell_iter_add_field_to_field_object field key: %s, value is: %lld\n", field->key, field->value_longlong);
     kv_pair_add_to_cjson(field, obj);
     kv_pair_free(field);
 }
@@ -376,6 +380,7 @@ void cjson_map_add_new_pair_for_one_loop(struct cjson_map **map_head_in, struct 
 
     char *key = cJSON_PrintUnformatted(cjson_tags);  // when this key is added to a new map entry, it is freed when the map is freed
     size_t key_len = strlen(key);
+    printf("tag cjson key: %s\n", key);
 
     struct cjson_map *map = cjson_map_find(map_head, key, key_len);
     if (map == NULL) {
@@ -466,6 +471,10 @@ char *fieldstat_json_exporter_export(const struct fieldstat_json_exporter *expor
         cJSON_AddItemToObject(cjson_root, "tags", current->cjson_tags);
         cJSON_AddItemToObject(cjson_root, "fields", current->cjson_fields);
         cJSON_AddNumberToObject(cjson_root, "timestamp", get_current_time());
+        // long long ts = get_current_time();
+        // char tmp_str[256] = "";
+        // sprintf(tmp_str, "%lld", ts);
+        // cJSON_AddStringToObject(cjson_root, "timestamp", tmp_str);
 
         cJSON_AddItemToArray(cjson_root_arr, cjson_root);
     }

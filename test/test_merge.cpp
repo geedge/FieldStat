@@ -248,216 +248,216 @@ TEST(unit_test_merge, new_too_many_cells_on_multiple_metric_given_source_cube_re
     fieldstat_free(instance_dest);
 }
 
-// TEST(unit_test_merge, new_cube_and_metric_to_empty_topk)
-// {
-//     struct fieldstat *instance = fieldstat_new();
-//     int cube_id = fieldstat_register_cube(instance, &TEST_TAG_INT, 1, SAMPLING_MODE_TOPK, 10);
-//     fieldstat_register_counter(instance, cube_id, "metric_name", false);
+TEST(unit_test_merge, new_cube_and_metric_to_empty_topk)
+{
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_register_cube(instance, &TEST_TAG_INT, 1, SAMPLING_MODE_TOPK, 10);
+    fieldstat_register_counter(instance, cube_id, "metric_name", false);
 
-//     struct fieldstat *instance_dest = fieldstat_new();
+    struct fieldstat *instance_dest = fieldstat_new();
 
-//     fieldstat_merge(instance_dest, instance);
+    fieldstat_merge(instance_dest, instance);
 
-//     int *cube_id_dest;
-//     int n_cube;
-//     fieldstat_get_cubes(instance_dest, &cube_id_dest, &n_cube);
-//     EXPECT_TRUE(n_cube == 1);
-//     EXPECT_STREQ(fieldstat_get_metric_name(instance_dest, cube_id_dest[0], 0), "metric_name");
+    int *cube_id_dest;
+    int n_cube;
+    fieldstat_get_cubes(instance_dest, &cube_id_dest, &n_cube);
+    EXPECT_TRUE(n_cube == 1);
+    EXPECT_STREQ(fieldstat_get_metric_name(instance_dest, cube_id_dest[0], 0), "metric_name");
 
-//     fieldstat_free(instance);
-//     fieldstat_free(instance_dest);
-//     free(cube_id_dest);
-// }
+    fieldstat_free(instance);
+    fieldstat_free(instance_dest);
+    free(cube_id_dest);
+}
 
-// TEST(unit_test_merge, new_cell_on_existing_cube_and_metric_topk)
-// {
-//     struct fieldstat *instance = fieldstat_new();
-//     int cube_id = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 10);
-//     int metric_id = fieldstat_register_counter(instance, cube_id, "metric_name", false);
-//     struct fieldstat *instance_dest = fieldstat_new();
-//     fieldstat_merge(instance_dest, instance);
+TEST(unit_test_merge, new_cell_on_existing_cube_and_metric_topk)
+{
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 10);
+    int metric_id = fieldstat_register_counter(instance, cube_id, "metric_name", false);
+    struct fieldstat *instance_dest = fieldstat_new();
+    fieldstat_merge(instance_dest, instance);
 
-//     int cell_id = fieldstat_cube_add(instance, cube_id, &TEST_TAG_STRING, 1, 1);
-//     fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id, 10086);
+    int cell_id = fieldstat_cube_add(instance, cube_id, &TEST_TAG_STRING, 1, 1);
+    fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id, 10086);
 
-//     fieldstat_merge(instance_dest, instance);
+    fieldstat_merge(instance_dest, instance);
 
-//     int *cube_id_dest;
-//     int n_cube;
-//     fieldstat_get_cubes(instance_dest, &cube_id_dest, &n_cube);
-//     EXPECT_TRUE(n_cube == 1);
-//     int ret_cube_id = cube_id_dest[0];
-//     free(cube_id_dest);
-//     int ret_metric_id = fieldstat_get_max_metric_id(instance, ret_cube_id);
-//     EXPECT_EQ(ret_metric_id, 0);
-//     long long measure = fieldstat_counter_get(instance, cube_id, metric_id, cell_id);
-//     EXPECT_EQ(measure, 10086);
+    int *cube_id_dest;
+    int n_cube;
+    fieldstat_get_cubes(instance_dest, &cube_id_dest, &n_cube);
+    EXPECT_TRUE(n_cube == 1);
+    int ret_cube_id = cube_id_dest[0];
+    free(cube_id_dest);
+    int ret_metric_id = fieldstat_get_max_metric_id(instance, ret_cube_id);
+    EXPECT_EQ(ret_metric_id, 0);
+    long long measure = fieldstat_counter_get(instance, cube_id, metric_id, cell_id);
+    EXPECT_EQ(measure, 10086);
 
-//     int *ret_cell_ids = NULL;
-//     struct fieldstat_tag_list *tag_list = NULL;
-//     size_t n_cell = 0;
-//     fieldstat_get_cells(instance, cube_id, metric_id, &ret_cell_ids, &tag_list, &n_cell);
-//     EXPECT_EQ(n_cell, 1);
-//     EXPECT_EQ(tag_list->n_tag, 1);
-//     EXPECT_STREQ(tag_list->tag[0].key, TEST_TAG_STRING.key);
+    int *ret_cell_ids = NULL;
+    struct fieldstat_tag_list *tag_list = NULL;
+    size_t n_cell = 0;
+    fieldstat_get_cells(instance, cube_id, metric_id, &ret_cell_ids, &tag_list, &n_cell);
+    EXPECT_EQ(n_cell, 1);
+    EXPECT_EQ(tag_list->n_tag, 1);
+    EXPECT_STREQ(tag_list->tag[0].key, TEST_TAG_STRING.key);
 
-//     fieldstat_free(instance);
-//     fieldstat_free(instance_dest);
-//     free(ret_cell_ids);
-//     fieldstat_tag_list_arr_free(tag_list, n_cell);
-// }
+    fieldstat_free(instance);
+    fieldstat_free(instance_dest);
+    free(ret_cell_ids);
+    fieldstat_tag_list_arr_free(tag_list, n_cell);
+}
 
-// TEST(unit_test_merge, merge_existing_cell_on_existing_cube_and_metric_topk)
-// {
-//     struct fieldstat *instance = fieldstat_new();
-//     int cube_id = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 10);
-//     int metric_id = fieldstat_register_counter(instance, cube_id, "metric_name", false);
-//     int cell_id = fieldstat_cube_add(instance, cube_id, &TEST_TAG_STRING, 1, 1);
-//     fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id, 5);
-//     struct fieldstat *instance_dest = fieldstat_new();
+TEST(unit_test_merge, merge_existing_cell_on_existing_cube_and_metric_topk)
+{
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 10);
+    int metric_id = fieldstat_register_counter(instance, cube_id, "metric_name", false);
+    int cell_id = fieldstat_cube_add(instance, cube_id, &TEST_TAG_STRING, 1, 1);
+    fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id, 5);
+    struct fieldstat *instance_dest = fieldstat_new();
 
-//     fieldstat_merge(instance_dest, instance);
-//     fieldstat_merge(instance_dest, instance);
+    fieldstat_merge(instance_dest, instance);
+    fieldstat_merge(instance_dest, instance);
 
-//     int *cube_id_dest;
-//     int n_cube;
-//     fieldstat_get_cubes(instance_dest, &cube_id_dest, &n_cube);
-//     EXPECT_TRUE(n_cube == 1);
-//     int ret_cube_id = cube_id_dest[0];
-//     free(cube_id_dest);
-//     int ret_metric_id = fieldstat_get_max_metric_id(instance_dest, ret_cube_id);
-//     EXPECT_EQ(ret_metric_id, 0);
+    int *cube_id_dest;
+    int n_cube;
+    fieldstat_get_cubes(instance_dest, &cube_id_dest, &n_cube);
+    EXPECT_TRUE(n_cube == 1);
+    int ret_cube_id = cube_id_dest[0];
+    free(cube_id_dest);
+    int ret_metric_id = fieldstat_get_max_metric_id(instance_dest, ret_cube_id);
+    EXPECT_EQ(ret_metric_id, 0);
 
-//     int *ret_cell_ids = NULL;
-//     struct fieldstat_tag_list *tag_list = NULL;
-//     size_t n_cell = 0;
-//     fieldstat_get_cells(instance_dest, ret_cube_id, ret_metric_id, &ret_cell_ids, &tag_list, &n_cell);
-//     EXPECT_EQ(n_cell, 1);
-//     long long measure = fieldstat_counter_get(instance_dest, cube_id, metric_id, ret_cell_ids[0]);
-//     EXPECT_EQ(measure, 10);
+    int *ret_cell_ids = NULL;
+    struct fieldstat_tag_list *tag_list = NULL;
+    size_t n_cell = 0;
+    fieldstat_get_cells(instance_dest, ret_cube_id, ret_metric_id, &ret_cell_ids, &tag_list, &n_cell);
+    EXPECT_EQ(n_cell, 1);
+    long long measure = fieldstat_counter_get(instance_dest, cube_id, metric_id, ret_cell_ids[0]);
+    EXPECT_EQ(measure, 10);
 
-//     free(ret_cell_ids);
-//     fieldstat_tag_list_arr_free(tag_list, n_cell);
-//     fieldstat_free(instance);
-//     fieldstat_free(instance_dest);
-// }
+    free(ret_cell_ids);
+    fieldstat_tag_list_arr_free(tag_list, n_cell);
+    fieldstat_free(instance);
+    fieldstat_free(instance_dest);
+}
 
-// TEST(unit_test_merge, new_too_many_cells_on_one_metric_given_source_cube_reset_and_get_different_cube_topk)
-// {
-//     struct fieldstat *instance = fieldstat_new();
-//     int cube_id = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 2);
-//     int metric_id = fieldstat_register_counter(instance, cube_id, "metric name", false);
-//     int cell_id1 = fieldstat_cube_add(instance, cube_id, &TEST_TAG_STRING, 1, 1);
-//     fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id1, 1);
-//     struct fieldstat *instance_dest = fieldstat_new();
-//     fieldstat_merge(instance_dest, instance);
-//     fieldstat_reset(instance);
+TEST(unit_test_merge, new_too_many_cells_on_one_metric_given_source_cube_reset_and_get_different_cube_topk)
+{
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 2);
+    int metric_id = fieldstat_register_counter(instance, cube_id, "metric name", false);
+    int cell_id1 = fieldstat_cube_add(instance, cube_id, &TEST_TAG_STRING, 1, 1);
+    fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id1, 1);
+    struct fieldstat *instance_dest = fieldstat_new();
+    fieldstat_merge(instance_dest, instance);
+    fieldstat_reset(instance);
 
-//     int cell_id2 = fieldstat_cube_add(instance, cube_id, &TEST_TAG_INT, 1, 1);
-//     fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id2, 2);
-//     int cell_id3 = fieldstat_cube_add(instance, cube_id, &TEST_TAG_DOUBLE, 1, 1);
-//     fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id3, 3);
+    int cell_id2 = fieldstat_cube_add(instance, cube_id, &TEST_TAG_INT, 1, 1);
+    fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id2, 2);
+    int cell_id3 = fieldstat_cube_add(instance, cube_id, &TEST_TAG_DOUBLE, 1, 1);
+    fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id3, 3);
 
-//     fieldstat_merge(instance_dest, instance);
+    fieldstat_merge(instance_dest, instance);
 
-//     int *cell_ids = NULL;
-//     struct fieldstat_tag_list *tag_list = NULL;
-//     size_t n_cell = 0;
-//     fieldstat_get_cells(instance_dest, 0, 0, &cell_ids, &tag_list, &n_cell);
-//     EXPECT_EQ(n_cell, 2);
+    int *cell_ids = NULL;
+    struct fieldstat_tag_list *tag_list = NULL;
+    size_t n_cell = 0;
+    fieldstat_get_cells(instance_dest, 0, 0, &cell_ids, &tag_list, &n_cell);
+    EXPECT_EQ(n_cell, 2);
 
-//     fieldstat_free(instance);
-//     fieldstat_free(instance_dest);
-//     free(cell_ids);
-//     fieldstat_tag_list_arr_free(tag_list, n_cell);
-// }
+    fieldstat_free(instance);
+    fieldstat_free(instance_dest);
+    free(cell_ids);
+    fieldstat_tag_list_arr_free(tag_list, n_cell);
+}
 
-// TEST(unit_test_merge, new_too_many_cells_on_multiple_metric_given_source_cube_reset_and_get_different_cube_topk)
-// {
-//     struct fieldstat *instance = fieldstat_new();
-//     int cube_id = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 2);
-//     int metric_id1 = fieldstat_register_counter(instance, cube_id, "metric name1", false);
-//     int metric_id2 = fieldstat_register_counter(instance, cube_id, "metric name2", false);
-//     int cell_id1 = fieldstat_cube_add(instance, cube_id, &TEST_TAG_STRING, 1, 1);
-//     fieldstat_counter_incrby(instance, cube_id, metric_id1, cell_id1, 1);
-//     struct fieldstat *instance_dest = fieldstat_new();
-//     printf("first merge\n");
-//     fieldstat_merge(instance_dest, instance);
-//     fieldstat_reset(instance);
+TEST(unit_test_merge, new_too_many_cells_on_multiple_metric_given_source_cube_reset_and_get_different_cube_topk)
+{
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 2);
+    int metric_id1 = fieldstat_register_counter(instance, cube_id, "metric name1", false);
+    int metric_id2 = fieldstat_register_counter(instance, cube_id, "metric name2", false);
+    int cell_id1 = fieldstat_cube_add(instance, cube_id, &TEST_TAG_STRING, 1, 1);
+    fieldstat_counter_incrby(instance, cube_id, metric_id1, cell_id1, 1);
+    struct fieldstat *instance_dest = fieldstat_new();
+    printf("first merge\n");
+    fieldstat_merge(instance_dest, instance);
+    fieldstat_reset(instance);
 
-//     int metric_id3 = fieldstat_register_counter(instance, cube_id, "metric name3", false);
-//     int cell_id2 = fieldstat_cube_add(instance, cube_id, &TEST_TAG_INT, 1, 2);
-//     fieldstat_counter_incrby(instance, cube_id, metric_id3, cell_id2, 2);
-//     int cell_id3 = fieldstat_cube_add(instance, cube_id, &TEST_TAG_DOUBLE, 1, 3);
-//     fieldstat_counter_incrby(instance, cube_id, metric_id2, cell_id3, 3);
+    int metric_id3 = fieldstat_register_counter(instance, cube_id, "metric name3", false);
+    int cell_id2 = fieldstat_cube_add(instance, cube_id, &TEST_TAG_INT, 1, 2);
+    fieldstat_counter_incrby(instance, cube_id, metric_id3, cell_id2, 2);
+    int cell_id3 = fieldstat_cube_add(instance, cube_id, &TEST_TAG_DOUBLE, 1, 3);
+    fieldstat_counter_incrby(instance, cube_id, metric_id2, cell_id3, 3);
 
-//     printf("second merge\n");
-//     fieldstat_merge(instance_dest, instance);
+    printf("second merge\n");
+    fieldstat_merge(instance_dest, instance);
 
-//     int *cell_ids = NULL;
-//     struct fieldstat_tag_list *tag_list = NULL;
-//     size_t n_cell = 0;
-//     fieldstat_get_cells(instance_dest, 0, metric_id1, &cell_ids, &tag_list, &n_cell);
-//     int pop_cell_cnt = 0;
-//     bool int_tag_found = false;
-//     bool double_tag_found = false;
-//     if (n_cell == 1) {
-//         if (strcmp(tag_list->tag[0].key, TEST_TAG_INT.key) == 0) {
-//             int_tag_found = true;
-//         } else if (strcmp(tag_list->tag[0].key, TEST_TAG_DOUBLE.key) == 0) {
-//             double_tag_found = true;
-//             printf("0\n");
-//         } else {
-//             printf("the tag is %s\n", tag_list->tag[0].key);
-//         }
-//         free(cell_ids);
-//         fieldstat_tag_list_arr_free(tag_list, n_cell);
-//     } else {
-//         EXPECT_EQ(n_cell, 0);
-//         pop_cell_cnt++;
-//     }
+    int *cell_ids = NULL;
+    struct fieldstat_tag_list *tag_list = NULL;
+    size_t n_cell = 0;
+    fieldstat_get_cells(instance_dest, 0, metric_id1, &cell_ids, &tag_list, &n_cell);
+    int pop_cell_cnt = 0;
+    bool int_tag_found = false;
+    bool double_tag_found = false;
+    if (n_cell == 1) {
+        if (strcmp(tag_list->tag[0].key, TEST_TAG_INT.key) == 0) {
+            int_tag_found = true;
+        } else if (strcmp(tag_list->tag[0].key, TEST_TAG_DOUBLE.key) == 0) {
+            double_tag_found = true;
+            printf("0\n");
+        } else {
+            printf("the tag is %s\n", tag_list->tag[0].key);
+        }
+        free(cell_ids);
+        fieldstat_tag_list_arr_free(tag_list, n_cell);
+    } else {
+        EXPECT_EQ(n_cell, 0);
+        pop_cell_cnt++;
+    }
 
-//     fieldstat_get_cells(instance_dest, 0, metric_id2, &cell_ids, &tag_list, &n_cell);
-//     if (n_cell == 1) {
-//         if (strcmp(tag_list->tag[0].key, TEST_TAG_INT.key) == 0) {
-//             int_tag_found = true;
-//         } else if (strcmp(tag_list->tag[0].key, TEST_TAG_DOUBLE.key) == 0) {
-//             printf("1\n");
-//             double_tag_found = true;
-//         } else {
-//             printf("the tag is %s\n", tag_list->tag[0].key);
-//         }
-//         free(cell_ids);
-//         fieldstat_tag_list_arr_free(tag_list, n_cell);
-//     } else {
-//         EXPECT_EQ(n_cell, 0);
-//         pop_cell_cnt++;
-//     }
+    fieldstat_get_cells(instance_dest, 0, metric_id2, &cell_ids, &tag_list, &n_cell);
+    if (n_cell == 1) {
+        if (strcmp(tag_list->tag[0].key, TEST_TAG_INT.key) == 0) {
+            int_tag_found = true;
+        } else if (strcmp(tag_list->tag[0].key, TEST_TAG_DOUBLE.key) == 0) {
+            printf("1\n");
+            double_tag_found = true;
+        } else {
+            printf("the tag is %s\n", tag_list->tag[0].key);
+        }
+        free(cell_ids);
+        fieldstat_tag_list_arr_free(tag_list, n_cell);
+    } else {
+        EXPECT_EQ(n_cell, 0);
+        pop_cell_cnt++;
+    }
 
-//     fieldstat_get_cells(instance_dest, 0, metric_id3, &cell_ids, &tag_list, &n_cell);
-//     if (n_cell == 1) {
-//         if (strcmp(tag_list->tag[0].key, TEST_TAG_INT.key) == 0) {
-//             int_tag_found = true;
-//         } else if (strcmp(tag_list->tag[0].key, TEST_TAG_DOUBLE.key) == 0) {
-//             printf("2\n");
+    fieldstat_get_cells(instance_dest, 0, metric_id3, &cell_ids, &tag_list, &n_cell);
+    if (n_cell == 1) {
+        if (strcmp(tag_list->tag[0].key, TEST_TAG_INT.key) == 0) {
+            int_tag_found = true;
+        } else if (strcmp(tag_list->tag[0].key, TEST_TAG_DOUBLE.key) == 0) {
+            printf("2\n");
 
-//             double_tag_found = true;
-//         } else {
-//             printf("the tag is %s\n", tag_list->tag[0].key);
-//         }
-//         free(cell_ids);
-//         fieldstat_tag_list_arr_free(tag_list, n_cell);
-//     } else {
-//         EXPECT_EQ(n_cell, 0);
-//         pop_cell_cnt++;
-//     }
-//     EXPECT_EQ(pop_cell_cnt, 1);
-//     EXPECT_TRUE(int_tag_found);
-//     EXPECT_TRUE(double_tag_found);
+            double_tag_found = true;
+        } else {
+            printf("the tag is %s\n", tag_list->tag[0].key);
+        }
+        free(cell_ids);
+        fieldstat_tag_list_arr_free(tag_list, n_cell);
+    } else {
+        EXPECT_EQ(n_cell, 0);
+        pop_cell_cnt++;
+    }
+    EXPECT_EQ(pop_cell_cnt, 1);
+    EXPECT_TRUE(int_tag_found);
+    EXPECT_TRUE(double_tag_found);
 
-//     fieldstat_free(instance);
-//     fieldstat_free(instance_dest);
-// }
+    fieldstat_free(instance);
+    fieldstat_free(instance_dest);
+}
 
 // extern "C" {
 // extern int tmp_get_hash_count();

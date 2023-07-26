@@ -768,7 +768,6 @@ void metric_delete_cell(struct metric *pthis, int cell_id)
 {
     struct metric_measure_data *data = metric_find_one_cell(pthis, cell_id);
     if (data == NULL) {
-        printf("ERR: metric_delete_cell: cell_id %d not exist\n", cell_id);
         return;
     }
     pthis->scheme->del(data);
