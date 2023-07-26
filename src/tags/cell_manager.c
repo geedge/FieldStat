@@ -350,7 +350,6 @@ struct cell_manager *cell_manager_copy(const struct cell_manager *src)
             if (tag == NULL) {
                 continue;
             }
-            printf("cell_manager_copy new node: i=%d, tag=%s\n", i, tag_hash_key_get_compound_key(tag));
             struct tag_hash_key *tag_copy = tag_hash_key_copy(tag);
             struct tag_id_map *tmp_node = (struct tag_id_map *)malloc(sizeof(struct tag_id_map));
             tmp_node->tag = tag_copy;

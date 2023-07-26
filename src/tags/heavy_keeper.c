@@ -328,7 +328,6 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
     int size_src = sorted_set_cardinality(ss_src);
     int max_size = size_dest > size_src ? size_dest : size_src;
 
-    printf("size_dest: %d, size_src: %d\n", size_dest, size_src);
     unsigned *count_arr = (unsigned *)malloc(max_size * sizeof(unsigned));
     struct tag_hash_key **tag_arr = (struct tag_hash_key **)malloc(max_size * sizeof(struct tag_hash_key *));
     int **user_datas = (int **)malloc(max_size * sizeof(int *));
@@ -353,7 +352,6 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
         *pst_cell_id_final = (int *)malloc(sizeof(unsigned int));
         **pst_cell_id_final = *pst_cell_id_dest;
 
-        printf("inserted tag in dest, tag: %s, id: %d\n", tag_hash_key_get_compound_key(tag_final), *pst_cell_id_dest);
 
         if (new_alloc_id < *pst_cell_id_dest) {
             new_alloc_id = *pst_cell_id_dest;
@@ -374,7 +372,6 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
             cell_id_in_dest_corresponding[cell_id_in_src_before_merge_len] = **pst_cell_id_dest;
             cell_id_in_src_before_merge_len++;
 
-            printf("inserted tag in both dest and src, tag: %s, id in src: %d, id in dest: %d\n", tag_hash_key_get_compound_key(tag_src), cell_id_src, **pst_cell_id_dest);
             continue;
         }
         // the dest heavy keeper has been merged, so the maxv is the maxv in the merged sketch, instead of the dest sketch
@@ -395,7 +392,6 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
             cell_id_in_src_before_merge_len++;
             new_alloc_id++;
 
-            printf("inserted tag in src, tag: %s, id in src: %d, id in dest: %d\n", tag_hash_key_get_compound_key(tag_src), cell_id_src, **pst_cell_id_final);
         } else {
             tag_hash_key_free(tag_final);
         }

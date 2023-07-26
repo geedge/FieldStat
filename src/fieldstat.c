@@ -587,7 +587,6 @@ struct fieldstat *fieldstat_deserialize(const char *blob, size_t blob_size)
 
 struct fs_cube *fieldstat_cube_dup(const struct fs_cube *cube)
 {
-    printf("fieldstat_cube_dup\n");
     struct fs_cube *cube_dup = malloc(sizeof(struct fs_cube));
     fieldstat_cube_info_init(cube_dup, cube->shared_tags, cube->n_shared_tags, cube->sampling_mode, cube->max_n_cell);
     struct cell_manager *cm_src = cube->cell_manager;
@@ -604,7 +603,6 @@ struct fs_cube *fieldstat_cube_dup(const struct fs_cube *cube)
 
 int fieldstat_cube_merge_comprehensive(struct fs_cube *dest, const struct fs_cube *src, int *metric_id_src_dest_map)
 {
-    printf("fieldstat_cube_merge_comprehensive\n");
     struct cell_manager *cell_manager_src = src->cell_manager;
     struct cell_manager *cell_manager_dest = dest->cell_manager;
 
@@ -652,7 +650,6 @@ int fieldstat_cube_merge_topk(struct fs_cube *dest, const struct fs_cube *src, i
     for (int i = 0; i < n_cell_id_added; i++) {
         int tmp_id_dest = cell_id_added[i];
         int tmp_id_src = cell_id_old[i];
-        printf("fieldstat_cube_merge_topk, cell_id_added[%d]: %d, cell_id_old[%d]: %d\n", i, tmp_id_dest, i, tmp_id_src);
 
         for (int j = 0; j < src->n_metric; j++) {
             int metric_id_dest = metric_id_src_dest_map[j];
@@ -664,7 +661,6 @@ int fieldstat_cube_merge_topk(struct fs_cube *dest, const struct fs_cube *src, i
     // todo: 返回的值包括新添加和old， 并且把merge or copy 分开
     for (int i = 0; i < n_cell_id_popped;i++) {
         int id = cell_id_popped[i];
-        printf("fieldstat_cube_merge_topk, cell_id_popped[%d]: %d\n", i, id);
 
         for (int j = 0; j < dest->n_metric; j++) {
             metric_delete_cell(dest->metrics[j], id);
@@ -707,7 +703,6 @@ int fieldstat_cube_merge(struct fs_cube *dest, const struct fs_cube *src)
 
 int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
 {
-    printf("fieldstat_merge enter\n");
     size_t n_cube_dest = instance->valid_cube_arr_length;
     size_t n_cube_src = src->valid_cube_arr_length;
     // tag_cube_id_map use cube shared tag as key, find cubes. Is is not a cell manager.
