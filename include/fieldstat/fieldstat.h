@@ -106,9 +106,20 @@ int fieldstat_cube_add(struct fieldstat *instance, int cube_id, const struct fie
     * @return 0 if success. -1 if cube_id is invalid. -2 if metric_id is invalid, or the metric is not a METRIC_TYPE_COUNTER. cell_id is not checked, user should guarantee that cell_id is valid.
 */
 int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long increment);
+
+/*
+    * @brief let the value of counter metric equal to value. Other annotations refer to fieldstat_counter_incrby.
+*/
 int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long value);
-int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, const char *key, size_t value_len);
-double fieldstat_hll_get(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id);
+
+/*
+    * @brief add a key to the hll metric of cell_id. HLL approximates the number of distinct elements in a set of `key`s.
+    * @param key: key of the hll metric. Cannot be NULL.
+    * @param key_len: strlen(key).
+    * @return 0 if success. -1 if cube_id is invalid. -2 if metric_id is invalid, or the metric is not a METRIC_TYPE_HLL. cell_id is not checked, user should guarantee that cell_id is valid.
+*/
+int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, const char *key, size_t key_len);
+
 int fieldstat_histogram_record(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long value);
 
 /*
@@ -144,6 +155,7 @@ void fieldstat_get_cells(const struct fieldstat *instance, int cube_id, int metr
 struct fieldstat_tag_list *fieldstat_get_shared_tags(const struct fieldstat *instance, int cube_id);
 
 long long fieldstat_counter_get(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id);
+double fieldstat_hll_get(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id);
 long long fieldstat_histogram_value_at_percentile(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, double percentile);
 long long fieldstat_histogram_count_le_value(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long value);
 void fieldstat_get_serialized_blob(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, char **blob, size_t *blob_size);

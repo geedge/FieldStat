@@ -420,7 +420,7 @@ int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id
     return metric_counter_set(metric, cell_id, value);
 }
 
-int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, const char *key, size_t value_len)
+int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, const char *key, size_t key_len)
 {
     struct fs_cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
@@ -433,7 +433,7 @@ int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, in
         return -2;
     }
 
-    return metric_hll_add(metric, cell_id, key, value_len);
+    return metric_hll_add(metric, cell_id, key, key_len);
 }
 
 int fieldstat_histogram_record(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long value)
