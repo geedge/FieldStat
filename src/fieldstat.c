@@ -632,13 +632,23 @@ int fieldstat_cube_merge_topk(struct fs_cube *dest, const struct fs_cube *src, i
 {
     struct cell_manager *cell_manager_src = src->cell_manager;
     struct cell_manager *cell_manager_dest = dest->cell_manager;
+
     int *cell_id_added;
     int *cell_id_old;
     int n_cell_id_added = 0;
+
     int *cell_id_popped = 0;
     int n_cell_id_popped = 0;
 
-    cell_manager_merge_topk(cell_manager_dest, cell_manager_src, &cell_id_popped, &n_cell_id_popped, &cell_id_old, &cell_id_added, &n_cell_id_added);
+    int *cell_id_merging_src;
+    int *cell_id_merging_dst;
+    int n_cell_id_merged = 0;
+    
+
+    cell_manager_merge_topk(cell_manager_dest, cell_manager_src,
+        &cell_id_popped, &n_cell_id_popped,
+        &cell_id_old, &cell_id_added, &n_cell_id_added,
+        &cell_id_merging_src, &cell_id_merging_dst, &n_cell_id_merged);
 
     for (int i = 0; i < n_cell_id_added; i++) {
         int tmp_id_dest = cell_id_added[i];
@@ -649,9 +659,7 @@ int fieldstat_cube_merge_topk(struct fs_cube *dest, const struct fs_cube *src, i
             metric_merge_or_copy_cell(dest->metrics[metric_id_dest], src->metrics[j], tmp_id_dest, tmp_id_src);
         }
     }
-    // chances are that: a cell exists in both dest and src, but it is not in final. In this case, these cells are merged and popped.
-    // Since all cells are counter, which is easy to merge, we just delete these cells after merging them.
-    // todo: 返回的值包括新添加和old， 并且把merge or copy 分开
+
     for (int i = 0; i < n_cell_id_popped;i++) {
         int id = cell_id_popped[i];
 
@@ -660,9 +668,21 @@ int fieldstat_cube_merge_topk(struct fs_cube *dest, const struct fs_cube *src, i
         }
     }
 
+    for (int i = 0; i < n_cell_id_merged; i++) {
+        int tmp_id_dest = cell_id_merging_dst[i];
+        int tmp_id_src = cell_id_merging_src[i];
+
+        for (int j = 0; j < src->n_metric; j++) {
+            int metric_id_dest = metric_id_src_dest_map[j];
+            metric_merge_cell(dest->metrics[metric_id_dest], src->metrics[j], tmp_id_dest, tmp_id_src);
+        }
+    }
+
     free(cell_id_popped);
     free(cell_id_added);
     free(cell_id_old);
+    free(cell_id_merging_src);
+    free(cell_id_merging_dst);
 
     return 0;
 }
