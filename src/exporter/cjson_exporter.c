@@ -131,8 +131,7 @@ long long get_current_time()
 /*                                    iter                                    */
 /* -------------------------------------------------------------------------- */
 struct cell_iter *cell_iter_new(const struct fieldstat *instance) {
-    struct cell_iter *iter = malloc(sizeof(struct cell_iter));
-    memset(iter, 0, sizeof(struct cell_iter));
+    struct cell_iter *iter = calloc(1, sizeof(struct cell_iter));
     iter->instance = instance;
     fieldstat_get_cubes(instance, &iter->cube_ids, &iter->n_cube);
 

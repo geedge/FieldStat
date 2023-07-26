@@ -33,9 +33,8 @@ struct heavy_keeper {
 
 struct Bucket *new_sketch(struct heavy_keeper_options *params) {
     size_t array_len = (size_t)params->array_num * (size_t)params->max_bucket_num;
-    size_t alloc_size = array_len * sizeof(struct Bucket);
-    struct Bucket *ret = (struct Bucket *)malloc(alloc_size);
-    memset(ret, 0, alloc_size);
+
+    struct Bucket *ret = (struct Bucket *)calloc(array_len, sizeof(struct Bucket));
 
     return ret;
 }

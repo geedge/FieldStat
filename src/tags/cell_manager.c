@@ -33,16 +33,14 @@ struct cell_manager {
 
 struct cell_manager *cell_manager_new_without_map(enum sampling_mode sampling_mode, int max_cell_num)
 {
-    struct cell_manager *cell_manager = (struct cell_manager *)malloc(sizeof(struct cell_manager));
-    memset(cell_manager, 0, sizeof(struct cell_manager));
+    struct cell_manager *cell_manager = (struct cell_manager *)calloc(1, sizeof(struct cell_manager));
 
     cell_manager->sampling_mode = sampling_mode;
     cell_manager->max_cell_num = max_cell_num;
     cell_manager->next_cell_id = 0;
 
     cell_manager->id_tag_array_len = max_cell_num;
-    cell_manager->id_tag_array = (const struct tag_hash_key **)malloc(sizeof(struct tag_hash_key *) * cell_manager->id_tag_array_len);
-    memset(cell_manager->id_tag_array, 0, sizeof(struct tag_hash_key *) * cell_manager->id_tag_array_len);
+    cell_manager->id_tag_array = (const struct tag_hash_key **)calloc(max_cell_num, sizeof(struct tag_hash_key *));
     cell_manager->max_cell_id = -1;
 
     return cell_manager;
@@ -84,8 +82,8 @@ void cell_manager_reset(struct cell_manager *pthis)
 
     free(pthis->id_tag_array);
     pthis->max_cell_id = -1;
-    pthis->id_tag_array = (const struct tag_hash_key **)malloc(sizeof(struct tag_hash_key *) * pthis->id_tag_array_len);
-    memset(pthis->id_tag_array, 0, sizeof(struct tag_hash_key *) * pthis->id_tag_array_len);
+
+    pthis->id_tag_array = (const struct tag_hash_key **)calloc(pthis->id_tag_array_len, sizeof(struct tag_hash_key *));
 }
 
 void cell_manager_free(struct cell_manager *pthis)
@@ -118,8 +116,8 @@ void cell_manager_id_tag_array_add(struct cell_manager *pthis, int cell_id, cons
         while (cell_id >= new_len) {
             new_len *= 2;
         }
-        struct tag_hash_key **new_array = (struct tag_hash_key **)malloc(sizeof(struct tag_hash_key *) * new_len);
-        memset(new_array, 0, sizeof(struct tag_hash_key *) * new_len);
+
+        struct tag_hash_key **new_array = (struct tag_hash_key **)calloc(new_len, sizeof(struct tag_hash_key *));
         memcpy(new_array, pthis->id_tag_array, sizeof(struct tag_hash_key *) * pthis->id_tag_array_len);
         free(pthis->id_tag_array);
         pthis->id_tag_array = (const struct tag_hash_key **)new_array;
@@ -131,6 +129,39 @@ void cell_manager_id_tag_array_add(struct cell_manager *pthis, int cell_id, cons
     if (cell_id > pthis->max_cell_id) {
         pthis->max_cell_id = cell_id;
     }
+}
+
+// todo: 如果一个用例仅做添加操作，那不需要id tag map
+// 在query / merge/ serialize时再生成？ 
+// 最麻烦的是，这样就有两种instance，感觉有点怪。
+int cell_manager_update_id_tag_map(struct cell_manager *pthis)
+{
+    if (pthis->id_tag_array != NULL) {
+        printf("ERR: id_tag_array is not NULL when update_id_tag_map\n");
+        return -1;
+    }
+
+    size_t id_tag_array_len = pthis->max_cell_num;
+    if (pthis->sampling_mode == SAMPLING_MODE_TOPK && pthis->next_cell_id > id_tag_array_len) {
+        id_tag_array_len = pthis->next_cell_id;
+    }
+    pthis->id_tag_array = calloc(id_tag_array_len, sizeof(struct tag_hash_key *));
+
+    if (pthis->sampling_mode == SAMPLING_MODE_TOPK) {
+        struct heavy_keeper_result *result = heavy_keeper_query(pthis->topk_tag_id_map);
+        for (size_t i = 0; i < result->n_key; i++) {
+            cell_manager_id_tag_array_add(pthis, result->cell_id[i], result->tags[i]);
+        }
+        heavy_keeper_result_free(result);
+    } else {
+        struct tag_id_map *node = NULL;
+        struct tag_id_map *tmp = NULL;
+        HASH_ITER(hh, pthis->comprehensive_tag_id_map, node, tmp) {
+            pthis->id_tag_array[node->cell_id] = node->tag;
+        }
+    }
+
+    return 0;
 }
 
 int cell_manager_get_cell_id_by_tag(const struct cell_manager *pthis, const struct tag_hash_key *tag)

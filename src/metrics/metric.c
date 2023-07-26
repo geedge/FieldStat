@@ -398,13 +398,11 @@ void metric_info_free(struct metric_info *info)
 
 struct metric *metric_new(const char *name, enum metric_type type, struct metric_parameter *para)
 {
-    struct metric *pthis = (struct metric *)malloc(sizeof(struct metric));
-    memset(pthis, 0, sizeof(struct metric));
+    struct metric *pthis = (struct metric *)calloc(1, sizeof(struct metric));
     pthis->info = metric_info_new(name, type, para);
     pthis->scheme = &g_metric_scheme_table[type];
-    pthis->data_array = (struct metric_measure_data **)malloc(sizeof(struct metric_measure_data *) * MAX_N_DATA_ARRAY_ITEM_INIT);
     pthis->max_n_array_item = MAX_N_DATA_ARRAY_ITEM_INIT;
-    memset(pthis->data_array, 0, sizeof(struct metric_measure_data *) * MAX_N_DATA_ARRAY_ITEM_INIT);
+    pthis->data_array = (struct metric_measure_data **)calloc(MAX_N_DATA_ARRAY_ITEM_INIT, sizeof(struct metric_measure_data *));
 
     return pthis;
 }
@@ -451,9 +449,8 @@ struct metric *metric_copy_structure(const struct metric *src)
     dst->scheme = &g_metric_scheme_table[src->info->type];
 
     dst->n_array_item = 0;
-    dst->data_array = (struct metric_measure_data **)malloc(sizeof(struct metric_measure_data *) * src->max_n_array_item);
     dst->max_n_array_item = src->max_n_array_item;
-    memset(dst->data_array, 0, sizeof(struct metric_measure_data *) * src->max_n_array_item);
+    dst->data_array = (struct metric_measure_data **)calloc(src->max_n_array_item, sizeof(struct metric_measure_data *));
 
     return dst;
 }

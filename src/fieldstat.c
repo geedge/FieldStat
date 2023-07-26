@@ -47,14 +47,11 @@ struct fieldstat {
 
 struct fieldstat *fieldstat_new()
 {
-    struct fieldstat *instance = malloc(sizeof(struct fieldstat));
-    memset(instance, 0, sizeof(struct fieldstat));
+    struct fieldstat *instance = calloc(1, sizeof(struct fieldstat));
 
     instance->max_n_cube = 100;
-    instance->cube = malloc(sizeof(struct fs_cube *) * instance->max_n_cube);
-    memset(instance->cube, 0, sizeof(struct fs_cube *) * instance->max_n_cube);
-    instance->cube_version = malloc(sizeof(unsigned long) * instance->max_n_cube);
-    memset(instance->cube_version, 0, sizeof(unsigned long) * instance->max_n_cube);
+    instance->cube = calloc(instance->max_n_cube, sizeof(struct fs_cube *));
+    instance->cube_version = calloc(instance->max_n_cube, sizeof(unsigned long));
 
     return instance;
 }
@@ -178,8 +175,7 @@ int fieldstat_append_cube_to_instance(struct fieldstat *instance, struct fs_cube
         instance->max_n_cube *= 2;
         instance->cube = realloc(instance->cube, sizeof(struct fs_cube *) * instance->max_n_cube);
         unsigned long *old_ver_arr = instance->cube_version;
-        instance->cube_version = malloc(sizeof(unsigned long) * instance->max_n_cube);
-        memset(instance->cube_version, 0, sizeof(unsigned long) * instance->max_n_cube);
+        instance->cube_version = calloc(instance->max_n_cube, sizeof(unsigned long));
         memcpy(instance->cube_version, old_ver_arr, sizeof(unsigned long) * instance->valid_cube_arr_length);
         free(old_ver_arr);
     }
@@ -188,12 +184,11 @@ int fieldstat_append_cube_to_instance(struct fieldstat *instance, struct fs_cube
     return instance->valid_cube_arr_length - 1;
 }
 
-void fieldstat_cube_info_init(struct fs_cube *cube, const struct fieldstat_tag *shared_tags, size_t n_tag, enum sampling_mode mode, size_t max_n_cell)
+struct fs_cube *fieldstat_cube_info_init(const struct fieldstat_tag *shared_tags, size_t n_tag, enum sampling_mode mode, size_t max_n_cell)
 {
-    memset(cube, 0, sizeof(struct fs_cube));
+    struct fs_cube *cube = calloc(1, sizeof(struct fs_cube));
     cube->sampling_mode = mode;
     cube->max_n_cell = max_n_cell;
-    cube->next_cell_id = 0;
     cube->shared_tags = malloc(sizeof(struct fieldstat_tag) * n_tag);
     for (int i = 0; i < n_tag; i++) {
         struct fieldstat_tag *dest_tag = &cube->shared_tags[i];
@@ -220,13 +215,13 @@ void fieldstat_cube_info_init(struct fs_cube *cube, const struct fieldstat_tag *
 
     cube->max_n_metric = 16;
     cube->metrics = malloc(sizeof(struct metric *) * cube->max_n_metric);
-    cube->n_metric = 0;
+
+    return cube;
 }
 
 struct fs_cube *fieldstat_cube_new(const struct fieldstat_tag *shared_tags, size_t n_tag, enum sampling_mode mode, size_t max_n_cell)
 {
-    struct fs_cube *cube = malloc(sizeof(struct fs_cube));
-    fieldstat_cube_info_init(cube, shared_tags, n_tag, mode, max_n_cell);
+    struct fs_cube *cube = fieldstat_cube_info_init(shared_tags, n_tag, mode, max_n_cell);
 
     cube->cell_manager = cell_manager_new(mode, max_n_cell);
 
@@ -558,8 +553,7 @@ struct fieldstat *fieldstat_deserialize(const char *blob, size_t blob_size)
         fieldtag_list_deserialize(mpack_node_bin_data(shared_tags_node), mpack_node_bin_size(shared_tags_node), &shared_tags, &n_shared_tags);
         int sampling_mode = mpack_node_i8(mpack_node_map_cstr(cube, "sampling_mode"));
         int max_n_cell = mpack_node_i64(mpack_node_map_cstr(cube, "max_n_cell"));
-        struct fs_cube *fs_cube = malloc(sizeof(struct fs_cube));
-        fieldstat_cube_info_init(fs_cube, shared_tags, n_shared_tags, sampling_mode, max_n_cell);
+        struct fs_cube *fs_cube = fieldstat_cube_info_init(shared_tags, n_shared_tags, sampling_mode, max_n_cell);
         fieldtag_list_free(shared_tags, n_shared_tags);
 
         mpack_node_t metrics_node = mpack_node_map_cstr(cube, "metrics");
@@ -587,8 +581,7 @@ struct fieldstat *fieldstat_deserialize(const char *blob, size_t blob_size)
 
 struct fs_cube *fieldstat_cube_dup(const struct fs_cube *cube)
 {
-    struct fs_cube *cube_dup = malloc(sizeof(struct fs_cube));
-    fieldstat_cube_info_init(cube_dup, cube->shared_tags, cube->n_shared_tags, cube->sampling_mode, cube->max_n_cell);
+    struct fs_cube *cube_dup = fieldstat_cube_info_init(cube->shared_tags, cube->n_shared_tags, cube->sampling_mode, cube->max_n_cell);
     struct cell_manager *cm_src = cube->cell_manager;
 
     struct cell_manager *cm_dup = cell_manager_copy(cm_src);
