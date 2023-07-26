@@ -7,9 +7,15 @@
 #include "fieldstat.h"
 #include "tags/cell_manager.h"
 #include "tags/heavy_keeper.h"
-// #include "tags/my_ut_hash_inner.h"
+#include "tags/my_ut_hash_inner.h"
 #include "tags/my_ut_hash.h"
-#include "tags/tag_id_map.h"
+
+
+struct tag_id_map {
+    struct tag_hash_key *tag;
+    int cell_id;
+    UT_hash_handle hh;
+};
 
 struct cell_manager {
     union {
@@ -134,7 +140,9 @@ int cell_manager_get_cell_id_by_tag(const struct cell_manager *pthis, const stru
     if (pthis->sampling_mode == SAMPLING_MODE_TOPK) {
         heavy_keeper_query_one(pthis->topk_tag_id_map, tag, NULL, &cell_id);
     } else {
-        struct tag_id_map *node = my_hash_key_list_find(pthis->comprehensive_tag_id_map, tag);
+        struct tag_id_map *node = NULL;
+        HASH_FIND_TAG(pthis->comprehensive_tag_id_map, tag, node);
+
         if (node == NULL) {
             cell_id = -1;
         } else {
@@ -162,10 +170,9 @@ int cell_manager_add_cell(struct cell_manager *pthis, const struct tag_hash_key 
     if (HASH_COUNT(pthis->comprehensive_tag_id_map) >= pthis->max_cell_num) {
         return -1;
     }
+
     struct tag_id_map *node = NULL;
-    if (HASH_COUNT(pthis->comprehensive_tag_id_map) != 0) {
-        node = my_hash_key_list_find(pthis->comprehensive_tag_id_map, tag);
-    }
+    HASH_FIND_TAG(pthis->comprehensive_tag_id_map, tag, node);
     if (node != NULL) {
         return node->cell_id;
     }
@@ -173,7 +180,7 @@ int cell_manager_add_cell(struct cell_manager *pthis, const struct tag_hash_key 
     node = (struct tag_id_map *)malloc(sizeof(struct tag_id_map));
     node->tag = tag_copy;
     node->cell_id = pthis->next_cell_id;
-    my_hash_key_list_add(&pthis->comprehensive_tag_id_map, node);
+    HASH_ADD_TAG(pthis->comprehensive_tag_id_map, tag, node);
 
     cell_manager_id_tag_array_add(pthis, pthis->next_cell_id, tag_copy);
     return pthis->next_cell_id++;
@@ -316,8 +323,8 @@ struct cell_manager *cell_manager_deserialize(const char *blob, size_t blob_size
             struct tag_id_map *node = (struct tag_id_map *)malloc(sizeof(struct tag_id_map));
             node->tag = tag;
             node->cell_id = cell_id;
-            my_hash_key_list_add(&pthis->comprehensive_tag_id_map, node);
-
+            HASH_ADD_TAG(pthis->comprehensive_tag_id_map, tag, node);
+   
             cell_manager_id_tag_array_add(pthis, cell_id, tag);
 
             if (cell_id > cell_id_max) {
@@ -354,7 +361,7 @@ struct cell_manager *cell_manager_copy(const struct cell_manager *src)
             struct tag_id_map *tmp_node = (struct tag_id_map *)malloc(sizeof(struct tag_id_map));
             tmp_node->tag = tag_copy;
             tmp_node->cell_id = i;
-            my_hash_key_list_add(&pthis->comprehensive_tag_id_map, tmp_node);
+            HASH_ADD_TAG(pthis->comprehensive_tag_id_map, tag, tmp_node);
 
             cell_manager_id_tag_array_add(pthis, i, tag_copy);
         }

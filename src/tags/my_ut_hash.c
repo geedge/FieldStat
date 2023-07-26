@@ -8,7 +8,6 @@
 #include "mpack/mpack.h"
 #include "my_ut_hash_inner.h"
 #include "my_ut_hash.h"
-#include "tag_id_map.h"
 
 // #define USING_BASE_HASH HASH_JEN
 #define USING_BASE_HASH HASH_SFH
@@ -87,18 +86,6 @@ struct tag_hash_key {
     size_t n_my_tag;
     unsigned int hashv;
 };
-
-void my_hash_key_list_add(struct tag_id_map **tbl, struct tag_id_map *node)
-{
-    HASH_ADD_TAG(*tbl, tag, node);
-}
-
-struct tag_id_map *my_hash_key_list_find(const struct tag_id_map *tbl, const struct tag_hash_key *my_hash_key)
-{
-    struct tag_id_map *node = NULL;
-    HASH_FIND_TAG(tbl, my_hash_key, node);
-    return node;
-}
 
 // todo: 这个函数弃用
 unsigned int tag_hash_key_cal_hash_value(struct tag_hash_key *my_hash_key)
