@@ -85,7 +85,6 @@ struct tag_hash_key {
     
     struct fieldstat_tag *tags; // not used for hash, just to recover the original tags.
     size_t n_my_tag;
-    bool is_hashed;
     unsigned int hashv;
 };
 
@@ -103,17 +102,8 @@ struct tag_id_map *my_hash_key_list_find(const struct tag_id_map *tbl, const str
 
 unsigned int tag_hash_key_cal_hash_value(struct tag_hash_key *my_hash_key)
 {
-    if (my_hash_key->is_hashed) {
-        simple_hash_cnt++;
-        return my_hash_key->hashv;
-    }
-    hash_cnt++;
-    unsigned int hashv = 0;
-    USING_BASE_HASH(my_hash_key->compound_key, my_hash_key->compound_key_len, hashv);
-
-    my_hash_key->hashv = hashv;
-    my_hash_key->is_hashed = true;
-    return hashv;
+    simple_hash_cnt++;
+    return my_hash_key->hashv;
 }
 
 int tag_hash_key_cmp(const struct tag_hash_key *a, const struct tag_hash_key *b)
@@ -171,7 +161,6 @@ void fieldtag_list_free(struct fieldstat_tag *tags, size_t n_tags)
     free(tags);
 }
 
-// todo: 现在cell 的tag没有sorted。想想怎么办，是不是干脆在add的时候sort掉得了
 int my_cmp_tag(const void *a, const void *b)
 {
     struct fieldstat_tag *aa = (struct fieldstat_tag *)a;
@@ -305,8 +294,9 @@ struct tag_hash_key *tag_hash_key_construct_with_fieldstat_tag(const struct fiel
     }
 
     ret_hash_key->n_my_tag = n_src;
-    ret_hash_key->is_hashed = false;
-    (void)tag_hash_key_cal_hash_value(ret_hash_key); // record hash value
+    USING_BASE_HASH(compound_key, compound_key_len, ret_hash_key->hashv);
+
+    hash_cnt++;
     return ret_hash_key;
 }
 
@@ -326,7 +316,6 @@ struct tag_hash_key *tag_hash_key_copy(const struct tag_hash_key *src)
 {
     struct tag_hash_key *dst = (struct tag_hash_key *)malloc(sizeof(struct tag_hash_key));
     dst->n_my_tag = src->n_my_tag;
-    dst->is_hashed = src->is_hashed;
     dst->hashv = src->hashv;
     dst->compound_key_len = src->compound_key_len;
     dst->compound_key = (char *)malloc(dst->compound_key_len + 1);
@@ -385,11 +374,15 @@ void tag_hash_key_serialize(const struct tag_hash_key *tag, char **blob, size_t 
     mpack_write_bin(&writer, blob_tag, blob_size_tag);
     free(blob_tag);
 
-    mpack_write_cstr(&writer, "hashed");
-    mpack_write_bool(&writer, tag->is_hashed);
-
     mpack_write_cstr(&writer, "hashv");
-    mpack_write_u32(&writer, tag->hashv);
+    // the tags may be changed, so we need to recalculate the hash value
+    char *compound_key;
+    size_t compound_key_len;
+    build_dynamic_cell_key(tag->tags, tag->n_my_tag, &compound_key, &compound_key_len);
+    unsigned hashv = 0;
+    USING_BASE_HASH(compound_key, compound_key_len, hashv);
+    mpack_write_u32(&writer, hashv);
+    free(compound_key);
 
     mpack_complete_map(&writer);
     if (mpack_writer_destroy(&writer) != mpack_ok) {
@@ -409,7 +402,6 @@ struct tag_hash_key *tag_hash_key_deserialize(const char *blob, size_t blob_size
     size_t n_tag;
     fieldtag_list_deserialize(mpack_node_bin_data(tags), mpack_node_bin_size(tags), &fieldstat_tag_arr, &n_tag);
 
-    bool is_hashed = mpack_node_bool(mpack_node_map_cstr(root, "hashed"));
     unsigned hashv_val = mpack_node_u32(mpack_node_map_cstr(root, "hashv"));
     
     char *compound_key;
@@ -421,7 +413,6 @@ struct tag_hash_key *tag_hash_key_deserialize(const char *blob, size_t blob_size
     ret_hash_key->compound_key_len = compound_key_len;
     ret_hash_key->tags = fieldstat_tag_arr;
     ret_hash_key->n_my_tag = n_tag;
-    ret_hash_key->is_hashed = is_hashed;
     ret_hash_key->hashv = hashv_val;
 
     mpack_tree_destroy(&tree);

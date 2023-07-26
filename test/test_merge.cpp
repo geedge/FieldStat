@@ -459,11 +459,6 @@ TEST(unit_test_merge, new_too_many_cells_on_multiple_metric_given_source_cube_re
 //     fieldstat_free(instance_dest);
 // }
 
-// TEST(unit_test_merge, merge_by_matching_metric_names_topk)
-// {
-//     // todo
-// }
-
 // extern "C" {
 // extern int tmp_get_hash_count();
 // extern int tmp_get_simple_hash_count();

@@ -101,18 +101,6 @@ void heavy_keeper_clear(struct heavy_keeper *hk) {
     sorted_set_hook_function_of_free_user_data(hk->top_K_heap, free);
 }
 
-struct heavy_keeper_result *heavy_keeper_result_new(struct heavy_keeper *hk) {
-    size_t expected_max_len = hk->K;
-    struct heavy_keeper_result *stats_hd = (struct heavy_keeper_result *)malloc(sizeof(struct heavy_keeper_result));
-    memset(stats_hd, 0, sizeof(struct heavy_keeper_result));
-    stats_hd->count = (unsigned *)malloc(expected_max_len * sizeof(unsigned));
-    stats_hd->tags = (struct tag_hash_key **)malloc(expected_max_len * sizeof(struct tag_hash_key *));
-
-    stats_hd->cell_id = (int *)malloc(expected_max_len * sizeof(int));
-
-    return stats_hd;
-}
-
 void heavy_keeper_result_free(struct heavy_keeper_result *stats_hd) {
     free(stats_hd->count);
     free(stats_hd->tags);
@@ -244,26 +232,21 @@ int heavy_keeper_add(struct heavy_keeper *hk, struct tag_hash_key *tag, unsigned
 }
 
 struct heavy_keeper_result *heavy_keeper_query(struct heavy_keeper *hk) {
-    struct heavy_keeper_result *stats  = heavy_keeper_result_new(hk);
-
-    int heap_entry_num = sorted_set_cardinality(hk->top_K_heap);
-    unsigned *cnt_arr = (unsigned *)malloc(heap_entry_num * sizeof(unsigned));
-    struct tag_hash_key **tag_arr = (struct tag_hash_key **)malloc(heap_entry_num * sizeof(struct tag_hash_key *));
-    int **user_data = (int **)malloc(heap_entry_num * sizeof(int *));
-
-    sorted_set_dump(hk->top_K_heap, cnt_arr, tag_arr, (void **)user_data);
-
-    int query_entry_num = heap_entry_num > hk->K ? hk->K : heap_entry_num;
+    size_t query_entry_num = sorted_set_cardinality(hk->top_K_heap);
+    struct heavy_keeper_result *stats = (struct heavy_keeper_result *)malloc(sizeof(struct heavy_keeper_result));
+    stats->count = (unsigned *)malloc(query_entry_num * sizeof(unsigned));
+    stats->tags = (struct tag_hash_key **)malloc(query_entry_num * sizeof(struct tag_hash_key *));
+    stats->cell_id = (int *)malloc(query_entry_num * sizeof(int));
     stats->n_key = query_entry_num;
-    // todo: 能直接把dump 的结果拿过来
+
+    int **user_data = (int **)malloc(query_entry_num * sizeof(int *));
+
+    sorted_set_dump(hk->top_K_heap, stats->count, stats->tags, (void **)user_data);
+
     for (int i = 0; i < query_entry_num; i++) {
-        stats->tags[i] = tag_arr[i];
-        stats->count[i] = cnt_arr[i];
         stats->cell_id[i] = *(user_data[i]);
     }
 
-    free(cnt_arr);
-    free(tag_arr);
     free(user_data);
     return stats;
 }
@@ -602,7 +585,6 @@ void heavy_keeper_sorted_set_deserialization(mpack_node_t *root, struct sorted_s
 
         sorted_set_insert(out, tag, score);
         sorted_set_insert_user_data(out, tag, (void *)id);
-        tag_hash_key_free(tag);
     }
 }
 

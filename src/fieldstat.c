@@ -732,7 +732,6 @@ int fieldstat_cube_merge(struct fs_cube *dest, const struct fs_cube *src)
     for (int metric_id_src = 0; metric_id_src < src->n_metric; metric_id_src++) {
         const char *name_src = metric_get_name(src->metrics[metric_id_src]);
         int metric_id_dest = name_id_map_get_id_by_name(name_id_map_dest, name_src);
-                                                                                    // todo: topk的这个逻辑也要改
         if (metric_id_dest == -1) { // dest does not have this metric
             struct metric *metric_dup = metric_copy_structure(src->metrics[metric_id_src]);
             metric_id_dest = append_metric_to_cube(dest, metric_dup);

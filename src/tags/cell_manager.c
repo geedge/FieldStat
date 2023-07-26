@@ -55,12 +55,6 @@ struct cell_manager *cell_manager_new(enum sampling_mode sampling_mode, int max_
     return cell_manager;
 }
 
-// todo: 这个函数用不着了
-void cell_manager_tag_cube_map_free(struct cell_manager *pthis)
-{
-    free(pthis->id_tag_array);
-}
-
 void cell_manager_comprehensive_tag_id_map_free(struct cell_manager *pthis)
 {
     struct tag_id_map *node = NULL;
@@ -81,7 +75,7 @@ void cell_manager_reset(struct cell_manager *pthis)
         pthis->next_cell_id = 0;
     }
 
-    cell_manager_tag_cube_map_free(pthis);
+    free(pthis->id_tag_array);
     pthis->max_cell_id = -1;
     pthis->id_tag_array = (const struct tag_hash_key **)malloc(sizeof(struct tag_hash_key *) * pthis->id_tag_array_len);
     memset(pthis->id_tag_array, 0, sizeof(struct tag_hash_key *) * pthis->id_tag_array_len);
@@ -89,7 +83,7 @@ void cell_manager_reset(struct cell_manager *pthis)
 
 void cell_manager_free(struct cell_manager *pthis)
 {
-    cell_manager_tag_cube_map_free(pthis);
+    free(pthis->id_tag_array);
 
     if (pthis->sampling_mode == SAMPLING_MODE_TOPK) {
         heavy_keeper_free(pthis->topk_tag_id_map);
@@ -160,30 +154,6 @@ int cell_manager_get_count_by_tag(const struct cell_manager *pthis, const struct
     heavy_keeper_query_one(pthis->topk_tag_id_map, tag, &count, NULL);
 
     return count;
-}
-
-//todo: 这个函数deserialzie 里还用了，之后改一下那边，删了这个函数
-int cell_manager_comprehensive_map_add(struct cell_manager *pthis, struct tag_hash_key *tag, int cell_id)
-{
-    if (HASH_COUNT(pthis->comprehensive_tag_id_map) >= pthis->max_cell_num) {
-        printf("ERR: cell_manager_comprehensive_map_add: HASH_COUNT(pthis->comprehensive_tag_id_map) >= pthis->max_cell_num\n");
-        return -1;
-    }
-
-    struct tag_id_map *node = NULL;
-    if (HASH_COUNT(pthis->comprehensive_tag_id_map) != 0) {
-        node = my_hash_key_list_find(pthis->comprehensive_tag_id_map, tag);
-    }
-    if (node != NULL) {
-        printf("ERR: cell_manager_comprehensive_map_add: node != NULL\n");
-        return 0;
-    }
-
-    node = (struct tag_id_map *)malloc(sizeof(struct tag_id_map));
-    node->tag = tag;
-    node->cell_id = cell_id;
-    my_hash_key_list_add(&pthis->comprehensive_tag_id_map, node);
-    return 0;
 }
 
 int cell_manager_add_cell(struct cell_manager *pthis, const struct tag_hash_key *tag)
@@ -342,8 +312,12 @@ struct cell_manager *cell_manager_deserialize(const char *blob, size_t blob_size
             const char *tag_blob = mpack_node_bin_data(tags_node);
             size_t tag_blob_size = mpack_node_bin_size(tags_node);
             struct tag_hash_key *tag = tag_hash_key_deserialize(tag_blob, tag_blob_size);
+            struct tag_id_map *node = (struct tag_id_map *)malloc(sizeof(struct tag_id_map));
+            node->tag = tag;
+            node->cell_id = cell_id;
+            my_hash_key_list_add(&pthis->comprehensive_tag_id_map, node);
+
             cell_manager_id_tag_array_add(pthis, cell_id, tag);
-            cell_manager_comprehensive_map_add(pthis, tag, cell_id);
 
             if (cell_id > cell_id_max) {
                 cell_id_max = cell_id;
@@ -401,7 +375,11 @@ void cell_manager_merge_topk(struct cell_manager *dest, const struct cell_manage
 {
     heavy_keeper_merge_recording_id_details(dest->topk_tag_id_map, src->topk_tag_id_map, 
         cell_id_popped, n_cell_id_popped, cell_id_old, cell_id_added, n_cell_id_added);
-    
-    // struct heavy_keeper_result *result = heavy_keeper_query(dest->topk_tag_id_map);
-    // todo: 更新 id tag array, 注意不用针对tag 来做free和copy
+
+    memset(dest->id_tag_array, 0, sizeof(struct tag_hash_key *) * dest->id_tag_array_len);
+    struct heavy_keeper_result *result = heavy_keeper_query(dest->topk_tag_id_map);
+    for (size_t i = 0; i < result->n_key; i++) {
+        cell_manager_id_tag_array_add(dest, result->cell_id[i], result->tags[i]);
+    }
+    heavy_keeper_result_free(result);
 }
