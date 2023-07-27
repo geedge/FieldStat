@@ -28,6 +28,7 @@ stages:
   script:
     - yum install -y libmnl-devel
     - yum install -y libnfnetlink-devel
+    - yum install gcc
     - ./ci/travis.sh
     - cd build
   tags:
