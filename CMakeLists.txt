@@ -110,7 +110,7 @@ add_subdirectory(test/deps)
 
 add_subdirectory(test)
 enable_testing()
-add_subdirectory(./ctest)
+add_subdirectory(ctest)
 
 
 

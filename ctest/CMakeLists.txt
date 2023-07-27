@@ -1,6 +1,7 @@
-# cmake_minimum_required(VERSION 2.8.8)
 
 # project(fieldstat_ctest)
+
+# message(STATUS "CMAKE_BINARY_DIR: ${CMAKE_BINARY_DIR}")
 
 # add_test(NAME COPY_CREATE_DIR COMMAND sh -c "mkdir -p ${CMAKE_BINARY_DIR}/testing/ ")
 

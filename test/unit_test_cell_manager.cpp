@@ -19,7 +19,7 @@ struct tag_hash_key *gen_key(const char *key, int value)
     struct fieldstat_tag tag = {
         .key = key,
         .type = TAG_CSTRING,
-        .value_str = value_str,
+        {.value_str = value_str},
     };
 
     struct tag_hash_key *tag_key = tag_hash_key_construct_with_fieldstat_tag(&tag, 1);
