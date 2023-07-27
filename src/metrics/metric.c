@@ -700,21 +700,6 @@ struct metric *metric_deserialize(const char *blob, size_t blob_size)
     return metric_out;
 }
 
-int metric_merge_cell(struct metric *dest, const struct metric *src, int dest_cell_id, int src_cell_id)
-{
-    struct metric_measure_data *src_data = metric_find_one_cell(src, src_cell_id);
-    if (src_data == NULL) {
-        return 1;
-    }
-
-    struct metric_measure_data *dest_data = metric_find_one_cell(dest, dest_cell_id);
-    if (dest_data == NULL) {
-        return 1;
-    }
-
-    return dest->scheme->merge(dest_data, src_data);
-}
-
 int metric_merge_or_copy_cell(struct metric *dest, const struct metric *src, int dest_cell_id, int src_cell_id)
 {
     struct metric_measure_data *src_data = metric_find_one_cell(src, src_cell_id);
