@@ -35,22 +35,23 @@ struct hdr_histogram *g_histogram_standard;
 // const struct fieldstat_tag TEST_TAG_SHARED3[1] = {
 //     {"test_tag_shared 3", .type = TAG_INTEGER, .value_longlong = 5}};
 
-const struct fieldstat_tag TEST_TAG_GLOBAL1 = {"test_tag_global 1", .type = TAG_INTEGER, .value_longlong = 1};
-const struct fieldstat_tag TEST_TAG_GLOBAL2 = {"test_tag_global 2", .type = TAG_DOUBLE, .value_double = 2.2};
-const struct fieldstat_tag TEST_TAG_GLOBAL3 = {"test_tag_global 3", .type = TAG_CSTRING, .value_str = "string3"};
+
+const struct fieldstat_tag TEST_TAG_GLOBAL1 = {"test_tag_global 1", .type = TAG_INTEGER, {.value_longlong = 1}};
+const struct fieldstat_tag TEST_TAG_GLOBAL2 = {"test_tag_global 2", .type = TAG_DOUBLE, {.value_double = 2.2}};
+const struct fieldstat_tag TEST_TAG_GLOBAL3 = {"test_tag_global 3", .type = TAG_CSTRING, {.value_str = "string3"}};
 const struct fieldstat_tag TEST_TAG_GLOBAL[3] = {TEST_TAG_GLOBAL1, TEST_TAG_GLOBAL2, TEST_TAG_GLOBAL3};
 
-const struct fieldstat_tag TEST_TAG_SHARED1_1 = {"test_tag_shared 1", .type = TAG_INTEGER, .value_longlong = 3};
-const struct fieldstat_tag TEST_TAG_SHARED1_2 = {"test_tag_shared 2", .type = TAG_DOUBLE, .value_double = 0.2};
-const struct fieldstat_tag TEST_TAG_SHARED1_3 = {"test_tag_shared 3", .type = TAG_CSTRING, .value_str = "1string"};
+const struct fieldstat_tag TEST_TAG_SHARED1_1 = {"test_tag_shared 1", .type = TAG_INTEGER, {.value_longlong = 3}};
+const struct fieldstat_tag TEST_TAG_SHARED1_2 = {"test_tag_shared 2", .type = TAG_DOUBLE, {.value_double = 0.2}};
+const struct fieldstat_tag TEST_TAG_SHARED1_3 = {"test_tag_shared 3", .type = TAG_CSTRING, {.value_str = "1string"}};
 const struct fieldstat_tag TEST_TAG_SHARED1[3] = {TEST_TAG_SHARED1_1, TEST_TAG_SHARED1_2, TEST_TAG_SHARED1_3};
 
-const struct fieldstat_tag TEST_TAG_SHARED2_1 = {"test_tag_shared 11", .type = TAG_INTEGER, .value_longlong = 4};
-const struct fieldstat_tag TEST_TAG_SHARED2_2 = {"test_tag_shared 22", .type = TAG_DOUBLE, .value_double = 0.3};
-const struct fieldstat_tag TEST_TAG_SHARED2_3 = {"test_tag_shared 33", .type = TAG_CSTRING, .value_str = "2string"};
+const struct fieldstat_tag TEST_TAG_SHARED2_1 = {"test_tag_shared 11", .type = TAG_INTEGER, {.value_longlong = 4}};
+const struct fieldstat_tag TEST_TAG_SHARED2_2 = {"test_tag_shared 22", .type = TAG_DOUBLE, {.value_double = 0.3}};
+const struct fieldstat_tag TEST_TAG_SHARED2_3 = {"test_tag_shared 33", .type = TAG_CSTRING, {.value_str = "2string"}};
 const struct fieldstat_tag TEST_TAG_SHARED2[3] = {TEST_TAG_SHARED2_1, TEST_TAG_SHARED2_2, TEST_TAG_SHARED2_3};
 
-const struct fieldstat_tag TEST_TAG_SHARED3_1 = {"test_tag_shared 3", .type = TAG_INTEGER, .value_longlong = 5};
+const struct fieldstat_tag TEST_TAG_SHARED3_1 = {"test_tag_shared 3", .type = TAG_INTEGER, {.value_longlong = 5}};
 const struct fieldstat_tag TEST_TAG_SHARED3[1] = {TEST_TAG_SHARED3_1};
 
 void test_check_if_tag_list_is_in_json(cJSON *tag_obj, const Fieldstat_tag_list_wrapper *benchmark)
