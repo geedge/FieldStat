@@ -20,9 +20,10 @@ include_directories(${PROJECT_SOURCE_DIR}/src/metrics)
 include_directories(${PROJECT_SOURCE_DIR}/include/fieldstat)
 
 # zlib, first install zlib from https://zlib.net/
-SET (ZLIB_ROOT "/home/chenzizhan/zlib")
-SET (ZLIB_INCLUDE_DIR "/home/chenzizhan/zlib/include/")
-SET (ZLIB_LIBRARY "/home/chenzizhan/zlib/lib/libz.so.1.2.13")
+# SET (ZLIB_ROOT "/home/chenzizhan/zlib")
+# SET (ZLIB_INCLUDE_DIR "/home/chenzizhan/zlib/include/")
+# SET (ZLIB_LIBRARY "/home/chenzizhan/zlib/lib/libz.so.1.2.13")
+
 
 FIND_PACKAGE (ZLIB REQUIRED)
 MESSAGE (" zlib version major is " ${ZLIB_VERSION_MAJOR})

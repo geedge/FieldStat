@@ -4,8 +4,11 @@ message("-- CMAKE_C_COMPILER: ${CMAKE_C_COMPILER_ID}")
 
 set(lib_name fieldstat4)
 
-#the path where you install the cppcheck
-
+# include(FetchContent)
+# FetchContent_Declare(zlib
+#   URL https://zlib.net/current/zlib.tar.gz
+# )
+# FetchContent_MakeAvailable(zlib)
 
 project (${lib_name})
 
