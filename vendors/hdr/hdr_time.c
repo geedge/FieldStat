@@ -65,15 +65,6 @@ void hdr_getnow(hdr_timespec* ts)
 #elif defined(__linux__) || defined(__CYGWIN__) || defined(__OpenBSD__)
 
 
-void hdr_gettime(hdr_timespec* t)
-{
-    clock_gettime(CLOCK_MONOTONIC, (struct timespec*)t);
-}
-
-void hdr_getnow(hdr_timespec* t)
-{
-    clock_gettime(CLOCK_REALTIME, (struct timespec*)t);
-}
 
 #else
 

@@ -27,12 +27,6 @@ typedef struct timespec hdr_timespec;
 extern "C" {
 #endif
 
-#if defined(_MSC_VER)
-void hdr_gettime(hdr_timespec* t);
-#else
-void hdr_gettime(hdr_timespec* t);
-#endif
-
 void hdr_getnow(hdr_timespec* t);
 
 double hdr_timespec_as_double(const hdr_timespec* t);
