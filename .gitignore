@@ -17,3 +17,4 @@ GRTAGS
 GTAGS
 test/profiling/tools
 /logs
+/cppcheck*

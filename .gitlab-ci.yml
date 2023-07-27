@@ -18,6 +18,7 @@ stages:
   - yum makecache
   - yum install -y elfutils-libelf-devel
   - yum install -y libuuid libuuid-devel
+  - yum install -y zlib
 
 
 .build_by_travis_for_centos7:
