@@ -838,7 +838,8 @@ int metric_hll_add(struct metric *pthis, int cell_id, const char *key, size_t ke
 {
     struct metric_measure_data *data = metric_find_or_new_cell(pthis, cell_id);
 
-    return ST_hyperloglog_add(data->hll, key, key_len);
+    ST_hyperloglog_add(data->hll, key, key_len);
+    return 0;
 }
 
 double metric_hll_get(const struct metric *pthis, int cell_id)
