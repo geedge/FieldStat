@@ -7,7 +7,6 @@
 #include "utils.hpp"
 #include "tags/my_ut_hash_inner.h"
 #include "tags/my_ut_hash.h"
-// #include "tags/sorted_set.h"
 
 struct testing_hash {
     struct tag_hash_key *key;
@@ -150,22 +149,17 @@ TEST(unit_test_fasthash, serialize_and_deserialize)
     tag_hash_key_convert_to_fieldstat_tag(deserialized_key, &deserialized_tags, &n_deserialized_tags);
 
     EXPECT_EQ(n_deserialized_tags, 3);
-    EXPECT_STREQ(deserialized_tags[0].key, TEST_TAG_INT.key);
-    EXPECT_STREQ(deserialized_tags[1].key, TEST_TAG_STRING.key);
-    EXPECT_STREQ(deserialized_tags[2].key, TEST_TAG_DOUBLE.key);
-    EXPECT_EQ(deserialized_tags[0].value_longlong, TEST_TAG_INT.value_longlong);
-    EXPECT_STREQ(deserialized_tags[1].value_str, TEST_TAG_STRING.value_str);
-    EXPECT_EQ(deserialized_tags[2].value_double, TEST_TAG_DOUBLE.value_double);
-
-    printf("0\n");
+    // the keys are rearranged
+    EXPECT_STREQ(deserialized_tags[0].key, TEST_TAG_DOUBLE.key);
+    EXPECT_STREQ(deserialized_tags[1].key, TEST_TAG_INT.key);
+    EXPECT_STREQ(deserialized_tags[2].key, TEST_TAG_STRING.key);
+    EXPECT_EQ(deserialized_tags[0].value_double, TEST_TAG_DOUBLE.value_double);
+    EXPECT_EQ(deserialized_tags[1].value_longlong, TEST_TAG_INT.value_longlong);
+    EXPECT_STREQ(deserialized_tags[2].value_str, TEST_TAG_STRING.value_str);
 
     tag_hash_key_free(new_key);
-    printf("1\n");
     tag_hash_key_free(deserialized_key);
-    printf("2\n");
-
     free(blob);
-    printf("3\n");
 
     for (size_t i = 0; i < n_deserialized_tags; i++)
     {
@@ -174,7 +168,6 @@ TEST(unit_test_fasthash, serialize_and_deserialize)
             free((char *)deserialized_tags[i].value_str);
         }
     }
-    printf("4\n");
 
     free(deserialized_tags);
 }

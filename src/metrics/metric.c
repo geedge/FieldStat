@@ -91,7 +91,7 @@ struct metric {
 /* -------------------------------------------------------------------------- */
 /*                                 id cell map                                */
 /* -------------------------------------------------------------------------- */
-inline struct metric_measure_data *metric_find_one_cell(const struct metric *pthis, int id) {
+struct metric_measure_data *metric_find_one_cell(const struct metric *pthis, int id) {
     if (id >= pthis->max_n_array_item) {
         return NULL;
     }

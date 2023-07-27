@@ -130,18 +130,14 @@ void fieldtag_copy(struct fieldstat_tag *dest, const struct fieldstat_tag *src)
     }
 }
 
-inline void fieldtag_clear(struct fieldstat_tag *tag)
-{
-    free((char *)tag->key);
-    if (tag->type == TAG_CSTRING) {
-        free((char *)tag->value_str);
-    }
-}
-
 void fieldtag_list_free(struct fieldstat_tag *tags, size_t n_tags)
 {
     for (int i = 0; i < (int)n_tags; i++) {
-        fieldtag_clear(&tags[i]);
+        struct fieldstat_tag *tag = &tags[i];
+        free((char *)tag->key);
+        if (tag->type == TAG_CSTRING) {
+            free((char *)tag->value_str);
+        }
     }
     free(tags);
 }

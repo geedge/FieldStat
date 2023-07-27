@@ -91,7 +91,7 @@ include_directories(${PROJECT_SOURCE_DIR}/vendors)
 include_directories(${PROJECT_SOURCE_DIR}/src)
 include_directories(${PROJECT_SOURCE_DIR}/include/fieldstat)
 include_directories(${PROJECT_SOURCE_DIR}/src/metrics)
-include_directories(${PROJECT_SOURCE_DIR}/src/utils)
+include_directories(${PROJECT_SOURCE_DIR}/src/tags)
 
 
 file(GLOB SRC

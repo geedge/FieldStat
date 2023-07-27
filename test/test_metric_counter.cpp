@@ -49,146 +49,146 @@ void test_assert_standard_instance(struct fieldstat *instance)
     fieldstat_tag_list_arr_free(tag_list, n_cell);
 }
 
-// TEST(metric_test_counter, simple_register_and_query_counter)
-// {
-//     struct fieldstat *instance = test_init_standard_instance_one_cube_one_metric_one_cell_counter();
+TEST(metric_test_counter, simple_register_and_query_counter)
+{
+    struct fieldstat *instance = test_init_standard_instance_one_cube_one_metric_one_cell_counter();
 
-//     fieldstat_counter_incrby(instance, 0, 0, 0, 10000);
-//     fieldstat_counter_incrby(instance, 0, 0, 0, 86);
+    fieldstat_counter_incrby(instance, 0, 0, 0, 10000);
+    fieldstat_counter_incrby(instance, 0, 0, 0, 86);
 
-//     test_assert_standard_instance(instance);
-//     EXPECT_EQ(fieldstat_counter_get(instance, 0, 0, 0), 10086);
+    test_assert_standard_instance(instance);
+    EXPECT_EQ(fieldstat_counter_get(instance, 0, 0, 0), 10086);
 
-//     fieldstat_free(instance);
-// }
+    fieldstat_free(instance);
+}
 
-// TEST(metric_test_counter, serialize_and_merge_counter)
-// {
-//     struct fieldstat *instance = test_init_standard_instance_one_cube_one_metric_one_cell_counter();
-//     fieldstat_counter_incrby(instance, 0, 0, 0, 100);
-//     fieldstat_counter_incrby(instance, 0, 0, 0, -10000);
+TEST(metric_test_counter, serialize_and_merge_counter)
+{
+    struct fieldstat *instance = test_init_standard_instance_one_cube_one_metric_one_cell_counter();
+    fieldstat_counter_incrby(instance, 0, 0, 0, 100);
+    fieldstat_counter_incrby(instance, 0, 0, 0, -10000);
 
-//     char *blob = NULL;
-//     size_t blob_len = 0;
-//     fieldstat_serialize(instance, &blob, &blob_len);
-//     struct fieldstat *instance_from_blob = fieldstat_deserialize(blob, blob_len);
-//     free(blob);
-//     struct fieldstat *instance_total = fieldstat_new();
-//     fieldstat_merge(instance_total, instance_from_blob);
+    char *blob = NULL;
+    size_t blob_len = 0;
+    fieldstat_serialize(instance, &blob, &blob_len);
+    struct fieldstat *instance_from_blob = fieldstat_deserialize(blob, blob_len);
+    free(blob);
+    struct fieldstat *instance_total = fieldstat_new();
+    fieldstat_merge(instance_total, instance_from_blob);
 
-//     // query
-//     test_assert_standard_instance(instance_total);
+    // query
+    test_assert_standard_instance(instance_total);
 
-//     long long measure = fieldstat_counter_get(instance_total, 0, 0, 0);
-//     EXPECT_EQ(measure, -9900);
+    long long measure = fieldstat_counter_get(instance_total, 0, 0, 0);
+    EXPECT_EQ(measure, -9900);
 
-//     fieldstat_free(instance);
-//     fieldstat_free(instance_from_blob);
-//     fieldstat_free(instance_total);
-// }
+    fieldstat_free(instance);
+    fieldstat_free(instance_from_blob);
+    fieldstat_free(instance_total);
+}
 
-// TEST(metric_test_counter, serialization_and_merge_counter_twice_with_reset)
-// {
-//     struct fieldstat *instance = test_init_standard_instance_one_cube_one_metric_one_cell_counter();
-//     fieldstat_counter_incrby(instance, 0, 0, 0, 10086);
+TEST(metric_test_counter, serialization_and_merge_counter_twice_with_reset)
+{
+    struct fieldstat *instance = test_init_standard_instance_one_cube_one_metric_one_cell_counter();
+    fieldstat_counter_incrby(instance, 0, 0, 0, 10086);
 
-//     char *blob = NULL;
-//     size_t blob_len = 0;
-//     fieldstat_serialize(instance, &blob, &blob_len);
-//     struct fieldstat *instance_from_blob = fieldstat_deserialize(blob, blob_len);
-//     free(blob);
-//     struct fieldstat *instance_total = fieldstat_new();
-//     fieldstat_merge(instance_total, instance_from_blob);
+    char *blob = NULL;
+    size_t blob_len = 0;
+    fieldstat_serialize(instance, &blob, &blob_len);
+    struct fieldstat *instance_from_blob = fieldstat_deserialize(blob, blob_len);
+    free(blob);
+    struct fieldstat *instance_total = fieldstat_new();
+    fieldstat_merge(instance_total, instance_from_blob);
 
-//     fieldstat_free(instance_from_blob);
-//     fieldstat_reset(instance);
-//     int cell_id = fieldstat_cube_add(instance, 0, &TEST_TAG_STRING, 1, 1);
-//     EXPECT_EQ(cell_id, 0);
-//     fieldstat_counter_incrby(instance, 0, 0, 0, 4);
+    fieldstat_free(instance_from_blob);
+    fieldstat_reset(instance);
+    int cell_id = fieldstat_cube_add(instance, 0, &TEST_TAG_STRING, 1, 1);
+    EXPECT_EQ(cell_id, 0);
+    fieldstat_counter_incrby(instance, 0, 0, 0, 4);
 
-//     fieldstat_serialize(instance, &blob, &blob_len);
-//     instance_from_blob = fieldstat_deserialize(blob, blob_len);
-//     free(blob);
-//     fieldstat_merge(instance_total, instance_from_blob);
+    fieldstat_serialize(instance, &blob, &blob_len);
+    instance_from_blob = fieldstat_deserialize(blob, blob_len);
+    free(blob);
+    fieldstat_merge(instance_total, instance_from_blob);
 
-//     test_assert_standard_instance(instance_total);
-//     long long measure = fieldstat_counter_get(instance_total, 0, 0, 0);
-//     EXPECT_EQ(measure, 10086 + 4);
+    test_assert_standard_instance(instance_total);
+    long long measure = fieldstat_counter_get(instance_total, 0, 0, 0);
+    EXPECT_EQ(measure, 10086 + 4);
 
-//     fieldstat_free(instance);
-//     fieldstat_free(instance_from_blob);
-//     fieldstat_free(instance_total);
-// }
+    fieldstat_free(instance);
+    fieldstat_free(instance_from_blob);
+    fieldstat_free(instance_total);
+}
 
-// TEST(metric_test_counter, simple_register_and_query_gauge)
-// {
-//     struct fieldstat *instance = test_init_standard_instance_one_cube_one_metric_one_cell_counter(true);
+TEST(metric_test_counter, simple_register_and_query_gauge)
+{
+    struct fieldstat *instance = test_init_standard_instance_one_cube_one_metric_one_cell_counter(true);
 
-//     fieldstat_counter_set(instance, 0, 0, 0, 10000);
-//     fieldstat_counter_set(instance, 0, 0, 0, 86);
+    fieldstat_counter_set(instance, 0, 0, 0, 10000);
+    fieldstat_counter_set(instance, 0, 0, 0, 86);
 
-//     test_assert_standard_instance(instance);
-//     EXPECT_EQ(fieldstat_counter_get(instance, 0, 0, 0), 86);
+    test_assert_standard_instance(instance);
+    EXPECT_EQ(fieldstat_counter_get(instance, 0, 0, 0), 86);
 
-//     fieldstat_free(instance);
-// }
+    fieldstat_free(instance);
+}
 
-// TEST(metric_test_counter, serialize_and_merge_gauge)
-// {
-//     struct fieldstat *instance = test_init_standard_instance_one_cube_one_metric_one_cell_counter(true);
-//     fieldstat_counter_incrby(instance, 0, 0, 0, 10086);
-//     fieldstat_counter_set(instance, 0, 0, 0, 10);
+TEST(metric_test_counter, serialize_and_merge_gauge)
+{
+    struct fieldstat *instance = test_init_standard_instance_one_cube_one_metric_one_cell_counter(true);
+    fieldstat_counter_incrby(instance, 0, 0, 0, 10086);
+    fieldstat_counter_set(instance, 0, 0, 0, 10);
 
-//     char *blob = NULL;
-//     size_t blob_len = 0;
-//     fieldstat_serialize(instance, &blob, &blob_len);
-//     struct fieldstat *instance_from_blob = fieldstat_deserialize(blob, blob_len);
-//     free(blob);
-//     struct fieldstat *instance_total = fieldstat_new();
-//     fieldstat_merge(instance_total, instance_from_blob);
+    char *blob = NULL;
+    size_t blob_len = 0;
+    fieldstat_serialize(instance, &blob, &blob_len);
+    struct fieldstat *instance_from_blob = fieldstat_deserialize(blob, blob_len);
+    free(blob);
+    struct fieldstat *instance_total = fieldstat_new();
+    fieldstat_merge(instance_total, instance_from_blob);
 
-//     test_assert_standard_instance(instance_total);
+    test_assert_standard_instance(instance_total);
 
-//     long long measure = fieldstat_counter_get(instance_total, 0, 0, 0);
-//     EXPECT_EQ(measure, 10);
+    long long measure = fieldstat_counter_get(instance_total, 0, 0, 0);
+    EXPECT_EQ(measure, 10);
 
-//     fieldstat_free(instance);
-//     fieldstat_free(instance_from_blob);
-//     fieldstat_free(instance_total);
-// }
+    fieldstat_free(instance);
+    fieldstat_free(instance_from_blob);
+    fieldstat_free(instance_total);
+}
 
-// TEST(metric_test_counter, serialization_and_merge_gauge_twice_with_reset)
-// {
-//     struct fieldstat *instance = test_init_standard_instance_one_cube_one_metric_one_cell_counter(true);
-//     fieldstat_counter_incrby(instance, 0, 0, 0, 1234);
+TEST(metric_test_counter, serialization_and_merge_gauge_twice_with_reset)
+{
+    struct fieldstat *instance = test_init_standard_instance_one_cube_one_metric_one_cell_counter(true);
+    fieldstat_counter_incrby(instance, 0, 0, 0, 1234);
 
-//     char *blob = NULL;
-//     size_t blob_len = 0;
-//     fieldstat_serialize(instance, &blob, &blob_len);
-//     struct fieldstat *instance_from_blob = fieldstat_deserialize(blob, blob_len);
-//     free(blob);
-//     struct fieldstat *instance_total = fieldstat_new();
-//     fieldstat_merge(instance_total, instance_from_blob);
+    char *blob = NULL;
+    size_t blob_len = 0;
+    fieldstat_serialize(instance, &blob, &blob_len);
+    struct fieldstat *instance_from_blob = fieldstat_deserialize(blob, blob_len);
+    free(blob);
+    struct fieldstat *instance_total = fieldstat_new();
+    fieldstat_merge(instance_total, instance_from_blob);
 
-//     fieldstat_free(instance_from_blob);
-//     fieldstat_reset(instance);
-//     int cell_id = fieldstat_cube_add(instance, 0, &TEST_TAG_STRING, 1, 1);
-//     EXPECT_EQ(cell_id, 0);
-//     fieldstat_counter_incrby(instance, 0, 0, 0, 1000);
+    fieldstat_free(instance_from_blob);
+    fieldstat_reset(instance);
+    int cell_id = fieldstat_cube_add(instance, 0, &TEST_TAG_STRING, 1, 1);
+    EXPECT_EQ(cell_id, 0);
+    fieldstat_counter_incrby(instance, 0, 0, 0, 1000);
 
-//     fieldstat_serialize(instance, &blob, &blob_len);
-//     instance_from_blob = fieldstat_deserialize(blob, blob_len);
-//     free(blob);
-//     fieldstat_merge(instance_total, instance_from_blob);
+    fieldstat_serialize(instance, &blob, &blob_len);
+    instance_from_blob = fieldstat_deserialize(blob, blob_len);
+    free(blob);
+    fieldstat_merge(instance_total, instance_from_blob);
 
-//     test_assert_standard_instance(instance_total);
-//     long long measure = fieldstat_counter_get(instance_total, 0, 0, 0);
-//     EXPECT_EQ(measure, 1234);
+    test_assert_standard_instance(instance_total);
+    long long measure = fieldstat_counter_get(instance_total, 0, 0, 0);
+    EXPECT_EQ(measure, 1234);
 
-//     fieldstat_free(instance);
-//     fieldstat_free(instance_from_blob);
-//     fieldstat_free(instance_total);
-// }
+    fieldstat_free(instance);
+    fieldstat_free(instance_from_blob);
+    fieldstat_free(instance_total);
+}
 
 TEST(metric_test_counter, topk_add_and_test_accuracy)
 {
