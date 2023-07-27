@@ -412,6 +412,8 @@ TEST(export_test, skip_empty_metrics_given_cube_deleted) {
     delete tags[0];
     fieldstat_free(instance);
     cJSON_Delete(root_arr);
+
+    EXPECT_TRUE(false); // todo: delete
 }
 
 void init_hll_standard_oper()
