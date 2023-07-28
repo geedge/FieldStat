@@ -17,7 +17,7 @@ struct metric *metric_deserialize(const char *blob, size_t blob_size);
 
 //return -1 when merge error. 0 when success. 1 when src has no cell.
 int metric_merge_or_copy_cell(struct metric *dest, const struct metric *src, int dest_cell_id, int src_cell_id);
-void metric_rearrange_cell_id(struct metric *pthis, int *original_id, int *final_id, size_t n_id);
+void metric_rearrange_cell_id(struct metric *pthis, const int *original_id, const int *final_id, size_t n_id);
 void metric_get_plain_blob(const struct metric *pthis, int cell_id, char **blob, size_t *blob_size);
 void metric_delete_cell(struct metric *pthis, int cell_id);
 

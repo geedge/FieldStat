@@ -59,7 +59,7 @@ void params_set_to_default(struct heavy_keeper_options *p, int K) {
     }
 }
 
-void params_set_to(struct heavy_keeper_options *p, struct heavy_keeper_options *src) {
+void params_set_to(struct heavy_keeper_options *p, const struct heavy_keeper_options *src) {
     if (src->array_num != 0) {
         p->array_num = src->array_num;
     }
@@ -71,7 +71,7 @@ void params_set_to(struct heavy_keeper_options *p, struct heavy_keeper_options *
     }
 }
 
-struct heavy_keeper *heavy_keeper_new(int max_query_num, struct heavy_keeper_options *params) {
+struct heavy_keeper *heavy_keeper_new(int max_query_num, const struct heavy_keeper_options *params) {
     struct heavy_keeper *hk = (struct heavy_keeper *)malloc(sizeof(struct heavy_keeper));
     hk->K = max_query_num;
 
@@ -230,7 +230,7 @@ int heavy_keeper_add(struct heavy_keeper *hk, struct tag_hash_key *tag, unsigned
     return 1;
 }
 
-struct heavy_keeper_result *heavy_keeper_query(struct heavy_keeper *hk) {
+struct heavy_keeper_result *heavy_keeper_query(const struct heavy_keeper *hk) {
     size_t query_entry_num = sorted_set_cardinality(hk->top_K_heap);
     struct heavy_keeper_result *stats = (struct heavy_keeper_result *)malloc(sizeof(struct heavy_keeper_result));
     stats->count = (unsigned *)malloc(query_entry_num * sizeof(unsigned));
@@ -250,7 +250,7 @@ struct heavy_keeper_result *heavy_keeper_query(struct heavy_keeper *hk) {
     return stats;
 }
 
-int heavy_keeper_query_one(struct heavy_keeper *hk, const struct tag_hash_key *tag, unsigned int *count_out, int *cell_id_out)
+int heavy_keeper_query_one(const struct heavy_keeper *hk, const struct tag_hash_key *tag, unsigned int *count_out, int *cell_id_out)
 {
     if (count_out != NULL) {
         unsigned int count = sorted_set_get_count(hk->top_K_heap, tag);
@@ -284,7 +284,7 @@ static void heavy_keeper_merge_sketch(struct heavy_keeper *dest, const struct he
     for (int array_id = 0; array_id < d; array_id++) {
         for (int bucket_id = 0; bucket_id < w; bucket_id++) {
             struct Bucket *bucket_dest = &(dest->sketch[array_id * w + bucket_id]);
-            struct Bucket *bucket_src = &(src->sketch[array_id * w + bucket_id]);
+            const struct Bucket *bucket_src = &(src->sketch[array_id * w + bucket_id]);
 
             if (bucket_dest->finger_print == bucket_src->finger_print) {
                 bucket_dest->count += bucket_src->count;
@@ -322,7 +322,7 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
     sorted_set_hook_function_of_free_user_data(new_rec, free);
 
     struct sorted_set *ss_dest = dest->top_K_heap; // original ss in dest
-    struct sorted_set *ss_src = src->top_K_heap; // the ss to be merged
+    const struct sorted_set *ss_src = src->top_K_heap; // the ss to be merged
     int size_dest = sorted_set_cardinality(ss_dest);
     int size_src = sorted_set_cardinality(ss_src);
     int max_size = size_dest > size_src ? size_dest : size_src;
@@ -344,7 +344,7 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
     for (int i = 0; i < size_dest; i++) {
         unsigned maxv = find_maxv_in_sketch(dest, tag_arr[i]);
         struct tag_hash_key *tag_final = tag_hash_key_copy(tag_arr[i]);
-        int *pst_cell_id_dest = user_datas[i];
+        const int *pst_cell_id_dest = user_datas[i];
 
         sorted_set_insert(new_rec, tag_final, maxv);
         int **pst_cell_id_final = (int **)sorted_set_get_pointer_to_user_data(new_rec, tag_final);
@@ -362,7 +362,7 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
     new_alloc_id++; // the new id should be larger than the largest id in dest
 
     for (int i = 0; i < size_src; i++) {
-        struct tag_hash_key *tag_src = tag_arr[i];
+        const struct tag_hash_key *tag_src = tag_arr[i];
         int **pst_cell_id_dest = (int **)sorted_set_get_pointer_to_user_data(ss_dest, tag_src);
         int cell_id_src = *user_datas[i];
     
@@ -399,18 +399,30 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
     free(count_arr);
     free(tag_arr);
     free(user_datas);
-    sorted_set_free(dest->top_K_heap);
+    sorted_set_free(ss_dest);
 
     dest->top_K_heap = new_rec;
 
-    *cell_id_popped_from_dest_when_merge_src_out = (int *)malloc(cell_id_popped_from_dest_when_merge_src_len * sizeof(int));
-    memcpy(*cell_id_popped_from_dest_when_merge_src_out, cell_id_popped_from_dest_when_merge_src, cell_id_popped_from_dest_when_merge_src_len * sizeof(int));
-    *cell_id_popped_from_dest_when_merge_src_len_out = cell_id_popped_from_dest_when_merge_src_len;
-    *cell_id_in_src_before_merge_out = (int *)malloc(cell_id_in_src_before_merge_len * sizeof(int));
-    memcpy(*cell_id_in_src_before_merge_out, cell_id_in_src_before_merge, cell_id_in_src_before_merge_len * sizeof(int));
-    *cell_id_in_src_before_merge_len_out = cell_id_in_src_before_merge_len;
-    *cell_id_in_dest_corresponding_out = (int *)malloc(cell_id_in_src_before_merge_len * sizeof(int));
-    memcpy(*cell_id_in_dest_corresponding_out, cell_id_in_dest_corresponding, cell_id_in_src_before_merge_len * sizeof(int));
+    if (cell_id_popped_from_dest_when_merge_src_len == 0) {
+        *cell_id_popped_from_dest_when_merge_src_out = NULL;
+        *cell_id_popped_from_dest_when_merge_src_len_out = 0;
+    } else {
+        *cell_id_popped_from_dest_when_merge_src_out = (int *)malloc(cell_id_popped_from_dest_when_merge_src_len * sizeof(int));
+        memcpy(*cell_id_popped_from_dest_when_merge_src_out, cell_id_popped_from_dest_when_merge_src, cell_id_popped_from_dest_when_merge_src_len * sizeof(int));
+        *cell_id_popped_from_dest_when_merge_src_len_out = cell_id_popped_from_dest_when_merge_src_len;
+    }
+
+    if (cell_id_in_src_before_merge_len == 0) {
+        *cell_id_in_src_before_merge_out = NULL;
+        *cell_id_in_src_before_merge_len_out = 0;
+        *cell_id_in_dest_corresponding_out = NULL;
+    } else {
+        *cell_id_in_src_before_merge_out = (int *)malloc(cell_id_in_src_before_merge_len * sizeof(int));
+        memcpy(*cell_id_in_src_before_merge_out, cell_id_in_src_before_merge, cell_id_in_src_before_merge_len * sizeof(int));
+        *cell_id_in_src_before_merge_len_out = cell_id_in_src_before_merge_len;
+        *cell_id_in_dest_corresponding_out = (int *)malloc(cell_id_in_src_before_merge_len * sizeof(int));
+        memcpy(*cell_id_in_dest_corresponding_out, cell_id_in_dest_corresponding, cell_id_in_src_before_merge_len * sizeof(int));
+    }
 }
 
 
@@ -465,7 +477,7 @@ struct heavy_keeper *heavy_keeper_copy(const struct heavy_keeper *src)
     }
 }
 ***********************************************************************************/
-int heavy_keeper_sorted_set_member_serialization(struct tag_hash_key *tag, unsigned int score, unsigned int cell_id, char **blob, size_t *blob_sz) {
+int heavy_keeper_sorted_set_member_serialization(const struct tag_hash_key *tag, unsigned int score, unsigned int cell_id, char **blob, size_t *blob_sz) {
     mpack_writer_t writer;
     mpack_writer_init_growable(&writer, blob, blob_sz);
     mpack_build_map(&writer);
@@ -560,7 +572,7 @@ void heavy_keeper_serialization(const struct heavy_keeper *hk, char **blob, size
     }
 }
 
-void heavy_keeper_sorted_set_deserialization(mpack_node_t *root, struct sorted_set *out)
+void heavy_keeper_sorted_set_deserialization(const mpack_node_t *root, struct sorted_set *out)
 {
     mpack_node_t item;
     mpack_node_t array_sorted_set = mpack_node_map_cstr(*root, "ss");
@@ -607,7 +619,7 @@ struct heavy_keeper *heavy_keeper_deserialization(const char *blob, size_t size)
     return hk;
 }
 
-int heavy_keeper_get_config_K(struct heavy_keeper *hk)
+int heavy_keeper_get_config_K(const struct heavy_keeper *hk)
 {
     return hk->K;
 }

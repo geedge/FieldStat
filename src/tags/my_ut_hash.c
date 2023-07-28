@@ -12,9 +12,6 @@
 // #define USING_BASE_HASH HASH_JEN
 #define USING_BASE_HASH HASH_SFH
 
-int simple_hash_cnt = 0;
-int hash_cnt = 0;
-
 void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_tags, char **out_key, size_t *out_key_size)
 {
 	int i = 0;
@@ -87,10 +84,8 @@ struct tag_hash_key {
     unsigned int hashv;
 };
 
-// todo: 这个函数弃用
-unsigned int tag_hash_key_cal_hash_value(struct tag_hash_key *my_hash_key)
+unsigned int tag_hash_key_cal_hash_value(const struct tag_hash_key *my_hash_key)
 {
-    simple_hash_cnt++;
     return my_hash_key->hashv;
 }
 
@@ -144,8 +139,8 @@ void fieldtag_list_free(struct fieldstat_tag *tags, size_t n_tags)
 
 int my_cmp_tag(const void *a, const void *b)
 {
-    struct fieldstat_tag *aa = (struct fieldstat_tag *)a;
-    struct fieldstat_tag *bb = (struct fieldstat_tag *)b;
+    const struct fieldstat_tag *aa = (struct fieldstat_tag *)a;
+    const struct fieldstat_tag *bb = (struct fieldstat_tag *)b;
     int key_cmp = strcmp(aa->key, bb->key);
     if (key_cmp != 0) {
         return key_cmp;
@@ -277,7 +272,6 @@ struct tag_hash_key *tag_hash_key_construct_with_fieldstat_tag(const struct fiel
     ret_hash_key->n_my_tag = n_src;
     USING_BASE_HASH(compound_key, compound_key_len, ret_hash_key->hashv);
 
-    hash_cnt++;
     return ret_hash_key;
 }
 
@@ -398,24 +392,6 @@ struct tag_hash_key *tag_hash_key_deserialize(const char *blob, size_t blob_size
 
     mpack_tree_destroy(&tree);
     return ret_hash_key;
-}
-
-// todo: delete them
-
-int tmp_get_hash_count()
-{
-    return hash_cnt;
-}
-
-int tmp_get_simple_hash_count()
-{
-    return simple_hash_cnt;
-}
-
-void reset_hash_count()
-{
-    hash_cnt = 0;
-    simple_hash_cnt = 0;
 }
 
 const char *tag_hash_key_get_compound_key(const struct tag_hash_key *tag)

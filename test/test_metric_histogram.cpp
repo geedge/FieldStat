@@ -18,7 +18,7 @@ struct fieldstat *test_init_standard_instance_one_cube_one_metric_one_cell_hdr()
     return instance;
 }
 
-void test_assert_standard_instance(struct fieldstat *instance)
+void test_assert_standard_instance(const struct fieldstat *instance)
 {
     int *ret_cube_id_arr = NULL;
     int n_cube = 0;
@@ -119,6 +119,10 @@ TEST(metric_test_histogram, serialization_and_merge_twice_with_reset)
     fieldstat_free(instance_from_blob);
     fieldstat_free(instance_total);
 }
+
+// todo: add on wrong cube/metric/cell
+
+// todo：测base 64序列化
 
 int main(int argc, char *argv[]) 
 {

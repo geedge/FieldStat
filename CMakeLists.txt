@@ -28,44 +28,47 @@ if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 	set(CMAKE_INSTALL_PREFIX "/opt/MESA" CACHE PATH "default install path" FORCE)
 endif()
 
-# set(CPP_BIN_PATH "/home/chenzizhan/cppcheck/bin")
-# find_program(CMAKE_CXX_CPPCHECK NAMES cppcheck HINTS ${CPP_BIN_PATH})
-# if (CMAKE_CXX_CPPCHECK)
-#     list(
-#         APPEND CMAKE_CXX_CPPCHECK 
-#             "--enable=all"
-#             "--error-exitcode=1"
-#             "--suppress=unreachableCode"
-#             "--suppress=unusedFunction"
-#             "--suppress=missingInclude"
-#             "--suppress=uselessAssignmentPtrArg"
-#             "--suppress=unmatchedSuppression"
-#             "--suppress=internalAstError"
-#             "--suppress=unmatchedSuppression"
-#             "--suppress=unreadVariable"
-#             "--suppress=memleakOnRealloc"
-#             "--suppress=redundantAssignment"
-#             "--suppress=constParameter"
-#             "--suppress=unsignedLessThanZero"
-#             "--suppress=variableScope"
-#             "--suppress=cstyleCast"
-#             "--suppress=objectIndex"
-#             "--suppress=shadowVariable"
-#             "--suppress=nullPointerRedundantCheck"
-#             "--suppress=ctunullpointer"
-#             "--suppress=shadowFunction"
-#             "--suppress=shiftTooManyBitsSigned"
-#             "--suppress=preprocessorErrorDirective"
-#             "--suppress=*:${PROJECT_SOURCE_DIR}/vendors/mpack/mpack.c"
-#             "--suppress=*:${PROJECT_SOURCE_DIR}/test/utils.hpp"
-#             "--suppress=*:${PROJECT_SOURCE_DIR}/test/unit_test_serialize.cpp"
-#             "--suppress=*:${PROJECT_SOURCE_DIR}/test/test_fuzz_test.cpp"
-#             # "--suppress=*:${PROJECT_SOURCE_DIR}/test/unit_test_fast_hash.cpp"
-#     )
-#     set(CMAKE_C_CPPCHECK ${CMAKE_CXX_CPPCHECK})
-# else()
-#   message(FATAL_ERROR "Could not find the program cppcheck.")
-# endif()
+set(CPP_BIN_PATH "/home/chenzizhan/cppcheck/cfg")
+find_program(CMAKE_CXX_CPPCHECK NAMES cppcheck HINTS ${CPP_BIN_PATH})
+if (CMAKE_CXX_CPPCHECK)
+    list(
+        APPEND CMAKE_CXX_CPPCHECK 
+            "--enable=all"
+            "--suppress=missingIncludeSystem"
+            "--error-exitcode=1"
+            "--suppress=unreachableCode"
+            "--suppress=unusedFunction"
+            "--suppress=missingInclude"
+            "--suppress=uselessAssignmentPtrArg"
+            "--suppress=unmatchedSuppression"
+            "--suppress=internalAstError"
+            "--suppress=unmatchedSuppression"
+            "--suppress=unreadVariable"
+            "--suppress=memleakOnRealloc"
+            "--suppress=redundantAssignment"
+            "--suppress=constParameter"
+            "--suppress=unsignedLessThanZero"
+            "--suppress=variableScope"
+            "--suppress=cstyleCast"
+            "--suppress=objectIndex"
+            "--suppress=shadowVariable"
+            "--suppress=nullPointerRedundantCheck"
+            "--suppress=ctunullpointer"
+            "--suppress=shadowFunction"
+            "--suppress=shiftTooManyBitsSigned"
+            "--suppress=preprocessorErrorDirective"
+            "--suppress=constParameterCallback:${PROJECT_SOURCE_DIR}/src/tags/sorted_set.c"
+            "--suppress=constParameterPointer:${PROJECT_SOURCE_DIR}/src/tags/sorted_set.c"
+            "--suppress=*:${PROJECT_SOURCE_DIR}/vendors/*"
+            "--suppress=*:${PROJECT_SOURCE_DIR}/test/utils.hpp"
+            "--suppress=*:${PROJECT_SOURCE_DIR}/test/unit_test_serialize.cpp"
+            "--suppress=*:${PROJECT_SOURCE_DIR}/test/test_fuzz_test.cpp"
+            # "--suppress=*:${PROJECT_SOURCE_DIR}/test/unit_test_fast_hash.cpp"
+    )
+    set(CMAKE_C_CPPCHECK ${CMAKE_CXX_CPPCHECK})
+else()
+  message(FATAL_ERROR "Could not find the program cppcheck.")
+endif()
 
 #for ASAN
 set(ASAN_OPTION "OFF" CACHE STRING " set asan type chosen by the user, using OFF as default")

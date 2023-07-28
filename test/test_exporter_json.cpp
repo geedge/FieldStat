@@ -112,7 +112,7 @@ void fill_random_tag(Fieldstat_tag_list_wrapper *tags[], int tag_list_num)
     }
 }
 
-cJSON *test_exporter_extract_results_with_standard_global(struct fieldstat *instance)
+cJSON *test_exporter_extract_results_with_standard_global(const struct fieldstat *instance)
 {
     struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new(instance);
     fieldstat_json_exporter_set_global_tag(fieldstat_json_exporter, TEST_TAG_GLOBAL, 3);
@@ -126,7 +126,7 @@ cJSON *test_exporter_extract_results_with_standard_global(struct fieldstat *inst
     return root_arr;
 }
 
-cJSON *test_exporter_extract_results(struct fieldstat *instance)
+cJSON *test_exporter_extract_results(const struct fieldstat *instance)
 {
     struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new(instance);
 
@@ -139,7 +139,7 @@ cJSON *test_exporter_extract_results(struct fieldstat *instance)
     return root_arr;
 }
 
-void topk_standard_oper(std::function<void(Fieldstat_tag_list_wrapper *, unsigned int *)> &topk_add, size_t metric_num, unsigned int test_expected_big_count)
+void topk_standard_oper(const std::function<void(Fieldstat_tag_list_wrapper *, unsigned int *)> &topk_add, size_t metric_num, unsigned int test_expected_big_count)
 {
     for (size_t i = 0; i < OPER_NUM; i++) {
         int tmp;
@@ -167,7 +167,7 @@ void topk_init(struct fieldstat *instance, unsigned int test_expected_big_count)
     int m2 = fieldstat_register_counter(instance, cube_id, field_name[1], 0);
 
     std::function<void(Fieldstat_tag_list_wrapper *, unsigned int *)> topk_add = [instance, cube_id, m1, m2](
-            Fieldstat_tag_list_wrapper *my_tags, unsigned int counts[TEST_METRIC_NUM]) {
+            const Fieldstat_tag_list_wrapper *my_tags, unsigned int counts[TEST_METRIC_NUM]) {
                 int cell_id = fieldstat_cube_add(instance, cube_id, my_tags->get_tag(), my_tags->get_tag_count(), counts[0]);
                 if (cell_id >= 0) {
                     fieldstat_counter_incrby(instance, cube_id, m1, cell_id, counts[0]);
@@ -313,7 +313,7 @@ TEST(export_test, skip_two_empty_cube_and_export_last_one_with_global_tag)
     const int tag_num = 1;
     Fieldstat_tag_list_wrapper *tags[tag_num];
     fill_random_tag(tags, tag_num);
-    Fieldstat_tag_list_wrapper *the_tag = tags[0];
+    const Fieldstat_tag_list_wrapper *the_tag = tags[0];
     int cell_id = fieldstat_cube_add(instance, cube_id_3, the_tag->get_tag(), the_tag->get_tag_count(), 1);
     for (size_t i = 0; i < OPER_NUM; i++){
         fieldstat_histogram_record(instance, cube_id_3, id_histogram, cell_id, g_histogram_standard_oper[i]);
@@ -362,7 +362,7 @@ TEST(export_test, skip_empty_metrics_given_cube_deleted) {
     const int tag_num = 1;
     Fieldstat_tag_list_wrapper *tags[tag_num];
     fill_random_tag(tags, tag_num);
-    Fieldstat_tag_list_wrapper *the_tag = tags[0];
+    const Fieldstat_tag_list_wrapper *the_tag = tags[0];
     int cell_id = fieldstat_cube_add(instance, cube_id, the_tag->get_tag(), the_tag->get_tag_count(), 1);
 
     fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id, 1234);

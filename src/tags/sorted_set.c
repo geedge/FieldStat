@@ -40,7 +40,7 @@ struct entry_data *entry_data_construct(struct tag_hash_key *tag)
     return entry_data;
 }
 
-void entry_data_destroy(struct entry_data *entry_data, void (*free_method)(void *))
+void entry_data_destroy(struct entry_data *entry_data, void const(* free_method)(void *))
 {
     if (entry_data == NULL) {
         return;
@@ -52,17 +52,17 @@ void entry_data_destroy(struct entry_data *entry_data, void (*free_method)(void 
     free(entry_data);
 }
 
-unsigned sorted_set_entry_get_count(heap_entry *entry)
+unsigned sorted_set_entry_get_count(const heap_entry *entry)
 {
     return *(unsigned *)entry->key;
 }
 
-struct entry_data *sorted_set_entry_get_data(heap_entry *entry)
+struct entry_data *sorted_set_entry_get_data(const heap_entry *entry)
 {
     return entry->value;
 }
 
-static bool cmp_int(void *aa, void *bb)
+static bool cmp_int(void *aa, void *bb) // cppcheck-suppress constParameterCallback
 {
     if (sorted_set_entry_get_count(aa) < sorted_set_entry_get_count(bb)) {
         return true;
@@ -241,9 +241,9 @@ unsigned sorted_set_get_min_count(const struct sorted_set *ss)
     if (heap->cur_size == 0) {
         return 0;
     }
-    heap_entry *ret = (heap_entry *)(heap->nodes[0]);
+    const heap_entry *ret = (heap_entry *)(heap->nodes[0]);
 
-    unsigned* key = ret->key;
+    const unsigned* key = ret->key;
     return *key;
 }
 
@@ -252,7 +252,7 @@ unsigned sorted_set_get_count(const struct sorted_set *ss, const struct tag_hash
     if (sorted_set_cardinality(ss) == 0) {
         return 0;
     }
-    heap_entry *entry = sorted_set_find_entry(ss, tag);
+    const heap_entry *entry = sorted_set_find_entry(ss, tag);
     if (entry == NULL) {
         return 0;
     }
@@ -288,9 +288,9 @@ void sorted_set_hook_function_of_free_user_data(struct sorted_set *ss, void (*fr
     ss->free_user_data_func = free_method;
 }
 
-void **sorted_set_get_pointer_to_user_data(struct sorted_set *ss, const struct tag_hash_key *tag)
+void **sorted_set_get_pointer_to_user_data(const struct sorted_set *ss, const struct tag_hash_key *tag)
 {
-    heap_entry *entry = sorted_set_find_entry(ss, tag);
+    const heap_entry *entry = sorted_set_find_entry(ss, tag);
     if (entry == NULL) {
         return NULL;
     }
@@ -301,7 +301,7 @@ void **sorted_set_get_pointer_to_user_data(struct sorted_set *ss, const struct t
 
 int sorted_set_insert_user_data(struct sorted_set *ss, const struct tag_hash_key *tag, void *user_data)
 {
-    heap_entry *entry = sorted_set_find_entry(ss, tag);
+    const heap_entry *entry = sorted_set_find_entry(ss, tag);
     if (entry == NULL) {
         return -1;
     }
@@ -317,8 +317,8 @@ typedef struct {
 
 int cmp_tmp_heap_node(const void *a, const void *b)
 {
-    tmp_heap_node *aa = (tmp_heap_node *)a;
-    tmp_heap_node *bb = (tmp_heap_node *)b;
+    const tmp_heap_node *aa = (tmp_heap_node *)a;
+    const tmp_heap_node *bb = (tmp_heap_node *)b;
 
     if (aa->key < bb->key) {
         return 1;
@@ -334,7 +334,7 @@ void sorted_set_dump(const struct sorted_set *ss, unsigned *scores_out, struct t
     struct minheap *h = ss->heap;
     tmp_heap_node *tmp_nodes = (tmp_heap_node *)malloc(sizeof(tmp_heap_node) * h->cur_size);
     for (int i = 0; i < h->cur_size; i++) {
-        heap_entry *entry = (heap_entry *)h->nodes[i];
+        const heap_entry *entry = (heap_entry *)h->nodes[i];
         tmp_nodes[i].key = sorted_set_entry_get_count(entry);
         tmp_nodes[i].val = sorted_set_entry_get_data(entry);
     }
@@ -353,8 +353,8 @@ struct sorted_set *sorted_set_copy(const struct sorted_set *ss)
     sorted_set_hook_function_of_free_user_data(ret, ss->free_user_data_func);
     
     for (int i = 0; i < ss->heap->cur_size; i++) {
-        heap_entry *entry = (heap_entry *)ss->heap->nodes[i];
-        struct entry_data *data = sorted_set_entry_get_data(entry);
+        const heap_entry *entry = (heap_entry *)ss->heap->nodes[i];
+        const struct entry_data *data = sorted_set_entry_get_data(entry);
         struct tag_hash_key *new_key = tag_hash_key_copy(data->key);
         sorted_set_insert(ret, new_key, sorted_set_entry_get_count(entry));
         int *new_user_data = (int *)malloc(sizeof(int));

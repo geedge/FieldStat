@@ -27,10 +27,6 @@ struct tag_hash_key *gen_key(const char *key, int value)
     return tag_key;
 }
 
-bool sortByValue(const std::pair<std::string, int> &a, const std::pair<std::string, int> &b) {
-    return a.second > b.second;
-}
-
 double cal_accuracy(vector<struct tag_hash_key *> &expected_keys, vector<struct tag_hash_key *> &test_result) {
     map<string, int> countMap;
     for (size_t i = 0; i < expected_keys.size(); i++) {
@@ -39,7 +35,9 @@ double cal_accuracy(vector<struct tag_hash_key *> &expected_keys, vector<struct 
     }
 
     std::vector<std::pair<std::string, int>> countVector(countMap.begin(), countMap.end());
-    std::sort(countVector.begin(), countVector.end(), sortByValue);
+    std::sort(countVector.begin(), countVector.end(), [](const std::pair<std::string, int> &a, const std::pair<std::string, int> &b) {
+        return a.second > b.second;
+    });
 
     std::set<std::string> myset;
     int min_in_max_count = 0;

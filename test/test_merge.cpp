@@ -1,7 +1,70 @@
 
 #include <gtest/gtest.h>
+#include <set>
+#include <map>
 #include "fieldstat.h"
 #include "utils.hpp"
+
+using namespace std;
+
+vector<Fieldstat_tag_list_wrapper *> test_gen_topk_flows(int num, int rand_flow_type_num)
+{
+    vector<Fieldstat_tag_list_wrapper *> flows;
+    for (int i = 0; i < num; i++)
+    {
+        if (rand() % 2) {
+            flows.push_back(new Fieldstat_tag_list_wrapper("my key", i));
+        } else {
+            flows.push_back(new Fieldstat_tag_list_wrapper("elephant", rand() % rand_flow_type_num));
+        }
+    }
+    return flows;
+}
+
+double test_cal_accuracy(vector<struct Fieldstat_tag_list_wrapper *> &expected_keys, vector<struct Fieldstat_tag_list_wrapper *> &test_result) {
+    map<string, int> countMap;
+    for (size_t i = 0; i < expected_keys.size(); i++) {
+        std::string key = expected_keys[i]->to_string();
+        countMap[key]++;
+    }
+
+    std::vector<std::pair<std::string, int>> countVector(countMap.begin(), countMap.end());
+    std::sort(countVector.begin(), countVector.end(), [](const std::pair<std::string, int> &a, const std::pair<std::string, int> &b) {
+        return a.second > b.second;
+    });
+
+    std::set<std::string> myset;
+    int min_in_max_count = 0;
+    size_t i;
+    for (i = 0; i < test_result.size(); ++i) {
+        myset.insert(countVector[i].first);
+        min_in_max_count = countVector[i].second;
+    }
+    while (i < countVector.size()) {
+        if (countVector[i].second != min_in_max_count) {
+            break;
+        }
+        myset.insert(countVector[i].first);
+        i++;
+    }
+
+    cout << "myset : " << endl;
+    for (auto it = myset.begin(); it != myset.end(); it++) {
+        cout << *it << endl;
+    }
+    cout << "------------------------- " << endl;
+
+    int correct = 0;
+    for (size_t i = 0; i < test_result.size(); i++) {
+        string key = test_result[i]->to_string();
+        if (myset.find(key) != myset.end()) {
+            correct++;
+        }
+    }
+
+    double accuracy = (double)correct / test_result.size();
+    return accuracy;
+}
 
 TEST(unit_test_merge, test_metric_name_mapping_with_new_metric_on_existing_cube)
 {
@@ -459,133 +522,69 @@ TEST(unit_test_merge, new_too_many_cells_on_multiple_metric_given_source_cube_re
     fieldstat_free(instance_dest);
 }
 
-// todo: 把unit test 里的merge测试移过来
+struct fieldstat *test_push_flows(vector<Fieldstat_tag_list_wrapper *> &flows_in_test, int K)
+{
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, K);
+    int metric_id = fieldstat_register_counter(instance, cube_id, "metric name", false);
+    for (size_t i = 0; i < flows_in_test.size(); i++) {
+        int cell_id = fieldstat_cube_add(instance, cube_id, flows_in_test[i]->get_tag(), flows_in_test[i]->get_tag_count(), 1);
+        if (cell_id < 0) {
+            continue;
+        }
+        fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id, 1);
+    }
+    return instance;
+}
+
+TEST(unit_test_merge, merge_accuracy_test_with_K_large_enough_topk)
+{
+    int K = 100;
+    vector<Fieldstat_tag_list_wrapper *> flows_in_src = test_gen_topk_flows(K, K);
+    printf("src test_push_flows\n");
+    struct fieldstat *instance_src = test_push_flows(flows_in_src, K);
+    vector<Fieldstat_tag_list_wrapper *> flows_in_dest = test_gen_topk_flows(K, K);
+    printf("dest test_push_flows\n");
+    struct fieldstat *instance_dest = test_push_flows(flows_in_dest, K);
+    printf("merge\n");
+    fieldstat_merge(instance_dest, instance_src);
+    printf("merge done\n");
+
+    int *cell_ids = NULL;
+    struct fieldstat_tag_list *tag_list = NULL;
+    size_t n_cell = 0;
+    fieldstat_get_cells(instance_dest, 0, 0, &cell_ids, &tag_list, &n_cell);
+
+    vector<Fieldstat_tag_list_wrapper *> flows_in_merged;
+    for (size_t i = 0; i < n_cell; i++) {
+        flows_in_merged.push_back(new Fieldstat_tag_list_wrapper(&tag_list[i]));
+    }
+
+    // // print
+    // printf("flows_in_merged\n");
+    // for (size_t i = 0; i < flows_in_merged.size(); i++) {
+    //     cout << flows_in_merged[i]->to_string() << endl;
+    // }
+    // cout << "---------------------------------------------" << endl;
+    
+    flows_in_dest.insert(flows_in_dest.end(), std::make_move_iterator(flows_in_src.begin()), std::make_move_iterator(flows_in_src.end()));
+    double accuracy = test_cal_accuracy(flows_in_dest, flows_in_merged);
+    EXPECT_TRUE(accuracy > 0.99); // should be 1.0
+    printf("accuracy is %lf\n", accuracy);
+
+    fieldstat_free(instance_src);
+    fieldstat_free(instance_dest);
+    free(cell_ids);
+    fieldstat_tag_list_arr_free(tag_list, n_cell);
+    for (size_t i = 0; i < flows_in_merged.size(); i++) {
+        delete flows_in_merged[i];
+    }
+    for (size_t i = 0; i < flows_in_dest.size(); i++) {
+        delete flows_in_dest[i];
+    }
+}
 
 // todo：topk 数量超了8倍K
-
-extern "C" {
-extern int tmp_get_hash_count();
-extern int tmp_get_simple_hash_count();
-void reset_hash_count();
-}
-
-// TEST(unit_test_merge, performance_test_when_comprehensive_sampling)
-// {   
-//     const int INSTANCE_NUM = 100;
-//     const int MAX_CELL_NUM = 65535;
-//     const int DIMENSION_TOTAL = 100000;
-//     // const int INSTANCE_NUM = 2;
-//     // const int MAX_CELL_NUM = 1000;
-//     // const int DIMENSION_TOTAL = 1024;
-//     Fieldstat_tag_list_wrapper *tags[DIMENSION_TOTAL];
-//     for (int i = 0; i < DIMENSION_TOTAL; i++)
-//     {
-//         tags[i] = new Fieldstat_tag_list_wrapper("my key", i);
-//     }
-
-//     struct fieldstat *instances[INSTANCE_NUM];
-//     for (int i = 0; i < INSTANCE_NUM; i++) {
-//         struct fieldstat *tmp_i = fieldstat_new();
-//         int cube_id = fieldstat_register_cube(tmp_i, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, MAX_CELL_NUM);
-//         int metric_id = fieldstat_register_counter(tmp_i, cube_id, "metric name", false);
-//         for (int j = 0; j < MAX_CELL_NUM; j++) {
-//             int cell_id = fieldstat_cube_add(tmp_i, cube_id, tags[rand() % DIMENSION_TOTAL]->get_tag(), 1, 1);
-
-//             fieldstat_counter_incrby(tmp_i, cube_id, metric_id, cell_id, 1);
-//         }
-//         instances[i] = tmp_i;
-//     }
-    
-//     struct fieldstat *instance_dest = fieldstat_new();
-//     reset_hash_count();
-//     printf("prepare done\n");
-
-//     clock_t start = clock();
-//     // getchar();
-//     for (int i = 0; i < INSTANCE_NUM; i++) {
-//         fieldstat_merge(instance_dest, instances[i]);
-//     }
-//     // exit(0);
-//     clock_t end = clock();
-
-//     double elapsed_secs = double(end - start) / CLOCKS_PER_SEC;
-//     printf("performance_test_when_comprehensive_sampling elapsed_secs: %f\n", elapsed_secs);
-//     printf("get hash count: %d\n", tmp_get_hash_count());
-//     printf("get simple hash count: %d\n", tmp_get_simple_hash_count());
-//     EXPECT_TRUE(elapsed_secs < 0.05); // fixme: approximately around 100 cube(templates), 10 metrics. So 0.005s finish it.
-
-//     fieldstat_free(instance_dest);
-//     for (int i = 0; i < INSTANCE_NUM; i++) {
-//         fieldstat_free(instances[i]);
-//     }
-//     for (int i = 0; i < DIMENSION_TOTAL; i++) {
-//         delete tags[i];
-//     }
-// }
-
-TEST(unit_test_merge, performance_test_when_topk_sampling){
-    const int INSTANCE_NUM = 100;
-    const int MAX_CELL_NUM = 1024;
-    const int DIMENSION_TOTAL = 100000;
-    const int CUBE_NUM = 100;
-
-    Fieldstat_tag_list_wrapper *tags[DIMENSION_TOTAL];
-    for (int i = 0; i < DIMENSION_TOTAL; i++)
-    {
-        if (i%2)
-            tags[i] = new Fieldstat_tag_list_wrapper("my key", i);
-        else
-            tags[i] = new Fieldstat_tag_list_wrapper("elephant", i % 1024);
-    }
-
-    Fieldstat_tag_list_wrapper *shared_tags[CUBE_NUM];
-    for (int i = 0; i < CUBE_NUM; i++)
-    {
-        shared_tags[i] = new Fieldstat_tag_list_wrapper("shared key", i);
-    }
-    
-    struct fieldstat *instances[INSTANCE_NUM];
-    for (int i = 0; i < INSTANCE_NUM; i++) {
-        for (int j = 0; j < CUBE_NUM; j++) {
-            struct fieldstat *tmp_i = fieldstat_new();
-            int cube_id = fieldstat_register_cube(tmp_i, shared_tags[j]->get_tag(), 1, SAMPLING_MODE_TOPK, MAX_CELL_NUM);
-            int metric_id = fieldstat_register_counter(tmp_i, cube_id, "metric name", false);
-            for (int j = 0; j < MAX_CELL_NUM; j++) {
-                int cell_id = fieldstat_cube_add(tmp_i, cube_id, tags[rand() % DIMENSION_TOTAL]->get_tag(), 1, 1);
-                if (cell_id == -1) {
-                    continue;
-                }
-                fieldstat_counter_incrby(tmp_i, cube_id, metric_id, cell_id, 1);
-            }
-            instances[i] = tmp_i;
-        }
-    }
-
-    struct fieldstat *instance_dest = fieldstat_new();
-    reset_hash_count();
-    printf("prepare done\n");
-    clock_t start = clock();
-    // getchar();
-    for (int i = 0; i < INSTANCE_NUM; i++) {
-        fieldstat_merge(instance_dest, instances[i]);
-    }
-    // exit(0);
-    clock_t end = clock();
-
-    double elapsed_secs = double(end - start) / CLOCKS_PER_SEC;
-    printf("performance_test_when_comprehensive_sampling elapsed_secs: %f\n", elapsed_secs);
-    printf("get hash count: %d\n", tmp_get_hash_count());
-    printf("get simple hash count: %d\n", tmp_get_simple_hash_count());
-    EXPECT_TRUE(elapsed_secs < 0.2); // fixme: approximately around 100 cube(templates), 10 metrics. So 0.005s finish it.
-
-    fieldstat_free(instance_dest);
-    for (int i = 0; i < INSTANCE_NUM; i++) {
-        fieldstat_free(instances[i]);
-    }
-    for (int i = 0; i < DIMENSION_TOTAL; i++) {
-        delete tags[i];
-    }
-}
 
 int main(int argc, char *argv[]) 
 {

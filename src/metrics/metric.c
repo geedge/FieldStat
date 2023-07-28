@@ -147,7 +147,7 @@ static void metric_scheme_counter_free(struct metric_measure_data *data)
 */
 static void metric_scheme_counter_serialize(const struct metric_measure_data *data, char **blob, size_t *blob_size)
 {
-    struct metric_counter_or_gauge *counter = data->counter;
+    const struct metric_counter_or_gauge *counter = data->counter;
     mpack_writer_t writer;
     mpack_writer_init_growable(&writer, blob, blob_size);
     mpack_build_map(&writer);
@@ -190,7 +190,7 @@ static int metric_scheme_counter_merge(struct metric_measure_data *pthis, const 
 static int metric_scheme_counter_copy(struct metric_measure_data *pthis, const struct metric_measure_data *from)
 {
     struct metric_counter_or_gauge *counter = pthis->counter;
-    struct metric_counter_or_gauge *from_counter = from->counter;
+    const struct metric_counter_or_gauge *from_counter = from->counter;
     counter->value = from_counter->value;
     counter->type = from_counter->type;
     return 0;
@@ -234,24 +234,17 @@ static void metric_scheme_hll_free(struct metric_measure_data *data)
 
 static void metric_scheme_hll_serialize(const struct metric_measure_data *data, char **blob, size_t *blob_size)
 {
-    struct ST_hyperloglog *hll = data->hll;
-    ST_hyperloglog_serialize(hll, blob, blob_size);
+    ST_hyperloglog_serialize(data->hll, blob, blob_size);
 }
 
 static int metric_scheme_hll_merge(struct metric_measure_data *pthis, const struct metric_measure_data *from)
 {
-    struct ST_hyperloglog *hll = pthis->hll;
-    struct ST_hyperloglog *from_hll = from->hll;
-
-    return ST_hyperloglog_merge(hll, from_hll);
+    return ST_hyperloglog_merge(pthis->hll, from->hll);
 }
 
 static int metric_scheme_hll_copy(struct metric_measure_data *pthis, const struct metric_measure_data *from)
 {
-    struct ST_hyperloglog *hll = pthis->hll;
-    struct ST_hyperloglog *from_hll = from->hll;
-    
-    return ST_hyperloglog_merge(hll, from_hll);
+    return ST_hyperloglog_merge(pthis->hll, from->hll);
 }
 
 struct metric_measure_data *metric_scheme_hll_deserialize(const char *blob, size_t blob_size) 
@@ -295,18 +288,13 @@ static void metric_scheme_histogram_serialize(const struct metric_measure_data *
 
 static int metric_scheme_histogram_merge(struct metric_measure_data *pthis, const struct metric_measure_data *from)
 {
-    struct hdr_histogram *hdr = pthis->hdr;
-    struct hdr_histogram *from_hdr = from->hdr;
-
-    (void)hdr_add(hdr, from_hdr);
+    (void)hdr_add(pthis->hdr, from->hdr);
     return 0;
 }
 
 static int metric_scheme_histogram_copy(struct metric_measure_data *pthis, const struct metric_measure_data *from)
 {
-    struct hdr_histogram *hdr = pthis->hdr;
-    struct hdr_histogram *from_hdr = from->hdr;
-    (void)hdr_add(hdr, from_hdr);
+    (void)hdr_add(pthis->hdr, from->hdr);
     return 0;
 }
 
@@ -733,7 +721,7 @@ void metric_get_plain_blob(const struct metric *pthis, int cell_id, char **blob,
     pthis->scheme->serialize(metric_find_one_cell(pthis, cell_id), blob, blob_size);
 }
 
-void metric_rearrange_cell_id(struct metric *pthis, int *original_id, int *final_id, size_t n_id)
+void metric_rearrange_cell_id(struct metric *pthis, const int *original_id, const int *final_id, size_t n_id)
 {
     if (n_id == 0) {
         return;
@@ -817,12 +805,12 @@ int metric_counter_set(struct metric *pthis, int cell_id, long long value)
 
 long long metric_counter_get(const struct metric *pthis, int cell_id)
 {
-    struct metric_measure_data *data = metric_find_one_cell(pthis, cell_id);
+    const struct metric_measure_data *data = metric_find_one_cell(pthis, cell_id);
     if (data == NULL) {
         printf("ERR: metric_counter_get cell id %d does not exist\n", cell_id);
         return -1;
     }
-    struct metric_counter_or_gauge *counter = data->counter;
+    const struct metric_counter_or_gauge *counter = data->counter;
     return counter->value;
 }
 
@@ -844,7 +832,7 @@ int metric_hll_add(struct metric *pthis, int cell_id, const char *key, size_t ke
 
 double metric_hll_get(const struct metric *pthis, int cell_id)
 {
-    struct metric_measure_data *data = metric_find_one_cell(pthis, cell_id);
+    const struct metric_measure_data *data = metric_find_one_cell(pthis, cell_id);
     if (data == NULL) {
         printf("ERR: metric_hll_get cell id %d does not exist\n", cell_id);
         return -1;
@@ -874,7 +862,7 @@ int metric_histogram_record(struct metric *pthis, int cell_id, long long value)
 
 long long metric_histogram_value_at_percentile(const struct metric *pthis, int cell_id, double percentile)
 {
-    struct metric_measure_data *data = metric_find_one_cell(pthis, cell_id);
+    const struct metric_measure_data *data = metric_find_one_cell(pthis, cell_id);
     if (data == NULL) {
         printf("ERR: metric_histogram_value_at_percentile cell id %d does not exist\n", cell_id);
         return -1;
@@ -897,7 +885,7 @@ static long long hdr_count_le_value(const struct hdr_histogram* h, long long val
 
 long long metric_histogram_count_le_value(const struct metric *pthis, int cell_id, long long value)
 {
-    struct metric_measure_data *data = metric_find_one_cell(pthis, cell_id);
+    const struct metric_measure_data *data = metric_find_one_cell(pthis, cell_id);
     if (data == NULL) {
         printf("ERR: metric_histogram_count_le_value cell id %d does not exist\n", cell_id);
         return -1;

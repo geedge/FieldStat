@@ -182,6 +182,32 @@ void Fieldstat_tag_list_wrapper::print_tag_list() const
     printf("print end\n");
 }
 
+string Fieldstat_tag_list_wrapper::to_string() const
+{
+    string str = "";
+    for (size_t i = 0; i < tag_list_c.n_tag; i++)
+    {
+        str += tag_list_c.tag[i].key;
+        str += ":";
+        switch (tag_list_c.tag[i].type)
+        {
+            case TAG_INTEGER:
+                str += std::to_string(tag_list_c.tag[i].value_longlong);
+                break;
+            case TAG_DOUBLE:
+                str += std::to_string(tag_list_c.tag[i].value_double);
+                break;
+            case TAG_CSTRING:
+                str += tag_list_c.tag[i].value_str;
+                break;
+            default:
+                break;
+        }
+        str += ",";
+    }
+    return str;
+}
+
 bool Fieldstat_tag_list_wrapper::operator==(const Fieldstat_tag_list_wrapper &tag_list_wrapper) const
 {
     const struct fieldstat_tag_list *tag_list = tag_list_wrapper.get_c_struct();

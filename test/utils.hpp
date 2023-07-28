@@ -17,6 +17,7 @@ public:
     explicit Fieldstat_tag_list_wrapper(const char * key, int value);
     explicit Fieldstat_tag_list_wrapper(const char * key, const char *value);
     explicit Fieldstat_tag_list_wrapper(std::uniform_int_distribution<int> &dist, int tag_count);
+    std::string to_string() const;
     // std::uniform_int_distribution<int> dist(1,100)
     explicit Fieldstat_tag_list_wrapper();
     Fieldstat_tag_list_wrapper(const Fieldstat_tag_list_wrapper &tag_list_wrapper);

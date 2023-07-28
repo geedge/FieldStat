@@ -11,7 +11,7 @@ extern "C"
 
 struct tag_hash_key;
 
-unsigned int tag_hash_key_cal_hash_value(struct tag_hash_key *my_hash_key);
+unsigned int tag_hash_key_cal_hash_value(const struct tag_hash_key *my_hash_key);
 // return 1 if not equal, 0 if equal
 int tag_hash_key_cmp(const struct tag_hash_key *a, const struct tag_hash_key *b);
 

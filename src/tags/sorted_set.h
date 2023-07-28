@@ -58,7 +58,7 @@ int sorted_set_insert_user_data(struct sorted_set *ss, const struct tag_hash_key
     * @brief get the pointer to the user data of the given member. So that the user can modify the user data.
     * @return the pointer to the user data. return NULL if the member is not in the sorted set.
 */
-void **sorted_set_get_pointer_to_user_data(struct sorted_set *ss, const struct tag_hash_key *tag);
+void **sorted_set_get_pointer_to_user_data(const struct sorted_set *ss, const struct tag_hash_key *tag);
 /**
  * @brief Increase the score of the given member.
  * @param score By the value of which increase member.

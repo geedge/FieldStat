@@ -59,9 +59,9 @@ int heavy_keeper_add(struct heavy_keeper *hk, struct tag_hash_key *tag, unsigned
  * @param   hk            the pointer to the heavy keeper.
  * @return  a pointer to the heavy keeper query result. User should free it after use by calling heavy_keeper_result_free.
  */
-struct heavy_keeper_result *heavy_keeper_query(struct heavy_keeper *hk);
+struct heavy_keeper_result *heavy_keeper_query(const struct heavy_keeper *hk);
 
-int heavy_keeper_query_one(struct heavy_keeper *hk, const struct tag_hash_key *tag, unsigned int *count_out, int *cube_id_out);
+int heavy_keeper_query_one(const struct heavy_keeper *hk, const struct tag_hash_key *tag, unsigned int *count_out, int *cube_id_out);
 
 /**
  * @brief   free a heavy keeper query result.
@@ -98,7 +98,7 @@ struct heavy_keeper *heavy_keeper_deserialization(const char *blob, size_t size)
 /**
  * @brief   Get the "K" parameter of the heavy keeper.
 */
-int heavy_keeper_get_config_K(struct heavy_keeper *hk);
+int heavy_keeper_get_config_K(const struct heavy_keeper *hk);
 
 void heavy_keeper_get_config_metric_header(struct heavy_keeper *hk, char **metric_names, size_t *n_metric, size_t *primary_metric_index);
 

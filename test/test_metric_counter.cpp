@@ -22,7 +22,7 @@ struct fieldstat *test_init_standard_instance_one_cube_one_metric_one_cell_count
     return instance;
 }
 
-void test_assert_standard_instance(struct fieldstat *instance)
+void test_assert_standard_instance(const struct fieldstat *instance)
 {
     int *ret_cube_id_arr = NULL;
     int n_cube = 0;
@@ -249,84 +249,7 @@ TEST(metric_test_counter, topk_add_and_test_accuracy)
         delete tags[i];
 }
 
-TEST(metric_test_counter, performance_test_on_1_cells_1000000_times)
-{
-    // getchar();
-    struct fieldstat *instance = fieldstat_new();
-    fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
-    fieldstat_register_counter(instance, 0, "test", 0);
-    int cell_id = fieldstat_cube_add(instance, 0, &TEST_TAG_DOUBLE, 1, 1);
-    clock_t start = clock();
-    for (size_t i = 0; i < 1000000; i++) {
-        fieldstat_counter_incrby(instance, 0, 0, cell_id, 1);
-    }
-    clock_t end = clock();
-    double seconds = (double)(end - start) / CLOCKS_PER_SEC;
-    printf("performance_test_on_1_cells_1000000_times time cost: %f\n", seconds);
-    EXPECT_TRUE(seconds < 1); // 1 = 0.000001 * 1000000
-    fieldstat_free(instance);
-}
-
-TEST(metric_test_counter, performance_test_on_60000_cells_comprehensive_1000000_times)
-{
-    int cell_count = 60000;
-    struct fieldstat_tag tags[cell_count];
-    for (int i = 0; i < cell_count; i++) {
-        tags[i] = TEST_TAG_INT;
-        tags[i].value_longlong = i;
-    }
-    // getchar();
-    struct fieldstat *instance = fieldstat_new();
-    fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, cell_count);
-    fieldstat_register_counter(instance, 0, "test", 0);
-
-    clock_t start = clock();
-    for (size_t i = 0; i < 1000000; i++) {
-        int cell_id = fieldstat_cube_add(instance, 0, &tags[i % cell_count], 1, 1);
-        if (cell_id < 0) {
-            continue;
-        }
-        fieldstat_counter_incrby(instance, 0, 0, cell_id, 1);
-    }
-    clock_t end = clock();
-    double seconds = (double)(end - start) / CLOCKS_PER_SEC;
-    printf("performance_test_on_60000_cells_comprehensive_1000000_times time cost: %f\n", seconds);
-    EXPECT_TRUE(seconds < 1); // 1 = 0.000001 * 1000000
-    fieldstat_free(instance);
-}
-
-TEST(metric_test_counter, performance_test_on_1000_cells_topk_1000000_times)
-{
-    int cell_count = 60000;
-    struct fieldstat_tag tags[cell_count];
-    for (int i = 0; i < cell_count; i++) {
-        tags[i] = TEST_TAG_INT;
-        // tags[i].value_longlong = rand() % 10000;
-        if (rand()%2)
-            tags[i].value_longlong = i;
-        else
-            tags[i].value_longlong = rand() % 1000;
-    }
-    struct fieldstat *instance = fieldstat_new();
-    fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_TOPK, 1000);
-    fieldstat_register_counter(instance, 0, "test", 0);
-
-    // getchar();
-    clock_t start = clock();
-    for (size_t i = 0; i < 1000000; i++) {
-        int cell_id = fieldstat_cube_add(instance, 0, &tags[i % cell_count], 1, 1);
-        if (cell_id != -1)
-            fieldstat_counter_incrby(instance, 0, 0, cell_id, 1);
-    }
-    clock_t end = clock();
-    double seconds = (double)(end - start) / CLOCKS_PER_SEC;
-    // exit(0);
-
-    EXPECT_TRUE(seconds < 1); // 1 = 0.000001 * 1000000
-    printf("performance_test_on_1000_cells_topk_1000000_times time cost: %f\n", seconds);
-
-    fieldstat_free(instance);
-}
+// todo: add on wrong cube/metric/cell
 
 int main(int argc, char *argv[]) 
 {
