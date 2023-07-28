@@ -13,21 +13,22 @@
 
 using namespace std;
 
-struct tag_hash_key *gen_key(const char *key, int value)
+struct tag_hash_key *test_gen_tag_key(const char *key, int value)
 {
-    const char *value_str = to_string(value).c_str();
     struct fieldstat_tag tag = {
         .key = key,
         .type = TAG_CSTRING,
-        {.value_str = value_str},
+        {.value_str = strdup(to_string(value).c_str())},
     };
 
     struct tag_hash_key *tag_key = tag_hash_key_construct_with_fieldstat_tag(&tag, 1);
 
+    free((void *)tag.value_str);
+
     return tag_key;
 }
 
-double cal_accuracy(vector<struct tag_hash_key *> &expected_keys, vector<struct tag_hash_key *> &test_result) {
+double cal_accuracy_with_tags(vector<struct tag_hash_key *> &expected_keys, vector<struct tag_hash_key *> &test_result) {
     map<string, int> countMap;
     for (size_t i = 0; i < expected_keys.size(); i++) {
         std::string key = tag_hash_key_get_compound_key(expected_keys[i]);
@@ -46,9 +47,8 @@ double cal_accuracy(vector<struct tag_hash_key *> &expected_keys, vector<struct 
         myset.insert(countVector[i].first);
         min_in_max_count = countVector[i].second;
     }
-    int last_cnt = min_in_max_count;
-    while (last_cnt == min_in_max_count && i < countVector.size()) {
-        if (countVector[i].second != last_cnt) {
+    while (i < countVector.size()) {
+        if (countVector[i].second != min_in_max_count) {
             break;
         }
         myset.insert(countVector[i].first);
@@ -66,7 +66,7 @@ double cal_accuracy(vector<struct tag_hash_key *> &expected_keys, vector<struct 
     return accuracy;
 }
 
-vector<tag_hash_key *> test_query_cell_manager_content(struct cell_manager *cm)
+vector<tag_hash_key *> test_query_cell_manager_content(const struct cell_manager *cm)
 {
     int ret_len;
     const struct tag_hash_key **dump_ret = cell_manager_dump(cm, &ret_len);
@@ -76,7 +76,6 @@ vector<tag_hash_key *> test_query_cell_manager_content(struct cell_manager *cm)
             continue;
         }
         test_result.push_back((struct tag_hash_key *)dump_ret[i]);
-        printf("query content, id: %d, key: %s\n", i, tag_hash_key_get_compound_key(dump_ret[i]));
     }
 
     return test_result;
@@ -91,10 +90,10 @@ TEST(unit_test_cell_manager, topk_add_and_query_accuracy)
     for (int i = 0; i < TEST_ROUND; i++)
     {
         if (rand()) {
-            struct tag_hash_key *key = gen_key("key", rand() % 10);
+            struct tag_hash_key *key = test_gen_tag_key("key", rand() % 10);
             keys.push_back(key);
         } else {
-            struct tag_hash_key *key = gen_key("key", rand() % 1000);
+            struct tag_hash_key *key = test_gen_tag_key("key", rand() % 1000);
             keys.push_back(key);
         }
     }
@@ -107,7 +106,7 @@ TEST(unit_test_cell_manager, topk_add_and_query_accuracy)
 
     vector<tag_hash_key *> test_result = test_query_cell_manager_content(cm);
     EXPECT_EQ(test_result.size(), 10);
-    double accuracy = cal_accuracy(keys, test_result);
+    double accuracy = cal_accuracy_with_tags(keys, test_result);
     EXPECT_NEAR(accuracy, 1.0, 0.01);
     
     cell_manager_free(cm);
@@ -122,11 +121,11 @@ TEST(unit_test_cell_manager, merge_topk_given_K_large_enough)
     struct cell_manager *cm2 = cell_manager_new(SAMPLING_MODE_TOPK, 10);
 
     vector<struct tag_hash_key *> keys;
-    keys.push_back(gen_key("key_share", 1));
-    keys.push_back(gen_key("key_1", 1));
-    keys.push_back(gen_key("key_1", 2));
-    keys.push_back(gen_key("key_share", 1));
-    keys.push_back(gen_key("key_2", 1));
+    keys.push_back(test_gen_tag_key("key_share", 1));
+    keys.push_back(test_gen_tag_key("key_1", 1));
+    keys.push_back(test_gen_tag_key("key_1", 2));
+    keys.push_back(test_gen_tag_key("key_share", 1));
+    keys.push_back(test_gen_tag_key("key_2", 1));
 
     int pop_dummy;
     int exist_dummy;
@@ -163,7 +162,7 @@ TEST(unit_test_cell_manager, merge_topk_given_K_large_enough)
     EXPECT_EQ(cell_id_old[1], cell_id_2[1]); // key_2 in cm2
 
     auto test_result = test_query_cell_manager_content(cm1);
-    double accuracy = cal_accuracy(keys, test_result);
+    double accuracy = cal_accuracy_with_tags(keys, test_result);
     EXPECT_NEAR(accuracy, 1.0, 0.01);
 
     EXPECT_EQ(cell_manager_get_count_by_tag(cm1, keys[0]), 2); // key_share merged once
@@ -185,9 +184,9 @@ TEST(unit_test_cell_manager, merge_topk_to_empty)
     struct cell_manager *cm2 = cell_manager_new(SAMPLING_MODE_TOPK, 10);
 
     vector<struct tag_hash_key *> keys;
-    keys.push_back(gen_key("key_1", 1));
-    keys.push_back(gen_key("key_1", 1));
-    keys.push_back(gen_key("key_1", 2));
+    keys.push_back(test_gen_tag_key("key_1", 1));
+    keys.push_back(test_gen_tag_key("key_1", 1));
+    keys.push_back(test_gen_tag_key("key_1", 2));
 
     int pop_dummy;
     int exist_dummy;
@@ -236,15 +235,15 @@ TEST(unit_test_cell_manager, merge_topk_to_full_one)
     struct cell_manager *cm2 = cell_manager_new(SAMPLING_MODE_TOPK, 10);
 
     vector<struct tag_hash_key *> keys1;
-    keys1.push_back(gen_key("key_1", 1));
-    keys1.push_back(gen_key("key_1", 2));
-    keys1.push_back(gen_key("key_shared", 1));
+    keys1.push_back(test_gen_tag_key("key_1", 1));
+    keys1.push_back(test_gen_tag_key("key_1", 2));
+    keys1.push_back(test_gen_tag_key("key_shared", 1));
 
     vector<struct tag_hash_key *> keys2;
     for (int i = 0; i < 9; i++) {
-        keys2.push_back(gen_key("key_2", i));
+        keys2.push_back(test_gen_tag_key("key_2", i));
     }
-    keys2.push_back(gen_key("key_shared", 1));
+    keys2.push_back(test_gen_tag_key("key_shared", 1));
 
     int pop_dummy;
     int exist_dummy;
@@ -279,7 +278,7 @@ TEST(unit_test_cell_manager, merge_topk_to_full_one)
     auto test_result = test_query_cell_manager_content(cm2);
     // join keys2 to keys1
     keys1.insert(keys1.end(), std::make_move_iterator(keys2.begin()), std::make_move_iterator(keys2.end()));
-    double accuracy = cal_accuracy(keys1, test_result);
+    double accuracy = cal_accuracy_with_tags(keys1, test_result);
     EXPECT_NEAR(accuracy, 1.0, 0.01);
 
     free(cell_id_popped);
@@ -291,6 +290,115 @@ TEST(unit_test_cell_manager, merge_topk_to_full_one)
         tag_hash_key_free(keys1[i]);
     }
     // all keys are moved to cm1, so no need to free keys2
+}
+
+void add_key_and_assert_find_result(struct cell_manager *cm, const struct tag_hash_key *key)
+{
+    int pop_dummy;
+    int exist_dummy;
+    int cell_id = cell_manager_add_cell_topk(cm, key, 1234, &pop_dummy, &exist_dummy);
+    EXPECT_EQ(cell_id, 0);
+    EXPECT_EQ(cell_manager_get_count_by_tag(cm, key), 1234);
+    const struct tag_hash_key *key_get = cell_manager_get_tag_by_cell_id(cm, cell_id);
+    EXPECT_STREQ(tag_hash_key_get_compound_key(key_get), tag_hash_key_get_compound_key(key));
+}
+
+void add_key_and_assert_find_result_comprehensive(struct cell_manager *cm, const struct tag_hash_key *key)
+{
+    int cell_id = cell_manager_add_cell(cm, key);
+    EXPECT_EQ(cell_id, 0);
+    const struct tag_hash_key *key_get = cell_manager_get_tag_by_cell_id(cm, cell_id);
+    EXPECT_STREQ(tag_hash_key_get_compound_key(key_get), tag_hash_key_get_compound_key(key));
+}
+
+TEST(unit_test_cell_manager, add_with_key_length_is_1_int_type_topk)
+{
+    struct cell_manager *cm = cell_manager_new(SAMPLING_MODE_TOPK, 10);
+    struct tag_hash_key *key = tag_hash_key_construct_with_fieldstat_tag(&TEST_TAG_INT, 1);
+    
+    add_key_and_assert_find_result(cm, key);
+
+    cell_manager_free(cm);
+    tag_hash_key_free(key);
+}
+
+TEST(unit_test_cell_manager, add_with_key_length_is_1_double_type_topk)
+{
+    struct tag_hash_key *key = tag_hash_key_construct_with_fieldstat_tag(&TEST_TAG_DOUBLE, 1);
+    struct cell_manager *cm = cell_manager_new(SAMPLING_MODE_TOPK, 10);
+
+    add_key_and_assert_find_result(cm, key);
+
+    cell_manager_free(cm);
+    tag_hash_key_free(key);
+}
+
+TEST(unit_test_cell_manager, add_with_key_length_is_1_string_type_topk)
+{
+    struct tag_hash_key *key = tag_hash_key_construct_with_fieldstat_tag(&TEST_TAG_STRING, 1);
+    struct cell_manager *cm = cell_manager_new(SAMPLING_MODE_TOPK, 10);
+
+    add_key_and_assert_find_result(cm, key);
+
+    cell_manager_free(cm);
+    tag_hash_key_free(key);
+}
+
+TEST(unit_test_cell_manager, add_with_key_length_is_3_of_diff_types_topk)
+{
+    const struct fieldstat_tag tags[3] = {TEST_TAG_INT, TEST_TAG_STRING, TEST_TAG_DOUBLE};
+    struct tag_hash_key *key = tag_hash_key_construct_with_fieldstat_tag(tags, 3);
+    struct cell_manager *cm = cell_manager_new(SAMPLING_MODE_TOPK, 10);
+
+    add_key_and_assert_find_result(cm, key);
+
+    cell_manager_free(cm);
+    tag_hash_key_free(key);
+}
+
+TEST(unit_test_cell_manager, add_with_key_length_is_1_int_type_comprehensive)
+{
+    struct cell_manager *cm = cell_manager_new(SAMPLING_MODE_COMPREHENSIVE, 10);
+    struct tag_hash_key *key = tag_hash_key_construct_with_fieldstat_tag(&TEST_TAG_INT, 1);
+    
+    add_key_and_assert_find_result_comprehensive(cm, key);
+
+    cell_manager_free(cm);
+    tag_hash_key_free(key);
+}
+
+TEST(unit_test_cell_manager, add_with_key_length_is_1_double_type_comprehensive)
+{
+    struct tag_hash_key *key = tag_hash_key_construct_with_fieldstat_tag(&TEST_TAG_DOUBLE, 1);
+    struct cell_manager *cm = cell_manager_new(SAMPLING_MODE_COMPREHENSIVE, 10);
+
+    add_key_and_assert_find_result_comprehensive(cm, key);
+
+    cell_manager_free(cm);
+    tag_hash_key_free(key);
+}
+
+TEST(unit_test_cell_manager, add_with_key_length_is_1_string_type_comprehensive)
+{
+    struct tag_hash_key *key = tag_hash_key_construct_with_fieldstat_tag(&TEST_TAG_STRING, 1);
+    struct cell_manager *cm = cell_manager_new(SAMPLING_MODE_COMPREHENSIVE, 10);
+
+    add_key_and_assert_find_result_comprehensive(cm, key);
+
+    cell_manager_free(cm);
+    tag_hash_key_free(key);
+}
+
+TEST(unit_test_cell_manager, add_with_key_length_is_3_of_diff_types_comprehensive)
+{
+    const struct fieldstat_tag tags[3] = {TEST_TAG_INT, TEST_TAG_STRING, TEST_TAG_DOUBLE};
+    struct tag_hash_key *key = tag_hash_key_construct_with_fieldstat_tag(tags, 3);
+    struct cell_manager *cm = cell_manager_new(SAMPLING_MODE_COMPREHENSIVE, 10);
+
+    add_key_and_assert_find_result_comprehensive(cm, key);
+
+    cell_manager_free(cm);
+    tag_hash_key_free(key);
 }
 
 
