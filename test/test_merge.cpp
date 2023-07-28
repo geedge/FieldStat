@@ -13,9 +13,9 @@ vector<Fieldstat_tag_list_wrapper *> test_gen_topk_flows(int num, int rand_flow_
     for (int i = 0; i < num; i++)
     {
         if (rand() % 2) {
-            flows.push_back(new Fieldstat_tag_list_wrapper("my key", i));
+            flows.push_back(new Fieldstat_tag_list_wrapper("my key", to_string(i).c_str()));
         } else {
-            flows.push_back(new Fieldstat_tag_list_wrapper("elephant", rand() % rand_flow_type_num));
+            flows.push_back(new Fieldstat_tag_list_wrapper("elephant", to_string(rand() % rand_flow_type_num).c_str()));
         }
     }
     return flows;
@@ -48,11 +48,11 @@ double test_cal_accuracy(vector<struct Fieldstat_tag_list_wrapper *> &expected_k
         i++;
     }
 
-    cout << "myset : " << endl;
-    for (auto it = myset.begin(); it != myset.end(); it++) {
-        cout << *it << endl;
-    }
-    cout << "------------------------- " << endl;
+    // cout << "myset : " << endl;
+    // for (auto it = myset.begin(); it != myset.end(); it++) {
+    //     cout << *it << endl;
+    // }
+    // cout << "------------------------- " << endl;
 
     int correct = 0;
     for (size_t i = 0; i < test_result.size(); i++) {
@@ -87,8 +87,6 @@ TEST(unit_test_merge, test_metric_name_mapping_with_new_metric_on_existing_cube)
 
     fieldstat_merge(instance_dest, instance);
 
-    printf("merge end\n");
-
     int *cube_id;
     int n_cube;
     fieldstat_get_cubes(instance_dest, &cube_id, &n_cube);
@@ -121,7 +119,6 @@ TEST(unit_test_merge, cube_shared_tag_mapping_with_new_cube)
     int cube_id_dest = fieldstat_register_cube(instance_dest, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
 
     fieldstat_merge(instance_dest, instance);
-    printf("merge end\n");
 
     int *cube_id;
     int n_cube;
@@ -522,17 +519,17 @@ TEST(unit_test_merge, new_too_many_cells_on_multiple_metric_given_source_cube_re
     fieldstat_free(instance_dest);
 }
 
-struct fieldstat *test_push_flows(vector<Fieldstat_tag_list_wrapper *> &flows_in_test, int K)
+struct fieldstat *test_push_flows(vector<Fieldstat_tag_list_wrapper *> &flows_in_test, int K, long long count = 1)
 {
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, K);
     int metric_id = fieldstat_register_counter(instance, cube_id, "metric name", false);
     for (size_t i = 0; i < flows_in_test.size(); i++) {
-        int cell_id = fieldstat_cube_add(instance, cube_id, flows_in_test[i]->get_tag(), flows_in_test[i]->get_tag_count(), 1);
+        int cell_id = fieldstat_cube_add(instance, cube_id, flows_in_test[i]->get_tag(), flows_in_test[i]->get_tag_count(), count);
         if (cell_id < 0) {
             continue;
         }
-        fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id, 1);
+        fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id, count);
     }
     return instance;
 }
@@ -541,14 +538,10 @@ TEST(unit_test_merge, merge_accuracy_test_with_K_large_enough_topk)
 {
     int K = 100;
     vector<Fieldstat_tag_list_wrapper *> flows_in_src = test_gen_topk_flows(K, K);
-    printf("src test_push_flows\n");
     struct fieldstat *instance_src = test_push_flows(flows_in_src, K);
     vector<Fieldstat_tag_list_wrapper *> flows_in_dest = test_gen_topk_flows(K, K);
-    printf("dest test_push_flows\n");
     struct fieldstat *instance_dest = test_push_flows(flows_in_dest, K);
-    printf("merge\n");
     fieldstat_merge(instance_dest, instance_src);
-    printf("merge done\n");
 
     int *cell_ids = NULL;
     struct fieldstat_tag_list *tag_list = NULL;
@@ -570,7 +563,6 @@ TEST(unit_test_merge, merge_accuracy_test_with_K_large_enough_topk)
     flows_in_dest.insert(flows_in_dest.end(), std::make_move_iterator(flows_in_src.begin()), std::make_move_iterator(flows_in_src.end()));
     double accuracy = test_cal_accuracy(flows_in_dest, flows_in_merged);
     EXPECT_TRUE(accuracy > 0.99); // should be 1.0
-    printf("accuracy is %lf\n", accuracy);
 
     fieldstat_free(instance_src);
     fieldstat_free(instance_dest);
@@ -584,7 +576,81 @@ TEST(unit_test_merge, merge_accuracy_test_with_K_large_enough_topk)
     }
 }
 
-// todo：topk 数量超了8倍K
+TEST(unit_test_merge, merge_accuracy_test_gen_dest_full_all_inserted_given_src_flows_larger)
+{
+    int K = 100;
+    vector<Fieldstat_tag_list_wrapper *> flows_in_src = test_gen_topk_flows(10000, K);
+    struct fieldstat *instance_src = test_push_flows(flows_in_src, K, 1000);
+    vector<Fieldstat_tag_list_wrapper *> flows_in_dest;
+    for (int i = 0; i < K; i++) {
+        Fieldstat_tag_list_wrapper *tmp = new Fieldstat_tag_list_wrapper("flows in dest", to_string(i).c_str());
+        flows_in_dest.push_back(tmp);
+    }
+    struct fieldstat *instance_dest = test_push_flows(flows_in_dest, K, 1);
+
+    fieldstat_merge(instance_dest, instance_src);
+
+    int *cell_ids = NULL;
+    struct fieldstat_tag_list *tag_list = NULL;
+    size_t n_cell = 0;
+    fieldstat_get_cells(instance_dest, 0, 0, &cell_ids, &tag_list, &n_cell);
+    vector<Fieldstat_tag_list_wrapper *> flows_in_merged;
+    for (size_t i = 0; i < n_cell; i++) {
+        flows_in_merged.push_back(new Fieldstat_tag_list_wrapper(&tag_list[i]));
+    }
+
+    flows_in_dest.insert(flows_in_dest.end(), std::make_move_iterator(flows_in_src.begin()), std::make_move_iterator(flows_in_src.end()));
+    double accuracy = test_cal_accuracy(flows_in_dest, flows_in_merged);
+
+    EXPECT_TRUE(accuracy > 0.99); // should be 1.0
+
+    fieldstat_free(instance_src);
+    fieldstat_free(instance_dest);
+    free(cell_ids);
+    fieldstat_tag_list_arr_free(tag_list, n_cell);
+    for (size_t i = 0; i < flows_in_merged.size(); i++) {
+        delete flows_in_merged[i];
+    }
+    for (size_t i = 0; i < flows_in_dest.size(); i++) {
+        delete flows_in_dest[i];
+    }
+}
+
+TEST(unit_test_merge, merge_accuracy_test_gen_dest_full_some_inserted_and_some_merged_and_some_fail_to_add)
+{
+    int K = 100;
+    vector<Fieldstat_tag_list_wrapper *> flows_in_src = test_gen_topk_flows(10000, K + 50); // let elephant flows in src and dest different
+    struct fieldstat *instance_src = test_push_flows(flows_in_src, K);
+    vector<Fieldstat_tag_list_wrapper *> flows_in_dest = test_gen_topk_flows(10000, K + 50);
+    struct fieldstat *instance_dest = test_push_flows(flows_in_dest, K);
+    fieldstat_merge(instance_dest, instance_src);
+
+    int *cell_ids = NULL;
+    struct fieldstat_tag_list *tag_list = NULL;
+    size_t n_cell = 0;
+    fieldstat_get_cells(instance_dest, 0, 0, &cell_ids, &tag_list, &n_cell);
+    vector<Fieldstat_tag_list_wrapper *> flows_in_merged;
+    for (size_t i = 0; i < n_cell; i++) {
+        flows_in_merged.push_back(new Fieldstat_tag_list_wrapper(&tag_list[i]));
+    }
+    
+    flows_in_dest.insert(flows_in_dest.end(), std::make_move_iterator(flows_in_src.begin()), std::make_move_iterator(flows_in_src.end()));
+    double accuracy = test_cal_accuracy(flows_in_dest, flows_in_merged);
+    EXPECT_TRUE(accuracy >= 0.93); // by heavy keeper benchmark, with K = 100, merging result should be about 0.96, for adding the flows will also cause some inaccuracy, so here we set 0.93
+    printf("merge_accuracy_test_gen_dest_full_some_inserted_and_some_merged_and_some_fail_to_add accuracy is %lf\n", accuracy);
+
+    fieldstat_free(instance_src);
+    fieldstat_free(instance_dest);
+    free(cell_ids);
+    fieldstat_tag_list_arr_free(tag_list, n_cell);
+    for (size_t i = 0; i < flows_in_merged.size(); i++) {
+        delete flows_in_merged[i];
+    }
+    for (size_t i = 0; i < flows_in_dest.size(); i++) {
+        delete flows_in_dest[i];
+    }
+}
+
 
 int main(int argc, char *argv[]) 
 {

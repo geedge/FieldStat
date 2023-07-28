@@ -16,9 +16,10 @@ unsigned int tag_hash_key_cal_hash_value(const struct tag_hash_key *my_hash_key)
 int tag_hash_key_cmp(const struct tag_hash_key *a, const struct tag_hash_key *b);
 
 // cover the original HASH_FUNCTION
-#define HASH_FUNCTION(keyptr, keylen, hashv) { \
-    hashv = tag_hash_key_cal_hash_value((struct tag_hash_key *)keyptr); \
-    }
+#define HASH_FUNCTION(keyptr, keylen, hashv) \
+        do { \
+            hashv = tag_hash_key_cal_hash_value((struct tag_hash_key *)keyptr); \
+        } while (0)
 
 #define HASH_KEYCMP(a, b, n) (tag_hash_key_cmp((const struct tag_hash_key *)a, (const struct tag_hash_key *)b))
 

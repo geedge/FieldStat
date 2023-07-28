@@ -248,6 +248,7 @@ TEST(metric_test_counter, topk_add_and_test_accuracy)
     for (int i = 0; i < tag_list_num; i++)
         delete tags[i];
 }
+// todo: 因为merge导致topk 的cell id超了
 
 // todo: add on wrong cube/metric/cell
 
