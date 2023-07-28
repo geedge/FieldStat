@@ -103,12 +103,13 @@ int fieldstat_cube_add(struct fieldstat *instance, int cube_id, const struct fie
     * @param metric_id: metric id, previously returned by fieldstat_register_counter.
     * @param cell_id: cell id, previously returned by fieldstat_cube_add.
     * @param increment: increment of the counter metric. Can be negative.
-    * @return 0 if success. -1 if cube_id is invalid. -2 if metric_id is invalid, or the metric is not a METRIC_TYPE_COUNTER. cell_id is not checked, user should guarantee that cell_id is valid.
+    * @return 0 if success. -1 if cube_id is invalid. -2 if metric_id is invalid, or the metric is not a METRIC_TYPE_COUNTER. -3 if cell_id is invalid.
 */
 int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long increment);
 
 /*
     * @brief let the value of counter metric equal to value. Other annotations refer to fieldstat_counter_incrby.
+    * @return 0 if success. -1 if cube_id is invalid. -2 if metric_id is invalid, or the metric is not a METRIC_TYPE_COUNTER. -3 if cell_id is invalid.
 */
 int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long value);
 
@@ -116,10 +117,15 @@ int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id
     * @brief add a key to the hll metric of cell_id. HLL approximates the number of distinct elements in a set of `key`s.
     * @param key: key of the hll metric. Cannot be NULL.
     * @param key_len: strlen(key).
-    * @return 0 if success. -1 if cube_id is invalid. -2 if metric_id is invalid, or the metric is not a METRIC_TYPE_HLL. cell_id is not checked, user should guarantee that cell_id is valid.
+    * @return 0 if success. -1 if cube_id is invalid. -2 if metric_id is invalid, or the metric is not a METRIC_TYPE_HLL. -3 if cell_id is invalid.
 */
 int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, const char *key, size_t key_len);
 
+/* 
+    * @brief Add a value to the histogram metric of cell_id. Histogram will record the distribution of the values.
+    * @param value: value of the histogram metric.
+    * @return 0 if success. -1 if cube_id is invalid. -2 if metric_id is invalid, or the metric is not a METRIC_TYPE_HISTOGRAM. -3 if cell_id is invalid.
+*/
 int fieldstat_histogram_record(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long value);
 
 /*

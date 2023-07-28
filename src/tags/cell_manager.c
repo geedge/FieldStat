@@ -101,12 +101,7 @@ void cell_manager_free(struct cell_manager *pthis)
 
 const struct tag_hash_key *cell_manager_get_tag_by_cell_id(const struct cell_manager *pthis, int cell_id)
 {
-    const struct tag_hash_key *tag_key = pthis->id_tag_array[cell_id];
-    if (tag_key == NULL) {
-        return NULL;
-    }
-
-    return tag_key;
+    return pthis->id_tag_array[cell_id];
 }
 
 void cell_manager_id_tag_array_add(struct cell_manager *pthis, int cell_id, const struct tag_hash_key *tag)

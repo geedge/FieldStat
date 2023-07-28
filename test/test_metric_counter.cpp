@@ -278,7 +278,87 @@ TEST(metric_test_counter, topk_add_with_monotonically_increasing_flow_expecting_
         delete tags[i];
 }
 
-// todo: add on wrong cube/metric/cell
+TEST(metric_test_counter, add_or_set_with_wrong_cell_id_expecting_fail)
+{
+    struct fieldstat *instance = fieldstat_new();
+    fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_TOPK, 10);
+    fieldstat_register_counter(instance, 0, "test", 0);
+
+    int ret = fieldstat_counter_incrby(instance, 0, 0, 1, 1);
+    EXPECT_EQ(ret, -3);
+    ret = fieldstat_counter_incrby(instance, 0, 0, -1, 1);
+    EXPECT_EQ(ret, -3);
+
+    fieldstat_free(instance);
+}
+
+TEST(metric_test_counter, add_with_wrong_cube_id_expecting_fail)
+{
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_TOPK, 10);
+
+    int ret = fieldstat_counter_incrby(instance, cube_id + 1, 0, 1, 1);
+    EXPECT_EQ(ret, -1);
+    ret = fieldstat_counter_incrby(instance, -1, 0, 1, 1);
+    EXPECT_EQ(ret, -1);
+
+    fieldstat_free(instance);
+}
+
+TEST(metric_test_counter, add_with_wrong_metric_id_expecting_fail)
+{
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_TOPK, 10);
+    int metric_id = fieldstat_register_counter(instance, cube_id, "test", 0);
+
+    int ret = fieldstat_counter_incrby(instance, cube_id, metric_id + 1, 1, 1);
+    EXPECT_EQ(ret, -2);
+    ret = fieldstat_counter_incrby(instance, cube_id, -1, 1, 1);
+    EXPECT_EQ(ret, -2);
+
+    fieldstat_free(instance);
+}
+
+TEST(metric_test_counter, set_with_wrong_cell_id_expecting_fail)
+{
+    struct fieldstat *instance = fieldstat_new();
+    fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_TOPK, 10);
+    fieldstat_register_counter(instance, 0, "test", 1);
+
+    int ret = fieldstat_counter_set(instance, 0, 0, 1, 1);
+    EXPECT_EQ(ret, -3);
+    ret = fieldstat_counter_set(instance, 0, 0, -1, 1);
+    EXPECT_EQ(ret, -3);
+
+    fieldstat_free(instance);
+}
+
+TEST(metric_test_counter, set_with_wrong_cube_id_expecting_fail)
+{
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_TOPK, 10);
+
+    int ret = fieldstat_counter_set(instance, cube_id + 1, 0, 1, 1);
+    EXPECT_EQ(ret, -1);
+    ret = fieldstat_counter_set(instance, -1, 0, 1, 1);
+    EXPECT_EQ(ret, -1);
+
+    fieldstat_free(instance);
+}
+
+TEST(metric_test_counter, set_with_wrong_metric_id_expecting_fail)
+{
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_TOPK, 10);
+    int metric_id = fieldstat_register_counter(instance, cube_id, "test", 1);
+
+    int ret = fieldstat_counter_set(instance, cube_id, metric_id + 1, 1, 1);
+    EXPECT_EQ(ret, -2);
+    ret = fieldstat_counter_set(instance, cube_id, -1, 1, 1);
+    EXPECT_EQ(ret, -2);
+
+    fieldstat_free(instance);
+}
 
 int main(int argc, char *argv[]) 
 {

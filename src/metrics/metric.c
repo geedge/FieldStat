@@ -782,13 +782,11 @@ struct metric *metric_counter_new(const char *name, bool is_gauge)
     return pthis;
 }
 
-int metric_counter_incrby(struct metric *pthis, int cell_id, long long value)
+void metric_counter_incrby(struct metric *pthis, int cell_id, long long value)
 {
     struct metric_measure_data *data = metric_find_or_new_cell(pthis, cell_id);
     struct metric_counter_or_gauge *counter = data->counter;
     counter->value += value;
-
-    return 0;
 }
 
 int metric_counter_set(struct metric *pthis, int cell_id, long long value)
@@ -822,12 +820,11 @@ struct metric *metric_hll_new(const char *name, unsigned char precision)
     return pthis;
 }
 
-int metric_hll_add(struct metric *pthis, int cell_id, const char *key, size_t key_len)
+void metric_hll_add(struct metric *pthis, int cell_id, const char *key, size_t key_len)
 {
     struct metric_measure_data *data = metric_find_or_new_cell(pthis, cell_id);
 
     ST_hyperloglog_add(data->hll, key, key_len);
-    return 0;
 }
 
 double metric_hll_get(const struct metric *pthis, int cell_id)

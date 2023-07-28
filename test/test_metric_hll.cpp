@@ -118,8 +118,49 @@ TEST(metric_test_hll, serialization_and_merge_twice_with_reset)
     fieldstat_free(instance_total);
 }
 
+TEST(metric_test_histogram, add_or_set_with_wrong_cell_id_expecting_fail)
+{
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    int metric_id = fieldstat_register_hll(instance, cube_id, "czz_test hll metric", 10);
+
+    int ret = fieldstat_hll_add(instance, cube_id, metric_id, 1, "hello", 5);
+    EXPECT_EQ(ret, -3);
+    ret = fieldstat_hll_add(instance, cube_id, metric_id, -1, "hello", 5);
+    EXPECT_EQ(ret, -3);
+
+    fieldstat_free(instance);
+}
+
+TEST(metric_test_histogram, add_with_wrong_cube_id_expecting_fail)
+{
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+
+    int ret = fieldstat_hll_add(instance, cube_id + 1, 0, 0, "hello", 5);
+    EXPECT_EQ(ret, -1);
+    ret = fieldstat_hll_add(instance, -1, 0, 0, "hello", 5);
+    EXPECT_EQ(ret, -1);
+
+    fieldstat_free(instance);
+}
+
+TEST(metric_test_histogram, add_with_wrong_metric_id_expecting_fail)
+{
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    int metric_id = fieldstat_register_hll(instance, cube_id, "czz_test hll metric", 10);
+
+    int ret = fieldstat_hll_add(instance, cube_id, metric_id + 1, 0, "hello", 5);
+    EXPECT_EQ(ret, -2);
+    ret = fieldstat_hll_add(instance, cube_id, -1, 0, "hello", 5);
+    EXPECT_EQ(ret, -2);
+
+    fieldstat_free(instance);
+}
+
+
 // todo：测base 64序列化
-// todo: add on wrong cube/metric/cell
 
 int main(int argc, char *argv[]) 
 {

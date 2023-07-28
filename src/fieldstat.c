@@ -371,28 +371,50 @@ int fieldstat_register_histogram(struct fieldstat *instance, int cube_id, const 
 /* -------------------------------------------------------------------------- */
 /*                               metric operation                              */
 /* -------------------------------------------------------------------------- */
-struct metric *fieldstat_find_metric(const struct fieldstat *instance, int cube_id, int metric_id)
+static struct metric *fieldstat_find_metric(const struct fieldstat *instance, int cube_id, int metric_id)
 {
+    if (cube_id < 0 || cube_id >= instance->valid_cube_arr_length) {
+        printf("ERR: fieldstat_find_metric cube_id is not correct, input cube id: %d\n", cube_id);
+        return NULL;
+    }
     struct fs_cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
-        printf("ERR: fieldstat_find_metric cube is not registered yet\n");
+        printf("ERR: fieldstat_find_metric cube is not registered yet, input cube id: %d\n", cube_id);
         return NULL;
     }
     return cube->metrics[metric_id];
 }
 
+#define FIELDSTAT_GENERAL_CHECK(instance, cube_id, metric_id, cell_id, metric_type) \
+do { \
+    if ((cube_id) < 0 || (cube_id) >= (instance)->valid_cube_arr_length) {    \
+        printf("ERR: [%s] cube_id is not correct, input cube id: %d\n", __FUNCTION__, (cube_id)); \
+        return -1;  \
+    }   \
+    const struct fs_cube *cube = (instance)->cube[(cube_id)];   \
+    if (cube == NULL) { \
+        printf("ERR: [%s] cube is not registered yet, input cube id: %d\n", __FUNCTION__, (cube_id)); \
+        return -1;  \
+    }   \
+    if ((metric_id) < 0 || (metric_id) >= cube->n_metric) { \
+        printf("ERR: [%s] metric_id is not correct, input metric id: %d\n", __FUNCTION__, (metric_id));   \
+        return -2;  \
+    }   \
+    const struct metric *metric = cube->metrics[(metric_id)]; \
+    if (metric == NULL || metric_get_type(metric) != (metric_type)) { \
+        printf("ERR: [%s] metric is not registered yet, input metric id: %d\n", __FUNCTION__, (metric_id));   \
+        return -2;  \
+    }   \
+    if ((cell_id) < 0 || cell_manager_get_tag_by_cell_id(cube->cell_manager, cell_id) == NULL) { \
+        printf("ERR: [%s] cell_id is not correct, input cell id: %d\n", __FUNCTION__, (cell_id)); \
+        return -3;  \
+    }   \
+} while (0)
+
 int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long increment)
 {
-    struct fs_cube *cube = instance->cube[cube_id];
-    if (cube == NULL) {
-        printf("ERR: fieldstat_counter_incrby cube is not registered yet\n");
-        return -1;
-    }
-    struct metric *metric = cube->metrics[metric_id];
-    if (metric == NULL || metric_get_type(metric) != METRIC_TYPE_COUNTER) {
-        printf("ERR: fieldstat_counter_incrby metrics is not registered yet\n");
-        return -2;
-    }
+    FIELDSTAT_GENERAL_CHECK(instance, cube_id, metric_id, cell_id, METRIC_TYPE_COUNTER);
+    struct metric *metric = instance->cube[cube_id]->metrics[metric_id];
 
     metric_counter_incrby(metric, cell_id, increment);
     return 0;
@@ -400,50 +422,37 @@ int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric
 
 int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long value)
 {
-    struct fs_cube *cube = instance->cube[cube_id];
-    if (cube == NULL) {
-        printf("ERR: fieldstat_counter_set cube is not registered yet\n");
-        return -1;
-    }
-    struct metric *metric = cube->metrics[metric_id];
-    if (metric == NULL || metric_get_type(metric) != METRIC_TYPE_COUNTER) {
-        printf("ERR: fieldstat_counter_set metrics is not registered yet\n");
-        return -2;
-    }
+    FIELDSTAT_GENERAL_CHECK(instance, cube_id, metric_id, cell_id, METRIC_TYPE_COUNTER);
+    struct metric *metric = instance->cube[cube_id]->metrics[metric_id];
 
-    return metric_counter_set(metric, cell_id, value);
+    int ret = metric_counter_set(metric, cell_id, value);
+    if (ret < 0) {
+        printf("ERR: fieldstat_counter_set failed");
+        return -4;
+    }
+    return 0;
 }
 
 int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, const char *key, size_t key_len)
 {
-    struct fs_cube *cube = instance->cube[cube_id];
-    if (cube == NULL) {
-        printf("ERR: fieldstat_hll_add cube is not registered yet\n");
-        return -1;
-    }
-    struct metric *metric = cube->metrics[metric_id];
-    if (metric == NULL || metric_get_type(metric) != METRIC_TYPE_HLL) {
-        printf("ERR: fieldstat_hll_add metrics is not registered yet\n");
-        return -2;
-    }
+    FIELDSTAT_GENERAL_CHECK(instance, cube_id, metric_id, cell_id, METRIC_TYPE_HLL);
+    struct metric *metric = instance->cube[cube_id]->metrics[metric_id];
 
-    return metric_hll_add(metric, cell_id, key, key_len);
+    metric_hll_add(metric, cell_id, key, key_len);
+    return 0;
 }
 
 int fieldstat_histogram_record(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long value)
 {
-    struct fs_cube *cube = instance->cube[cube_id];
-    if (cube == NULL) {
-        printf("ERR: fieldstat_histogram_record cube is not registered yet\n");
-        return -1;
-    }
-    struct metric *metric = cube->metrics[metric_id];
-    if (metric == NULL || metric_get_type(metric) != METRIC_TYPE_HISTOGRAM) {
-        printf("ERR: fieldstat_histogram_record metrics is not registered yet\n");
-        return -2;
-    }
+    FIELDSTAT_GENERAL_CHECK(instance, cube_id, metric_id, cell_id, METRIC_TYPE_HISTOGRAM);
+    struct metric *metric = instance->cube[cube_id]->metrics[metric_id];
 
-    return metric_histogram_record(metric, cell_id, value);
+    int ret = metric_histogram_record(metric, cell_id, value);
+    if (ret < 0) {
+        printf("ERR: fieldstat_histogram_record failed");
+        return -4;
+    }
+    return 0;
 }
 
 
@@ -794,7 +803,6 @@ void fieldstat_get_cells(const struct fieldstat *instance, int cube_id, int metr
 
     size_t n_cell_ret = 0;
     metric_get_cell_ids(metric, cell_ids, &n_cell_ret);
-    printf("fieldstat_get_cells, number of cells in metric: %zu\n", n_cell_ret);
     *n_cell = n_cell_ret;
     if (n_cell_ret == 0) {
         *tag_list = NULL;
