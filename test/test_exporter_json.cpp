@@ -19,22 +19,6 @@ struct ST_hyperloglog *g_hll_standard;
 struct hdr_histogram *g_histogram_standard;
 #define TEST_TOPK_STANDARD_K 5
 #define TEST_METRIC_NUM 2
-// const struct fieldstat_tag TEST_TAG_GLOBAL[3] = {
-//     {"test_tag_global 1", .type = TAG_INTEGER, .value_longlong = 1},
-//     {"test_tag_global 2", .type = TAG_DOUBLE, .value_double = 2.2},
-//     {"test_tag_global 3", .type = TAG_CSTRING, .value_str = "string3"}};
-
-// const struct fieldstat_tag TEST_TAG_SHARED1[3] = {
-//     {"test_tag_shared 1", .type = TAG_INTEGER, .value_longlong = 3},
-//     {"test_tag_shared 2", .type = TAG_DOUBLE, .value_double = 0.2},
-//     {"test_tag_shared 3", .type = TAG_CSTRING, .value_str = "1string"}};
-// const struct fieldstat_tag TEST_TAG_SHARED2[3] = {
-//     {"test_tag_shared 11", .type = TAG_INTEGER, .value_longlong = 4},
-//     {"test_tag_shared 22", .type = TAG_DOUBLE, .value_double = 0.3},
-//     {"test_tag_shared 33", .type = TAG_CSTRING, .value_str = "2string"}};
-// const struct fieldstat_tag TEST_TAG_SHARED3[1] = {
-//     {"test_tag_shared 3", .type = TAG_INTEGER, .value_longlong = 5}};
-
 
 const struct fieldstat_tag TEST_TAG_GLOBAL1 = {"test_tag_global 1", .type = TAG_INTEGER, {.value_longlong = 1}};
 const struct fieldstat_tag TEST_TAG_GLOBAL2 = {"test_tag_global 2", .type = TAG_DOUBLE, {.value_double = 2.2}};
@@ -412,8 +396,6 @@ TEST(export_test, skip_empty_metrics_given_cube_deleted) {
     delete tags[0];
     fieldstat_free(instance);
     cJSON_Delete(root_arr);
-
-    EXPECT_TRUE(false); // todo: delete
 }
 
 void init_hll_standard_oper()

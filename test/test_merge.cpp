@@ -461,12 +461,15 @@ TEST(unit_test_merge, new_too_many_cells_on_multiple_metric_given_source_cube_re
     fieldstat_free(instance_dest);
 }
 
+// todo: 把unit test 里的merge测试移过来
+
+// todo：topk 数量超了8倍K
+
 extern "C" {
 extern int tmp_get_hash_count();
 extern int tmp_get_simple_hash_count();
 void reset_hash_count();
 }
-
 
 // TEST(unit_test_merge, performance_test_when_comprehensive_sampling)
 // {   
@@ -497,6 +500,8 @@ void reset_hash_count();
     
 //     struct fieldstat *instance_dest = fieldstat_new();
 //     reset_hash_count();
+//     printf("prepare done\n");
+
 //     clock_t start = clock();
 //     // getchar();
 //     for (int i = 0; i < INSTANCE_NUM; i++) {
@@ -509,7 +514,7 @@ void reset_hash_count();
 //     printf("performance_test_when_comprehensive_sampling elapsed_secs: %f\n", elapsed_secs);
 //     printf("get hash count: %d\n", tmp_get_hash_count());
 //     printf("get simple hash count: %d\n", tmp_get_simple_hash_count());
-//     EXPECT_TRUE(elapsed_secs < 0.2); // fixme: approximately around 100 cube(templates), 10 metrics. So 0.005s finish it.
+//     EXPECT_TRUE(elapsed_secs < 0.05); // fixme: approximately around 100 cube(templates), 10 metrics. So 0.005s finish it.
 
 //     fieldstat_free(instance_dest);
 //     for (int i = 0; i < INSTANCE_NUM; i++) {
@@ -520,58 +525,69 @@ void reset_hash_count();
 //     }
 // }
 
-// TEST(unit_test_merge, performance_test_when_topk_sampling){
-//     const int INSTANCE_NUM = 100;
-//     const int MAX_CELL_NUM = 1024;
-//     const int DIMENSION_TOTAL = 100000;
-//     Fieldstat_tag_list_wrapper *tags[DIMENSION_TOTAL];
-//     for (int i = 0; i < DIMENSION_TOTAL; i++)
-//     {
-//         if (i%2)
-//             tags[i] = new Fieldstat_tag_list_wrapper("my key", i);
-//         else
-//             tags[i] = new Fieldstat_tag_list_wrapper("elephant", i % 1024);
-//     }
+TEST(unit_test_merge, performance_test_when_topk_sampling){
+    const int INSTANCE_NUM = 100;
+    const int MAX_CELL_NUM = 1024;
+    const int DIMENSION_TOTAL = 100000;
+    const int CUBE_NUM = 100;
+
+    Fieldstat_tag_list_wrapper *tags[DIMENSION_TOTAL];
+    for (int i = 0; i < DIMENSION_TOTAL; i++)
+    {
+        if (i%2)
+            tags[i] = new Fieldstat_tag_list_wrapper("my key", i);
+        else
+            tags[i] = new Fieldstat_tag_list_wrapper("elephant", i % 1024);
+    }
+
+    Fieldstat_tag_list_wrapper *shared_tags[CUBE_NUM];
+    for (int i = 0; i < CUBE_NUM; i++)
+    {
+        shared_tags[i] = new Fieldstat_tag_list_wrapper("shared key", i);
+    }
     
-//     struct fieldstat *instances[INSTANCE_NUM];
-//     for (int i = 0; i < INSTANCE_NUM; i++) {
-//         struct fieldstat *tmp_i = fieldstat_new();
-//         int cube_id = fieldstat_register_cube(tmp_i, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, MAX_CELL_NUM);
-//         int metric_id = fieldstat_register_counter(tmp_i, cube_id, "metric name", false);
-//         for (int j = 0; j < MAX_CELL_NUM; j++) {
-//             int cell_id = fieldstat_cube_add(tmp_i, cube_id, tags[rand() % DIMENSION_TOTAL]->get_tag(), 1, 1);
-//             if (cell_id == -1) {
-//                 continue;
-//             }
-//             fieldstat_counter_incrby(tmp_i, cube_id, metric_id, cell_id, 1);
-//         }
-//         instances[i] = tmp_i;
-//     }
+    struct fieldstat *instances[INSTANCE_NUM];
+    for (int i = 0; i < INSTANCE_NUM; i++) {
+        for (int j = 0; j < CUBE_NUM; j++) {
+            struct fieldstat *tmp_i = fieldstat_new();
+            int cube_id = fieldstat_register_cube(tmp_i, shared_tags[j]->get_tag(), 1, SAMPLING_MODE_TOPK, MAX_CELL_NUM);
+            int metric_id = fieldstat_register_counter(tmp_i, cube_id, "metric name", false);
+            for (int j = 0; j < MAX_CELL_NUM; j++) {
+                int cell_id = fieldstat_cube_add(tmp_i, cube_id, tags[rand() % DIMENSION_TOTAL]->get_tag(), 1, 1);
+                if (cell_id == -1) {
+                    continue;
+                }
+                fieldstat_counter_incrby(tmp_i, cube_id, metric_id, cell_id, 1);
+            }
+            instances[i] = tmp_i;
+        }
+    }
 
-//     struct fieldstat *instance_dest = fieldstat_new();
-//     reset_hash_count();
-//     clock_t start = clock();
-//     getchar();
-//     for (int i = 0; i < INSTANCE_NUM; i++) {
-//         fieldstat_merge(instance_dest, instances[i]);
-//     }
-//     exit(0);
-//     clock_t end = clock();
+    struct fieldstat *instance_dest = fieldstat_new();
+    reset_hash_count();
+    printf("prepare done\n");
+    clock_t start = clock();
+    // getchar();
+    for (int i = 0; i < INSTANCE_NUM; i++) {
+        fieldstat_merge(instance_dest, instances[i]);
+    }
+    // exit(0);
+    clock_t end = clock();
 
-//     double elapsed_secs = double(end - start) / CLOCKS_PER_SEC;
-//     printf("performance_test_when_comprehensive_sampling elapsed_secs: %f\n", elapsed_secs);
-//     printf("get hash count: %d\n", tmp_get_hash_count());
-//     printf("get simple hash count: %d\n", tmp_get_simple_hash_count());
-//     EXPECT_TRUE(elapsed_secs < 0.2); // fixme: approximately around 100 cube(templates), 10 metrics. So 0.005s finish it.
+    double elapsed_secs = double(end - start) / CLOCKS_PER_SEC;
+    printf("performance_test_when_comprehensive_sampling elapsed_secs: %f\n", elapsed_secs);
+    printf("get hash count: %d\n", tmp_get_hash_count());
+    printf("get simple hash count: %d\n", tmp_get_simple_hash_count());
+    EXPECT_TRUE(elapsed_secs < 0.2); // fixme: approximately around 100 cube(templates), 10 metrics. So 0.005s finish it.
 
-//     fieldstat_free(instance_dest);
-//     for (int i = 0; i < INSTANCE_NUM; i++) {
-//         fieldstat_free(instances[i]);
-//     }
-//     for (int i = 0; i < DIMENSION_TOTAL; i++) {
-//         delete tags[i];
-//     }
-// }
+    fieldstat_free(instance_dest);
+    for (int i = 0; i < INSTANCE_NUM; i++) {
+        fieldstat_free(instances[i]);
+    }
+    for (int i = 0; i < DIMENSION_TOTAL; i++) {
+        delete tags[i];
+    }
+}
 
 int main(int argc, char *argv[]) 
 {

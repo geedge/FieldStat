@@ -118,6 +118,8 @@ TEST(metric_test_hll, serialization_and_merge_twice_with_reset)
     fieldstat_free(instance_total);
 }
 
+// todo：测base 64序列化
+
 
 int main(int argc, char *argv[]) 
 {

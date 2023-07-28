@@ -125,7 +125,6 @@ long long get_current_time()
     return time_stamp_in_ms;
 }
 
-// todo cjson support long long
 
 /* -------------------------------------------------------------------------- */
 /*                                    iter                                    */

@@ -20,6 +20,8 @@ void fill_random_tag_of_length_1_to_3(Fieldstat_tag_list_wrapper *tags[], int ta
         tags[i] = tmp;
     }
 }
+// todo: 验证结果
+// todo：cube 删除+version测试（如果变了，那么version是否+1了）
 
 TEST(Fuzz_test, fuzz_test)
 {
