@@ -248,7 +248,35 @@ TEST(metric_test_counter, topk_add_and_test_accuracy)
     for (int i = 0; i < tag_list_num; i++)
         delete tags[i];
 }
-// todo: 因为merge导致topk 的cell id超了
+
+TEST(metric_test_counter, topk_add_with_monotonically_increasing_flow_expecting_add_fail)
+{
+    struct fieldstat *instance = fieldstat_new();
+    fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_TOPK, 10);
+    fieldstat_register_counter(instance, 0, "test", 0);
+
+    const int end_cell_id = 10 * 8;
+    const int tag_list_num = 100;
+    Fieldstat_tag_list_wrapper *tags[tag_list_num];
+    for (int i = 0; i < tag_list_num; i++)
+    {
+        tags[i] = new Fieldstat_tag_list_wrapper("elephant", std::to_string(i).c_str());
+    }
+
+    for (int i = 0; i < tag_list_num; i++) {
+        int cell_id = fieldstat_cube_add(instance, 0, tags[i]->get_tag(), tags[i]->get_tag_count(), i + 1);
+        if (cell_id != -1){
+            fieldstat_counter_incrby(instance, 0, 0, cell_id, i + 1);
+        } else {
+            EXPECT_EQ(i, end_cell_id);
+            break;
+        }
+    }
+
+    fieldstat_free(instance);
+    for (int i = 0; i < tag_list_num; i++)
+        delete tags[i];
+}
 
 // todo: add on wrong cube/metric/cell
 

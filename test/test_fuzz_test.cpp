@@ -107,7 +107,7 @@ TEST(Fuzz_test, fuzz_test)
         // int cube_id = 0;
         if (cube_ids[cube_id] != -1) {
             if (cube_is_topk[cube_id]) {
-                Fieldstat_tag_list_wrapper * tmp = tag_list_wrapper[rand() % CELL_NUM];
+                const Fieldstat_tag_list_wrapper * tmp = tag_list_wrapper[rand() % CELL_NUM];
                 int cell_id = fieldstat_cube_add(instance, cube_ids[cube_id], tmp->get_tag(), tmp->get_tag_count(), rand_nums[i]);
                 if (cell_id == -1) {
                     continue;
@@ -117,7 +117,7 @@ TEST(Fuzz_test, fuzz_test)
                 }
                 
             } else {
-                Fieldstat_tag_list_wrapper * tmp = tag_list_wrapper[rand() % CELL_NUM];
+                const Fieldstat_tag_list_wrapper * tmp = tag_list_wrapper[rand() % CELL_NUM];
                 int cell_id = fieldstat_cube_add(instance, cube_ids[cube_id], tmp->get_tag(), tmp->get_tag_count(), 1);
                 if (cell_id == -1) {
                     continue;
