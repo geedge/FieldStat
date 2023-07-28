@@ -126,9 +126,6 @@ void cell_manager_id_tag_array_add(struct cell_manager *pthis, int cell_id, cons
     }
 }
 
-// todo: 如果一个用例仅做添加操作，那不需要id tag map
-// 在query / merge/ serialize时再生成？ 
-// 最麻烦的是，这样就有两种instance，感觉有点怪。
 int cell_manager_update_id_tag_map(struct cell_manager *pthis)
 {
     if (pthis->id_tag_array != NULL) {

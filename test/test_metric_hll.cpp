@@ -118,6 +118,53 @@ TEST(metric_test_hll, serialization_and_merge_twice_with_reset)
     fieldstat_free(instance_total);
 }
 
+
+#define BigLittleSwap32(A)        ((((uint32_t)(A) & 0xff000000) >> 24) | \
+                                                       (((uint32_t)(A) & 0x00ff0000) >> 8) | \
+                                                       (((uint32_t)(A) & 0x0000ff00) << 8) | \
+                                                       (((uint32_t)(A) & 0x000000ff) << 24))
+#include "base64/b64.h"
+#include "st_hyperloglog.h"
+TEST(metric_test_hll, serialize_with_b64_and_query)
+{
+    struct fieldstat *instance = test_init_standard_instance_one_cube_one_metric_one_cell_hll();
+    fieldstat_hll_add(instance, 0, 0, 0, "hello", 5);
+    fieldstat_hll_add(instance, 0, 0, 0, "wor", 3);
+    fieldstat_hll_add(instance, 0, 0, 0, "world", 5);
+
+    char *blob = NULL;
+    size_t blob_len = 0;
+    fieldstat_get_serialized_blob(instance, 0, 0, 0, &blob, &blob_len);
+    size_t dec_size = 0;
+    unsigned char *dec = b64_decode_ex(blob, blob_len, &dec_size);
+
+    unsigned char version;
+    memcpy(&version, dec, sizeof(unsigned char));
+    EXPECT_EQ(version, 1);
+    unsigned char precision;
+    memcpy(&precision, dec + sizeof(unsigned char), sizeof(unsigned char));
+    EXPECT_EQ(precision, 10); // the one initialized in test_init_standard_instance_one_cube_one_metric_one_cell_hll
+
+    struct ST_hyperloglog *hll_from_blob = ST_hyperloglog_new(precision);
+    int num_reg = NUM_REG(precision);
+    int words = INT_CEIL(num_reg, REG_PER_WORD);
+    size_t reg_size = words * sizeof(uint32_t);
+
+    uint32_t *registers = (uint32_t *)malloc(reg_size);
+    memcpy(registers, dec + 2 * sizeof(unsigned char), reg_size);
+    for (int i = 0; i < words; i++) {
+        registers[i] = BigLittleSwap32(registers[i]);
+    }
+    memcpy(hll_from_blob->registers, registers, reg_size);
+    free(registers);
+
+    EXPECT_NEAR(ST_hyperloglog_count(hll_from_blob), 3, 0.5);
+    free(blob);
+    free(dec);
+    fieldstat_free(instance);
+    ST_hyperloglog_free(hll_from_blob);
+}
+
 TEST(metric_test_histogram, add_or_set_with_wrong_cell_id_expecting_fail)
 {
     struct fieldstat *instance = fieldstat_new();
@@ -159,8 +206,6 @@ TEST(metric_test_histogram, add_with_wrong_metric_id_expecting_fail)
     fieldstat_free(instance);
 }
 
-
-// todo：测base 64序列化
 
 int main(int argc, char *argv[]) 
 {
