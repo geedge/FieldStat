@@ -114,7 +114,6 @@ TEST(unit_test_merge, new_cell_on_existing_cube_and_metric_comprehensive)
     int metric_id = fieldstat_register_counter(instance, cube_id, "metric_name", false);
     struct fieldstat *instance_dest = fieldstat_new();
     fieldstat_merge(instance_dest, instance);
-    fieldstat_reset(instance); // must call reset after merge, let the ownership of the cube return to the caller
 
     int cell_id = fieldstat_cube_add(instance, cube_id, &TEST_TAG_STRING, 1, 1);
     fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id, 10086);
@@ -277,7 +276,6 @@ TEST(unit_test_merge, new_cell_on_existing_cube_and_metric_topk)
     int metric_id = fieldstat_register_counter(instance, cube_id, "metric_name", false);
     struct fieldstat *instance_dest = fieldstat_new();
     fieldstat_merge(instance_dest, instance);
-    fieldstat_reset(instance); // must call reset after merge, let the ownership of the cube return to the caller
 
     int cell_id = fieldstat_cube_add(instance, cube_id, &TEST_TAG_STRING, 1, 1);
     fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id, 10086);
