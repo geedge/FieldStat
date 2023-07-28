@@ -62,7 +62,7 @@ struct entry_data *sorted_set_entry_get_data(const heap_entry *entry)
     return entry->value;
 }
 
-// cppcheck-suppress constParameterCallback
+// cppcheck-suppress [constParameterCallback,unmatchedSuppression]
 static bool cmp_int(void *aa, void *bb)
 {
     if (sorted_set_entry_get_count(aa) < sorted_set_entry_get_count(bb)) {
@@ -300,7 +300,7 @@ void **sorted_set_get_pointer_to_user_data(const struct sorted_set *ss, const st
     return &(heap_data->user_data);
 }
 
-// cppcheck-suppress constParameterPointer
+// cppcheck-suppress [constParameterCallback,unmatchedSuppression]
 int sorted_set_insert_user_data(struct sorted_set *ss, const struct tag_hash_key *tag, void *user_data)
 {
     const heap_entry *entry = sorted_set_find_entry(ss, tag);
