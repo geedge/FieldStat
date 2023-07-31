@@ -145,6 +145,9 @@ int my_cmp_tag(const void *a, const void *b)
     if (key_cmp != 0) {
         return key_cmp;
     }
+    if (aa->type != bb->type) {
+        return aa->type - bb->type;
+    }
 
     switch (aa->type) {
         case TAG_INTEGER:

@@ -616,6 +616,55 @@ TEST(unit_test_merge, merge_accuracy_test_gen_dest_full_some_inserted_and_some_m
     }
 }
 
+TEST(unit_test_merge, exception_test_given_cell_added_but_no_metric_operation_given_empty_dst)
+{
+    struct fieldstat *instance = fieldstat_new();
+    struct fieldstat *instance2 = fieldstat_new();
+    int cube_id = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 2);
+    int metric_id = fieldstat_register_counter(instance, cube_id, "metric name1", false);
+    int cell_id = fieldstat_cube_add(instance, cube_id, &TEST_TAG_STRING, 1, 1);
+
+    fieldstat_merge(instance2, instance);
+
+    int *cell_ids = NULL;
+    struct fieldstat_tag_list *tag_list = NULL;
+    size_t n_cell = 0;
+    fieldstat_get_cells(instance2, cube_id, metric_id, &cell_ids, &tag_list, &n_cell);
+    EXPECT_TRUE(n_cell == 0);
+    EXPECT_EQ(fieldstat_counter_get(instance2, cube_id, metric_id, cell_id), -1);
+
+    fieldstat_free(instance);
+    fieldstat_free(instance2);
+}
+
+TEST(unit_test_merge, exception_test_given_cell_added_but_no_metric_operation_given_dst_with_cell_topk)
+{
+    struct fieldstat *instance = fieldstat_new();
+    struct fieldstat *instance2 = fieldstat_new();
+    int cube_id = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 2);
+    int metric_id = fieldstat_register_counter(instance, cube_id, "metric name1", false);
+    int cell_id = fieldstat_cube_add(instance, cube_id, &TEST_TAG_STRING, 1, 1);
+
+    int cube_id_dst = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 2);
+    int metric_id_dst = fieldstat_register_counter(instance, cube_id_dst, "metric name1", false);
+    int cell_id_dst = fieldstat_cube_add(instance, cube_id_dst, &TEST_TAG_STRING, 1, 1);
+    fieldstat_counter_incrby(instance, cube_id_dst, metric_id_dst, cell_id_dst, 123);
+
+    fieldstat_merge(instance2, instance);
+
+    int *cell_ids = NULL;
+    struct fieldstat_tag_list *tag_list = NULL;
+    size_t n_cell = 0;
+    fieldstat_get_cells(instance2, cube_id, metric_id, &cell_ids, &tag_list, &n_cell);
+    EXPECT_TRUE(n_cell == 1);
+    EXPECT_EQ(fieldstat_counter_get(instance2, cube_id, metric_id, cell_id), 123);
+
+    fieldstat_free(instance);
+    fieldstat_free(instance2);
+
+    free(cell_ids);
+    fieldstat_tag_list_arr_free(tag_list, n_cell);
+}
 
 int main(int argc, char *argv[]) 
 {

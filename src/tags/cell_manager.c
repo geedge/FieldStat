@@ -131,26 +131,6 @@ void cell_manager_id_tag_array_add(struct cell_manager *pthis, int cell_id, cons
     }
 }
 
-int cell_manager_get_cell_id_by_tag(const struct cell_manager *pthis, const struct tag_hash_key *tag)
-{
-    int cell_id = -1;
-
-    if (pthis->sampling_mode == SAMPLING_MODE_TOPK) {
-        heavy_keeper_query_one(pthis->topk_tag_id_map, tag, NULL, &cell_id);
-    } else {
-        struct tag_id_map *node = NULL;
-        HASH_FIND_TAG(pthis->comprehensive_tag_id_map, tag, node);
-
-        if (node == NULL) {
-            cell_id = -1;
-        } else {
-            cell_id = node->cell_id;
-        }
-    }
-
-    return cell_id;
-}
-
 int cell_manager_get_count_by_tag(const struct cell_manager *pthis, const struct tag_hash_key *tag)
 {
     if (pthis->sampling_mode == SAMPLING_MODE_COMPREHENSIVE) {

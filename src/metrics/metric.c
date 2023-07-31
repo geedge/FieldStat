@@ -721,34 +721,6 @@ void metric_get_plain_blob(const struct metric *pthis, int cell_id, char **blob,
     pthis->scheme->serialize(metric_find_one_cell(pthis, cell_id), blob, blob_size);
 }
 
-void metric_rearrange_cell_id(struct metric *pthis, const int *original_id, const int *final_id, size_t n_id)
-{
-    if (n_id == 0) {
-        return;
-    }
-    struct metric_measure_data *tmp_node_arr[n_id];
-    int valid_id_count = 0;
-    struct metric_measure_data **data_array = pthis->data_array;
-    for (int i = 0; i < n_id; i++) {
-        struct metric_measure_data *data = metric_find_one_cell(pthis, original_id[i]);
-        if (data == NULL) {
-            printf("ERR: metric_rearrange_cell_id: cell_id %d not exist\n", original_id[i]);
-            continue;
-        }
-        tmp_node_arr[valid_id_count++] = data;
-        data_array[original_id[i]] = NULL;
-    }
-    for (int i = 0; i < pthis->n_array_item; i++) {
-        if (data_array[i] != NULL) {
-            printf("ERR: metric_rearrange_cell_id: cell_id %d not in original_id\n", i);
-        }
-    }
-
-    for (int i = 0; i < valid_id_count; i++) {
-        metric_add_one_cell(pthis, final_id[i], tmp_node_arr[i]);
-    }
-}
-
 void metric_delete_cell(struct metric *pthis, int cell_id)
 {
     struct metric_measure_data *data = metric_find_one_cell(pthis, cell_id);

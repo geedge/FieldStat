@@ -24,6 +24,9 @@ include_directories(${PROJECT_SOURCE_DIR}/include/fieldstat)
 # SET (ZLIB_INCLUDE_DIR "/home/chenzizhan/zlib/include/")
 # SET (ZLIB_LIBRARY "/home/chenzizhan/zlib/lib/libz.so.1.2.13")
 
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fprofile-arcs -ftest-coverage --coverage")
+MESSAGE ("CMAKE_C_FLAGS in test is " ${CMAKE_C_FLAGS})
+
 
 FIND_PACKAGE (ZLIB REQUIRED)
 MESSAGE (" zlib version major is " ${ZLIB_VERSION_MAJOR})
@@ -35,11 +38,12 @@ SET(TEST_UTILS_SRC
   utils.cpp
   )
 
+SET(LFLAGS "-lgcov --coverage")
+
 function (add_unit_test file_name)
     add_executable(${file_name} ${SRC} ${TEST_UTILS_SRC} ${file_name}.cpp)
-    target_link_libraries(${file_name} gtest-static ${ZLIB_LIBRARIES})
+    target_link_libraries(${file_name} gtest-static ${ZLIB_LIBRARIES} ${LFLAGS})
     set_property(TARGET ${file_name} PROPERTY CXX_STANDARD 17)
-    # add_test(NAME ${file_name} COMMAND ${file_name})
 endfunction()
 
 add_unit_test(test_exporter_json)
@@ -49,6 +53,6 @@ add_unit_test(test_metric_counter)
 add_unit_test(test_metric_histogram)
 add_unit_test(test_metric_hll)
 add_unit_test(test_performance)
-add_unit_test(test_reset_and_delete_cube)
+add_unit_test(test_register_and_reset)
 add_unit_test(test_serialize)
 add_unit_test(unit_test_cell_manager)

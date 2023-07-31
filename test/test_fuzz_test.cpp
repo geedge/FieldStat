@@ -29,7 +29,7 @@ TEST(Fuzz_test, both_comp_and_topk_cubes_with_merge_and_reset_expecting_correct_
     const char *metric_name_of_topk[METRIC_NUM] = {"topk1", "topk2"};
     const char *metric_name_of_comprehensive[METRIC_NUM] = {"counter_", "hll_"};
     const int CELL_NUM = 50;
-    const int CUBE_NUM = 1;
+    const int CUBE_NUM = 10;
     int cube_ids[CUBE_NUM];
     bool cube_is_topk[CUBE_NUM];
     unordered_map<string, int> topk_count_per_metric[CUBE_NUM][METRIC_NUM];
@@ -43,7 +43,7 @@ TEST(Fuzz_test, both_comp_and_topk_cubes_with_merge_and_reset_expecting_correct_
     Fieldstat_tag_list_wrapper *tag_list_wrapper[CELL_NUM];
     fill_random_tag_of_length_1_to_3(tag_list_wrapper, CELL_NUM);
 
-    const int TEST_ROUND = 10001;
+    const int TEST_ROUND = 100001;
     struct fieldstat *instance = fieldstat_new();
     struct fieldstat *instance_dest = fieldstat_new();
     long long rand_nums[TEST_ROUND];
@@ -77,7 +77,7 @@ TEST(Fuzz_test, both_comp_and_topk_cubes_with_merge_and_reset_expecting_correct_
     clock_t start = clock();
 
     for (int i = 0; i < TEST_ROUND; i++) {
-        if (i != 0 && i % 100 == 0) {
+        if (i != 0 && i % 1000 == 0) {
             char *blob;
             size_t blob_len;
             fieldstat_serialize(instance, &blob, &blob_len);
@@ -119,7 +119,6 @@ TEST(Fuzz_test, both_comp_and_topk_cubes_with_merge_and_reset_expecting_correct_
             string cell_key = tmp->to_string();
             comp_count[cube_id][cell_key] += rand_nums[i];
             comp_hll[cube_id][cell_key].insert(*val);
-            cout << "add: " << cell_key << "of count" << rand_nums[i] << endl;
         }
     }
 
@@ -178,8 +177,6 @@ TEST(Fuzz_test, both_comp_and_topk_cubes_with_merge_and_reset_expecting_correct_
                 string cell_key = Fieldstat_tag_list_wrapper(&tags0[j]).to_string();
                 EXPECT_EQ(comp_count[cubes[i]][cell_key], fieldstat_counter_get(instance_in_focus, cubes[i], 0, cells0[j]));
                 EXPECT_NEAR(comp_hll[cubes[i]][cell_key].size(), fieldstat_hll_get(instance_in_focus, cubes[i], 1, cells0[j]), comp_hll[cubes[i]][cell_key].size() * 0.2);
-
-                cout << "get: " << cell_key << " of count: "<< fieldstat_counter_get(instance_in_focus, cubes[i], 0, cells0[j]) << endl;
             }
         }
 

@@ -13,7 +13,6 @@ struct cell_manager *cell_manager_new(enum sampling_mode sampling_mode, int max_
 struct cell_manager *cell_manager_copy(const struct cell_manager *src);
 void cell_manager_reset(struct cell_manager *pthis);
 
-int cell_manager_get_cell_id_by_tag(const struct cell_manager *pthis, const struct tag_hash_key *tag);
 const struct tag_hash_key *cell_manager_get_tag_by_cell_id(const struct cell_manager *pthis, int cell_id);
 int cell_manager_get_count_by_tag(const struct cell_manager *pthis, const struct tag_hash_key *tag);
 const struct tag_hash_key **cell_manager_dump(const struct cell_manager *pthis, int *array_len);
