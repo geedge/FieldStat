@@ -168,7 +168,7 @@ const char *cell_iter_get_name(const struct cell_iter *iter) {
     return fieldstat_get_metric_name(iter->instance, iter->cube_ids[iter->curr_cube_idx], iter->curr_metric_id);
 }
 
-int cell_iter_next_nonempty_cube(struct cell_iter *iter) {
+int cell_iter_next_cube(struct cell_iter *iter) {
     const struct fieldstat *instance = iter->instance;
     while (iter->curr_cube_idx < iter->n_cube - 1) {
         int cube_id_next = iter->cube_ids[++iter->curr_cube_idx];
@@ -213,13 +213,20 @@ int cell_iter_next_nonempty_metric(struct cell_iter *iter) {
     return 0;
 }
 
+int cell_iter_next_non_empty_cube(struct cell_iter *iter) {
+    while (cell_iter_next_cube(iter)) {
+        if (cell_iter_next_nonempty_metric(iter)) {
+            iter->shared_tag = fieldstat_get_shared_tags(iter->instance, iter->cube_ids[iter->curr_cube_idx]);
+            return 1;
+        }
+    }
+    return 0;
+}
+
 int cell_iter_next(struct cell_iter *iter) {
     if (iter->curr_cube_idx == -1) { // first time
-        while (cell_iter_next_nonempty_cube(iter)) {
-            if (cell_iter_next_nonempty_metric(iter)) {
-                iter->shared_tag = fieldstat_get_shared_tags(iter->instance, iter->cube_ids[iter->curr_cube_idx]);
-                return 1;
-            }
+        if (cell_iter_next_non_empty_cube(iter)) {
+            return 1;
         }
         return 0;
     }
@@ -235,11 +242,8 @@ int cell_iter_next(struct cell_iter *iter) {
 
     fieldstat_tag_list_arr_free(iter->shared_tag, 1);
     iter->shared_tag = NULL;
-    while (cell_iter_next_nonempty_cube(iter)) {
-        if (cell_iter_next_nonempty_metric(iter)) {
-            iter->shared_tag = fieldstat_get_shared_tags(iter->instance, iter->cube_ids[iter->curr_cube_idx]);
-            return 1;
-        }
+    if (cell_iter_next_non_empty_cube(iter)) {
+        return 1;
     }
     return 0;
 }

@@ -122,6 +122,24 @@ TEST(test_reset_and_delete_cube, add_long_tagged_cells)
     fieldstat_free(instance);
 }
 
+TEST(test_reset_and_delete_cube, register_too_many_metrics)
+{
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    int metric_id = 0;
+    for (int i = 0; i < 50; i++) {
+        metric_id = fieldstat_register_counter(instance, cube_id, (std::string("counter ") + std::to_string(i)).c_str(), false);
+        EXPECT_EQ(metric_id, i);
+    }
+
+    for (int i = 0; i < 50; i++) {
+        int cell_id = fieldstat_cube_add(instance, cube_id, &TEST_TAG_INT, 1, 1);
+        EXPECT_EQ(fieldstat_counter_incrby(instance, cube_id, i, cell_id, 1), 0);
+    }
+
+    fieldstat_free(instance);
+}
+
 int main(int argc, char *argv[]) 
 {
 	testing::InitGoogleTest(&argc, argv);

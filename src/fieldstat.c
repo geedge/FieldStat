@@ -276,7 +276,6 @@ void fieldstat_cube_free(struct fieldstat *instance, int cube_id)
 {
     struct fs_cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
-        printf("ERR: fieldstat_cube_free cube is not registered yet\n");
         return;
     }
     cell_manager_free(cube->cell_manager);
