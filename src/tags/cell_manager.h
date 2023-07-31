@@ -26,6 +26,14 @@ struct cell_manager *cell_manager_deserialize(const char *blob, size_t blob_size
 void cell_manager_merge_topk(struct cell_manager *dest, const struct cell_manager *src, 
     int **cell_id_popped, int *n_cell_id_popped, int **cell_id_old, int **cell_id_added, int *n_cell_id_added);
 
+/* ------- a simpler cell_manager, which only support check if tag exist and add. ------- */
+struct cube_manager;
+
+struct cube_manager *cube_manager_new();
+void cube_manager_free(struct cube_manager *pthis);
+void cube_manager_add(struct cube_manager *pthis, const struct tag_hash_key *tag, int id);
+int cube_manager_find(const struct cube_manager *pthis, const struct tag_hash_key *tag);
+
 #ifdef __cplusplus
 }
 #endif

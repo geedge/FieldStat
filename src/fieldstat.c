@@ -41,7 +41,7 @@ struct fieldstat {
     size_t valid_cube_arr_length;
     size_t max_n_cube;
 
-    struct cell_manager *shared_tag_cube_manager; // used only in merge to store shared tags in history
+    struct cube_manager *shared_tag_cube_manager; // used only in merge to store shared tags in history
 };
 
 
@@ -65,7 +65,7 @@ void fieldstat_free(struct fieldstat *instance)
     free(instance->cube);
     free(instance->cube_version);
     if (instance->shared_tag_cube_manager != NULL){
-        cell_manager_free(instance->shared_tag_cube_manager);
+        cube_manager_free(instance->shared_tag_cube_manager);
     }
 
     free(instance);
@@ -703,10 +703,9 @@ int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
     size_t n_cube_dest = instance->valid_cube_arr_length;
     size_t n_cube_src = src->valid_cube_arr_length;
     // tag_cube_id_map use cube shared tag as key, find cubes. Is is not a cell manager.
-    struct cell_manager *tag_cube_id_map = instance->shared_tag_cube_manager;
+    struct cube_manager *tag_cube_id_map = instance->shared_tag_cube_manager;
     if (tag_cube_id_map == NULL) {
-        tag_cube_id_map = cell_manager_new(SAMPLING_MODE_COMPREHENSIVE,
-                                           instance->max_n_cube + src->max_n_cube); // Just make sure shared_tag_cube_manager is big enough.
+        tag_cube_id_map = cube_manager_new();
         instance->shared_tag_cube_manager = tag_cube_id_map;
         for (int i = 0; i < n_cube_dest; i++) {
             const struct fs_cube *cube_dest = instance->cube[i];
@@ -714,7 +713,7 @@ int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
                 continue;
             }
             struct tag_hash_key *shared_tag_key = tag_hash_key_construct_with_fieldstat_tag(cube_dest->shared_tags, instance->cube[i]->n_shared_tags);
-            cell_manager_add_cell(tag_cube_id_map, shared_tag_key);
+            cube_manager_add(tag_cube_id_map, shared_tag_key, i);
             tag_hash_key_free(shared_tag_key);
         }
     }
@@ -727,11 +726,11 @@ int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
         }
 
         struct tag_hash_key *shared_tag_key_src = tag_hash_key_construct_with_fieldstat_tag(cube_src->shared_tags, cube_src->n_shared_tags);
-        int cube_id_tmp = cell_manager_get_cell_id_by_tag(tag_cube_id_map, shared_tag_key_src);
+        int cube_id_tmp = cube_manager_find(tag_cube_id_map, shared_tag_key_src);
         if (cube_id_tmp == -1) {
             struct fs_cube *copied_cube = fieldstat_cube_dup(cube_src);
-            (void)fieldstat_append_cube_to_instance(instance, copied_cube);
-            cell_manager_add_cell(tag_cube_id_map, shared_tag_key_src);
+            int cube_id = fieldstat_append_cube_to_instance(instance, copied_cube);
+            cube_manager_add(tag_cube_id_map, shared_tag_key_src, cube_id);
         } else {
             if (instance->cube[cube_id_tmp]->sampling_mode != cube_src->sampling_mode) {
                 printf("ERR: cube sampling mode not match\n");

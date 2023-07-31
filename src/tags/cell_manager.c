@@ -31,6 +31,10 @@ struct cell_manager {
     int next_cell_id;
 };
 
+struct cube_manager {
+    struct tag_id_map *head;
+};
+
 struct cell_manager *cell_manager_new_without_map(enum sampling_mode sampling_mode, int max_cell_num)
 {
     struct cell_manager *cell_manager = (struct cell_manager *)calloc(1, sizeof(struct cell_manager));
@@ -59,12 +63,12 @@ struct cell_manager *cell_manager_new(enum sampling_mode sampling_mode, int max_
     return cell_manager;
 }
 
-void cell_manager_comprehensive_tag_id_map_free(struct cell_manager *pthis)
+void tag_id_map_free(struct tag_id_map *head)
 {
     struct tag_id_map *node = NULL;
     struct tag_id_map *tmp = NULL;
-    HASH_ITER(hh, pthis->comprehensive_tag_id_map, node, tmp) {
-        HASH_DEL(pthis->comprehensive_tag_id_map, node);
+    HASH_ITER(hh, head, node, tmp) {
+        HASH_DEL(head, node);
         tag_hash_key_free(node->tag);
         free(node);
     }
@@ -75,7 +79,8 @@ void cell_manager_reset(struct cell_manager *pthis)
     if (pthis->sampling_mode == SAMPLING_MODE_TOPK) {
         heavy_keeper_clear(pthis->topk_tag_id_map);
     } else {
-        cell_manager_comprehensive_tag_id_map_free(pthis);
+        tag_id_map_free(pthis->comprehensive_tag_id_map);
+        pthis->comprehensive_tag_id_map = NULL;
     }
 
     pthis->next_cell_id = 0;
@@ -93,7 +98,7 @@ void cell_manager_free(struct cell_manager *pthis)
     if (pthis->sampling_mode == SAMPLING_MODE_TOPK) {
         heavy_keeper_free(pthis->topk_tag_id_map);
     } else {
-        cell_manager_comprehensive_tag_id_map_free(pthis);
+        tag_id_map_free(pthis->comprehensive_tag_id_map);
     }
 
     free(pthis);
@@ -124,36 +129,6 @@ void cell_manager_id_tag_array_add(struct cell_manager *pthis, int cell_id, cons
     if (cell_id > pthis->max_cell_id) {
         pthis->max_cell_id = cell_id;
     }
-}
-
-int cell_manager_update_id_tag_map(struct cell_manager *pthis)
-{
-    if (pthis->id_tag_array != NULL) {
-        printf("ERR: id_tag_array is not NULL when update_id_tag_map\n");
-        return -1;
-    }
-
-    size_t id_tag_array_len = pthis->max_cell_num;
-    if (pthis->sampling_mode == SAMPLING_MODE_TOPK && pthis->next_cell_id > id_tag_array_len) {
-        id_tag_array_len = pthis->next_cell_id;
-    }
-    pthis->id_tag_array = calloc(id_tag_array_len, sizeof(struct tag_hash_key *));
-
-    if (pthis->sampling_mode == SAMPLING_MODE_TOPK) {
-        struct heavy_keeper_result *result = heavy_keeper_query(pthis->topk_tag_id_map);
-        for (size_t i = 0; i < result->n_key; i++) {
-            cell_manager_id_tag_array_add(pthis, result->cell_id[i], result->tags[i]);
-        }
-        heavy_keeper_result_free(result);
-    } else {
-        struct tag_id_map *node = NULL;
-        struct tag_id_map *tmp = NULL;
-        HASH_ITER(hh, pthis->comprehensive_tag_id_map, node, tmp) {
-            pthis->id_tag_array[node->cell_id] = node->tag;
-        }
-    }
-
-    return 0;
 }
 
 int cell_manager_get_cell_id_by_tag(const struct cell_manager *pthis, const struct tag_hash_key *tag)
@@ -412,4 +387,36 @@ void cell_manager_merge_topk(struct cell_manager *dest, const struct cell_manage
         cell_manager_id_tag_array_add(dest, result->cell_id[i], result->tags[i]);
     }
     heavy_keeper_result_free(result);
+}
+
+void cube_manager_free(struct cube_manager *pthis)
+{
+    tag_id_map_free(pthis->head);
+    free(pthis);
+}
+
+struct cube_manager *cube_manager_new()
+{
+    struct cube_manager *pthis = (struct cube_manager *)malloc(sizeof(struct cube_manager));
+    pthis->head = NULL;
+    return pthis;
+}
+
+void cube_manager_add(struct cube_manager *pthis, const struct tag_hash_key *tag, int id)
+{
+    struct tag_id_map *node = (struct tag_id_map *)malloc(sizeof(struct tag_id_map));
+    node->tag = tag_hash_key_copy(tag);
+    node->cell_id = id;
+    HASH_ADD_TAG(pthis->head, tag, node);
+}
+
+int cube_manager_find(const struct cube_manager *pthis, const struct tag_hash_key *tag)
+{
+    struct tag_id_map *node = NULL;
+    HASH_FIND_TAG(pthis->head, tag, node);
+    if (node == NULL) {
+        return -1;
+    } else {
+        return node->cell_id;
+    }
 }
