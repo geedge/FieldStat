@@ -28,42 +28,48 @@ struct tag_hash_key *test_gen_tag_key(const char *key, int value)
     return tag_key;
 }
 
-double cal_accuracy_with_tags(vector<struct tag_hash_key *> &expected_keys, vector<struct tag_hash_key *> &test_result) {
-    map<string, int> countMap;
+struct Fieldstat_tag_list_wrapper *test_key_tag_to_wrapper(const struct tag_hash_key *key)
+{
+    struct fieldstat_tag *tag;
+    size_t n_out;
+    tag_hash_key_convert_to_fieldstat_tag(key, &tag, &n_out);
+    struct fieldstat_tag_list tag_list;
+    tag_list.tag = tag;
+    tag_list.n_tag = n_out;
+    struct Fieldstat_tag_list_wrapper *wrapper = new Fieldstat_tag_list_wrapper(&tag_list);
+
+    for (size_t i = 0; i < n_out; i++)
+    {
+        if (tag[i].type == TAG_CSTRING)
+            free((void *)tag[i].value_str);
+        free((void *)tag[i].key);
+    }
+    free(tag);
+
+    return wrapper;
+}
+
+double cal_accuracy_with_tags(const vector<struct tag_hash_key *> &expected_keys, const vector<struct tag_hash_key *> &test_result) {
+    unordered_map<string, int> countMap;
     for (size_t i = 0; i < expected_keys.size(); i++) {
-        std::string key = tag_hash_key_get_compound_key(expected_keys[i]);
+        struct Fieldstat_tag_list_wrapper *wrapper = test_key_tag_to_wrapper(expected_keys[i]);
+        string key = wrapper->to_string();
         countMap[key]++;
+        delete wrapper;
     }
+    vector<struct Fieldstat_tag_list_wrapper *> test_result_wrapper;
 
-    std::vector<std::pair<std::string, int>> countVector(countMap.begin(), countMap.end());
-    std::sort(countVector.begin(), countVector.end(), [](const std::pair<std::string, int> &a, const std::pair<std::string, int> &b) {
-        return a.second > b.second;
-    });
-
-    std::set<std::string> myset;
-    int min_in_max_count = 0;
-    size_t i;
-    for (i = 0; i < test_result.size(); ++i) {
-        myset.insert(countVector[i].first);
-        min_in_max_count = countVector[i].second;
-    }
-    while (i < countVector.size()) {
-        if (countVector[i].second != min_in_max_count) {
-            break;
-        }
-        myset.insert(countVector[i].first);
-        i++;
-    }
-
-    int correct = 0;
     for (size_t i = 0; i < test_result.size(); i++) {
-        if (myset.find(tag_hash_key_get_compound_key(test_result[i])) != myset.end()) {
-            correct++;
-        }
+        struct Fieldstat_tag_list_wrapper *wrapper = test_key_tag_to_wrapper(test_result[i]);
+        test_result_wrapper.push_back(wrapper);
     }
 
-    double accuracy = (double)correct / test_result.size();
-    return accuracy;
+    double ret = test_cal_topk_accuracy(test_result_wrapper, countMap);
+
+    for (size_t i = 0; i < test_result.size(); i++) {
+        delete test_result_wrapper[i];
+    }
+    return ret;
 }
 
 vector<tag_hash_key *> test_query_cell_manager_content(const struct cell_manager *cm)

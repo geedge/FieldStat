@@ -190,15 +190,15 @@ int cell_manager_get_count_by_tag(const struct cell_manager *pthis, const struct
 
 int cell_manager_add_cell(struct cell_manager *pthis, const struct tag_hash_key *tag)
 {
-    if (HASH_COUNT(pthis->comprehensive_tag_id_map) >= pthis->max_cell_num) {
-        return -1;
-    }
-
     struct tag_id_map *node = NULL;
     HASH_FIND_TAG(pthis->comprehensive_tag_id_map, tag, node);
     if (node != NULL) {
         return node->cell_id;
     }
+    if (HASH_COUNT(pthis->comprehensive_tag_id_map) >= pthis->max_cell_num) {
+        return -1;
+    }
+
     struct tag_hash_key *tag_copy = tag_hash_key_copy(tag);
     node = (struct tag_id_map *)malloc(sizeof(struct tag_id_map));
     node->tag = tag_copy;

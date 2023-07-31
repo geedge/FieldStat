@@ -1,4 +1,6 @@
 #include <string>
+#include <vector>
+#include <unordered_map>
 #include "fieldstat.h"
 
 const struct fieldstat_tag TEST_TAG_STRING = {"STRING KEY_", TAG_CSTRING, {.value_str = "100.1"}};
@@ -28,6 +30,10 @@ public:
     size_t get_tag_count() const;
     const struct fieldstat_tag_list *get_c_struct() const;
     void print_tag_list() const;
+    Fieldstat_tag_list_wrapper& sort_tag_list();
 private:
     struct fieldstat_tag_list tag_list_c;
 };
+
+
+double test_cal_topk_accuracy(std::vector<struct Fieldstat_tag_list_wrapper *> &test_result, std::unordered_map<std::string, int> &expected_count);

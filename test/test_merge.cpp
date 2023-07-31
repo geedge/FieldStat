@@ -1,7 +1,7 @@
 
 #include <gtest/gtest.h>
 #include <set>
-#include <map>
+#include <unordered_map>
 #include "fieldstat.h"
 #include "utils.hpp"
 
@@ -21,49 +21,14 @@ vector<Fieldstat_tag_list_wrapper *> test_gen_topk_flows(int num, int rand_flow_
     return flows;
 }
 
-double test_cal_accuracy(vector<struct Fieldstat_tag_list_wrapper *> &expected_keys, vector<struct Fieldstat_tag_list_wrapper *> &test_result) {
-    map<string, int> countMap;
+double test_cal_accuracy_given_expected_key(vector<struct Fieldstat_tag_list_wrapper *> &expected_keys, vector<struct Fieldstat_tag_list_wrapper *> &test_result) {
+    unordered_map<string, int> countMap;
     for (size_t i = 0; i < expected_keys.size(); i++) {
         std::string key = expected_keys[i]->to_string();
         countMap[key]++;
     }
 
-    std::vector<std::pair<std::string, int>> countVector(countMap.begin(), countMap.end());
-    std::sort(countVector.begin(), countVector.end(), [](const std::pair<std::string, int> &a, const std::pair<std::string, int> &b) {
-        return a.second > b.second;
-    });
-
-    std::set<std::string> myset;
-    int min_in_max_count = 0;
-    size_t i;
-    for (i = 0; i < test_result.size(); ++i) {
-        myset.insert(countVector[i].first);
-        min_in_max_count = countVector[i].second;
-    }
-    while (i < countVector.size()) {
-        if (countVector[i].second != min_in_max_count) {
-            break;
-        }
-        myset.insert(countVector[i].first);
-        i++;
-    }
-
-    // cout << "myset : " << endl;
-    // for (auto it = myset.begin(); it != myset.end(); it++) {
-    //     cout << *it << endl;
-    // }
-    // cout << "------------------------- " << endl;
-
-    int correct = 0;
-    for (size_t i = 0; i < test_result.size(); i++) {
-        string key = test_result[i]->to_string();
-        if (myset.find(key) != myset.end()) {
-            correct++;
-        }
-    }
-
-    double accuracy = (double)correct / test_result.size();
-    return accuracy;
+    return test_cal_topk_accuracy(test_result, countMap);
 }
 
 TEST(unit_test_merge, test_metric_name_mapping_with_new_metric_on_existing_cube)
@@ -561,7 +526,7 @@ TEST(unit_test_merge, merge_accuracy_test_with_K_large_enough_topk)
     // cout << "---------------------------------------------" << endl;
     
     flows_in_dest.insert(flows_in_dest.end(), std::make_move_iterator(flows_in_src.begin()), std::make_move_iterator(flows_in_src.end()));
-    double accuracy = test_cal_accuracy(flows_in_dest, flows_in_merged);
+    double accuracy = test_cal_accuracy_given_expected_key(flows_in_dest, flows_in_merged);
     EXPECT_TRUE(accuracy > 0.99); // should be 1.0
 
     fieldstat_free(instance_src);
@@ -600,7 +565,7 @@ TEST(unit_test_merge, merge_accuracy_test_gen_dest_full_all_inserted_given_src_f
     }
 
     flows_in_dest.insert(flows_in_dest.end(), std::make_move_iterator(flows_in_src.begin()), std::make_move_iterator(flows_in_src.end()));
-    double accuracy = test_cal_accuracy(flows_in_dest, flows_in_merged);
+    double accuracy = test_cal_accuracy_given_expected_key(flows_in_dest, flows_in_merged);
 
     EXPECT_TRUE(accuracy > 0.99); // should be 1.0
 
@@ -635,7 +600,7 @@ TEST(unit_test_merge, merge_accuracy_test_gen_dest_full_some_inserted_and_some_m
     }
     
     flows_in_dest.insert(flows_in_dest.end(), std::make_move_iterator(flows_in_src.begin()), std::make_move_iterator(flows_in_src.end()));
-    double accuracy = test_cal_accuracy(flows_in_dest, flows_in_merged);
+    double accuracy = test_cal_accuracy_given_expected_key(flows_in_dest, flows_in_merged);
     EXPECT_TRUE(accuracy >= 0.93); // by heavy keeper benchmark, with K = 100, merging result should be about 0.96, for adding the flows will also cause some inaccuracy, so here we set 0.93
     printf("merge_accuracy_test_gen_dest_full_some_inserted_and_some_merged_and_some_fail_to_add accuracy is %lf\n", accuracy);
 

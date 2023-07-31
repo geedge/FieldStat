@@ -3,6 +3,8 @@
 #include <iostream>
 #include <vector>
 #include <chrono>
+#include <set>
+#include <unordered_map>    
 #include <random>
 #include <string.h>
 #include <algorithm>
@@ -242,4 +244,52 @@ bool Fieldstat_tag_list_wrapper::operator==(const Fieldstat_tag_list_wrapper &ta
         }
     }
     return true;
+}
+
+Fieldstat_tag_list_wrapper& Fieldstat_tag_list_wrapper::sort_tag_list()
+{
+    std::sort(tag_list_c.tag, tag_list_c.tag + tag_list_c.n_tag, [](const struct fieldstat_tag &a, const struct fieldstat_tag &b) {
+        return strcmp((char *)a.key, (char *)b.key) < 0;
+    });
+    return *this;
+}
+
+double test_cal_topk_accuracy(vector<struct Fieldstat_tag_list_wrapper *> &test_result, unordered_map<string, int> &expected_count)
+{
+    std::vector<std::pair<std::string, int>> countVector(expected_count.begin(), expected_count.end());
+    std::sort(countVector.begin(), countVector.end(), [](const std::pair<std::string, int> &a, const std::pair<std::string, int> &b) {
+        return a.second > b.second;
+    });
+
+    std::set<std::string> myset;
+    int min_in_max_count = 0;
+    size_t i;
+    for (i = 0; i < test_result.size(); ++i) {
+        myset.insert(countVector[i].first);
+        min_in_max_count = countVector[i].second;
+    }
+    while (i < countVector.size()) {
+        if (countVector[i].second != min_in_max_count) {
+            break;
+        }
+        myset.insert(countVector[i].first);
+        i++;
+    }
+
+    // cout << "myset : " << endl;
+    // for (auto it = myset.begin(); it != myset.end(); it++) {
+    //     cout << *it << endl;
+    // }
+    // cout << "------------------------- " << endl;
+
+    int correct = 0;
+    for (size_t i = 0; i < test_result.size(); i++) {
+        string key = test_result[i]->to_string();
+        if (myset.find(key) != myset.end()) {
+            correct++;
+        }
+    }
+
+    double accuracy = (double)correct / test_result.size();
+    return accuracy;
 }

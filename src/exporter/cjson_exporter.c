@@ -346,7 +346,6 @@ void cell_iter_read_tag_list(struct cell_iter *iter, struct export_kv_pair **exp
 void cell_iter_add_field_to_field_object(const struct cell_iter *iter, cJSON *obj)
 {
     struct export_kv_pair *field = cell_query_with_iter(iter);
-    printf("cell_iter_add_field_to_field_object field key: %s, value is: %lld\n", field->key, field->value_longlong);
     kv_pair_add_to_cjson(field, obj);
     kv_pair_free(field);
 }
@@ -378,7 +377,6 @@ void cjson_map_add_new_pair_for_one_loop(struct cjson_map **map_head_in, struct 
 
     char *key = cJSON_PrintUnformatted(cjson_tags);  // when this key is added to a new map entry, it is freed when the map is freed
     size_t key_len = strlen(key);
-    printf("tag cjson key: %s\n", key);
 
     struct cjson_map *map = cjson_map_find(map_head, key, key_len);
     if (map == NULL) {
