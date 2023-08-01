@@ -24,9 +24,11 @@ include_directories(${PROJECT_SOURCE_DIR}/include/fieldstat)
 # SET (ZLIB_INCLUDE_DIR "/home/chenzizhan/zlib/include/")
 # SET (ZLIB_LIBRARY "/home/chenzizhan/zlib/lib/libz.so.1.2.13")
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fprofile-arcs -ftest-coverage --coverage")
-MESSAGE ("CMAKE_C_FLAGS in test is " ${CMAKE_C_FLAGS})
-
+if (COVERAGE) # user defined
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fprofile-arcs -ftest-coverage --coverage")
+    MESSAGE ("CMAKE_C_FLAGS in test is " ${CMAKE_C_FLAGS})
+    SET(LFLAGS "-lgcov --coverage")
+endif()
 
 FIND_PACKAGE (ZLIB REQUIRED)
 MESSAGE (" zlib version major is " ${ZLIB_VERSION_MAJOR})
@@ -37,8 +39,6 @@ MESSAGE (" zlib libraries are " ${ZLIB_LIBRARIES})
 SET(TEST_UTILS_SRC
   utils.cpp
   )
-
-SET(LFLAGS "-lgcov --coverage")
 
 function (add_unit_test file_name)
     add_executable(${file_name} ${SRC} ${TEST_UTILS_SRC} ${file_name}.cpp)

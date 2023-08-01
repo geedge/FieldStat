@@ -2,7 +2,7 @@ scriptfolder=`pwd`
 cd build
 rm -rf *
 # cmake -DCMAKE_BUILD_TYPE=Release .. 
-cmake ..
+cmake .. -DCOVERAGE=True
 make
 cd test
 for f in *test*; do
