@@ -916,6 +916,9 @@ void fieldstat_get_serialized_blob(const struct fieldstat *instance, int cube_id
 
 void fieldstat_tag_list_arr_free(struct fieldstat_tag_list *tag_list, size_t n_cell)
 {
+    if (tag_list == NULL) {
+        return;
+    }
     for (int i = 0; i < n_cell; i++) {
         for (int j = 0; j < tag_list[i].n_tag; j++) {
             fieldstat_clear_one_tag(&(tag_list[i].tag[j]));
@@ -945,4 +948,30 @@ enum metric_type fieldstat_get_metric_type(const struct fieldstat *instance, int
     }
 
     return metric_get_type(metric);
+}
+
+struct fieldstat *fieldstat_dup(const struct fieldstat *instance)
+{
+    struct fieldstat *new_instance = calloc(1, sizeof(struct fieldstat));
+
+    new_instance->valid_cube_arr_length = instance->valid_cube_arr_length;
+    new_instance->max_n_cube = instance->max_n_cube;
+    new_instance->cube = malloc(sizeof(struct fs_cube *) * new_instance->max_n_cube);
+    for (size_t i = 0; i < new_instance->valid_cube_arr_length; i++) {
+        struct fs_cube *cube = instance->cube[i];
+        if (cube == NULL) {
+            new_instance->cube[i] = NULL;
+            continue;
+        }
+        new_instance->cube[i] = fieldstat_cube_new(cube->shared_tags, cube->n_shared_tags, cube->sampling_mode, cube->max_n_cell);
+        // copy registered metrics
+        for (size_t j = 0; j < cube->n_metric; j++) {
+            const struct metric *metric = cube->metrics[j];
+            struct metric *new_metric = metric_copy_structure(metric);
+            append_metric_to_cube(new_instance->cube[i], new_metric);
+        }
+    }
+
+    new_instance->cube_version = calloc(new_instance->max_n_cube, sizeof(unsigned long));
+    return new_instance;
 }
