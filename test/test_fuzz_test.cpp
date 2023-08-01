@@ -199,6 +199,73 @@ TEST(Fuzz_test, both_comp_and_topk_cubes_with_merge_and_reset_expecting_correct_
     fieldstat_free(instance);
 }
 
+
+// TEST(Fuzz_test, memory_cost_test)
+// {
+//     const int METRIC_NUM = 10;
+//     const char *metric_name_of_comprehensive[METRIC_NUM] = {"counter1", "counter2", "counter3", "counter4", "counter5", "counter6", "counter7", "counter8", "counter9", "counter10"};
+//     const int CELL_NUM = 4000;
+//     const int CUBE_NUM = 1;
+//     int cube_ids[CUBE_NUM];
+
+//     Fieldstat_tag_list_wrapper *shared_tag[CUBE_NUM];
+//     for (int i = 0; i < CUBE_NUM; i++) {
+//         shared_tag[i] = new Fieldstat_tag_list_wrapper("shared_tag", i);
+//     }
+
+//     Fieldstat_tag_list_wrapper *tag_list_wrapper[CELL_NUM];
+//     fill_random_tag_of_length_1_to_3(tag_list_wrapper, CELL_NUM);
+
+//     const int TEST_ROUND = 100000;
+//     struct fieldstat *instance = fieldstat_new();
+//     long long rand_nums[TEST_ROUND];
+//     for (int i = 0; i < TEST_ROUND; i++) {
+//         rand_nums[i] = rand() % 10000;
+//     }
+
+//     for (int i = 0; i < CUBE_NUM; i++) {
+//         cube_ids[i] = fieldstat_register_cube(instance, shared_tag[i]->get_tag(), shared_tag[i]->get_tag_count(), SAMPLING_MODE_COMPREHENSIVE,
+//             CELL_NUM);
+//         for (int metric_id = 0; metric_id < METRIC_NUM; metric_id++) {
+//             fieldstat_register_counter(instance, cube_ids[i], metric_name_of_comprehensive[metric_id], false);
+//         }
+//     }
+
+//     for (int i = 0; i < TEST_ROUND; i++) {
+//         // int cube_id = i % CUBE_NUM;
+//         int cube_id = 0;
+//         // int cube_id = 0;
+
+//         const Fieldstat_tag_list_wrapper * tmp = tag_list_wrapper[rand() % CELL_NUM];
+//         int cell_id = fieldstat_cube_add(instance, cube_ids[cube_id], tmp->get_tag(), tmp->get_tag_count(), 1);
+//         if (cell_id == -1) {
+//             continue;
+//         }
+//         for (int metric_id = 0; metric_id < METRIC_NUM; metric_id++) {
+//             fieldstat_counter_incrby(instance, cube_ids[cube_id], metric_id, cell_id, rand_nums[i]);
+//         }
+//     }
+
+//     for (int i = 0; i < CELL_NUM; i++) {
+//         delete tag_list_wrapper[i];
+//     }
+//     for (int i = 0; i < CUBE_NUM; i++) {
+//         delete shared_tag[i];
+//     }
+//     printf("czzzz test (json)----------------\n");
+//     getchar();
+//     struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new(instance);
+//     char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter);
+//     EXPECT_TRUE(json_string != NULL);
+//     // printf("%s\n", json_string);
+//     printf("export done\n");
+//     getchar();
+//     fieldstat_json_exporter_free(fieldstat_json_exporter);
+//     free(json_string);
+
+//     fieldstat_free(instance);
+// }
+
 int main(int argc, char *argv[]) 
 {
 	testing::InitGoogleTest(&argc, argv);
