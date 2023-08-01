@@ -956,11 +956,10 @@ struct fieldstat *fieldstat_dup(const struct fieldstat *instance)
 
     new_instance->valid_cube_arr_length = instance->valid_cube_arr_length;
     new_instance->max_n_cube = instance->max_n_cube;
-    new_instance->cube = malloc(sizeof(struct fs_cube *) * new_instance->max_n_cube);
+    new_instance->cube = calloc(new_instance->max_n_cube, sizeof(struct fs_cube *));
     for (size_t i = 0; i < new_instance->valid_cube_arr_length; i++) {
         struct fs_cube *cube = instance->cube[i];
         if (cube == NULL) {
-            new_instance->cube[i] = NULL;
             continue;
         }
         new_instance->cube[i] = fieldstat_cube_new(cube->shared_tags, cube->n_shared_tags, cube->sampling_mode, cube->max_n_cell);

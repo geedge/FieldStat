@@ -361,7 +361,6 @@ void cell_manager_merge_topk(struct cell_manager *dest, const struct cell_manage
     heavy_keeper_merge_recording_id_details(dest->topk_tag_id_map, src->topk_tag_id_map, 
         cell_id_popped, n_cell_id_popped, cell_id_old, cell_id_added, n_cell_id_added);
 
-    // todo: 重新排列并且更新，heavy_keeper_merge_recording_id_details 应该用更细致的方法来处理id
     memset(dest->id_tag_array, 0, sizeof(struct tag_hash_key *) * dest->id_tag_array_len);
     struct heavy_keeper_result *result = heavy_keeper_query(dest->topk_tag_id_map);
     for (size_t i = 0; i < result->n_key; i++) {

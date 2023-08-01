@@ -314,6 +314,55 @@ unsigned find_maxv_in_sketch(struct heavy_keeper *hk, const struct tag_hash_key 
     return maxv;
 }
 
+int find_next_unused_cell_id(const int *const *sorted_pst_cell_id_arr, size_t arr_len, int last_find_result, int *next_idx)
+{
+    int cur_idx = *next_idx;
+
+    if (arr_len == 0) {
+        if (last_find_result < 0) {
+            return 0;
+        } else {
+            return last_find_result + 1;
+        }
+    }
+
+    if (cur_idx >= arr_len) {
+        int max_id = *sorted_pst_cell_id_arr[arr_len - 1];
+        if (last_find_result <= max_id) { //  this first time reach the end of sorted_pst_cell_id_arr
+            return max_id + 1;
+        } else {
+            return last_find_result + 1;
+        }
+    }
+
+    int expected_id = last_find_result + 1;
+    while (cur_idx < arr_len) {
+        int cur_id = *sorted_pst_cell_id_arr[cur_idx];
+
+        // check if expected_id id is used
+        if (cur_id == expected_id) { // used
+            expected_id++;
+            cur_idx++;
+        } else if (cur_id > expected_id) { // not used
+            *next_idx = cur_idx;
+            return expected_id;
+        } else { // still cannot guarantee expected_id is not used
+            cur_idx++;
+        }
+    }
+
+    // all cell_id in sorted_pst_cell_id_arr is used
+    int max_id = *sorted_pst_cell_id_arr[arr_len - 1];
+    *next_idx = arr_len;
+    return max_id + 1;
+}
+
+int cmp_pst_int(const void *a, const void *b) {
+    const int *pa = *(int **)a;
+    const int *pb = *(int **)b;
+    return *pa - *pb;
+}
+
 void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *dest, const struct heavy_keeper *src, 
     int **cell_id_popped_from_dest_when_merge_src_out, int *cell_id_popped_from_dest_when_merge_src_len_out,
     int **cell_id_in_src_before_merge_out, int **cell_id_in_dest_corresponding_out, int *cell_id_in_src_before_merge_len_out) 
@@ -329,42 +378,39 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
 
     unsigned *count_arr = (unsigned *)malloc(max_size * sizeof(unsigned));
     struct tag_hash_key **tag_arr = (struct tag_hash_key **)malloc(max_size * sizeof(struct tag_hash_key *));
-    int **user_datas = (int **)malloc(max_size * sizeof(int *));
+    int **cell_id_arr_dst = (int **)malloc(size_dest * sizeof(int *));
 
-    sorted_set_dump(ss_dest, count_arr, tag_arr, (void **)user_datas);
+    sorted_set_dump(ss_dest, count_arr, tag_arr, (void **)cell_id_arr_dst);
     int cell_id_popped_from_dest_when_merge_src[dest->K];
     int cell_id_popped_from_dest_when_merge_src_len = 0;
     int cell_id_in_src_before_merge[dest->K];
     int cell_id_in_src_before_merge_len = 0;
     int cell_id_in_dest_corresponding[dest->K]; // length == cell_id_in_src_before_merge_len
-    int new_alloc_id = -1; // used for alloc for new tags from src
-
 
     /* ------------------------------ merge dest ------------------------------ */
     for (int i = 0; i < size_dest; i++) {
         unsigned maxv = find_maxv_in_sketch(dest, tag_arr[i]);
         struct tag_hash_key *tag_final = tag_hash_key_copy(tag_arr[i]);
-        const int *pst_cell_id_dest = user_datas[i];
+        const int *pst_cell_id_dest = cell_id_arr_dst[i];
 
         sorted_set_insert(new_rec, tag_final, maxv);
         int **pst_cell_id_final = (int **)sorted_set_get_pointer_to_user_data(new_rec, tag_final);
         *pst_cell_id_final = (int *)malloc(sizeof(unsigned int));
         **pst_cell_id_final = *pst_cell_id_dest;
-
-
-        if (new_alloc_id < *pst_cell_id_dest) {
-            new_alloc_id = *pst_cell_id_dest;
-        }
     }
 
+    qsort(cell_id_arr_dst, size_dest, sizeof(int *), cmp_pst_int);
+
     /* ------------------------------ merge source ------------------------------ */
-    sorted_set_dump(ss_src, count_arr, tag_arr, (void **)user_datas);
-    new_alloc_id++; // the new id should be larger than the largest id in dest
+    int **cell_id_arr_src = (int **)malloc(size_src * sizeof(int *));
+    sorted_set_dump(ss_src, count_arr, tag_arr, (void **)cell_id_arr_src);
+    int last_find_id = -1;
+    int next_idx = 0;
 
     for (int i = 0; i < size_src; i++) {
         const struct tag_hash_key *tag_src = tag_arr[i];
         int **pst_cell_id_dest = (int **)sorted_set_get_pointer_to_user_data(ss_dest, tag_src);
-        int cell_id_src = *user_datas[i];
+        int cell_id_src = *cell_id_arr_src[i];
     
         if (pst_cell_id_dest != NULL) {  // the tag is in both dest and src, so has been processed in the previous loop. Just record some info
             cell_id_in_src_before_merge[cell_id_in_src_before_merge_len] = cell_id_src;
@@ -384,13 +430,12 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
         if (tmp_ret != 0) { // insert success
             int **pst_cell_id_final = (int **)sorted_set_get_pointer_to_user_data(new_rec, tag_final);
             *pst_cell_id_final = (int *)malloc(sizeof(unsigned int));
-            **pst_cell_id_final = new_alloc_id;
+            last_find_id = find_next_unused_cell_id((const int *const *)cell_id_arr_dst, size_dest, last_find_id, &next_idx);
+            **pst_cell_id_final = last_find_id;
         
             cell_id_in_src_before_merge[cell_id_in_src_before_merge_len] = cell_id_src;
-            cell_id_in_dest_corresponding[cell_id_in_src_before_merge_len] = new_alloc_id;
+            cell_id_in_dest_corresponding[cell_id_in_src_before_merge_len] = last_find_id;
             cell_id_in_src_before_merge_len++;
-            new_alloc_id++;
-
         } else {
             tag_hash_key_free(tag_final);
         }
@@ -398,7 +443,8 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
 
     free(count_arr);
     free(tag_arr);
-    free(user_datas);
+    free(cell_id_arr_dst);
+    free(cell_id_arr_src);
     sorted_set_free(ss_dest);
 
     dest->top_K_heap = new_rec;

@@ -407,6 +407,159 @@ TEST(unit_test_cell_manager, add_with_key_length_is_3_of_diff_types_comprehensiv
     tag_hash_key_free(key);
 }
 
+extern "C" 
+{
+    int cmp_pst_int(const void *a, const void *b);
+    int find_next_unused_cell_id(const int *const *sorted_pst_cell_id_arr, size_t arr_len, int last_find_result, int *next_idx);
+}
+TEST(unit_test_cell_manager, find_next_id_given_all_cell_id_continuous)
+{
+    int **arr = (int **)malloc(sizeof(int *) * 10);
+    for (int i = 0; i < 10; i++)
+    {
+        arr[i] = (int *)malloc(sizeof(int));
+        *arr[i] = i;
+    }
+
+    printf("arr:\n");
+    for (int i = 0; i < 10; i++)
+    {
+        printf("%d ", *arr[i]);
+    }
+    printf("\n");
+
+    int last_find_result = -1;
+    int next_idx = 0;
+    last_find_result = find_next_unused_cell_id((const int *const *)arr, 10, last_find_result, &next_idx);
+    EXPECT_EQ(last_find_result, 10);
+    last_find_result = find_next_unused_cell_id((const int *const *)arr, 10, last_find_result, &next_idx);
+    EXPECT_EQ(last_find_result, 11);
+
+    for (int i = 0; i < 10; i++)
+    {
+        free(arr[i]);
+    }
+    free(arr);
+}
+
+TEST(unit_test_cell_manager, find_next_id_given_continuous_hole)
+{
+    int **arr = (int **)malloc(sizeof(int *) * 10);
+    for (int i = 0; i < 3; i++)
+    {
+        arr[i] = (int *)malloc(sizeof(int));
+        *arr[i] = i;
+    }
+    arr[3] = (int *)malloc(sizeof(int));
+    *arr[3] = 5; // 3, 4 is hole
+    for (int i = 4; i < 10; i++)
+    {
+        arr[i] = (int *)malloc(sizeof(int));
+        *arr[i] = i + 2;
+    }
+    
+    printf("arr:\n");
+    for (int i = 0; i < 10; i++)
+    {
+        printf("%d ", *arr[i]);
+    }
+    printf("\n");
+
+    int last_find_result = -1;
+    int next_idx = 0;
+    last_find_result = find_next_unused_cell_id((const int *const *)arr, 10, last_find_result, &next_idx);
+    EXPECT_EQ(last_find_result, 3);
+    last_find_result = find_next_unused_cell_id((const int *const *)arr, 10, last_find_result, &next_idx);
+    EXPECT_EQ(last_find_result, 4);
+    last_find_result = find_next_unused_cell_id((const int *const *)arr, 10, last_find_result, &next_idx);
+    EXPECT_EQ(last_find_result, 12);
+    last_find_result = find_next_unused_cell_id((const int *const *)arr, 10, last_find_result, &next_idx);
+    EXPECT_EQ(last_find_result, 13);
+
+    for (int i = 0; i < 10; i++)
+    {
+        free(arr[i]);
+    }
+    free(arr);
+}
+
+TEST(unit_test_cell_manager, find_next_id_given_holes)
+{
+    int **arr = (int **)malloc(sizeof(int *) * 10);
+    for (int i = 0; i < 10; i++)
+    {
+        arr[i] = (int *)malloc(sizeof(int));
+        *arr[i] = i * 2; // 0, 2, 4, ...
+    }
+    
+    printf("arr:\n");
+    for (int i = 0; i < 10; i++)
+    {
+        printf("%d ", *arr[i]);
+    }
+    printf("\n");
+
+    int last_find_result = -1;
+    int next_idx = 0;
+    last_find_result = find_next_unused_cell_id((const int *const *)arr, 10, last_find_result, &next_idx);
+    EXPECT_EQ(last_find_result, 1);
+    last_find_result = find_next_unused_cell_id((const int *const *)arr, 10, last_find_result, &next_idx);
+    EXPECT_EQ(last_find_result, 3);
+    last_find_result = find_next_unused_cell_id((const int *const *)arr, 10, last_find_result, &next_idx);
+    EXPECT_EQ(last_find_result, 5);
+
+    for (int i = 0; i < 10; i++)
+    {
+        free(arr[i]);
+    }
+    free(arr);
+}
+
+TEST(unit_test_cell_manager, find_next_id_given_holes_at_only_start)
+{
+    int **arr = (int **)malloc(sizeof(int *) * 10);
+    for (int i = 0; i < 10; i++)
+    {
+        arr[i] = (int *)malloc(sizeof(int));
+        *arr[i] = i + 2;
+    }
+    
+    printf("arr:\n");
+    for (int i = 0; i < 10; i++)
+    {
+        printf("%d ", *arr[i]);
+    }
+    printf("\n");
+
+    int last_find_result = -1;
+    int next_idx = 0;
+    last_find_result = find_next_unused_cell_id((const int *const *)arr, 10, last_find_result, &next_idx);
+    EXPECT_EQ(last_find_result, 0);
+    last_find_result = find_next_unused_cell_id((const int *const *)arr, 10, last_find_result, &next_idx);
+    EXPECT_EQ(last_find_result, 1);
+    last_find_result = find_next_unused_cell_id((const int *const *)arr, 10, last_find_result, &next_idx);
+    EXPECT_EQ(last_find_result, 12);
+
+    for (int i = 0; i < 10; i++)
+    {
+        free(arr[i]);
+    }
+    free(arr);
+}
+
+TEST(unit_test_cell_manager, find_next_id_given_empty_arr)
+{
+    int **arr = (int **)malloc(sizeof(int *) * 0);
+
+    int last_find_result = -1;
+    int next_idx = 0;
+    last_find_result = find_next_unused_cell_id((const int *const *)arr, 0, last_find_result, &next_idx);
+    EXPECT_EQ(last_find_result, 0);
+    last_find_result = find_next_unused_cell_id((const int *const *)arr, 0, last_find_result, &next_idx);
+    EXPECT_EQ(last_find_result, 1);
+
+    free(arr);
+}
 
 int main(int argc, char *argv[]) 
 {

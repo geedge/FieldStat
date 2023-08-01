@@ -34,7 +34,6 @@ TEST(unit_test_serialize, serialize_and_deserialize_fieldstat_instance_comprehen
     const char *name = fieldstat_get_metric_name(instance2, cube_id, metric_id);
     EXPECT_STREQ(name, "czz_test counter metric");
 
-    printf("going to get cells\n");
 
     int *ret_cell_ids = NULL;
     struct fieldstat_tag_list *tag_list = NULL;
@@ -83,8 +82,6 @@ TEST(unit_test_serialize, serialize_and_deserialize_fieldstat_instance_topk)
     EXPECT_EQ(measure, 10086);
     const char *name = fieldstat_get_metric_name(instance2, cube_id, metric_id);
     EXPECT_STREQ(name, "czz_test counter metric");
-
-    printf("going to get cells\n");
 
     int *ret_cell_ids = NULL;
     struct fieldstat_tag_list *tag_list = NULL;
