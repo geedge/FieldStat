@@ -3,6 +3,7 @@
 
 #include <gtest/gtest.h>
 #include "fieldstat.h"
+#include "fieldstat_exporter.h"
 #include "utils.hpp"
 
 
@@ -27,6 +28,10 @@ TEST(test_performance, merge_performance_when_comprehensive_sampling_multi_insta
         int metric_id = fieldstat_register_counter(tmp_i, cube_id, "metric name", false);
         for (int j = 0; j < MAX_CELL_NUM; j++) {
             int cell_id = fieldstat_cube_add(tmp_i, cube_id, tags[rand() % DIMENSION_TOTAL]->get_tag(), 1, 1);
+            if (cell_id == -1) {
+                printf("cell_id == -1\n");
+                continue;
+            }
 
             fieldstat_counter_incrby(tmp_i, cube_id, metric_id, cell_id, 1);
         }
@@ -104,6 +109,7 @@ TEST(test_performance, merge_performance_one_instance_comprehensive_counter_empt
 
     clock_t elapsed = perform_merge_test(metric_add_func, metric_register_func, SAMPLING_MODE_COMPREHENSIVE, true);
     printf("merge_performance_one_instance_comprehensive_counter_empty_dest elapsed_secs: %ld\n", elapsed);
+    EXPECT_TRUE(elapsed < 1000);
 }
 
 TEST(test_performance, merge_performance_one_instance_comprehensive_hll_empty_dest)
@@ -119,7 +125,8 @@ TEST(test_performance, merge_performance_one_instance_comprehensive_hll_empty_de
     };
 
     clock_t elapsed = perform_merge_test(metric_add_func, metric_register_func, SAMPLING_MODE_COMPREHENSIVE, true);
-    printf("merge_performance_one_instance_comprehensive_counter_empty_dest elapsed_secs: %ld\n", elapsed);
+    printf("merge_performance_one_instance_comprehensive_hll_empty_dest elapsed_secs: %ld\n", elapsed);
+    EXPECT_TRUE(elapsed < 1000);
 }
 
 TEST(test_performance, merge_performance_one_instance_comprehensive_histogram_empty_dest)
@@ -135,7 +142,8 @@ TEST(test_performance, merge_performance_one_instance_comprehensive_histogram_em
     };
 
     clock_t elapsed = perform_merge_test(metric_add_func, metric_register_func, SAMPLING_MODE_COMPREHENSIVE, true);
-    printf("merge_performance_one_instance_comprehensive_counter_empty_dest elapsed_secs: %ld\n", elapsed);
+    printf("merge_performance_one_instance_comprehensive_histogram_empty_dest elapsed_secs: %ld\n", elapsed);
+    EXPECT_TRUE(elapsed < 2000);
 }
 
 TEST(test_performance, merge_performance_one_instance_topk_counter_empty_dest)
@@ -148,7 +156,8 @@ TEST(test_performance, merge_performance_one_instance_topk_counter_empty_dest)
     };
 
     clock_t elapsed = perform_merge_test(metric_add_func, metric_register_func, SAMPLING_MODE_TOPK, true);
-    printf("merge_performance_one_instance_comprehensive_counter_empty_dest elapsed_secs: %ld\n", elapsed);
+    printf("merge_performance_one_instance_topk_counter_empty_dest elapsed_secs: %ld\n", elapsed);
+    EXPECT_TRUE(elapsed < 1000);
 }
 
 TEST(test_performance, merge_performance_one_instance_comprehensive_counter_full_dest)
@@ -163,7 +172,8 @@ TEST(test_performance, merge_performance_one_instance_comprehensive_counter_full
     };
 
     clock_t elapsed = perform_merge_test(metric_add_func, metric_register_func, SAMPLING_MODE_COMPREHENSIVE, false);
-    printf("merge_performance_one_instance_comprehensive_counter_empty_dest elapsed_secs: %ld\n", elapsed);
+    printf("merge_performance_one_instance_comprehensive_counter_full_dest elapsed_secs: %ld\n", elapsed);
+    EXPECT_TRUE(elapsed < 1000);
 }
 
 TEST(test_performance, merge_performance_one_instance_comprehensive_hll_full_dest)
@@ -179,7 +189,8 @@ TEST(test_performance, merge_performance_one_instance_comprehensive_hll_full_des
     };
 
     clock_t elapsed = perform_merge_test(metric_add_func, metric_register_func, SAMPLING_MODE_COMPREHENSIVE, false);
-    printf("merge_performance_one_instance_comprehensive_counter_empty_dest elapsed_secs: %ld\n", elapsed);
+    printf("merge_performance_one_instance_comprehensive_hll_full_dest elapsed_secs: %ld\n", elapsed);
+    EXPECT_TRUE(elapsed < 1000);
 }
 
 TEST(test_performance, merge_performance_one_instance_comprehensive_histogram_full_dest)
@@ -195,7 +206,8 @@ TEST(test_performance, merge_performance_one_instance_comprehensive_histogram_fu
     };
 
     clock_t elapsed = perform_merge_test(metric_add_func, metric_register_func, SAMPLING_MODE_COMPREHENSIVE, false);
-    printf("merge_performance_one_instance_comprehensive_counter_empty_dest elapsed_secs: %ld\n", elapsed);
+    printf("merge_performance_one_instance_comprehensive_histogram_full_dest elapsed_secs: %ld\n", elapsed);
+    EXPECT_TRUE(elapsed < 2 * 1000);
 }
 
 TEST(test_performance, merge_performance_one_instance_topk_counter_full_dest)
@@ -208,10 +220,13 @@ TEST(test_performance, merge_performance_one_instance_topk_counter_full_dest)
     };
 
     clock_t elapsed = perform_merge_test(metric_add_func, metric_register_func, SAMPLING_MODE_TOPK, false);
-    printf("merge_performance_one_instance_comprehensive_counter_empty_dest elapsed_secs: %ld\n", elapsed);
+    printf("merge_performance_one_instance_topk_counter_full_dest elapsed_secs: %ld\n", elapsed);
+    EXPECT_TRUE(elapsed < 1 * 1000);
 }
 
-
+/* -------------------------------------------------------------------------- */
+/*                                     add                                    */
+/* -------------------------------------------------------------------------- */
 TEST(test_performance, performance_test_add_cells_comprehensive)
 {
     size_t cell_count = 100000;
@@ -313,6 +328,55 @@ TEST(test_performance, performance_test_add_cells_hll_add)
     fieldstat_free(instance);
 }
 
+/* -------------------------------------------------------------------------- */
+/*                                   export                                   */
+/* -------------------------------------------------------------------------- */
+using namespace std;
+
+TEST(test_performance, export_many_cells)
+{
+    const int MAX_CELL_NUM = 1000;
+    const int TAG_NUM = 3000;
+    const int CUBE_NUM = 100;
+    const int METRIC_NUM = 10;
+
+    Fieldstat_tag_list_wrapper *tags[TAG_NUM];
+    for (int i = 0; i < TAG_NUM; i++) {
+        tags[i] = new Fieldstat_tag_list_wrapper("my key", i);
+    }
+
+    struct fieldstat *instance = fieldstat_new();
+    int cell_id[MAX_CELL_NUM];
+    for (int i = 0; i < CUBE_NUM; i++) {
+        Fieldstat_tag_list_wrapper cube_tag("shared key", i);
+        int cube_id = fieldstat_register_cube(instance, cube_tag.get_tag(), cube_tag.get_tag_count(), SAMPLING_MODE_COMPREHENSIVE, MAX_CELL_NUM);
+        for (int k = 0; k < MAX_CELL_NUM; k++) {
+            cell_id[k] = fieldstat_cube_add(instance, cube_id, tags[rand() % TAG_NUM]->get_tag(), 1, 1);
+        }
+        for (int j = 0; j < METRIC_NUM; j++) {
+            string metric_name = "metric name" + to_string(i) + to_string(j);
+            int metric_id = fieldstat_register_counter(instance, cube_id, metric_name.c_str(), false);
+
+            for (int k = 0; k < MAX_CELL_NUM; k++) {
+                fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id[k], 1);
+            }
+        }
+    }
+
+    struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new(instance);
+    clock_t start = clock();
+    char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter);
+    clock_t end = clock();
+    free(json_string);
+    fieldstat_json_exporter_free(fieldstat_json_exporter);
+
+    printf("export_many_cells us: %ld\n", end - start);
+    fieldstat_free(instance);
+
+    for (int i = 0; i < TAG_NUM; i++) {
+        delete tags[i];
+    }
+}
 
 int main(int argc, char *argv[]) 
 {

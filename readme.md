@@ -150,7 +150,7 @@ It is hard to calculate memory usage of CJSON. By experiment, RSS to different c
 | merge 1000 cell of a HLL metric                  | 0.288    | fieldstat_merge(destination also has registered cube, metric and cells)          |
 | merge 1000 cell of a histogram metric            | 1.347    | fieldstat_merge(destination instance also has registered cube, metric and cells) |
 | merge 1000 cell of a counter metric on topk cube | 1.078    | fieldstat_merge(destination instance also has registered cube, metric and cells) |
-
+| export a cell                                    | 160      | fieldstat_json_exporter_export                                                   |
 
 ### Explanation
 #### add a cell(topk)
@@ -187,3 +187,6 @@ The same as "copy 1 cell of a histogram metric" but merge twice.
 #### merge 1 cell of a counter metric on topk cube
 The same as "copy 1 cell of a counter metric on topk cube" but merge twice. 
 Merging Heavy Keeper is slower the coping it, it is why the execution time is unusually higher than copying it.
+
+#### export a cell
+I add a instance with 100 cubes, on each of which I register 10 metrics. The max cell number of each cube is 1000, and call the metric operation on every added cell. So there are 100 * 10 * 1000 cells in total. After exporting the instance, calculate the average time spent on each cells.
