@@ -365,11 +365,11 @@ TEST(test_performance, export_many_cells)
 
     struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new(instance);
     printf("export_many_cells\n");
-    getchar();
+    // getchar();
     clock_t start = clock();
     char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter);
     clock_t end = clock();
-    exit(0);
+    // exit(0);
     free(json_string);
     fieldstat_json_exporter_free(fieldstat_json_exporter);
 

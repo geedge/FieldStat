@@ -399,6 +399,50 @@ void fieldstat_json_exporter_write_global_tags(const struct fieldstat_json_expor
     }
 }
 
+int add_object_to_json_array_start(char *buf, int buf_len)
+{
+    memset(buf, 0, buf_len);
+    memcpy(buf, "[", 1);
+    return 1;
+}
+
+int add_object_to_json_array_end(char **buf, int buf_len, int start)
+{
+    if (start == 1) { // only [
+        strcpy(*buf, "[]");
+        return 3;
+    }
+    start = start - 1; // eat the last ','
+    int used_len = start + 2; // 1 for ] and 1 for \0
+    if (used_len >= buf_len) { 
+        *buf = realloc(*buf, used_len);
+    }
+    strcpy(*buf + start, "]");
+    return used_len;
+}
+
+/* [{<str>},*/
+int add_object_to_json_array(char **buf, int *buf_len, int start, const char *str)
+{
+    int str_len = strlen(str);
+    int used_len = start + str_len + 1; // 1 for ','
+    int cur_len = *buf_len;
+    char *buf_ptr = *buf;
+    if (used_len >= cur_len) {
+        // realloc
+        while (used_len >= cur_len) {
+            cur_len *= 2;
+        }
+        *buf = realloc(buf_ptr, cur_len);
+        *buf_len = cur_len;
+    }
+
+    buf_ptr = *buf;
+    memcpy(buf_ptr + start, str, str_len);
+    buf_ptr[start + str_len] = ',';
+
+    return used_len;
+}
 /*
     {
         "name":<exporter name>
@@ -434,7 +478,10 @@ char *fieldstat_json_exporter_export(const struct fieldstat_json_exporter *expor
 
     fieldstat_json_exporter_write_global_tags(exporter, tag_field_pair, n_pair);
 
-    cJSON *cjson_root_arr = cJSON_CreateArray();
+    int buf_len = 4096;
+    char *cjson_str_arr = (char *)malloc(buf_len);
+    // cjson is so slow, so we construct the json array manually
+    int used_len = add_object_to_json_array_start(cjson_str_arr, buf_len);
     cJSON *cjson_root;
     for (int i = 0; i < n_pair; i++) {
         struct cjson_tag_field_pair *current = &tag_field_pair[i];
@@ -445,18 +492,16 @@ char *fieldstat_json_exporter_export(const struct fieldstat_json_exporter *expor
         cJSON_AddItemToObject(cjson_root, "fields", current->cjson_fields);
         cJSON_AddNumberToObject(cjson_root, "timestamp", get_current_time());
 
-        cJSON_AddItemToArray(cjson_root_arr, cjson_root);
+        char *cjson_str = cJSON_PrintUnformatted(cjson_root);
+        cJSON_Delete(cjson_root);
+        used_len = add_object_to_json_array(&cjson_str_arr, &buf_len, used_len, cjson_str);
+        free(cjson_str);
     }
+    add_object_to_json_array_end(&cjson_str_arr, buf_len, used_len);
 
     free(tag_field_pair);    // cjson object will be freed with cjson root
 
-    char *out_cjson = NULL;
-    if (cJSON_GetArraySize(cjson_root_arr) != 0) {
-        out_cjson = cJSON_PrintUnformatted(cjson_root_arr);
-    }
-    cJSON_Delete(cjson_root_arr);
-
-    return out_cjson;
+    return cjson_str_arr;
 }
 
 struct fieldstat_json_exporter *fieldstat_json_exporter_new(const struct fieldstat *instance)

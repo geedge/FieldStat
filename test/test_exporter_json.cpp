@@ -398,6 +398,49 @@ TEST(export_test, skip_empty_metrics_given_cube_deleted) {
     cJSON_Delete(root_arr);
 }
 
+extern "C" {
+extern int add_object_to_json_array_start(char *buf, int buf_len);
+extern int add_object_to_json_array_end(char **buf, int buf_len, int start);
+extern int add_object_to_json_array(char **buf, int *buf_len, int start, const char *str);
+}
+
+TEST(export_unit_test, test_add_json_length_is_on_margin_4096)
+{
+    int buf_len = 4096; // the initial buffer max len is 4096
+    char *buf = (char *)malloc(buf_len);
+    char str[4096 + 1];
+    memset(str, 'a', 4096);
+    str[4096] = '\0';
+
+    int used_len = add_object_to_json_array_start(buf, buf_len);
+    used_len = add_object_to_json_array(&buf, &buf_len, used_len, str);
+    used_len = add_object_to_json_array_end(&buf, buf_len, used_len);
+
+    EXPECT_EQ(used_len, 4096 + 3);
+    std::string target = "[" + std::string(str) + "]";
+    EXPECT_STREQ(buf, target.c_str());
+
+    free(buf);
+}
+
+TEST(export_unit_test, test_add_json_length_is_on_margin_4095)
+{
+    int buf_len = 4096; // the initial buffer max len is 4096
+    char *buf = (char *)malloc(buf_len);
+    char str[4096];
+    memset(str, 'a', 4095);
+    str[4095] = '\0';
+
+    int used_len = add_object_to_json_array_start(buf, buf_len);
+    used_len = add_object_to_json_array(&buf, &buf_len, used_len, str);
+    used_len = add_object_to_json_array_end(&buf, buf_len, used_len);
+
+    std::string target = "[" + std::string(str) + "]";
+    EXPECT_STREQ(buf, target.c_str());
+
+    free(buf);
+}
+
 void init_hll_standard_oper()
 {
     g_hll_standard = ST_hyperloglog_new(12);
