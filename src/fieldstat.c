@@ -974,3 +974,58 @@ struct fieldstat *fieldstat_dup(const struct fieldstat *instance)
     new_instance->cube_version = calloc(new_instance->max_n_cube, sizeof(unsigned long));
     return new_instance;
 }
+
+void fieldstat_cube_read_cell(const struct fieldstat *instance, int cube_id, int **cell_ids, struct fieldstat_tag_list **tag_list, size_t *n_cell)
+{
+    const struct fs_cube *cube = instance->cube[cube_id];
+    if (cube == NULL) {
+        printf("ERR: fieldstat_cube_read_cell cube is not registered yet, cube id: %d\n", cube_id);
+        return;
+    }
+    
+    int arr_len = 0;
+    const struct tag_hash_key **tags_discontinuous = cell_manager_dump(cube->cell_manager, &arr_len);
+    if (arr_len == 0) {
+        *cell_ids = NULL;
+        *tag_list = NULL;
+        *n_cell = 0;
+        return;
+    }
+
+    struct fieldstat_tag_list *tag_list_ret = (struct fieldstat_tag_list *)malloc(sizeof(struct fieldstat_tag_list) * arr_len);
+    int *cell_ids_ret = (int *)malloc(sizeof(int) * arr_len);
+    int n_cell_ret = 0;
+
+    for (int i = 0; i < arr_len; i++) {
+        const struct tag_hash_key *tag_key = tags_discontinuous[i];
+        if (tag_key == NULL) {
+            continue;
+        }
+        tag_hash_key_convert_to_fieldstat_tag(tag_key, &(tag_list_ret[n_cell_ret].tag), &(tag_list_ret[n_cell_ret].n_tag));
+        cell_ids_ret[n_cell_ret] = i;
+        n_cell_ret++;
+    }
+    if (n_cell_ret == 0) {
+        free(cell_ids_ret);
+        free(tag_list_ret);
+        *cell_ids = NULL;
+        *tag_list = NULL;
+        *n_cell = 0;
+        return;
+    }
+
+    *cell_ids = cell_ids_ret;
+    *tag_list = tag_list_ret;
+    *n_cell = n_cell_ret;
+}
+
+int fieldstat_get_max_cell_num(const struct fieldstat *instance, int cube_id)
+{
+    const struct fs_cube *cube = instance->cube[cube_id];
+    if (cube == NULL) {
+        printf("ERR: fieldstat_get_max_cell_num cube is not registered yet, cube id: %d\n", cube_id);
+        return -1;
+    }
+
+    return cube->max_n_cell;
+}

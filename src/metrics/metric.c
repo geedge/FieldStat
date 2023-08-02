@@ -714,11 +714,17 @@ int metric_merge_or_copy_cell(struct metric *dest, const struct metric *src, int
 
 void metric_get_plain_blob(const struct metric *pthis, int cell_id, char **blob, size_t *blob_size)
 {
-    if (pthis->info->type == METRIC_TYPE_HLL) {
-        ST_hyperloglog_serialize_for_networking(metric_find_one_cell(pthis, cell_id)->hll, blob, blob_size);
+    struct metric_measure_data *data = metric_find_one_cell(pthis, cell_id);
+    if (data == NULL) {
+        *blob = NULL;
+        *blob_size = 0;
         return;
     }
-    pthis->scheme->serialize(metric_find_one_cell(pthis, cell_id), blob, blob_size);
+    if (pthis->info->type == METRIC_TYPE_HLL) {
+        ST_hyperloglog_serialize_for_networking(data->hll, blob, blob_size);
+        return;
+    }
+    pthis->scheme->serialize(data, blob, blob_size);
 }
 
 void metric_delete_cell(struct metric *pthis, int cell_id)
@@ -777,7 +783,6 @@ long long metric_counter_get(const struct metric *pthis, int cell_id)
 {
     const struct metric_measure_data *data = metric_find_one_cell(pthis, cell_id);
     if (data == NULL) {
-        printf("ERR: metric_counter_get cell id %d does not exist\n", cell_id);
         return -1;
     }
     const struct metric_counter_or_gauge *counter = data->counter;
@@ -803,7 +808,6 @@ double metric_hll_get(const struct metric *pthis, int cell_id)
 {
     const struct metric_measure_data *data = metric_find_one_cell(pthis, cell_id);
     if (data == NULL) {
-        printf("ERR: metric_hll_get cell id %d does not exist\n", cell_id);
         return -1;
     }
     return ST_hyperloglog_count(data->hll);
@@ -833,7 +837,6 @@ long long metric_histogram_value_at_percentile(const struct metric *pthis, int c
 {
     const struct metric_measure_data *data = metric_find_one_cell(pthis, cell_id);
     if (data == NULL) {
-        printf("ERR: metric_histogram_value_at_percentile cell id %d does not exist\n", cell_id);
         return -1;
     }
     return hdr_value_at_percentile(data->hdr, percentile);

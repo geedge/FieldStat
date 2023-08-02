@@ -156,9 +156,10 @@ struct fieldstat_tag_list
 
 void fieldstat_get_cubes(const struct fieldstat *instance, int **cube_ids, int *n_cube);
 int fieldstat_get_max_metric_id(const struct fieldstat *instance, int cube_id);
-void fieldstat_get_cells(const struct fieldstat *instance, int cube_id, int metric_id,
+void fieldstat_cube_read_cell(const struct fieldstat *instance, int cube_id,
     int **cell_ids, struct fieldstat_tag_list **tag_list, size_t *n_cell);
 struct fieldstat_tag_list *fieldstat_get_shared_tags(const struct fieldstat *instance, int cube_id);
+int fieldstat_get_max_cell_num(const struct fieldstat *instance, int cube_id);
 
 long long fieldstat_counter_get(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id);
 double fieldstat_hll_get(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id);
@@ -168,7 +169,9 @@ void fieldstat_get_serialized_blob(const struct fieldstat *instance, int cube_id
 
 const char *fieldstat_get_metric_name(const struct fieldstat *instance, int cube_id, int metric_id);
 enum metric_type fieldstat_get_metric_type(const struct fieldstat *instance, int cube_id, int metric_id);
-
+void fieldstat_get_cells(const struct fieldstat *instance, int cube_id, int metric_id,
+    int **cell_ids, struct fieldstat_tag_list **tag_list, size_t *n_cell);
+    
 void fieldstat_tag_list_arr_free(struct fieldstat_tag_list *tag_list, size_t n_cell);
 
 #ifdef __cplusplus
