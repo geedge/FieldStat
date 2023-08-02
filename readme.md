@@ -150,7 +150,7 @@ It is hard to calculate memory usage of CJSON. By experiment, RSS to different c
 | merge 1000 cell of a HLL metric                  | 0.288    | fieldstat_merge(destination also has registered cube, metric and cells)          |
 | merge 1000 cell of a histogram metric            | 1.347    | fieldstat_merge(destination instance also has registered cube, metric and cells) |
 | merge 1000 cell of a counter metric on topk cube | 1.078    | fieldstat_merge(destination instance also has registered cube, metric and cells) |
-| export a cell                                    | 160      | fieldstat_json_exporter_export                                                   |
+| export a cell                                    | 0.00297  | fieldstat_json_exporter_export                                                   |
 
 ### Explanation
 #### add a cell(topk)
