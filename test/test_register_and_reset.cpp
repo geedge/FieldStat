@@ -190,6 +190,41 @@ TEST(test_register, dup_registered_info_with_cube_and_metric_without_cell)
     fieldstat_free(instance);
 }
 
+TEST(test_register, unregister_cube_on_wrong_instance)
+{
+    struct fieldstat *instance = fieldstat_new();
+    struct fieldstat *instance_dst = fieldstat_new();
+
+    int cube_id = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    int cube_id2 = fieldstat_register_cube(instance, &TEST_TAG_DOUBLE, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    int metric_id = fieldstat_register_counter(instance, cube_id, "counter", false);
+    int metric_id2 = fieldstat_register_counter(instance, cube_id2, "counter2", false);
+    int cell_id = fieldstat_cube_add(instance, cube_id, &TEST_TAG_INT, 1, 1);
+    int cell_id2 = fieldstat_cube_add(instance, cube_id2, &TEST_TAG_INT, 1, 1);
+    fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id, 1);
+    fieldstat_counter_incrby(instance, cube_id2, metric_id2, cell_id2, 1);
+
+    fieldstat_merge(instance_dst, instance);
+
+    fieldstat_unregister_cube(instance_dst, 0);
+
+    int *cube_ids;
+    int cube_num;
+    fieldstat_get_cubes(instance_dst, &cube_ids, &cube_num);
+    EXPECT_EQ(cube_num, 1);
+    EXPECT_EQ(cube_ids[0], cube_id2);
+
+    fieldstat_merge(instance_dst, instance);
+
+    long long val_deleted_once = fieldstat_counter_get(instance_dst, cube_id, metric_id, cell_id);
+    EXPECT_EQ(val_deleted_once, 1);
+    long long val_merged_twice = fieldstat_counter_get(instance_dst, cube_id2, metric_id2, cell_id2);
+    EXPECT_EQ(val_merged_twice, 2);
+
+    fieldstat_free(instance);
+    fieldstat_free(instance_dst);
+    free(cube_ids);
+}
 
 int main(int argc, char *argv[]) 
 {

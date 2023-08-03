@@ -109,8 +109,9 @@ int fieldstat_unregister_cube(struct fieldstat *instance, int cube_id)
         return -1;
     }
     if (instance->shared_tag_cube_manager != NULL) {
-        printf("ERR: cannot unregister cube when the instance is used for merging\n");
-        return -1;
+        printf("WARNING: This fieldstat instance is used as a merge destination. Please make sure merging has finished.\n");
+        cube_manager_free(instance->shared_tag_cube_manager);
+        instance->shared_tag_cube_manager = NULL;
     }
     fieldstat_cube_free(instance, cube_id);
     instance->cube[cube_id] = NULL;
