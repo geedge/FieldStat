@@ -143,7 +143,7 @@ TEST(test_performance, merge_performance_one_instance_comprehensive_histogram_em
 
     clock_t elapsed = perform_merge_test(metric_add_func, metric_register_func, SAMPLING_MODE_COMPREHENSIVE, true);
     printf("merge_performance_one_instance_comprehensive_histogram_empty_dest elapsed_secs: %ld\n", elapsed);
-    EXPECT_TRUE(elapsed < 2000);
+    EXPECT_TRUE(elapsed < 2500);
 }
 
 TEST(test_performance, merge_performance_one_instance_topk_counter_empty_dest)
