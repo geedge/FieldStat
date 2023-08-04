@@ -1,9 +1,11 @@
 cmake_minimum_required(VERSION 2.8.8)
 
+message("-- CMAKE_C_COMPILER: ${CMAKE_C_COMPILER_ID}")
+
 set(lib_name fieldstat4)
 
 #the path where you install the cppcheck
-set(CPP_BIN_PATH "/home/chenzizhan/bin")
+
 
 project (${lib_name})
 
@@ -19,18 +21,24 @@ include(Version)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_MACOSX_RPATH 0)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -fPIC -Wall -lm -lz")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -fPIC -Wall -lm -lz --std=gnu11")
 set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} -Wall)
+
+set(C_INCLUDE_PATH ${C_INCLUDE_PATH} /opt/MESA/include)
+set(CPLUS_INCLUDE_PATH ${CPLUS_INCLUDE_PATH} /opt/MESA/include)
+set (LIBRARY_PATH ${LIBRARY_PATH} /opt/MESA/lib)
 
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 	set(CMAKE_INSTALL_PREFIX "/opt/MESA" CACHE PATH "default install path" FORCE)
 endif()
 
+set(CPP_BIN_PATH "/home/chenzizhan/cppcheck/cfg")
 find_program(CMAKE_CXX_CPPCHECK NAMES cppcheck HINTS ${CPP_BIN_PATH})
 if (CMAKE_CXX_CPPCHECK)
     list(
         APPEND CMAKE_CXX_CPPCHECK 
             "--enable=all"
+            "--suppress=missingIncludeSystem"
             "--error-exitcode=1"
             "--suppress=unreachableCode"
             "--suppress=unusedFunction"
@@ -53,8 +61,10 @@ if (CMAKE_CXX_CPPCHECK)
             "--suppress=shadowFunction"
             "--suppress=shiftTooManyBitsSigned"
             "--suppress=preprocessorErrorDirective"
-            "--suppress=*:${PROJECT_SOURCE_DIR}/vendors/mpack/mpack.c"
+            "--inline-suppr"
+            "--suppress=*:${PROJECT_SOURCE_DIR}/vendors/*"
             "--suppress=*:${PROJECT_SOURCE_DIR}/test/utils.hpp"
+            "--suppress=*:${PROJECT_SOURCE_DIR}/test/unit_test_serialize.cpp"
     )
     set(CMAKE_C_CPPCHECK ${CMAKE_CXX_CPPCHECK})
 else()
@@ -84,13 +94,13 @@ include_directories(${PROJECT_SOURCE_DIR}/vendors)
 include_directories(${PROJECT_SOURCE_DIR}/src)
 include_directories(${PROJECT_SOURCE_DIR}/include/fieldstat)
 include_directories(${PROJECT_SOURCE_DIR}/src/metrics)
-include_directories(${PROJECT_SOURCE_DIR}/src/utils)
+include_directories(${PROJECT_SOURCE_DIR}/src/tags)
 
 
 file(GLOB SRC
     "src/*.c"
     "src/metrics/*.c"
-    "src/utils/*.c"
+    "src/tags/*.c"
     "src/exporter/*.c"
     "vendors/cjson/*.c"
     "vendors/hdr/*.c"
@@ -104,7 +114,7 @@ add_subdirectory(test/deps)
 
 add_subdirectory(test)
 enable_testing()
-add_subdirectory(./ctest)
+add_subdirectory(ctest)
 
 
 
@@ -124,15 +134,6 @@ set_target_properties(${lib_name}_static PROPERTIES OUTPUT_NAME ${lib_name})
 
 install(TARGETS ${lib_name}_shared LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib COMPONENT LIBRARIES)
 install(TARGETS ${lib_name}_static LIBRARY ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib COMPONENT LIBRARIES)
-install(FILES inc/fieldstat.h   DESTINATION   ${CMAKE_INSTALL_PREFIX}/include/MESA COMPONENT HEADER)
+install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_PREFIX}/include COMPONENT HEADER)
 
-
-# include(Package)
-
-# file(GLOB DEMO	
-#     "test/*.c"
-#     "test/*.cpp"
-# )
-
-# add_executable(demo ${DEMO})
-# target_link_libraries(demo  pthread ${lib_name}_static)
+include(Package)

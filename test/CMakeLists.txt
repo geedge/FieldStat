@@ -11,18 +11,24 @@
 
 cmake_minimum_required(VERSION 2.8)
 
-
+set(DEBUG_FLAGS "-O3")
 
 include_directories(${PROJECT_SOURCE_DIR}/test)
 include_directories(${PROJECT_SOURCE_DIR}/src)
-include_directories(${PROJECT_SOURCE_DIR}/src/utils)
+include_directories(${PROJECT_SOURCE_DIR}/src/tags)
 include_directories(${PROJECT_SOURCE_DIR}/src/metrics)
-include_directories(${PROJECT_SOURCE_DIR}/include)
+include_directories(${PROJECT_SOURCE_DIR}/include/fieldstat)
 
 # zlib, first install zlib from https://zlib.net/
-SET (ZLIB_ROOT "/home/chenzizhan/zlib")
-SET (ZLIB_INCLUDE_DIR "/home/chenzizhan/zlib/include/")
-SET (ZLIB_LIBRARY "/home/chenzizhan/zlib/lib/libz.so.1.2.13")
+# SET (ZLIB_ROOT "/home/chenzizhan/zlib")
+# SET (ZLIB_INCLUDE_DIR "/home/chenzizhan/zlib/include/")
+# SET (ZLIB_LIBRARY "/home/chenzizhan/zlib/lib/libz.so.1.2.13")
+
+if (COVERAGE) # user defined
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fprofile-arcs -ftest-coverage --coverage")
+    MESSAGE ("CMAKE_C_FLAGS in test is " ${CMAKE_C_FLAGS})
+    SET(LFLAGS "-lgcov --coverage")
+endif()
 
 FIND_PACKAGE (ZLIB REQUIRED)
 MESSAGE (" zlib version major is " ${ZLIB_VERSION_MAJOR})
@@ -36,15 +42,17 @@ SET(TEST_UTILS_SRC
 
 function (add_unit_test file_name)
     add_executable(${file_name} ${SRC} ${TEST_UTILS_SRC} ${file_name}.cpp)
-    target_link_libraries(${file_name} gtest-static ${ZLIB_LIBRARIES})
+    target_link_libraries(${file_name} gtest-static MESA_handle_logger ${ZLIB_LIBRARIES} ${LFLAGS})
     set_property(TARGET ${file_name} PROPERTY CXX_STANDARD 17)
-    # add_test(NAME ${file_name} COMMAND ${file_name})
 endfunction()
 
-add_unit_test(gtest_hll)
-add_unit_test(gtest_counter)
-add_unit_test(gtest_histogram)
-add_unit_test(gtest_topk)
-add_unit_test(gtest_json_export)
-add_unit_test(gtest_misc)
-# add_unit_test(gtest_benchmark)
+add_unit_test(test_exporter_json)
+add_unit_test(test_fuzz_test)
+add_unit_test(test_merge)
+add_unit_test(test_metric_counter)
+add_unit_test(test_metric_histogram)
+add_unit_test(test_metric_hll)
+add_unit_test(test_performance)
+add_unit_test(test_register_and_reset)
+add_unit_test(test_serialize)
+add_unit_test(unit_test_cell_manager)

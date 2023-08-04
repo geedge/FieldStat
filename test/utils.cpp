@@ -1,21 +1,20 @@
-
-
 #include <string>
 #include <stdlib.h>
 #include <iostream>
-#include <type_traits>
 #include <vector>
-#include <functional>
 #include <chrono>
+#include <set>
+#include <unordered_map>    
 #include <random>
-#include <tuple>
 #include <string.h>
 #include <algorithm>
+
 
 #include "fieldstat.h"
 #include "utils.hpp"
 
 using namespace std;
+
 
 string gen_rand_string(int len)
 {
@@ -39,18 +38,18 @@ Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(const struct fieldstat_ta
     for (size_t i = 0; i < tag_list->n_tag; i++)
     {
         // copy the tag_list
-        memcpy((char *)tag_list_c.tag[i].key, tag_list->tag[i].key, MAX_TAG_KEY_LENGTH);
+        tag_list_c.tag[i].key = strdup(tag_list->tag[i].key);
         tag_list_c.tag[i].type = tag_list->tag[i].type;
         switch (tag_list->tag[i].type)
         {
             case TAG_INTEGER:
-                tag_list_c.tag[i].value_int = tag_list->tag[i].value_int;
+                tag_list_c.tag[i].value_longlong = tag_list->tag[i].value_longlong;
                 break;
             case TAG_DOUBLE:
                 tag_list_c.tag[i].value_double = tag_list->tag[i].value_double;
                 break;
             case TAG_CSTRING:
-                memcpy((char *)tag_list_c.tag[i].value_str, tag_list->tag[i].value_str, MAX_TAG_STRING_VAL_LENGTH);
+                tag_list_c.tag[i].value_str = strdup(tag_list->tag[i].value_str);
                 break;
             default:
                 break;
@@ -58,23 +57,48 @@ Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(const struct fieldstat_ta
     }
 }
 
+Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(const char * key, int value)
+{
+    tag_list_c.tag = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag));
+    tag_list_c.n_tag = 1;
+    tag_list_c.tag[0].key = strdup(key);
+    tag_list_c.tag[0].type = TAG_INTEGER;
+    tag_list_c.tag[0].value_longlong = value;
+}
+
+Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(const char * key, const char *value)
+{
+    tag_list_c.tag = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag));
+    tag_list_c.n_tag = 1;
+    tag_list_c.tag[0].key = strdup(key);
+    tag_list_c.tag[0].type = TAG_CSTRING;
+    tag_list_c.tag[0].value_str = strdup(value);
+}
+
+
 Fieldstat_tag_list_wrapper::~Fieldstat_tag_list_wrapper() {
-    free((void *)tag_list_c.tag);
+    for (size_t i = 0; i < tag_list_c.n_tag; i++) {
+        free((char *)tag_list_c.tag[i].key);
+        if (tag_list_c.tag[i].type == TAG_CSTRING) {
+            free((char *)tag_list_c.tag[i].value_str);
+        }
+    }
+    free(tag_list_c.tag);
 }
 
 Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(std::uniform_int_distribution<int> &dist, int tag_count)
 {
     tag_list_c.tag = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * tag_count);
     tag_list_c.n_tag = tag_count;
-    std::mt19937 rng(RAND_SEED);
+    std::mt19937 rng(1);
     for (int i = 0; i < tag_count; i++)
     {
-        strcpy((char *)tag_list_c.tag[i].key, gen_rand_string(10).c_str());
+        tag_list_c.tag[i].key = strdup(gen_rand_string(10).c_str());
         int rand_ret = rand() % 3;
         if (rand_ret == 0)
         {
             tag_list_c.tag[i].type = TAG_INTEGER;
-            tag_list_c.tag[i].value_int = static_cast<long long>(dist(rng));
+            tag_list_c.tag[i].value_longlong = static_cast<long long>(dist(rng));
         }
         else if (rand_ret == 1)
         {
@@ -84,7 +108,7 @@ Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(std::uniform_int_distribu
         else
         {
             tag_list_c.tag[i].type = TAG_CSTRING;
-            strcpy((char *)tag_list_c.tag[i].value_str, gen_rand_string(10).c_str());
+            tag_list_c.tag[i].value_str = strdup(gen_rand_string(10).c_str());
         }
     }
 }
@@ -101,18 +125,18 @@ Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(const Fieldstat_tag_list_
     for (size_t i = 0; i < tag_list->n_tag; i++)
     {
         // copy the tag_list
-        memcpy((char *)tag_list_c.tag[i].key, tag_list->tag[i].key, MAX_TAG_KEY_LENGTH);
+        tag_list_c.tag[i].key = strdup(tag_list->tag[i].key);
         tag_list_c.tag[i].type = tag_list->tag[i].type;
         switch (tag_list->tag[i].type)
         {
             case TAG_INTEGER:
-                tag_list_c.tag[i].value_int = tag_list->tag[i].value_int;
+                tag_list_c.tag[i].value_longlong = tag_list->tag[i].value_longlong;
                 break;
             case TAG_DOUBLE:
                 tag_list_c.tag[i].value_double = tag_list->tag[i].value_double;
                 break;
             case TAG_CSTRING:
-                memcpy((char *)tag_list_c.tag[i].value_str, tag_list->tag[i].value_str, MAX_TAG_STRING_VAL_LENGTH);
+                tag_list_c.tag[i].value_str = strdup(tag_list->tag[i].value_str);
                 break;
             default:
                 break;
@@ -145,7 +169,7 @@ void Fieldstat_tag_list_wrapper::print_tag_list() const
         switch (tag_list_c.tag[i].type)
         {
             case TAG_INTEGER:
-                printf("tag_list_c.tag[%zu].value_int: %lld\n", i, tag_list_c.tag[i].value_int);
+                printf("tag_list_c.tag[%zu].value_longlong: %lld\n", i, tag_list_c.tag[i].value_longlong);
                 break;
             case TAG_DOUBLE:
                 printf("tag_list_c.tag[%zu].value_double: %lf\n", i, tag_list_c.tag[i].value_double);
@@ -158,6 +182,32 @@ void Fieldstat_tag_list_wrapper::print_tag_list() const
         }
     }
     printf("print end\n");
+}
+
+string Fieldstat_tag_list_wrapper::to_string() const
+{
+    string str = "";
+    for (size_t i = 0; i < tag_list_c.n_tag; i++)
+    {
+        str += tag_list_c.tag[i].key;
+        str += ":";
+        switch (tag_list_c.tag[i].type)
+        {
+            case TAG_INTEGER:
+                str += std::to_string(tag_list_c.tag[i].value_longlong);
+                break;
+            case TAG_DOUBLE:
+                str += std::to_string(tag_list_c.tag[i].value_double);
+                break;
+            case TAG_CSTRING:
+                str += tag_list_c.tag[i].value_str;
+                break;
+            default:
+                break;
+        }
+        str += ",";
+    }
+    return str;
 }
 
 bool Fieldstat_tag_list_wrapper::operator==(const Fieldstat_tag_list_wrapper &tag_list_wrapper) const
@@ -175,7 +225,7 @@ bool Fieldstat_tag_list_wrapper::operator==(const Fieldstat_tag_list_wrapper &ta
         }
         switch (tag_list_c.tag[i].type) {
             case TAG_INTEGER:
-                if (tag_list_c.tag[i].value_int != tag_list->tag[i].value_int) {
+                if (tag_list_c.tag[i].value_longlong != tag_list->tag[i].value_longlong) {
                     return false;
                 }
                 break;
@@ -196,40 +246,50 @@ bool Fieldstat_tag_list_wrapper::operator==(const Fieldstat_tag_list_wrapper &ta
     return true;
 }
 
-struct fieldstat *test_serialize_and_deserialize(struct fieldstat *instance)
+Fieldstat_tag_list_wrapper& Fieldstat_tag_list_wrapper::sort_tag_list()
 {
-    // serialize 
-    char *blob = NULL;
-    size_t blob_size = 0;
-    fieldstat_serialize(instance, &blob, &blob_size);
-    // deserialize
-    struct fieldstat *instance_from_deserialize = fieldstat_deserialize(blob, blob_size);
-    free(blob);
-    return instance_from_deserialize;
+    std::sort(tag_list_c.tag, tag_list_c.tag + tag_list_c.n_tag, [](const struct fieldstat_tag &a, const struct fieldstat_tag &b) {
+        return strcmp((char *)a.key, (char *)b.key) < 0;
+    });
+    return *this;
 }
 
-void test_merge_with_blob(struct fieldstat *dest, const struct fieldstat *src)
+double test_cal_topk_accuracy(vector<struct Fieldstat_tag_list_wrapper *> &test_result, unordered_map<string, int> &expected_count)
 {
-    char *blob = NULL;
-    size_t blob_size = 0;
-    fieldstat_serialize(src, &blob, &blob_size);
-    fieldstat_merge_with_blob(dest, blob, blob_size);
-    free(blob);
-}
+    std::vector<std::pair<std::string, int>> countVector(expected_count.begin(), expected_count.end());
+    std::sort(countVector.begin(), countVector.end(), [](const std::pair<std::string, int> &a, const std::pair<std::string, int> &b) {
+        return a.second > b.second;
+    });
 
-void test_merge_with_blob_twice(struct fieldstat *dest, const struct fieldstat *src)
-{
-    char *blob = NULL;
-    size_t blob_size = 0;
-    fieldstat_serialize(src, &blob, &blob_size);
-    fieldstat_merge_with_blob(dest, blob, blob_size);
-    fieldstat_merge_with_blob(dest, blob, blob_size);
-    free(blob);
-}
-
-void test_hll_add(int adding_time, struct fieldstat *instance, int id, const struct fieldstat_tag *tags, size_t tag_count) {
-    for (int i = 0; i < adding_time; i++) {
-        std::string tmp_str = to_string(i);
-        fieldstat_hll_add(instance, id, tmp_str.c_str(), tmp_str.size(), tags, tag_count);
+    std::set<std::string> myset;
+    int min_in_max_count = 0;
+    size_t i;
+    for (i = 0; i < test_result.size(); ++i) {
+        myset.insert(countVector[i].first);
+        min_in_max_count = countVector[i].second;
     }
+    while (i < countVector.size()) {
+        if (countVector[i].second != min_in_max_count) {
+            break;
+        }
+        myset.insert(countVector[i].first);
+        i++;
+    }
+
+    // cout << "myset : " << endl;
+    // for (auto it = myset.begin(); it != myset.end(); it++) {
+    //     cout << *it << endl;
+    // }
+    // cout << "------------------------- " << endl;
+
+    int correct = 0;
+    for (size_t i = 0; i < test_result.size(); i++) {
+        string key = test_result[i]->to_string();
+        if (myset.find(key) != myset.end()) {
+            correct++;
+        }
+    }
+
+    double accuracy = (double)correct / test_result.size();
+    return accuracy;
 }

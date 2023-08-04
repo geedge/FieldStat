@@ -13,6 +13,7 @@ int init_heap(struct minheap *heap, int max_size, minheap_cmp cmp, minheap_getin
 	heap->max_size = max_size;
 	heap->cur_size = 0;
 	heap->nodes = malloc(sizeof(void *) * max_size);
+    memset(heap->nodes, 0, sizeof(void *) * max_size);
 	if (!heap->nodes)
 		return (-1);
 	assert(cmp);

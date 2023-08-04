@@ -6,7 +6,7 @@
 #include "st_hyperloglog.h"
 #include "xxhash/xxhash.h"
 #include "mpack/mpack.h"
-#include "utils/crdt_utils.h"
+#include "crdt_utils.h"
 
 #include <stdint.h>
 #include <math.h>
@@ -380,7 +380,7 @@ static double bias_estimate(const struct ST_hyperloglog *h, double raw_est) {
     }
 
     // Get the proper arrays based on precision
-    double *estimates = *(g_rawEstimateData+(precision-4));
+    const double *estimates = *(g_rawEstimateData+(precision-4));
     double *biases = *(g_biasData+(precision-4));
 
     // Get the matching biases

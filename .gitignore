@@ -5,6 +5,7 @@ SI/
 *.si4project/
 *.a
 *.d
+*.zip
 build/
 .vscode
 .idea
@@ -15,3 +16,6 @@ GPATH
 GRTAGS
 GTAGS
 test/profiling/tools
+/logs
+/cppcheck*
+*/Testing/

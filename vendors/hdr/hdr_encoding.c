@@ -16,8 +16,7 @@ int zig_zag_encode_i64(uint8_t* buffer, int64_t signed_value)
     int bytesWritten;
     int64_t value = signed_value;
 
-// cppcheck-suppress    shiftTooManyBitsSigned
-    value = (value << 1) ^ (value >> 63); // cppcheck-suppress[shiftTooManyBitsSigned]
+    value = (value << 1) ^ (value >> 63);
     if (value >> 7 == 0)
     {
         buffer[0] = (uint8_t) value;

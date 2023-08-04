@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stddef.h>
+#include "my_ut_hash.h"
 
 #ifdef __cplusplus
 extern "C"{
@@ -28,13 +29,16 @@ void sorted_set_hook_function_of_free_user_data(struct sorted_set *ss, void (*fr
 
 /** 
  * @brief insert a new entry into the sorted set. The minimum entry will be popped if the list is full.
- * @param ss the sorted set
- * @param member the key of the entry, a string of flow id.
- * @param member_size the length of the key, not including the '\0' terminator.
- * @param cnt The initial score for the member inserted.
+ * @param tag the pointer to the tag, user should alloc it, when the entry is popped out, the tag will be freed. If the tag is not inserted to the sorted set, user should free it.
  * @return 0 if the entry is not inserted because the sorted set is full and the score of the entry is less than the minimum score in the sorted set. Otherwise, return 1.
 */
-int sorted_set_insert(struct sorted_set *ss, const char *member, size_t member_size, unsigned cnt);
+int sorted_set_insert(struct sorted_set *ss, struct tag_hash_key *tag, unsigned cnt);
+
+/*
+  @return 0 if the entry is not inserted because the sorted set is full. return 2 if some data is popped out. Otherwise, return 1.
+  @param popped_user_data user should alloc it, popped_user_data_size is equal to the size of the user data memory.
+*/
+int sorted_set_insert_and_record_popped_back(struct sorted_set *ss, struct tag_hash_key *tag, unsigned cnt, void *popped_user_data, size_t popped_user_data_size);
 
 /**
  * @brief pop out the minumum-score entry from the sorted set.
@@ -45,35 +49,28 @@ unsigned sorted_set_pop(struct sorted_set *ss);
 
 /**
     * @brief record the user data to the sorted set. The user data will be freed when the entry is popped out, if the free_method is defined by sorted_set_hook_function_of_free_user_data().
-    * @param member the key of the entry, a string of flow id.
-    * @param member_size the length of the key, not including the '\0' terminator.
-    * @param user_data the pointer to the user data.
+    * @param user_data the pointer to the user data. user must malloc it first.
     * @return 0 if success, -1 if the member is not in the sorted set.
 */
-int sorted_set_insert_user_data(struct sorted_set *ss, const char *member, size_t member_size, void *user_data);
+int sorted_set_insert_user_data(struct sorted_set *ss, const struct tag_hash_key *tag, void *user_data);
 
 /*
     * @brief get the pointer to the user data of the given member. So that the user can modify the user data.
-    * @param member the key of the entry, a string of flow id.
-    * @param member_size the length of the key, not including the '\0' terminator.
     * @return the pointer to the user data. return NULL if the member is not in the sorted set.
 */
-void **sorted_set_get_pointer_to_user_data(struct sorted_set *ss, const char *member, size_t member_size);
+void **sorted_set_get_pointer_to_user_data(const struct sorted_set *ss, const struct tag_hash_key *tag);
 /**
  * @brief Increase the score of the given member.
- * @param ss the sorted set
- * @param member the key of the entry, a string of flow id.
- * @param member_size the length of the key, not including the '\0' terminator.
  * @param score By the value of which increase member.
 */
-void sorted_set_incrby(struct sorted_set *ss, const char *member, size_t member_size, unsigned score);
+void sorted_set_incrby(struct sorted_set *ss, const struct tag_hash_key *tag, unsigned count);
 
 /**
  * @brief get the minimum score from the sorted set.
  * @param ss the sorted set
  * @return the score of the minimum-score member
 */
-unsigned sorted_set_get_min_score(const struct sorted_set *ss);
+unsigned sorted_set_get_min_count(const struct sorted_set *ss);
 
 /** 
  * @brief find the how many elements the sorted set contains.
@@ -82,29 +79,19 @@ int sorted_set_cardinality(const struct sorted_set *ss);
 
 /**
  * @brief Get the score of the given key string.
- * @param ss the sorted set
- * @param member the key of the entry, a string of flow id.
- * @param member_size the length of the key, not including the '\0' terminator.
  * @return the score of the member. return 0 if the member is not in the sorted set.
 */
-unsigned sorted_set_get_member_score(const struct sorted_set *ss, const char *member, size_t member_size);
+unsigned sorted_set_get_count(const struct sorted_set *ss, const struct tag_hash_key *tag);
 
 /**
  * @brief Get all the contents in sorted order from small to big.
- * @param ss the sorted set
  * @param scores_out the scores of the entries. User should alloc it and make sure the buffer is long enough.
- * @param members_out the member name strings of the entries. User should alloc it and make sure the buffer is long enough. Its content is the pointer to the member name string in the sorted set. Don't free the content.
- * @param members_len_out the length of the member name strings. User should alloc it and make sure the buffer is long enough. Including the '\0' terminator.
+ * @param tags_out the tags of the entries. User should alloc it and make sure the buffer is long enough. Don't free the content.
  * @param user_data_out the user data of the entries. User should alloc it and make sure the buffer is long enough. Its content is the pointer to the user data in the sorted set. Don't free the content.
 */
-void sorted_set_dump(const struct sorted_set *ss, unsigned *scores_out, char **members_out, size_t *members_len_out, void **user_data_out);
+void sorted_set_dump(const struct sorted_set *ss, unsigned *scores_out, struct tag_hash_key **tags_out, void **user_data_out);
 
-/*
-    * @brief Get the total memory usage of the sorted set.
-    * @param ss the sorted set
-    * @return the total memory usage of the sorted set.
-*/
-size_t sorted_set_cal_total_memory_usage(const struct sorted_set *ss);
+struct sorted_set *sorted_set_copy(const struct sorted_set *ss);
 
 #ifdef __cplusplus 
 }//end extern "C"

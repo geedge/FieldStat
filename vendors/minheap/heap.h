@@ -32,4 +32,5 @@ int push_heap(struct minheap *heap, void *node);
 void *pop_heap(struct minheap *heap);
 int adjust_heap_node(struct minheap *heap, void *node);
 int erase_heap_node(struct minheap* heap, void *node);
+
 #endif /* MINHEAP_H */
