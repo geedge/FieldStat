@@ -51,7 +51,7 @@ branch_build_debug_for_centos7:
     BUILD_TYPE: Debug
     UNIT_TEST: 1
   except:
-    - /^develop.*$/i
+    - /^develop-*$/i
     - /^master.*$/i
     - tags
 
@@ -62,7 +62,7 @@ branch_build_release_for_centos7:
     UNIT_TEST: 1
   extends: .build_by_travis_for_centos7
   except:
-    - /^develop.*$/i
+    - /^develop-*$/i
     - /^master.*$/i
     - tags
 
@@ -79,11 +79,11 @@ develop_build_debug_for_centos7:
     PULP3_REPO_NAME: framework-testing-x86_64.el7
     PULP3_DIST_NAME: framework-testing-x86_64.el7
   artifacts:
-    name: "fieldstat3-$CI_COMMIT_REF_NAME-debug"
+    name: "fieldstat4-$CI_COMMIT_REF_NAME-debug"
     paths:
       - build/*.rpm
   only:
-    - /^develop.*$/i
+    - /^develop-*$/i
     - /^master.*$/i
 
 develop_build_release_for_centos7:
@@ -98,11 +98,11 @@ develop_build_release_for_centos7:
     PULP3_REPO_NAME: framework-testing-x86_64.el7
     PULP3_DIST_NAME: framework-testing-x86_64.el7
   artifacts:
-    name: "fieldstat3-$CI_COMMIT_REF_NAME-release"
+    name: "fieldstat4-$CI_COMMIT_REF_NAME-release"
     paths:
       - build/*.rpm
   only:
-    - /^develop.*$/i
+    - /^develop-*$/i
     - /^master.*$/i
 
 release_build_debug_for_centos7:
@@ -116,7 +116,7 @@ release_build_debug_for_centos7:
     PULP3_DIST_NAME: framework-stable-x86_64.el7
   extends: .build_by_travis_for_centos7
   artifacts:
-    name: "fieldstat3-$CI_COMMIT_REF_NAME-debug"
+    name: "fieldstat4-$CI_COMMIT_REF_NAME-debug"
     paths:
       - build/*.rpm
   only:
@@ -129,13 +129,11 @@ release_build_release_for_centos7:
     UNIT_TEST: 1
     PACKAGE: 1
     UPLOAD_RPM: 1
-    UPLOAD_SYMBOL_FILES: 1
-    SYMBOL_TARGET: libfieldstat3
     PULP3_REPO_NAME: framework-stable-x86_64.el7
     PULP3_DIST_NAME: framework-stable-x86_64.el7
   extends: .build_by_travis_for_centos7
   artifacts:
-    name: "fieldstat3-$CI_COMMIT_REF_NAME-release"
+    name: "fieldstat4-$CI_COMMIT_REF_NAME-release"
     paths:
       - build/*.rpm
   only:
@@ -148,7 +146,7 @@ branch_build_debug_for_centos8:
     BUILD_TYPE: Debug
     UNIT_TEST: 1
   except:
-    - /^develop.*$/i
+    - /^develop-*$/i
     - /^master.*$/i
     - tags
 
@@ -159,7 +157,7 @@ branch_build_release_for_centos8:
     UNIT_TEST: 1
   extends: .build_by_travis_for_centos8
   except:
-    - /^develop.*$/i
+    - /^develop-*$/i
     - /^master.*$/i
     - tags
 
@@ -176,11 +174,11 @@ develop_build_debug_for_centos8:
     PULP3_REPO_NAME: framework-testing-x86_64.el8
     PULP3_DIST_NAME: framework-testing-x86_64.el8
   artifacts:
-    name: "fieldstat3-$CI_COMMIT_REF_NAME-debug"
+    name: "fieldstat4-$CI_COMMIT_REF_NAME-debug"
     paths:
       - build/*.rpm
   only:
-    - /^develop.*$/i
+    - /^develop-*$/i
     - /^master.*$/i
 
 develop_build_release_for_centos8:
@@ -195,11 +193,11 @@ develop_build_release_for_centos8:
     PULP3_REPO_NAME: framework-testing-x86_64.el8
     PULP3_DIST_NAME: framework-testing-x86_64.el8
   artifacts:
-    name: "fieldstat3-$CI_COMMIT_REF_NAME-release"
+    name: "fieldstat4-$CI_COMMIT_REF_NAME-release"
     paths:
       - build/*.rpm
   only:
-    - /^develop.*$/i
+    - /^develop-*$/i
     - /^master.*$/i
 
 release_build_debug_for_centos8:
@@ -213,7 +211,7 @@ release_build_debug_for_centos8:
     PULP3_DIST_NAME: framework-stable-x86_64.el8
   extends: .build_by_travis_for_centos8
   artifacts:
-    name: "fieldstat3-$CI_COMMIT_REF_NAME-debug"
+    name: "fieldstat4-$CI_COMMIT_REF_NAME-debug"
     paths:
       - build/*.rpm
   only:
@@ -226,13 +224,11 @@ release_build_release_for_centos8:
     UNIT_TEST: 1
     PACKAGE: 1
     UPLOAD_RPM: 1
-    UPLOAD_SYMBOL_FILES: 1
-    SYMBOL_TARGET: libfieldstat3
     PULP3_REPO_NAME: framework-stable-x86_64.el8
     PULP3_DIST_NAME: framework-stable-x86_64.el8
   extends: .build_by_travis_for_centos8
   artifacts:
-    name: "fieldstat3-$CI_COMMIT_REF_NAME-release"
+    name: "fieldstat4-$CI_COMMIT_REF_NAME-release"
     paths:
       - build/*.rpm
   only:
