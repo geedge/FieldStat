@@ -421,13 +421,6 @@ TEST(unit_test_cell_manager, find_next_id_given_all_cell_id_continuous)
         *arr[i] = i;
     }
 
-    printf("arr:\n");
-    for (int i = 0; i < 10; i++)
-    {
-        printf("%d ", *arr[i]);
-    }
-    printf("\n");
-
     int last_find_result = -1;
     int next_idx = 0;
     last_find_result = find_next_unused_cell_id((const int *const *)arr, 10, last_find_result, &next_idx);
@@ -458,13 +451,6 @@ TEST(unit_test_cell_manager, find_next_id_given_continuous_hole)
         *arr[i] = i + 2;
     }
     
-    printf("arr:\n");
-    for (int i = 0; i < 10; i++)
-    {
-        printf("%d ", *arr[i]);
-    }
-    printf("\n");
-
     int last_find_result = -1;
     int next_idx = 0;
     last_find_result = find_next_unused_cell_id((const int *const *)arr, 10, last_find_result, &next_idx);
@@ -492,13 +478,6 @@ TEST(unit_test_cell_manager, find_next_id_given_holes)
         *arr[i] = i * 2; // 0, 2, 4, ...
     }
     
-    printf("arr:\n");
-    for (int i = 0; i < 10; i++)
-    {
-        printf("%d ", *arr[i]);
-    }
-    printf("\n");
-
     int last_find_result = -1;
     int next_idx = 0;
     last_find_result = find_next_unused_cell_id((const int *const *)arr, 10, last_find_result, &next_idx);
@@ -523,13 +502,6 @@ TEST(unit_test_cell_manager, find_next_id_given_holes_at_only_start)
         arr[i] = (int *)malloc(sizeof(int));
         *arr[i] = i + 2;
     }
-    
-    printf("arr:\n");
-    for (int i = 0; i < 10; i++)
-    {
-        printf("%d ", *arr[i]);
-    }
-    printf("\n");
 
     int last_find_result = -1;
     int next_idx = 0;

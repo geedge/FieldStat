@@ -406,7 +406,6 @@ TEST(unit_test_merge, new_too_many_cells_on_multiple_metric_given_source_cube_re
     int cell_id1 = fieldstat_cube_add(instance, cube_id, &TEST_TAG_STRING, 1, 1);
     fieldstat_counter_incrby(instance, cube_id, metric_id1, cell_id1, 1);
     struct fieldstat *instance_dest = fieldstat_new();
-    printf("first merge\n");
     fieldstat_merge(instance_dest, instance);
     fieldstat_reset(instance);
 
@@ -416,7 +415,6 @@ TEST(unit_test_merge, new_too_many_cells_on_multiple_metric_given_source_cube_re
     int cell_id3 = fieldstat_cube_add(instance, cube_id, &TEST_TAG_DOUBLE, 1, 3);
     fieldstat_counter_incrby(instance, cube_id, metric_id2, cell_id3, 3);
 
-    printf("second merge\n");
     fieldstat_merge(instance_dest, instance);
 
     int *cell_ids = NULL;
