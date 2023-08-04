@@ -10,6 +10,7 @@
 #include "fieldstat.h"
 #include "metrics/metric.h"
 #include "tags/cell_manager.h"
+#include "MESA/MESA_handle_logger.h"
 
 struct fs_cube {
     enum sampling_mode sampling_mode;

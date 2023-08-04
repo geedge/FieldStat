@@ -24,6 +24,10 @@ set(CMAKE_MACOSX_RPATH 0)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -fPIC -Wall -lm -lz --std=gnu11")
 set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} -Wall)
 
+set(C_INCLUDE_PATH ${C_INCLUDE_PATH} /opt/MESA/include)
+set(CPLUS_INCLUDE_PATH ${CPLUS_INCLUDE_PATH} /opt/MESA/include)
+set (LIBRARY_PATH ${LIBRARY_PATH} /opt/MESA/lib)
+
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 	set(CMAKE_INSTALL_PREFIX "/opt/MESA" CACHE PATH "default install path" FORCE)
 endif()
@@ -128,5 +132,8 @@ endif()
 add_library(${lib_name}_static STATIC ${SRC})
 set_target_properties(${lib_name}_static PROPERTIES OUTPUT_NAME ${lib_name})
 
-install(TARGETS ${lib_name}_shared LIBRARY DESTINATION ${PROJECT_SOURCE_DIR}/lib COMPONENT LIBRARIES)
-install(TARGETS ${lib_name}_static LIBRARY ARCHIVE DESTINATION ${PROJECT_SOURCE_DIR}/lib COMPONENT LIBRARIES)
+install(TARGETS ${lib_name}_shared LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib COMPONENT LIBRARIES)
+install(TARGETS ${lib_name}_static LIBRARY ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib COMPONENT LIBRARIES)
+install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_PREFIX}/include COMPONENT HEADER)
+
+include(Package)
