@@ -82,7 +82,7 @@ int fieldstat_register_hll(struct fieldstat *instance, int cube_id, const char *
     * @param significant_figures: the precision of the histogram. Must be in [1, 5].
     * @return metric id, if success; otherwise, return -1. Fail when cube is not registered, or the parameter is invalid.
 */
-int fieldstat_register_histogram(struct fieldstat *instance, int cube_id, const char *field_name, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures);
+int fieldstat_register_hist(struct fieldstat *instance, int cube_id, const char *field_name, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures);
 
 /*
     * @brief add a cell to the cube of cube_id. One cell represents a set of tags. In topk sampling mode, this function will update the cell ranking every time it is called.
@@ -126,7 +126,7 @@ int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, in
     * @param value: value of the histogram metric.
     * @return 0 if success. -1 if cube_id is invalid. -2 if metric_id is invalid, or the metric is not a METRIC_TYPE_HISTOGRAM. -3 if cell_id is invalid.
 */
-int fieldstat_histogram_record(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long value);
+int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long value);
 
 /*
     * @brief Delete all the cells, also the content of every metrics. The cube and metrics are not deleted. Increase cell_version by 1.
@@ -163,8 +163,8 @@ int fieldstat_get_max_cell_num(const struct fieldstat *instance, int cube_id);
 
 long long fieldstat_counter_get(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id);
 double fieldstat_hll_get(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id);
-long long fieldstat_histogram_value_at_percentile(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, double percentile);
-long long fieldstat_histogram_count_le_value(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long value);
+long long fieldstat_hist_value_at_percentile(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, double percentile);
+long long fieldstat_hist_count_le_value(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long value);
 void fieldstat_get_serialized_blob(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, char **blob, size_t *blob_size);
 
 const char *fieldstat_get_metric_name(const struct fieldstat *instance, int cube_id, int metric_id);

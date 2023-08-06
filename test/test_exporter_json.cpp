@@ -188,7 +188,7 @@ TEST(export_test, cjson_export_with_fixed_tag_and_many_metrics_on_one_cube_of_co
     int cube_id = fieldstat_register_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, tag_list_num);
     int id_counter = fieldstat_register_counter(instance, cube_id, "counter", 0);
     int id_gauge = fieldstat_register_hll(instance, cube_id, "gauge", g_hll_standard->cfg.precision);
-    int id_histogram = fieldstat_register_histogram(instance, cube_id, "histogram",
+    int id_histogram = fieldstat_register_hist(instance, cube_id, "histogram",
         g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
 
     Fieldstat_tag_list_wrapper *tags[tag_list_num];
@@ -202,7 +202,7 @@ TEST(export_test, cjson_export_with_fixed_tag_and_many_metrics_on_one_cube_of_co
         fieldstat_counter_incrby(instance, cube_id, id_counter, cell_id, 1);
         for (size_t i = 0; i < OPER_NUM; i++){
             fieldstat_hll_add(instance, cube_id, id_gauge, cell_id, g_hll_standard_oper[i].c_str(), g_hll_standard_oper[i].length());
-            fieldstat_histogram_record(instance, cube_id, id_histogram, cell_id, g_histogram_standard_oper[i]);
+            fieldstat_hist_record(instance, cube_id, id_histogram, cell_id, g_histogram_standard_oper[i]);
         }
     }
 
@@ -289,7 +289,7 @@ TEST(export_test, only_registered_but_not_added_export_null_with_global_tag)
     int cube_id = fieldstat_register_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
     fieldstat_register_counter(instance, cube_id, "counter", 0);
     fieldstat_register_hll(instance, cube_id, "gauge", g_hll_standard->cfg.precision);
-    fieldstat_register_histogram(instance, cube_id, "histogram",
+    fieldstat_register_hist(instance, cube_id, "histogram",
         g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
 
     // add global tag
@@ -307,7 +307,7 @@ TEST(export_test, skip_two_empty_cube_and_export_last_one_with_global_tag)
     int cube_id_2 = fieldstat_register_cube(instance, TEST_TAG_SHARED2, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
     (void)fieldstat_register_counter(instance, cube_id_2, "counter", false);
     int cube_id_3 = fieldstat_register_cube(instance, TEST_TAG_SHARED3, 1, SAMPLING_MODE_COMPREHENSIVE, 3);
-    int id_histogram = fieldstat_register_histogram(instance, cube_id_3, "histogram",
+    int id_histogram = fieldstat_register_hist(instance, cube_id_3, "histogram",
         g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
 
     const int tag_num = 1;
@@ -316,7 +316,7 @@ TEST(export_test, skip_two_empty_cube_and_export_last_one_with_global_tag)
     const Fieldstat_tag_list_wrapper *the_tag = tags[0];
     int cell_id = fieldstat_cube_add(instance, cube_id_3, the_tag->get_tag(), the_tag->get_tag_count(), 1);
     for (size_t i = 0; i < OPER_NUM; i++){
-        fieldstat_histogram_record(instance, cube_id_3, id_histogram, cell_id, g_histogram_standard_oper[i]);
+        fieldstat_hist_record(instance, cube_id_3, id_histogram, cell_id, g_histogram_standard_oper[i]);
     }
 
     // export test

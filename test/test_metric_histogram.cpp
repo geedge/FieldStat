@@ -9,7 +9,7 @@ struct fieldstat *test_init_standard_instance_one_cube_one_metric_one_cell_hdr()
     int cube_id = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
     EXPECT_EQ(cube_id, 0);
 
-    int metric_id = fieldstat_register_histogram(instance, cube_id, "czz_test hdr metric", 1, 600000, 3);
+    int metric_id = fieldstat_register_hist(instance, cube_id, "czz_test hdr metric", 1, 600000, 3);
     EXPECT_EQ(metric_id, 0);
 
     int cell_id = fieldstat_cube_add(instance, cube_id, &TEST_TAG_STRING, 1, 1);
@@ -49,13 +49,13 @@ TEST(metric_test_histogram, simple_register_and_query)
 {
     struct fieldstat *instance = test_init_standard_instance_one_cube_one_metric_one_cell_hdr();
 
-    fieldstat_histogram_record(instance, 0, 0, 0, 1234);
-    fieldstat_histogram_record(instance, 0, 0, 0, 1234);
-    fieldstat_histogram_record(instance, 0, 0, 0, 123);
+    fieldstat_hist_record(instance, 0, 0, 0, 1234);
+    fieldstat_hist_record(instance, 0, 0, 0, 1234);
+    fieldstat_hist_record(instance, 0, 0, 0, 123);
 
     test_assert_standard_instance(instance);
-    EXPECT_EQ(fieldstat_histogram_value_at_percentile(instance, 0, 0, 0, 50.0), 1234);
-    EXPECT_EQ(fieldstat_histogram_count_le_value(instance, 0, 0, 0, 1000), 1);
+    EXPECT_EQ(fieldstat_hist_value_at_percentile(instance, 0, 0, 0, 50.0), 1234);
+    EXPECT_EQ(fieldstat_hist_count_le_value(instance, 0, 0, 0, 1000), 1);
 
     fieldstat_free(instance);
 }
@@ -63,9 +63,9 @@ TEST(metric_test_histogram, simple_register_and_query)
 TEST(metric_test_histogram, serialize_and_merge)
 {
     struct fieldstat *instance = test_init_standard_instance_one_cube_one_metric_one_cell_hdr();
-    fieldstat_histogram_record(instance, 0, 0, 0, 1234);
-    fieldstat_histogram_record(instance, 0, 0, 0, 1234);
-    fieldstat_histogram_record(instance, 0, 0, 0, 123);
+    fieldstat_hist_record(instance, 0, 0, 0, 1234);
+    fieldstat_hist_record(instance, 0, 0, 0, 1234);
+    fieldstat_hist_record(instance, 0, 0, 0, 123);
 
     char *blob = NULL;
     size_t blob_len = 0;
@@ -78,8 +78,8 @@ TEST(metric_test_histogram, serialize_and_merge)
     // query
     test_assert_standard_instance(instance_total);
 
-    EXPECT_EQ(fieldstat_histogram_value_at_percentile(instance_total, 0, 0, 0, 50.0), 1234);
-    EXPECT_EQ(fieldstat_histogram_count_le_value(instance, 0, 0, 0, 1000), 1);
+    EXPECT_EQ(fieldstat_hist_value_at_percentile(instance_total, 0, 0, 0, 50.0), 1234);
+    EXPECT_EQ(fieldstat_hist_count_le_value(instance, 0, 0, 0, 1000), 1);
 
     fieldstat_free(instance);
     fieldstat_free(instance_from_blob);
@@ -89,8 +89,8 @@ TEST(metric_test_histogram, serialize_and_merge)
 TEST(metric_test_histogram, serialization_and_merge_twice_with_reset)
 {
     struct fieldstat *instance = test_init_standard_instance_one_cube_one_metric_one_cell_hdr();
-    fieldstat_histogram_record(instance, 0, 0, 0, 1234);
-    fieldstat_histogram_record(instance, 0, 0, 0, 123);
+    fieldstat_hist_record(instance, 0, 0, 0, 1234);
+    fieldstat_hist_record(instance, 0, 0, 0, 123);
 
     char *blob = NULL;
     size_t blob_len = 0;
@@ -104,7 +104,7 @@ TEST(metric_test_histogram, serialization_and_merge_twice_with_reset)
     fieldstat_reset(instance);
     int cell_id = fieldstat_cube_add(instance, 0, &TEST_TAG_STRING, 1, 1);
     EXPECT_EQ(cell_id, 0);
-    fieldstat_histogram_record(instance, 0, 0, 0, 1234);
+    fieldstat_hist_record(instance, 0, 0, 0, 1234);
 
     fieldstat_serialize(instance, &blob, &blob_len);
     instance_from_blob = fieldstat_deserialize(blob, blob_len);
@@ -112,8 +112,8 @@ TEST(metric_test_histogram, serialization_and_merge_twice_with_reset)
     fieldstat_merge(instance_total, instance_from_blob);
 
     test_assert_standard_instance(instance_total);
-    EXPECT_EQ(fieldstat_histogram_value_at_percentile(instance_total, 0, 0, 0, 50.0), 1234);
-    EXPECT_EQ(fieldstat_histogram_count_le_value(instance_total, 0, 0, 0, 1000), 1);
+    EXPECT_EQ(fieldstat_hist_value_at_percentile(instance_total, 0, 0, 0, 50.0), 1234);
+    EXPECT_EQ(fieldstat_hist_count_le_value(instance_total, 0, 0, 0, 1000), 1);
 
     fieldstat_free(instance);
     fieldstat_free(instance_from_blob);
@@ -126,9 +126,9 @@ TEST(metric_test_histogram, serialization_and_merge_twice_with_reset)
 TEST(metric_test_histogram, serialize_with_b64_and_query)
 {
     struct fieldstat *instance = test_init_standard_instance_one_cube_one_metric_one_cell_hdr();
-    fieldstat_histogram_record(instance, 0, 0, 0, 1234);
-    fieldstat_histogram_record(instance, 0, 0, 0, 1234);
-    fieldstat_histogram_record(instance, 0, 0, 0, 123);
+    fieldstat_hist_record(instance, 0, 0, 0, 1234);
+    fieldstat_hist_record(instance, 0, 0, 0, 1234);
+    fieldstat_hist_record(instance, 0, 0, 0, 123);
 
     char *blob = NULL;
     size_t blob_len = 0;
@@ -149,11 +149,11 @@ TEST(metric_test_histogram, add_or_set_with_wrong_cell_id_expecting_fail)
 {
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
-    int metric_id = fieldstat_register_histogram(instance, cube_id, "czz_test", 1, 600000, 3);
+    int metric_id = fieldstat_register_hist(instance, cube_id, "czz_test", 1, 600000, 3);
 
-    int ret = fieldstat_histogram_record(instance, cube_id, metric_id, 1, 1234);
+    int ret = fieldstat_hist_record(instance, cube_id, metric_id, 1, 1234);
     EXPECT_EQ(ret, -3);
-    ret = fieldstat_histogram_record(instance, cube_id, metric_id, -1, 1234);
+    ret = fieldstat_hist_record(instance, cube_id, metric_id, -1, 1234);
     EXPECT_EQ(ret, -3);
 
     fieldstat_free(instance);
@@ -164,9 +164,9 @@ TEST(metric_test_histogram, add_with_wrong_cube_id_expecting_fail)
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
 
-    int ret = fieldstat_histogram_record(instance, cube_id + 1, 0, 1, 1);
+    int ret = fieldstat_hist_record(instance, cube_id + 1, 0, 1, 1);
     EXPECT_EQ(ret, -1);
-    ret = fieldstat_histogram_record(instance, -1, 0, 1, 1);
+    ret = fieldstat_hist_record(instance, -1, 0, 1, 1);
     EXPECT_EQ(ret, -1);
 
     fieldstat_free(instance);
@@ -176,11 +176,11 @@ TEST(metric_test_histogram, add_with_wrong_metric_id_expecting_fail)
 {
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
-    int metric_id = fieldstat_register_histogram(instance, cube_id, "czz_test", 1, 600000, 3);
+    int metric_id = fieldstat_register_hist(instance, cube_id, "czz_test", 1, 600000, 3);
 
-    int ret = fieldstat_histogram_record(instance, cube_id, metric_id + 1, 1, 1);
+    int ret = fieldstat_hist_record(instance, cube_id, metric_id + 1, 1, 1);
     EXPECT_EQ(ret, -2);
-    ret = fieldstat_histogram_record(instance, cube_id, -1, 1, 1);
+    ret = fieldstat_hist_record(instance, cube_id, -1, 1, 1);
     EXPECT_EQ(ret, -2);
 
     fieldstat_free(instance);
