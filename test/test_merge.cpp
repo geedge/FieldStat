@@ -179,9 +179,7 @@ TEST(unit_test_merge, merge_existing_cell_on_existing_cube_and_metric_comprehens
     fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id, 5);
     struct fieldstat *instance_dest = fieldstat_new();
 
-    printf("first merge\n");
     fieldstat_merge(instance_dest, instance);
-    printf("2nd merge\n");
     fieldstat_merge(instance_dest, instance);
 
     int *cube_id_dest;
@@ -429,7 +427,6 @@ TEST(unit_test_merge, new_too_many_cells_on_multiple_metric_given_source_cube_re
             int_tag_found = true;
         } else if (strcmp(tag_list->tag[0].key, TEST_TAG_DOUBLE.key) == 0) {
             double_tag_found = true;
-            printf("0\n");
         } else {
             printf("the tag is %s\n", tag_list->tag[0].key);
         }
@@ -445,7 +442,6 @@ TEST(unit_test_merge, new_too_many_cells_on_multiple_metric_given_source_cube_re
         if (strcmp(tag_list->tag[0].key, TEST_TAG_INT.key) == 0) {
             int_tag_found = true;
         } else if (strcmp(tag_list->tag[0].key, TEST_TAG_DOUBLE.key) == 0) {
-            printf("1\n");
             double_tag_found = true;
         } else {
             printf("the tag is %s\n", tag_list->tag[0].key);
@@ -462,8 +458,6 @@ TEST(unit_test_merge, new_too_many_cells_on_multiple_metric_given_source_cube_re
         if (strcmp(tag_list->tag[0].key, TEST_TAG_INT.key) == 0) {
             int_tag_found = true;
         } else if (strcmp(tag_list->tag[0].key, TEST_TAG_DOUBLE.key) == 0) {
-            printf("2\n");
-
             double_tag_found = true;
         } else {
             printf("the tag is %s\n", tag_list->tag[0].key);

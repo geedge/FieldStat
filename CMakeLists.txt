@@ -32,8 +32,8 @@ if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 	set(CMAKE_INSTALL_PREFIX "/opt/MESA" CACHE PATH "default install path" FORCE)
 endif()
 # set (CMAKE_INSTALL_PREFIX ${PROJECT_SOURCE_DIR})
-
-find_program(CMAKE_CXX_CPPCHECK NAMES cppcheck)
+set(CPP_BIN_PATH "/home/chenzizhan/cppcheck/cfg")
+find_program(CMAKE_CXX_CPPCHECK NAMES cppcheck HINTS ${CPP_BIN_PATH})
 if (CMAKE_CXX_CPPCHECK)
     list(
         APPEND CMAKE_CXX_CPPCHECK 

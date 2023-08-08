@@ -170,11 +170,6 @@ int cell_iter_next_cube(struct cell_iter *iter) {
         iter->max_metric_id = metric_id_max_next;
         iter->shared_tag = fieldstat_get_shared_tags(iter->instance, iter->cube_ids[iter->curr_cube_idx]);
         iter->curr_cell_idx = 0;
-
-        // todo: 现在直接拿一个cell manager 过来，所以没办法很好的判断metric里是不是有cell，要考虑add 了但是metric里没有cell 的情况
-        // 但是没必要在这里判断，添加field的时候判断一下就好
-        // todo：先添加field，再添加tag
-
         return 1;
     }
 
