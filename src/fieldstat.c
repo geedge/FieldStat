@@ -80,11 +80,15 @@ void fieldstat_reset(struct fieldstat *instance)
         return;
     }
     for (size_t i = 0; i < instance->valid_cube_arr_length; i++) {
-        for (size_t j = 0; j < instance->cube[i]->n_metric; j++) {
-            metric_reset(instance->cube[i]->metrics[j]);
+        struct fs_cube *cube = instance->cube[i];
+        if (cube == NULL) {
+            continue;
+        }
+        for (size_t j = 0; j < cube->n_metric; j++) {
+            metric_reset(cube->metrics[j]);
         }
 
-        cell_manager_reset(instance->cube[i]->cell_manager);
+        cell_manager_reset(cube->cell_manager);
     }
     instance->cell_version++;
 }
@@ -1027,6 +1031,10 @@ struct fieldstat *fieldstat_dup(const struct fieldstat *instance)
 
 void fieldstat_cube_read_cell(const struct fieldstat *instance, int cube_id, int **cell_ids, struct fieldstat_tag_list **tag_list, size_t *n_cell)
 {
+    if (cube_id >= instance->max_n_cube) {
+        printf("ERR: fieldstat_cube_read_cell cube id is invalid, cube id: %d\n", cube_id);
+        return;
+    }
     const struct fs_cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
         printf("ERR: fieldstat_cube_read_cell cube is not registered yet, cube id: %d\n", cube_id);
