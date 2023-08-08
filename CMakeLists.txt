@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.8)
+cmake_minimum_required(VERSION 2.8.8...3.10)
 
 message("-- CMAKE_C_COMPILER: ${CMAKE_C_COMPILER_ID}")
 
@@ -33,8 +33,7 @@ if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 endif()
 # set (CMAKE_INSTALL_PREFIX ${PROJECT_SOURCE_DIR})
 
-set(CPP_BIN_PATH "/home/chenzizhan/cppcheck/cfg")
-find_program(CMAKE_CXX_CPPCHECK NAMES cppcheck HINTS ${CPP_BIN_PATH})
+find_program(CMAKE_CXX_CPPCHECK NAMES cppcheck)
 if (CMAKE_CXX_CPPCHECK)
     list(
         APPEND CMAKE_CXX_CPPCHECK 

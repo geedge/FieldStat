@@ -376,7 +376,7 @@ int fieldstat_register_hll(struct fieldstat *instance, int cube_id, const char *
     return append_metric_to_cube(cube, metric);
 }
 
-int fieldstat_register_histogram(struct fieldstat *instance, int cube_id, const char *field_name, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures)
+int fieldstat_register_hist(struct fieldstat *instance, int cube_id, const char *field_name, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures)
 {
     if (instance == NULL) {
         printf("ERR: fieldstat instance is NULL\n");
@@ -484,7 +484,7 @@ int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, in
     return 0;
 }
 
-int fieldstat_histogram_record(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long value)
+int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long value)
 {
     FIELDSTAT_GENERAL_CHECK(instance, cube_id, metric_id, cell_id, METRIC_TYPE_HISTOGRAM);
     struct metric *metric = instance->cube[cube_id]->metrics[metric_id];
@@ -927,7 +927,7 @@ double fieldstat_hll_get(const struct fieldstat *instance, int cube_id, int metr
     return metric_hll_get(metric, cell_id);
 }
 
-long long fieldstat_histogram_value_at_percentile(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, double percentile)
+long long fieldstat_hist_value_at_percentile(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, double percentile)
 {
     const struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id);
     if (metric == NULL || metric_get_type(metric) != METRIC_TYPE_HISTOGRAM) {
@@ -938,7 +938,7 @@ long long fieldstat_histogram_value_at_percentile(const struct fieldstat *instan
     return metric_histogram_value_at_percentile(metric, cell_id, percentile);
 }
 
-long long fieldstat_histogram_count_le_value(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long value)
+long long fieldstat_hist_count_le_value(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long value)
 {
     const struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id);
     if (metric == NULL || metric_get_type(metric) != METRIC_TYPE_HISTOGRAM) {

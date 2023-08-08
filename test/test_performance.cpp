@@ -131,14 +131,14 @@ TEST(test_performance, merge_performance_one_instance_comprehensive_hll_empty_de
 
 TEST(test_performance, merge_performance_one_instance_comprehensive_histogram_empty_dest)
 {   
-    // int metric_id = fieldstat_register_histogram(instance, cube_id, "czz_test", 1, 100000, 1);
-    // int ret = fieldstat_histogram_record(instance, cube_id, metric_id, cell_id, 1234);
+    // int metric_id = fieldstat_register_hist(instance, cube_id, "czz_test", 1, 100000, 1);
+    // int ret = fieldstat_hist_record(instance, cube_id, metric_id, cell_id, 1234);
 
     auto metric_add_func = [](struct fieldstat *instance, int cube_id, int metric_id, int cell_id) {
-        fieldstat_histogram_record(instance, cube_id, metric_id, cell_id, 1234);
+        fieldstat_hist_record(instance, cube_id, metric_id, cell_id, 1234);
     };
     auto metric_register_func = [](struct fieldstat *instance, int cube_id) {
-        return fieldstat_register_histogram(instance, cube_id, "histogram metric", 1, 100000, 1);
+        return fieldstat_register_hist(instance, cube_id, "histogram metric", 1, 100000, 1);
     };
 
     clock_t elapsed = perform_merge_test(metric_add_func, metric_register_func, SAMPLING_MODE_COMPREHENSIVE, true);
@@ -195,14 +195,14 @@ TEST(test_performance, merge_performance_one_instance_comprehensive_hll_full_des
 
 TEST(test_performance, merge_performance_one_instance_comprehensive_histogram_full_dest)
 {   
-    // int metric_id = fieldstat_register_histogram(instance, cube_id, "czz_test", 1, 600000, 3);
-    // int ret = fieldstat_histogram_record(instance, cube_id, metric_id, cell_id, 1234);
+    // int metric_id = fieldstat_register_hist(instance, cube_id, "czz_test", 1, 600000, 3);
+    // int ret = fieldstat_hist_record(instance, cube_id, metric_id, cell_id, 1234);
 
     auto metric_add_func = [](struct fieldstat *instance, int cube_id, int metric_id, int cell_id) {
-        fieldstat_histogram_record(instance, cube_id, metric_id, cell_id, 1234);
+        fieldstat_hist_record(instance, cube_id, metric_id, cell_id, 1234);
     };
     auto metric_register_func = [](struct fieldstat *instance, int cube_id) {
-        return fieldstat_register_histogram(instance, cube_id, "histogram metric", 1, 100000, 1);
+        return fieldstat_register_hist(instance, cube_id, "histogram metric", 1, 100000, 1);
     };
 
     clock_t elapsed = perform_merge_test(metric_add_func, metric_register_func, SAMPLING_MODE_COMPREHENSIVE, false);
@@ -286,7 +286,7 @@ TEST(test_performance, performance_test_add_cells_histogram_record)
 {
     struct fieldstat *instance = fieldstat_new();
     fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
-    fieldstat_register_histogram(instance, 0, "test", 1, 1000000, 3);
+    fieldstat_register_hist(instance, 0, "test", 1, 1000000, 3);
     int cell_id = fieldstat_cube_add(instance, 0, &TEST_TAG_DOUBLE, 1, 1);
     size_t test_num = 100000;
     long long vals[test_num];
@@ -296,7 +296,7 @@ TEST(test_performance, performance_test_add_cells_histogram_record)
 
     clock_t start = clock();
     for (size_t i = 0; i < test_num; i++) {
-        fieldstat_histogram_record(instance, 0, 0, cell_id, vals[i]);
+        fieldstat_hist_record(instance, 0, 0, cell_id, vals[i]);
     }
     clock_t end = clock();
     double seconds = (double)(end - start) / test_num;

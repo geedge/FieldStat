@@ -9,7 +9,7 @@
 # set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
 # FetchContent_MakeAvailable(gtest)
 
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 2.8...3.10)
 
 set(DEBUG_FLAGS "-O3")
 
