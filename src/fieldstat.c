@@ -196,7 +196,7 @@ int fieldstat_append_cube_to_instance(struct fieldstat *instance, struct fs_cube
     }
     if (instance->valid_cube_arr_length >= instance->max_n_cube) {
         instance->max_n_cube *= 2;
-        struct fs_fieldstat_cube **old_cube_arr = instance->cube;
+        struct fs_cube **old_cube_arr = instance->cube;
         instance->cube = calloc(instance->max_n_cube, sizeof(struct fs_cube *));
         memcpy(instance->cube, old_cube_arr, sizeof(struct fs_cube *) * instance->valid_cube_arr_length);
         free(old_cube_arr);
