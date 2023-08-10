@@ -22,10 +22,12 @@ TEST(test_register, delete_cube_and_version_increase)
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
     EXPECT_EQ(fieldstat_get_cube_version(instance, cube_id), 0);
-    fieldstat_unregister_cube(instance, cube_id);
+    int ret = fieldstat_unregister_cube(instance, cube_id);
+    EXPECT_EQ(ret, 0);
     EXPECT_EQ(fieldstat_get_cube_version(instance, cube_id), 1);
-    fieldstat_unregister_cube(instance, cube_id);
-    EXPECT_EQ(fieldstat_get_cube_version(instance, cube_id), 2);
+    ret = fieldstat_unregister_cube(instance, cube_id);
+    EXPECT_EQ(ret, -1);
+    EXPECT_EQ(fieldstat_get_cube_version(instance, cube_id), 1);
     EXPECT_EQ(fieldstat_get_cube_version(instance, 123), 0);
 
     fieldstat_free(instance);
