@@ -108,14 +108,18 @@ int fieldstat_unregister_cube(struct fieldstat *instance, int cube_id)
         printf("ERR: instance is NULL\n");
         return -1;
     }
-    if (cube_id >= instance->valid_cube_arr_length) {
-        printf("ERR: cube_id is out of range\n");
+    if (cube_id < 0 || cube_id >= instance->valid_cube_arr_length) {
+        printf("ERR: cube_id is out of range, cube_id: %d\n", cube_id);
         return -1;
     }
     if (instance->shared_tag_cube_manager != NULL) {
         printf("WARNING: This fieldstat instance is used as a merge destination. Please make sure merging has finished.\n");
         cube_manager_free(instance->shared_tag_cube_manager);
         instance->shared_tag_cube_manager = NULL;
+    }
+    if (instance->cube[cube_id] == NULL) {
+        printf("ERR: cube_id is not registered\n");
+        return -1;
     }
     fieldstat_cube_free(instance, cube_id);
     instance->cube[cube_id] = NULL;
@@ -192,7 +196,11 @@ int fieldstat_append_cube_to_instance(struct fieldstat *instance, struct fs_cube
     }
     if (instance->valid_cube_arr_length >= instance->max_n_cube) {
         instance->max_n_cube *= 2;
-        instance->cube = realloc(instance->cube, sizeof(struct fs_cube *) * instance->max_n_cube);
+        struct fs_fieldstat_cube **old_cube_arr = instance->cube;
+        instance->cube = calloc(instance->max_n_cube, sizeof(struct fs_cube *));
+        memcpy(instance->cube, old_cube_arr, sizeof(struct fs_cube *) * instance->valid_cube_arr_length);
+        free(old_cube_arr);
+
         unsigned long *old_ver_arr = instance->cube_version;
         instance->cube_version = calloc(instance->max_n_cube, sizeof(unsigned long));
         memcpy(instance->cube_version, old_ver_arr, sizeof(unsigned long) * instance->valid_cube_arr_length);
@@ -269,6 +277,11 @@ int fieldstat_cube_add(struct fieldstat *instance, int cube_id, const struct fie
         printf("ERR: fieldstat instance is NULL\n");
         return -1;
     }
+    if (cube_id < 0 || cube_id >= instance->valid_cube_arr_length) {
+        printf("ERR: cube_id is invalid, %d\n", cube_id);
+        return -1;
+    }
+    
     struct fs_cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
         printf("ERR: fieldstat_cube_add cube is not registered yet\n");
@@ -346,6 +359,10 @@ int fieldstat_register_counter(struct fieldstat *instance, int cube_id, const ch
         printf("ERR: fieldstat instance is NULL\n");
         return -1;
     }
+    if (cube_id < 0 || cube_id >= instance->valid_cube_arr_length) {
+        printf("ERR: fieldstat_register_hist cube_id is invalid, %d\n", cube_id);
+        return -1;
+    }
     struct fs_cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
         printf("ERR: fieldstat_register_counter cube is not registered yet\n");
@@ -360,6 +377,10 @@ int fieldstat_register_hll(struct fieldstat *instance, int cube_id, const char *
 {
     if (instance == NULL) {
         printf("ERR: fieldstat instance is NULL\n");
+        return -1;
+    }
+    if (cube_id < 0 || cube_id >= instance->valid_cube_arr_length) {
+        printf("ERR: fieldstat_register_hist cube_id is invalid, %d\n", cube_id);
         return -1;
     }
     struct fs_cube *cube = instance->cube[cube_id];
@@ -380,6 +401,10 @@ int fieldstat_register_hist(struct fieldstat *instance, int cube_id, const char 
 {
     if (instance == NULL) {
         printf("ERR: fieldstat instance is NULL\n");
+        return -1;
+    }
+    if (cube_id < 0 || cube_id >= instance->valid_cube_arr_length) {
+        printf("ERR: fieldstat_register_hist cube_id is invalid, %d\n", cube_id);
         return -1;
     }
     struct fs_cube *cube = instance->cube[cube_id];
@@ -1031,7 +1056,7 @@ struct fieldstat *fieldstat_dup(const struct fieldstat *instance)
 
 void fieldstat_cube_read_cell(const struct fieldstat *instance, int cube_id, int **cell_ids, struct fieldstat_tag_list **tag_list, size_t *n_cell)
 {
-    if (cube_id >= instance->max_n_cube) {
+    if (cube_id < 0 || cube_id >= instance->valid_cube_arr_length) {
         printf("ERR: fieldstat_cube_read_cell cube id is invalid, cube id: %d\n", cube_id);
         return;
     }
