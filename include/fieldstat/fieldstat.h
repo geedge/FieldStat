@@ -64,7 +64,12 @@ int fieldstat_register_cube(struct fieldstat *instance, const struct fieldstat_t
     * @return 0 if success. -1 if cube_id is invalid.
 */
 int fieldstat_unregister_cube(struct fieldstat *instance, int cube_id);
-unsigned long fieldstat_get_cube_version(const struct fieldstat *instance, int cube_id);
+
+/*
+    * @brief get the cube_version of the cube of cube_id.
+    * @return cube_version if success. -1 if instance is NULL. -2 if cube_id is -1. -3 if the cube_id is invalid(never registered for even once)
+*/
+long long fieldstat_get_cube_version(const struct fieldstat *instance, int cube_id);
 /*
     * @brief add a metric to the cube of cube_id. One metric may have multiple sub-metric that are associated with different cells.
     * @param cube_id: cube id, previously returned by fieldstat_register_cube.

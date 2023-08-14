@@ -127,12 +127,21 @@ int fieldstat_unregister_cube(struct fieldstat *instance, int cube_id)
     return 0;
 }
 
-unsigned long fieldstat_get_cube_version(const struct fieldstat *instance, int cube_id)
+long long fieldstat_get_cube_version(const struct fieldstat *instance, int cube_id)
 {
-    if (cube_id >= instance->valid_cube_arr_length) {
-        //printf("ERR: cube_id is out of range\n");
-        return 0;
+    if (instance == NULL) {
+        return -1;
     }
+    if (cube_id < 0) {
+        return -2;
+    }
+    if (cube_id >= instance->valid_cube_arr_length) {
+        return -3;
+    }
+    if (instance->cube[cube_id] == NULL && instance->cube_version[cube_id] == 0) {
+        return -3;
+    }
+
     return instance->cube_version[cube_id];
 }
 

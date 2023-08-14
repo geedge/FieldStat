@@ -28,8 +28,16 @@ TEST(test_register, delete_cube_and_version_increase)
     ret = fieldstat_unregister_cube(instance, cube_id);
     EXPECT_EQ(ret, -1);
     EXPECT_EQ(fieldstat_get_cube_version(instance, cube_id), 1);
-    EXPECT_EQ(fieldstat_get_cube_version(instance, 123), 0);
 
+    fieldstat_free(instance);
+}
+
+TEST(test_register, query_on_wrong_version)
+{
+    EXPECT_EQ(fieldstat_get_cube_version(NULL, 1), -1);
+    struct fieldstat *instance = fieldstat_new();
+    EXPECT_EQ(fieldstat_get_cube_version(instance, 1), -3);
+    EXPECT_EQ(fieldstat_get_cube_version(instance, -1), -2);
     fieldstat_free(instance);
 }
 
