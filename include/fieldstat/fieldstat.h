@@ -161,25 +161,73 @@ struct fieldstat_tag_list
     size_t n_tag;
 };
 
+/* 
+    * @brief Get all the registered cubes.
+    * @param cube_ids: the cube ids. The caller should free it. Use it like: int *cube_ids; fieldstat_get_cubes(instance, &cube_ids, &n_cube); for (int i = 0; i < n_cube; i++) { printf("%d\n", cube_ids[i]); } free(cube_ids);
+    * @param n_cube: Length of cube_ids.
+*/
 void fieldstat_get_cubes(const struct fieldstat *instance, int **cube_ids, int *n_cube);
 
+/*
+    * @brief Get all the registered metrics of a cube.
+    * @param cube_id: cube id, previously returned by fieldstat_get_cubes.
+    * @param metric_ids: the metric ids. The caller should free it. Use it like: int max_id = fieldstat_get_max_metric_id(instance, cube_id); for (int metric_id = 0; metric_id <= max_id; metric_id++) {// do something }
+    * @param n_metric: Length of metric_ids.
+    * @return -1 is returned if cube_id is invalid, or no metrics are registered.
+*/
 int fieldstat_get_max_metric_id(const struct fieldstat *instance, int cube_id);
+
+// query the name of the metric, return NULL if cube_id or metric_id is invalid.
+const char *fieldstat_get_metric_name(const struct fieldstat *instance, int cube_id, int metric_id);
+
+// query the type of the metric. return -1 if cube_id or metric_id is invalid.
+enum metric_type fieldstat_get_metric_type(const struct fieldstat *instance, int cube_id, int metric_id);
+
+/*
+    * @brief Get all the cells in a cube and their tags, added by fieldstat_cube_add.
+    * @param cell_ids cell_ids[i] is the cell id of i-th cell. User free them.
+    * @param tag_list tag_list[i] is the tag list of i-th cell. User free them by calling fieldstat_tag_list_arr_free.
+    * @param n_cell: Length of cell_ids and tag_list.
+*/
 void fieldstat_cube_read_cell(const struct fieldstat *instance, int cube_id,
     int **cell_ids, struct fieldstat_tag_list **tag_list, size_t *n_cell);
+
+/*
+    * @brief Get all the cells in a cube and their tags in a specific metric. Different metrics may have different cells.
+    * @param metric_id: metric id, previously returned by fieldstat_get_max_metric_id.
+    * @param cell_ids cell_ids[i] is the cell id of i-th cell. User free them.
+    * @param tag_list tag_list[i] is the tag list of i-th cell. User free them by calling fieldstat_tag_list_arr_free.
+    * @param n_cell: Length of cell_ids and tag_list.
+*/
+void fieldstat_get_cells(const struct fieldstat *instance, int cube_id, int metric_id,
+    int **cell_ids, struct fieldstat_tag_list **tag_list, size_t *n_cell);
+    
+
+/*
+    get the shared tag of fieldstat_register_cube. User free them by calling fieldstat_tag_list_arr_free(struct fieldstat_tag_list *, 1)
+*/
 struct fieldstat_tag_list *fieldstat_get_shared_tags(const struct fieldstat *instance, int cube_id);
+
+/* 
+    get the parameter max_n_cell of fieldstat_register_cube
+*/
 int fieldstat_get_max_cell_num(const struct fieldstat *instance, int cube_id);
 
+/*
+    * @brief Get the value of a metric of a cell.
+    * @param cube_id: cube id, previously returned by fieldstat_get_cubes.
+    * @param metric_id: metric id, previously returned by fieldstat_get_max_metric_id.
+    * @param cell_id: cell id, previously returned by fieldstat_get_cells.
+    * @return -1 if cube_id or metric_id or cell_id is invalid.
+*/
 long long fieldstat_counter_get(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id);
 double fieldstat_hll_get(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id);
 long long fieldstat_hist_value_at_percentile(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, double percentile);
 long long fieldstat_hist_count_le_value(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long value);
+
+// get the base 64 encoded string of the serialized blob of a cell
 void fieldstat_get_serialized_blob(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, char **blob, size_t *blob_size);
 
-const char *fieldstat_get_metric_name(const struct fieldstat *instance, int cube_id, int metric_id);
-enum metric_type fieldstat_get_metric_type(const struct fieldstat *instance, int cube_id, int metric_id);
-void fieldstat_get_cells(const struct fieldstat *instance, int cube_id, int metric_id,
-    int **cell_ids, struct fieldstat_tag_list **tag_list, size_t *n_cell);
-    
 void fieldstat_tag_list_arr_free(struct fieldstat_tag_list *tag_list, size_t n_cell);
 
 #ifdef __cplusplus

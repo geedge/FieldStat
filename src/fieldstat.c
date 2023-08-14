@@ -858,6 +858,10 @@ void fieldstat_get_cubes(const struct fieldstat *instance, int **cube_ids, int *
 
 int fieldstat_get_max_metric_id(const struct fieldstat *instance, int cube_id)
 {
+    if (cube_id >= instance->valid_cube_arr_length || cube_id < 0) {
+        printf("ERR: fieldstat_get_max_metric_id cube_id is invalid\n");
+        return -1;
+    }
     const struct fs_cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
         printf("ERR: fieldstat_get_max_metric_id cube is not registered yet\n");
@@ -869,6 +873,10 @@ int fieldstat_get_max_metric_id(const struct fieldstat *instance, int cube_id)
 void fieldstat_get_cells(const struct fieldstat *instance, int cube_id, int metric_id,
     int **cell_ids, struct fieldstat_tag_list **tag_list, size_t *n_cell)
 {
+    if (cube_id >= instance->valid_cube_arr_length || cube_id < 0) {
+        printf("ERR: fieldstat_get_cells cube_id is invalid\n");
+        return;
+    }
     const struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id);
     if (metric == NULL) {
         printf("ERR: metric or cube is not registered yet\n");
@@ -897,6 +905,10 @@ void fieldstat_get_cells(const struct fieldstat *instance, int cube_id, int metr
 
 struct fieldstat_tag_list *fieldstat_get_shared_tags(const struct fieldstat *instance, int cube_id)
 {
+    if (cube_id >= instance->valid_cube_arr_length || cube_id < 0) {
+        printf("ERR: fieldstat_get_shared_tags cube_id is invalid\n");
+        return NULL;
+    }
     struct fs_cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
         printf("ERR: fieldstat_get_shared_tags cube is not registered yet\n");
@@ -1020,7 +1032,7 @@ enum metric_type fieldstat_get_metric_type(const struct fieldstat *instance, int
     const struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id);
     if (metric == NULL) {
         printf("ERR: metrics is not registered yet\n");
-        return -1;
+        return (enum metric_type)-1;
     }
 
     return metric_get_type(metric);
