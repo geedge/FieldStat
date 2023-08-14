@@ -109,7 +109,7 @@ int fieldstat_unregister_cube(struct fieldstat *instance, int cube_id)
         return -1;
     }
     if (cube_id < 0 || cube_id >= instance->valid_cube_arr_length) {
-        printf("ERR: cube_id is out of range, cube_id: %d\n", cube_id);
+        //printf("ERR: cube_id is out of range, cube_id: %d\n", cube_id);
         return -1;
     }
     if (instance->shared_tag_cube_manager != NULL) {
@@ -130,7 +130,7 @@ int fieldstat_unregister_cube(struct fieldstat *instance, int cube_id)
 unsigned long fieldstat_get_cube_version(const struct fieldstat *instance, int cube_id)
 {
     if (cube_id >= instance->valid_cube_arr_length) {
-        printf("ERR: cube_id is out of range\n");
+        //printf("ERR: cube_id is out of range\n");
         return 0;
     }
     return instance->cube_version[cube_id];
@@ -278,7 +278,7 @@ int fieldstat_cube_add(struct fieldstat *instance, int cube_id, const struct fie
         return -1;
     }
     if (cube_id < 0 || cube_id >= instance->valid_cube_arr_length) {
-        printf("ERR: cube_id is invalid, %d\n", cube_id);
+        //printf("ERR: cube_id is invalid, %d\n", cube_id);
         return -1;
     }
     
