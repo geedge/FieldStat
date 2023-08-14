@@ -25,7 +25,7 @@ TEST(test_performance, merge_performance_when_comprehensive_sampling_multi_insta
     for (int i = 0; i < INSTANCE_NUM; i++) {
         struct fieldstat *tmp_i = fieldstat_new();
         int cube_id = fieldstat_register_cube(tmp_i, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, MAX_CELL_NUM);
-        int metric_id = fieldstat_register_counter(tmp_i, cube_id, "metric name", false);
+        int metric_id = fieldstat_register_counter(tmp_i, cube_id, "metric name", COUNTER_MERGE_BY_SUM);
         for (int j = 0; j < MAX_CELL_NUM; j++) {
             int cell_id = fieldstat_cube_add(tmp_i, cube_id, tags[rand() % DIMENSION_TOTAL]->get_tag(), 1, 1);
             if (cell_id == -1) {
@@ -98,13 +98,11 @@ clock_t perform_merge_test(std::function<void (struct fieldstat*, int, int, int)
 
 TEST(test_performance, merge_performance_one_instance_comprehensive_counter_empty_dest)
 {   
-    // int metric_id = fieldstat_register_counter(tmp_i, cube_id, "metric name", false);
-    // fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id, 1);
     auto metric_add_func = [](struct fieldstat *instance, int cube_id, int metric_id, int cell_id) {
         fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id, 1);
     };
     auto metric_register_func = [](struct fieldstat *instance, int cube_id) {
-        return fieldstat_register_counter(instance, cube_id, "metric name", false);
+        return fieldstat_register_counter(instance, cube_id, "metric name", COUNTER_MERGE_BY_SUM);
     };
 
     clock_t elapsed = perform_merge_test(metric_add_func, metric_register_func, SAMPLING_MODE_COMPREHENSIVE, true);
@@ -152,7 +150,7 @@ TEST(test_performance, merge_performance_one_instance_topk_counter_empty_dest)
         fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id, rand() % 1000);
     };
     auto metric_register_func = [](struct fieldstat *instance, int cube_id) {
-        return fieldstat_register_counter(instance, cube_id, "metric name", false);
+        return fieldstat_register_counter(instance, cube_id, "metric name", COUNTER_MERGE_BY_SUM);
     };
 
     clock_t elapsed = perform_merge_test(metric_add_func, metric_register_func, SAMPLING_MODE_TOPK, true);
@@ -168,7 +166,7 @@ TEST(test_performance, merge_performance_one_instance_comprehensive_counter_full
         fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id, 1);
     };
     auto metric_register_func = [](struct fieldstat *instance, int cube_id) {
-        return fieldstat_register_counter(instance, cube_id, "metric name", false);
+        return fieldstat_register_counter(instance, cube_id, "metric name", COUNTER_MERGE_BY_SUM);
     };
 
     clock_t elapsed = perform_merge_test(metric_add_func, metric_register_func, SAMPLING_MODE_COMPREHENSIVE, false);
@@ -216,7 +214,7 @@ TEST(test_performance, merge_performance_one_instance_topk_counter_full_dest)
         fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id, rand() % 1000);
     };
     auto metric_register_func = [](struct fieldstat *instance, int cube_id) {
-        return fieldstat_register_counter(instance, cube_id, "metric name", false);
+        return fieldstat_register_counter(instance, cube_id, "metric name", COUNTER_MERGE_BY_SUM);
     };
 
     clock_t elapsed = perform_merge_test(metric_add_func, metric_register_func, SAMPLING_MODE_TOPK, false);
@@ -238,7 +236,7 @@ TEST(test_performance, performance_test_add_cells_comprehensive)
     // getchar();
     struct fieldstat *instance = fieldstat_new();
     fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, cell_count);
-    fieldstat_register_counter(instance, 0, "test", 0);
+    fieldstat_register_counter(instance, 0, "test", COUNTER_MERGE_BY_SUM);
 
     clock_t start = clock();
     for (size_t i = 0; i < cell_count; i++) {
@@ -265,7 +263,7 @@ TEST(test_performance, performance_test_add_cells_topk)
     }
     struct fieldstat *instance = fieldstat_new();
     fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_TOPK, 1000);
-    fieldstat_register_counter(instance, 0, "test", 0);
+    fieldstat_register_counter(instance, 0, "test", COUNTER_MERGE_BY_SUM);
 
     // getchar();
     clock_t start = clock();
@@ -355,7 +353,7 @@ TEST(test_performance, export_many_cells)
         }
         for (int j = 0; j < METRIC_NUM; j++) {
             string metric_name = "metric name" + to_string(i) + to_string(j);
-            int metric_id = fieldstat_register_counter(instance, cube_id, metric_name.c_str(), false);
+            int metric_id = fieldstat_register_counter(instance, cube_id, metric_name.c_str(), COUNTER_MERGE_BY_SUM);
 
             for (int k = 0; k < MAX_CELL_NUM; k++) {
                 fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id[k], 1);

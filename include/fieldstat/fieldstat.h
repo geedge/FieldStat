@@ -29,6 +29,12 @@ enum sampling_mode {
     SAMPLING_MODE_TOPK,
 };
 
+enum counter_mode {
+    COUNTER_MERGE_BY_SUM,
+    COUNTER_MERGE_BY_MAX,
+    COUNTER_MERGE_BY_MIN,
+};
+
 struct fieldstat_tag {
 	const char *key;
     enum fs_tag_type type;
@@ -63,10 +69,11 @@ unsigned long fieldstat_get_cube_version(const struct fieldstat *instance, int c
     * @brief add a metric to the cube of cube_id. One metric may have multiple sub-metric that are associated with different cells.
     * @param cube_id: cube id, previously returned by fieldstat_register_cube.
     * @param field_name: name of the metric. Cannot be NULL. Must be unique in this cube.
-    * @param is_gauge: whether this metric is a gauge. Only affects merging.
+    * @param counter_mode: merge method of the metric. Refer to enum counter_mode.
     * @return metric id, if success; otherwise, return -1. Fail when cube is not registered, or the parameter is invalid.
 */
-int fieldstat_register_counter(struct fieldstat *instance, int cube_id, const char *field_name, bool is_gauge);
+int fieldstat_register_counter(struct fieldstat *instance, int cube_id, const char *field_name, enum counter_mode mode);
+// is_gauge: merge 方法：最大 最小 求和 
 
 /*
     * @brief add a metric to the cube of cube_id. One metric may have multiple sub-metric that are associated with different cells. other parameters are the same as fieldstat_register_counter.
@@ -155,6 +162,7 @@ struct fieldstat_tag_list
 };
 
 void fieldstat_get_cubes(const struct fieldstat *instance, int **cube_ids, int *n_cube);
+
 int fieldstat_get_max_metric_id(const struct fieldstat *instance, int cube_id);
 void fieldstat_cube_read_cell(const struct fieldstat *instance, int cube_id,
     int **cell_ids, struct fieldstat_tag_list **tag_list, size_t *n_cell);

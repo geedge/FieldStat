@@ -20,7 +20,7 @@ int metric_merge_or_copy_cell(struct metric *dest, const struct metric *src, int
 void metric_get_plain_blob(const struct metric *pthis, int cell_id, char **blob, size_t *blob_size);
 void metric_delete_cell(struct metric *pthis, int cell_id);
 
-struct metric *metric_counter_new(const char *name, bool is_gauge);
+struct metric *metric_counter_new(const char *name, enum counter_mode mode);
 void metric_counter_incrby(struct metric *pthis, int cell_id, long long value);
 int metric_counter_set(struct metric *pthis, int cell_id, long long value);
 long long metric_counter_get(const struct metric *pthis, int cell_id);

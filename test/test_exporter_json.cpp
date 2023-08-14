@@ -163,8 +163,8 @@ void topk_init(struct fieldstat *instance, unsigned int test_expected_big_count)
 {
     const char *field_name[TEST_METRIC_NUM] = {"topk1", "topk2"};
     int cube_id = fieldstat_register_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_TOPK, TEST_TOPK_STANDARD_K);
-    int m1 = fieldstat_register_counter(instance, cube_id, field_name[0], 0);
-    int m2 = fieldstat_register_counter(instance, cube_id, field_name[1], 0);
+    int m1 = fieldstat_register_counter(instance, cube_id, field_name[0], COUNTER_MERGE_BY_SUM);
+    int m2 = fieldstat_register_counter(instance, cube_id, field_name[1], COUNTER_MERGE_BY_SUM);
 
     std::function<void(Fieldstat_tag_list_wrapper *, unsigned int *)> topk_add = [instance, cube_id, m1, m2](
             const Fieldstat_tag_list_wrapper *my_tags, unsigned int counts[TEST_METRIC_NUM]) {
@@ -186,7 +186,7 @@ TEST(export_test, cjson_export_with_fixed_tag_and_many_metrics_on_one_cube_of_co
     // new instance
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_register_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, tag_list_num);
-    int id_counter = fieldstat_register_counter(instance, cube_id, "counter", 0);
+    int id_counter = fieldstat_register_counter(instance, cube_id, "counter", COUNTER_MERGE_BY_SUM);
     int id_gauge = fieldstat_register_hll(instance, cube_id, "gauge", g_hll_standard->cfg.precision);
     int id_histogram = fieldstat_register_hist(instance, cube_id, "histogram",
         g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
@@ -287,7 +287,7 @@ TEST(export_test, only_registered_but_not_added_export_null_with_global_tag)
     struct fieldstat *instance = fieldstat_new();
 
     int cube_id = fieldstat_register_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
-    fieldstat_register_counter(instance, cube_id, "counter", 0);
+    fieldstat_register_counter(instance, cube_id, "counter", COUNTER_MERGE_BY_SUM);
     fieldstat_register_hll(instance, cube_id, "gauge", g_hll_standard->cfg.precision);
     fieldstat_register_hist(instance, cube_id, "histogram",
         g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
@@ -305,7 +305,7 @@ TEST(export_test, skip_two_empty_cube_and_export_last_one_with_global_tag)
     int cube_id_1 = fieldstat_register_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
     (void)fieldstat_register_hll(instance, cube_id_1, "gauge", g_hll_standard->cfg.precision);
     int cube_id_2 = fieldstat_register_cube(instance, TEST_TAG_SHARED2, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
-    (void)fieldstat_register_counter(instance, cube_id_2, "counter", false);
+    (void)fieldstat_register_counter(instance, cube_id_2, "counter", COUNTER_MERGE_BY_SUM);
     int cube_id_3 = fieldstat_register_cube(instance, TEST_TAG_SHARED3, 1, SAMPLING_MODE_COMPREHENSIVE, 3);
     int id_histogram = fieldstat_register_hist(instance, cube_id_3, "histogram",
         g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
@@ -354,10 +354,10 @@ TEST(export_test, skip_empty_metrics_given_cube_deleted) {
     int cube_id_del = fieldstat_register_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
     int cube_id = fieldstat_register_cube(instance, TEST_TAG_SHARED2, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
     fieldstat_unregister_cube(instance, cube_id_del);
-    (void)fieldstat_register_counter(instance, cube_id, "counter", false);
-    (void)fieldstat_register_counter(instance, cube_id, "counter2", false);
-    int metric_id = fieldstat_register_counter(instance, cube_id, "counter3", false);
-    (void)fieldstat_register_counter(instance, cube_id, "counter4", false);
+    (void)fieldstat_register_counter(instance, cube_id, "counter", COUNTER_MERGE_BY_SUM);
+    (void)fieldstat_register_counter(instance, cube_id, "counter2", COUNTER_MERGE_BY_SUM);
+    int metric_id = fieldstat_register_counter(instance, cube_id, "counter3", COUNTER_MERGE_BY_SUM);
+    (void)fieldstat_register_counter(instance, cube_id, "counter4", COUNTER_MERGE_BY_SUM);
 
     const int tag_num = 1;
     Fieldstat_tag_list_wrapper *tags[tag_num];

@@ -353,7 +353,7 @@ static int append_metric_to_cube(struct fs_cube *cube, struct metric *metric)
     return cube->n_metric - 1;
 }
 
-int fieldstat_register_counter(struct fieldstat *instance, int cube_id, const char *field_name, bool is_gauge)
+int fieldstat_register_counter(struct fieldstat *instance, int cube_id, const char *field_name, enum counter_mode mode)
 {
     if (instance == NULL) {
         printf("ERR: fieldstat instance is NULL\n");
@@ -368,7 +368,7 @@ int fieldstat_register_counter(struct fieldstat *instance, int cube_id, const ch
         printf("ERR: fieldstat_register_counter cube is not registered yet\n");
         return -1;
     }
-    struct metric *metric = metric_counter_new(field_name, is_gauge);
+    struct metric *metric = metric_counter_new(field_name, mode);
 
     return append_metric_to_cube(cube, metric);
 }

@@ -8,7 +8,7 @@ TEST(unit_test_serialize, serialize_and_deserialize_fieldstat_instance_comprehen
 {
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
-    int metric_id = fieldstat_register_counter(instance, cube_id, "czz_test counter metric", true);
+    int metric_id = fieldstat_register_counter(instance, cube_id, "czz_test counter metric", COUNTER_MERGE_BY_MAX);
     int cell_id1 = fieldstat_cube_add(instance, cube_id, &TEST_TAG_STRING, 1, 1);
     int cell_id2 = fieldstat_cube_add(instance, cube_id, &TEST_TAG_STRING_collided, 1, 1);
     fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id1, 10086);
@@ -57,7 +57,7 @@ TEST(unit_test_serialize, serialize_and_deserialize_fieldstat_instance_topk)
 {
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 10);
-    int metric_id = fieldstat_register_counter(instance, cube_id, "czz_test counter metric", true);
+    int metric_id = fieldstat_register_counter(instance, cube_id, "czz_test counter metric", COUNTER_MERGE_BY_MAX);
     int cell_id1 = fieldstat_cube_add(instance, cube_id, &TEST_TAG_STRING, 1, 1);
     int cell_id2 = fieldstat_cube_add(instance, cube_id, &TEST_TAG_STRING_collided, 1, 1);
     fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id1, 10086);
@@ -105,7 +105,7 @@ TEST(unit_test_serialize, rearrange_tags_when_serialize)
 {
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 10);
-    int metric_id = fieldstat_register_counter(instance, cube_id, "czz_test counter metric", true);
+    int metric_id = fieldstat_register_counter(instance, cube_id, "czz_test counter metric", COUNTER_MERGE_BY_MAX);
     struct fieldstat_tag tag1 = {"tag1", TAG_INTEGER, 1};
     struct fieldstat_tag tag2 = {"tag1", TAG_INTEGER, 2};
     struct fieldstat_tag tag3 = {"tag1", TAG_DOUBLE, {.value_double = 3.0}};

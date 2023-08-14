@@ -17,18 +17,13 @@
 
 #define MAX_N_DATA_ARRAY_ITEM_INIT 1024
 
-enum counter_metric_type {
-    COUNTER_TYPE_COUNTER,
-    COUNTER_TYPE_GAUGE,
-};
-
 struct metric_counter_or_gauge {
-    enum counter_metric_type type;
+    enum counter_mode mode;
     long long value;
 };
 
 struct para_counter {
-    enum counter_metric_type type;
+    enum counter_mode mode;
 };
 
 struct para_hdr{
@@ -129,7 +124,7 @@ struct metric_measure_data *metric_scheme_counter_new(const struct metric_parame
     struct metric_counter_or_gauge *counter = (struct metric_counter_or_gauge *)malloc(sizeof(struct metric_counter_or_gauge));
     data->counter = counter;
     counter->value = 0;
-    counter->type = para->counter.type;
+    counter->mode = para->counter.mode;
     return data;
 }
 
@@ -142,7 +137,7 @@ static void metric_scheme_counter_free(struct metric_measure_data *data)
 /*
     "counter": {
         "value": 0
-        "type": 0(counter) / 1(gauge)
+        "mode": 0(sum) / 1(max)  /  2(min)
     }
 */
 static void metric_scheme_counter_serialize(const struct metric_measure_data *data, char **blob, size_t *blob_size)
@@ -154,8 +149,8 @@ static void metric_scheme_counter_serialize(const struct metric_measure_data *da
 
     mpack_write_cstr(&writer, "value");
     mpack_write_i64(&writer, counter->value);
-    mpack_write_cstr(&writer, "type");
-    mpack_write_i8(&writer, counter->type);
+    mpack_write_cstr(&writer, "mode");
+    mpack_write_i8(&writer, counter->mode);
 
     mpack_complete_map(&writer);
     if (mpack_writer_destroy(&writer) != mpack_ok) {
@@ -168,16 +163,19 @@ static int metric_scheme_counter_merge(struct metric_measure_data *pthis, const 
     struct metric_counter_or_gauge *counter = pthis->counter;
     struct metric_counter_or_gauge *from_counter = from->counter;
     
-    if (counter->type != from_counter->type) {
+    if (counter->mode != from_counter->mode) {
         printf("ERR: counter type not match!\n");
         return -1;
     }
-    switch (counter->type) {
-        case COUNTER_TYPE_COUNTER:
+    switch (counter->mode) {
+        case COUNTER_MERGE_BY_SUM:
             counter->value += from_counter->value;
             break;
-        case COUNTER_TYPE_GAUGE:
+        case COUNTER_MERGE_BY_MAX:
             counter->value = counter->value > from_counter->value ? counter->value : from_counter->value;
+            break;
+        case COUNTER_MERGE_BY_MIN:
+            counter->value = counter->value < from_counter->value ? counter->value : from_counter->value;
             break;
         default:
             printf("ERR: unknown counter type\n");
@@ -192,7 +190,7 @@ static int metric_scheme_counter_copy(struct metric_measure_data *pthis, const s
     struct metric_counter_or_gauge *counter = pthis->counter;
     const struct metric_counter_or_gauge *from_counter = from->counter;
     counter->value = from_counter->value;
-    counter->type = from_counter->type;
+    counter->mode = from_counter->mode;
     return 0;
 }
 
@@ -208,7 +206,7 @@ struct metric_measure_data *metric_scheme_counter_deserialize(const char *blob, 
     ret->counter = counter;
 
     counter->value = mpack_node_i64(mpack_node_map_cstr(content_root, "value"));
-    counter->type = mpack_node_i8(mpack_node_map_cstr(content_root, "type"));
+    counter->mode = mpack_node_i8(mpack_node_map_cstr(content_root, "mode"));
 
     if (mpack_tree_destroy(&content_tree) != mpack_ok) {
         printf("ERR: An error occurred in counter_metric_deserialize!\n");
@@ -349,7 +347,7 @@ struct metric_parameter *construct_parameters(enum metric_type type, ...)
     va_start(ap, type);
     switch (type) {
         case METRIC_TYPE_COUNTER:
-            paras->counter.type = (enum counter_metric_type)va_arg(ap, int);
+            paras->counter.mode = (enum counter_mode)va_arg(ap, int);
             break;
         case METRIC_TYPE_HLL:
             paras->hll.precision = (char)va_arg(ap, int);
@@ -495,7 +493,7 @@ void metric_serialize_parameters(const struct metric *metric, char **blob, size_
     {
     case METRIC_TYPE_COUNTER:
         mpack_write_cstr(&writer, "merge_type");
-        mpack_write_i32(&writer, para->counter.type);
+        mpack_write_i32(&writer, para->counter.mode);
     case METRIC_TYPE_HLL:
         mpack_write_cstr(&writer, "prec");
         mpack_write_i32(&writer, para->hll.precision);
@@ -752,9 +750,9 @@ struct metric_measure_data *metric_find_or_new_cell(struct metric *pthis, int ce
     return data;
 }
 
-struct metric *metric_counter_new(const char *name, bool is_gauge)
+struct metric *metric_counter_new(const char *name, enum counter_mode mode)
 {
-    struct metric_parameter *metric_para = construct_parameters(METRIC_TYPE_COUNTER, is_gauge ? COUNTER_TYPE_GAUGE : COUNTER_TYPE_COUNTER);
+    struct metric_parameter *metric_para = construct_parameters(METRIC_TYPE_COUNTER, mode);
     struct metric *pthis = metric_new(name, METRIC_TYPE_COUNTER, metric_para);
 
     return pthis;
@@ -771,7 +769,7 @@ int metric_counter_set(struct metric *pthis, int cell_id, long long value)
 {
     struct metric_measure_data *data = metric_find_or_new_cell(pthis, cell_id);
     struct metric_counter_or_gauge *counter = data->counter;
-    if (counter->type == COUNTER_TYPE_COUNTER) {
+    if (counter->mode == COUNTER_MERGE_BY_SUM) {
         return -1;
     }
     counter->value = value;
