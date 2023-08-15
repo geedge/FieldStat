@@ -136,7 +136,6 @@ TEST(Fuzz_test, both_comp_and_topk_cubes_with_merge_and_reset_expecting_correct_
         delete shared_tag[i];
     }
 
-    printf("czzzz test (dest)----------------\n");
     int *cubes;
     int cube_num;
     struct fieldstat *instance_in_focus = instance_dest;

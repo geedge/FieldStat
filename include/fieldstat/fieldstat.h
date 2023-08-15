@@ -78,7 +78,6 @@ long long fieldstat_get_cube_version(const struct fieldstat *instance, int cube_
     * @return metric id, if success; otherwise, return -1. Fail when cube is not registered, or the parameter is invalid.
 */
 int fieldstat_register_counter(struct fieldstat *instance, int cube_id, const char *field_name, enum counter_mode mode);
-// is_gauge: merge 方法：最大 最小 求和 
 
 /*
     * @brief add a metric to the cube of cube_id. One metric may have multiple sub-metric that are associated with different cells. other parameters are the same as fieldstat_register_counter.

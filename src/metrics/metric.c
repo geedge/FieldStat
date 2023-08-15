@@ -102,7 +102,8 @@ void metric_add_one_cell(struct metric *pthis, int id, struct metric_measure_dat
         memset(pthis->data_array + pthis->n_array_item, 0, (pthis->max_n_array_item - pthis->n_array_item) * sizeof(struct metric_measure_data *));
     }
     if (pthis->data_array[id] != NULL) {
-        printf("err, metric_add_one_cell, id: %d, data_array[id] is not NULL\n", id);
+        // todo: log
+        // printf("err, metric_add_one_cell, id: %d, data_array[id] is not NULL\n", id);
     }
     pthis->data_array[id] = data;
 
@@ -154,7 +155,7 @@ static void metric_scheme_counter_serialize(const struct metric_measure_data *da
 
     mpack_complete_map(&writer);
     if (mpack_writer_destroy(&writer) != mpack_ok) {
-        printf("ERR: An error occurred in counter_metric_serialize!\n");
+        // todo: log
     }
 }
 
@@ -164,7 +165,7 @@ static int metric_scheme_counter_merge(struct metric_measure_data *pthis, const 
     struct metric_counter_or_gauge *from_counter = from->counter;
     
     if (counter->mode != from_counter->mode) {
-        printf("ERR: counter type not match!\n");
+        //todo: log
         return -1;
     }
     switch (counter->mode) {
@@ -178,7 +179,8 @@ static int metric_scheme_counter_merge(struct metric_measure_data *pthis, const 
             counter->value = counter->value < from_counter->value ? counter->value : from_counter->value;
             break;
         default:
-            printf("ERR: unknown counter type\n");
+            // todo: log
+            // printf("ERR: unknown counter type\n");
             return -1;
     }
 
@@ -209,7 +211,8 @@ struct metric_measure_data *metric_scheme_counter_deserialize(const char *blob, 
     counter->mode = mpack_node_i8(mpack_node_map_cstr(content_root, "mode"));
 
     if (mpack_tree_destroy(&content_tree) != mpack_ok) {
-        printf("ERR: An error occurred in counter_metric_deserialize!\n");
+        // todo: log
+        // printf("ERR: An error occurred in counter_metric_deserialize!\n");
     }
     return ret;
 }
@@ -262,7 +265,8 @@ struct metric_measure_data *metric_scheme_histogram_new(const struct metric_para
     struct hdr_histogram* tmp_p_hdr = NULL;
     int ret = hdr_init((int64_t)para->hdr.lowest_trackable_value, (int64_t)para->hdr.highest_trackable_value, para->hdr.significant_figures, &tmp_p_hdr);
 	if (ret != 0) {
-        printf("ERR: hdr_init failed!\n");
+        // printf("ERR: hdr_init failed!\n");
+        // todo: log
         return NULL;
     }
     struct metric_measure_data *data = (struct metric_measure_data *)malloc(sizeof(struct metric_measure_data));
@@ -300,8 +304,7 @@ struct metric_measure_data *metric_scheme_histogram_deserialize(const char *blob
 {
     struct hdr_histogram *hdr = NULL;
     int ret = hdr_log_decode(&hdr, (char *)blob, blob_size);
-    if (ret != 0 || hdr == NULL) {
-        printf("ERR: hdr_log_decode failed!\n");
+    if (ret != 0 || hdr == NULL) {// todo: log 
         return NULL;
     }
     struct metric_measure_data *data = (struct metric_measure_data *)malloc(sizeof(struct metric_measure_data));
@@ -357,8 +360,7 @@ struct metric_parameter *construct_parameters(enum metric_type type, ...)
             paras->hdr.highest_trackable_value = va_arg(ap, long long);
             paras->hdr.significant_figures = va_arg(ap, int);
             break;
-        default:
-            printf("ERR: construct_parameters: unknown type\n");
+        default:// todo: log 
             assert(0);
     }
     va_end(ap);
@@ -698,8 +700,7 @@ int metric_merge_or_copy_cell(struct metric *dest, const struct metric *src, int
         dest_data = src->scheme->new(src->info->paras);
         int ret = dest->scheme->copy(dest_data, src_data);
         if (ret == -1) {
-            dest->scheme->del(dest_data);
-            printf("ERR: metric_merge_or_copy_cell copy failed\n");
+            dest->scheme->del(dest_data);// todo: log 
             return -1;
         }
         metric_add_one_cell(dest, dest_cell_id, dest_data);
@@ -824,8 +825,7 @@ int metric_histogram_record(struct metric *pthis, int cell_id, long long value)
     struct metric_measure_data *data = metric_find_or_new_cell(pthis, cell_id);
     
     bool ret = hdr_record_value(data->hdr, value);
-    if (!ret) {
-        printf("ERR: metric_histogram_record: hdr_record_value failed\n");
+    if (!ret) {// todo: log 
         return -1;
     }
     return 0;
@@ -857,7 +857,6 @@ long long metric_histogram_count_le_value(const struct metric *pthis, int cell_i
 {
     const struct metric_measure_data *data = metric_find_one_cell(pthis, cell_id);
     if (data == NULL) {
-        printf("ERR: metric_histogram_count_le_value cell id %d does not exist\n", cell_id);
         return -1;
     }
     return hdr_count_le_value(data->hdr, value);

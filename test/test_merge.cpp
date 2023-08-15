@@ -510,13 +510,6 @@ TEST(unit_test_merge, merge_accuracy_test_with_K_large_enough_topk)
         flows_in_merged.push_back(new Fieldstat_tag_list_wrapper(&tag_list[i]));
     }
 
-    // // print
-    // printf("flows_in_merged\n");
-    // for (size_t i = 0; i < flows_in_merged.size(); i++) {
-    //     cout << flows_in_merged[i]->to_string() << endl;
-    // }
-    // cout << "---------------------------------------------" << endl;
-    
     flows_in_dest.insert(flows_in_dest.end(), std::make_move_iterator(flows_in_src.begin()), std::make_move_iterator(flows_in_src.end()));
     double accuracy = test_cal_accuracy_given_expected_key(flows_in_dest, flows_in_merged);
     EXPECT_TRUE(accuracy > 0.99); // should be 1.0

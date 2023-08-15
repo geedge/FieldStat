@@ -479,7 +479,8 @@ int heavy_keeper_merge_recording_id_details(struct heavy_keeper *dest, const str
     if (dest->params.array_num != src->params.array_num ||
         dest->params.max_bucket_num != src->params.max_bucket_num ||
         dest->K != src->K) {
-        printf("ERR: parameters of two merged heavy keeper must be the same\n");
+            // todo: log
+        // printf("ERR: parameters of two merged heavy keeper must be the same\n");
         return -1;
     }
 
@@ -543,7 +544,7 @@ int heavy_keeper_sorted_set_member_serialization(const struct tag_hash_key *tag,
 
     mpack_complete_map(&writer);
     if (mpack_writer_destroy(&writer) != mpack_ok) {
-        printf("ERR: An error occurred in heavy_keeper_sorted_set_member_serialization!\n");
+        // printf("ERR: An error occurred in heavy_keeper_sorted_set_member_serialization!\n");
         return -1;
     }
     return 0;
@@ -560,7 +561,7 @@ int heavy_keeper_bucket_serialization(const struct Bucket *b, char **blob, size_
     mpack_write_u32(&writer, b->finger_print);
     mpack_complete_map(&writer);
     if (mpack_writer_destroy(&writer) != mpack_ok) {
-        printf("ERR: An error occurred in heavy_keeper_bucket_serialization!\n");
+        // printf("ERR: An error occurred in heavy_keeper_bucket_serialization!\n");
         return -1;
     }
     return 0;
@@ -614,7 +615,7 @@ void heavy_keeper_serialization(const struct heavy_keeper *hk, char **blob, size
 
     mpack_complete_map(&writer);
     if (mpack_writer_destroy(&writer) != mpack_ok) {
-        printf("ERR: An error occurred in heavy_keeper_serialization\n");
+        // printf("ERR: An error occurred in heavy_keeper_serialization\n");
     }
 }
 
@@ -659,7 +660,7 @@ struct heavy_keeper *heavy_keeper_deserialization(const char *blob, size_t size)
     heavy_keeper_sorted_set_deserialization(&root, hk->top_K_heap);
 
     if (mpack_tree_destroy(&tree) != mpack_ok) {
-        printf("ERR: An error occurred in heavy_keeper_deserialization\n");
+        // printf("ERR: An error occurred in heavy_keeper_deserialization\n");
         return NULL;
     }
     return hk;

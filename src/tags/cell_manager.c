@@ -191,7 +191,8 @@ Even though there is a small possibility of not counting certain flows due to th
 The number 8 was determined through experiment, where multiple tests were conducted, randomly generating flows by which cells are determined.
     The observed stable cell ID count did not exceed 3 times the value of K. Therefore, a conservative value of 8 was chosen.*/
     if (pthis->next_cell_id >= pthis->max_cell_num * 8) { // max int is much larger, no risk of overflow
-        printf("ERR: the number of cells exceeds the limit when topk get bad flows\n");
+        // todo: log
+        // printf("ERR: the number of cells exceeds the limit when topk get bad flows\n");
         return -1;
     }
 
@@ -255,7 +256,8 @@ int cell_manager_serialize(const struct cell_manager *pthis, char **blob, size_t
 
     mpack_complete_map(&writer);
     if (mpack_writer_destroy(&writer) != mpack_ok) {
-        printf("ERR: An error occurred in cell_manager_serialize\n");
+        // todo: log
+        // printf("ERR: An error occurred in cell_manager_serialize\n");
     }
 
     return 0;

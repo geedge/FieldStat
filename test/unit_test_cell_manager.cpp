@@ -144,15 +144,6 @@ TEST(unit_test_cell_manager, merge_topk_given_K_large_enough)
     for (size_t i = 3; i < 5; i++) {
         cell_id_2[i - 3] = cell_manager_add_cell_topk(cm2, keys[i], 1, &pop_dummy, &exist_dummy);
     }
-    auto test_result_1 = test_query_cell_manager_content(cm1);
-    for (size_t i = 0; i < test_result_1.size(); i++) {
-        printf("cm1 content: %s\n", tag_hash_key_get_compound_key(test_result_1[i]));
-    }
-    auto test_result_2 = test_query_cell_manager_content(cm2);
-    for (size_t i = 0; i < test_result_2.size(); i++) {
-        printf("cm2 content: %s\n", tag_hash_key_get_compound_key(test_result_2[i]));
-    }
-
     int *cell_id_popped;
     int n_cell_id_popped;
     int *cell_id_old;

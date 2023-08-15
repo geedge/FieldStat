@@ -96,7 +96,6 @@ void fieldstat_reset(struct fieldstat *instance)
 unsigned long fieldstat_get_cell_version(const struct fieldstat *instance)
 {
     if (instance == NULL) {
-        printf("ERR: instance is NULL\n");
         return 0;
     }
     return instance->cell_version;
@@ -105,20 +104,16 @@ unsigned long fieldstat_get_cell_version(const struct fieldstat *instance)
 int fieldstat_unregister_cube(struct fieldstat *instance, int cube_id)
 {
     if (instance == NULL) {
-        printf("ERR: instance is NULL\n");
         return -1;
     }
     if (cube_id < 0 || cube_id >= instance->valid_cube_arr_length) {
-        //printf("ERR: cube_id is out of range, cube_id: %d\n", cube_id);
         return -1;
     }
     if (instance->shared_tag_cube_manager != NULL) {
-        printf("WARNING: This fieldstat instance is used as a merge destination. Please make sure merging has finished.\n");
         cube_manager_free(instance->shared_tag_cube_manager);
         instance->shared_tag_cube_manager = NULL;
     }
     if (instance->cube[cube_id] == NULL) {
-        printf("ERR: cube_id is not registered\n");
         return -1;
     }
     fieldstat_cube_free(instance, cube_id);
@@ -267,11 +262,9 @@ struct fs_cube *fieldstat_cube_new(const struct fieldstat_tag *shared_tags, size
 int fieldstat_register_cube(struct fieldstat *instance, const struct fieldstat_tag *shared_tags, size_t n_tag, enum sampling_mode mode, size_t max_n_cell)
 {
     if (instance == NULL) {
-        printf("ERR: fieldstat instance is NULL\n");
         return -1;
     }
     if (n_tag == 0 || shared_tags == NULL) {
-        printf("ERR: shared tags must not be empty\n");
         return -1;
     }
     struct fs_cube *cube = fieldstat_cube_new(shared_tags, n_tag, mode, max_n_cell);
@@ -283,21 +276,17 @@ int fieldstat_register_cube(struct fieldstat *instance, const struct fieldstat_t
 int fieldstat_cube_add(struct fieldstat *instance, int cube_id, const struct fieldstat_tag *tags, size_t n_tag, long long increment)
 {
     if (instance == NULL) {
-        printf("ERR: fieldstat instance is NULL\n");
         return -1;
     }
     if (cube_id < 0 || cube_id >= instance->valid_cube_arr_length) {
-        //printf("ERR: cube_id is invalid, %d\n", cube_id);
         return -1;
     }
     
     struct fs_cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
-        printf("ERR: fieldstat_cube_add cube is not registered yet\n");
         return -1;
     }
     if (cube->sampling_mode == SAMPLING_MODE_TOPK && increment <= 0) {
-        printf("ERR: increment cannot less than zero\n");
         return -1;
     }
 
@@ -365,16 +354,13 @@ static int append_metric_to_cube(struct fs_cube *cube, struct metric *metric)
 int fieldstat_register_counter(struct fieldstat *instance, int cube_id, const char *field_name, enum counter_mode mode)
 {
     if (instance == NULL) {
-        printf("ERR: fieldstat instance is NULL\n");
         return -1;
     }
     if (cube_id < 0 || cube_id >= instance->valid_cube_arr_length) {
-        printf("ERR: fieldstat_register_hist cube_id is invalid, %d\n", cube_id);
         return -1;
     }
     struct fs_cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
-        printf("ERR: fieldstat_register_counter cube is not registered yet\n");
         return -1;
     }
     struct metric *metric = metric_counter_new(field_name, mode);
@@ -385,20 +371,16 @@ int fieldstat_register_counter(struct fieldstat *instance, int cube_id, const ch
 int fieldstat_register_hll(struct fieldstat *instance, int cube_id, const char *field_name, unsigned char precision)
 {
     if (instance == NULL) {
-        printf("ERR: fieldstat instance is NULL\n");
         return -1;
     }
     if (cube_id < 0 || cube_id >= instance->valid_cube_arr_length) {
-        printf("ERR: fieldstat_register_hist cube_id is invalid, %d\n", cube_id);
         return -1;
     }
     struct fs_cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
-        printf("ERR: fieldstat_register_hll cube is not registered yet\n");
         return -1;
     }
     if (precision < 4 || precision > 18) {
-        printf("ERR: precision must be between 4 and 18\n");
         return -1;
     }
     struct metric *metric = metric_hll_new(field_name, precision);
@@ -409,29 +391,23 @@ int fieldstat_register_hll(struct fieldstat *instance, int cube_id, const char *
 int fieldstat_register_hist(struct fieldstat *instance, int cube_id, const char *field_name, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures)
 {
     if (instance == NULL) {
-        printf("ERR: fieldstat instance is NULL\n");
         return -1;
     }
     if (cube_id < 0 || cube_id >= instance->valid_cube_arr_length) {
-        printf("ERR: fieldstat_register_hist cube_id is invalid, %d\n", cube_id);
         return -1;
     }
     struct fs_cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
-        printf("ERR: fieldstat_register_histogram cube is not registered yet\n");
         return -1;
     }
     if (lowest_trackable_value < 1) {
-        printf("ERR: lowest_trackable_value not correct.\n");
         return -1;
     }
     if (significant_figures < 1 || significant_figures > 5) {
-        printf("ERR: significant_figures must be between 1 and 5\n");
         return -1;
     }
     if (lowest_trackable_value * 2 > highest_trackable_value)
 	{
-        printf("ERR: highest_trackable_value must be at least twice as large as lowest_trackable_value\n");
 		return -1;
 	}
 
@@ -446,12 +422,10 @@ int fieldstat_register_hist(struct fieldstat *instance, int cube_id, const char 
 static struct metric *fieldstat_find_metric(const struct fieldstat *instance, int cube_id, int metric_id)
 {
     if (cube_id < 0 || cube_id >= instance->valid_cube_arr_length) {
-        printf("ERR: fieldstat_find_metric cube_id is not correct, input cube id: %d\n", cube_id);
         return NULL;
     }
     struct fs_cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
-        printf("ERR: fieldstat_find_metric cube is not registered yet, input cube id: %d\n", cube_id);
         return NULL;
     }
     return cube->metrics[metric_id];
@@ -460,29 +434,23 @@ static struct metric *fieldstat_find_metric(const struct fieldstat *instance, in
 #define FIELDSTAT_GENERAL_CHECK(instance, cube_id, metric_id, cell_id, metric_type) \
 do { \
     if ((instance) == NULL) {   \
-        printf("ERR: [%s] fieldstat instance is NULL\n", __FUNCTION__); \
         return -1;  \
     }   \
     if ((cube_id) < 0 || (cube_id) >= (instance)->valid_cube_arr_length) {    \
-        printf("ERR: [%s] cube_id is not correct, input cube id: %d\n", __FUNCTION__, (cube_id)); \
         return -1;  \
     }   \
     const struct fs_cube *cube = (instance)->cube[(cube_id)];   \
     if (cube == NULL) { \
-        printf("ERR: [%s] cube is not registered yet, input cube id: %d\n", __FUNCTION__, (cube_id)); \
         return -1;  \
     }   \
     if ((metric_id) < 0 || (metric_id) >= cube->n_metric) { \
-        printf("ERR: [%s] metric_id is not correct, input metric id: %d\n", __FUNCTION__, (metric_id));   \
         return -2;  \
     }   \
     const struct metric *metric = cube->metrics[(metric_id)]; \
     if (metric == NULL || metric_get_type(metric) != (metric_type)) { \
-        printf("ERR: [%s] metric is not registered yet, input metric id: %d\n", __FUNCTION__, (metric_id));   \
         return -2;  \
     }   \
     if ((cell_id) < 0 || cell_manager_get_tag_by_cell_id(cube->cell_manager, cell_id) == NULL) { \
-        printf("ERR: [%s] cell_id is not correct, input cell id: %d\n", __FUNCTION__, (cell_id)); \
         return -3;  \
     }   \
 } while (0)
@@ -503,7 +471,6 @@ int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id
 
     int ret = metric_counter_set(metric, cell_id, value);
     if (ret < 0) {
-        printf("ERR: fieldstat_counter_set failed");
         return -4;
     }
     return 0;
@@ -525,7 +492,6 @@ int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id
 
     int ret = metric_histogram_record(metric, cell_id, value);
     if (ret < 0) {
-        printf("ERR: fieldstat_histogram_record failed");
         return -4;
     }
     return 0;
@@ -556,7 +522,6 @@ int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id
 int fieldstat_serialize(const struct fieldstat *instance, char **blob_out, size_t *blob_size_out)
 {
     if (instance == NULL) {
-        printf("ERR: fieldstat_serialize input is NULL\n");
         return -1;
     }
     mpack_writer_t writer;
@@ -609,7 +574,7 @@ int fieldstat_serialize(const struct fieldstat *instance, char **blob_out, size_
 
     mpack_complete_map(&writer);
     if (mpack_writer_destroy(&writer) != mpack_ok) {
-        printf("ERR: fieldstat_serialize: mpack_writer_destroy failed\n");
+        // todo: log
         return -1;
     }
 
@@ -624,7 +589,7 @@ struct fieldstat *fieldstat_deserialize(const char *blob, size_t blob_size)
     mpack_node_t root = mpack_tree_root(&tree);
     int ver = mpack_node_i32(mpack_node_map_cstr(root, "ver"));
     if (ver != EXPORT_VER) {
-        printf("ERR: fieldstat_deserialize: invalid version\n");
+        // todo: log
         mpack_tree_destroy(&tree);
         return NULL;
     }
@@ -693,7 +658,7 @@ void fieldstat_cube_merge_comprehensive(struct fs_cube *dest, const struct fs_cu
         const struct tag_hash_key *tag_src = tag_arr_src[cell_id_src];
         if (tag_src == NULL) {
             // the tag_src is continuous, so there may not be NULL in the middle
-            printf("ERR: tag_src is NULL, id: %d\n", cell_id_src);
+            // TODO: log
             continue;
         }
 
@@ -704,9 +669,7 @@ void fieldstat_cube_merge_comprehensive(struct fs_cube *dest, const struct fs_cu
         for (int metric_id_src = 0; metric_id_src < src->n_metric; metric_id_src++) {
             int metric_id_dest = metric_id_src_dest_map[metric_id_src];
             int tmp_ret = metric_merge_or_copy_cell(dest->metrics[metric_id_dest], src->metrics[metric_id_src], cell_id_final, cell_id_src);
-            if (tmp_ret == -1) {
-                printf("ERR: metric_merge_or_copy_cell failed\n");
-            }
+            // todo: log
         }
     }
 }
@@ -781,7 +744,6 @@ void fieldstat_cube_merge(struct fs_cube *dest, const struct fs_cube *src)
 int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
 {
     if (instance == NULL || src == NULL) {
-        printf("ERR: fieldstat_merge: instance or src is NULL\n");
         return -1;
     }
     size_t n_cube_dest = instance->valid_cube_arr_length;
@@ -817,7 +779,7 @@ int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
             cube_manager_add(tag_cube_id_map, shared_tag_key_src, cube_id);
         } else {
             if (instance->cube[cube_id_tmp]->sampling_mode != cube_src->sampling_mode) {
-                printf("ERR: cube sampling mode not match\n");
+                // todo: log
                 ret = -1;
                 tag_hash_key_free(shared_tag_key_src);
                 continue;
@@ -868,12 +830,10 @@ void fieldstat_get_cubes(const struct fieldstat *instance, int **cube_ids, int *
 int fieldstat_get_max_metric_id(const struct fieldstat *instance, int cube_id)
 {
     if (cube_id >= instance->valid_cube_arr_length || cube_id < 0) {
-        printf("ERR: fieldstat_get_max_metric_id cube_id is invalid\n");
         return -1;
     }
     const struct fs_cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
-        printf("ERR: fieldstat_get_max_metric_id cube is not registered yet\n");
         return -1;
     }
     return cube->n_metric - 1;
@@ -883,12 +843,10 @@ void fieldstat_get_cells(const struct fieldstat *instance, int cube_id, int metr
     int **cell_ids, struct fieldstat_tag_list **tag_list, size_t *n_cell)
 {
     if (cube_id >= instance->valid_cube_arr_length || cube_id < 0) {
-        printf("ERR: fieldstat_get_cells cube_id is invalid\n");
         return;
     }
     const struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id);
     if (metric == NULL) {
-        printf("ERR: metric or cube is not registered yet\n");
         return;
     }
 
@@ -905,7 +863,6 @@ void fieldstat_get_cells(const struct fieldstat *instance, int cube_id, int metr
     for (int i = 0; i < n_cell_ret; i++) {
         const struct tag_hash_key *tag_key = cell_manager_get_tag_by_cell_id(instance->cube[cube_id]->cell_manager, (*cell_ids)[i]);
         if (tag_key == NULL) {
-            printf("ERR: fieldstat_get_cells cell_manager_get_tag_by_cell_id failed, cube id: %d, metric id: %d,  cell id: %d\n", cube_id, metric_id, (*cell_ids)[i]);
             continue;
         }
         tag_hash_key_convert_to_fieldstat_tag(tag_key, &(tag_list_ret[i].tag), &(tag_list_ret[i].n_tag));
@@ -915,12 +872,10 @@ void fieldstat_get_cells(const struct fieldstat *instance, int cube_id, int metr
 struct fieldstat_tag_list *fieldstat_get_shared_tags(const struct fieldstat *instance, int cube_id)
 {
     if (cube_id >= instance->valid_cube_arr_length || cube_id < 0) {
-        printf("ERR: fieldstat_get_shared_tags cube_id is invalid\n");
         return NULL;
     }
     struct fs_cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
-        printf("ERR: fieldstat_get_shared_tags cube is not registered yet\n");
         return NULL;
     }
 
@@ -942,7 +897,6 @@ struct fieldstat_tag_list *fieldstat_get_shared_tags(const struct fieldstat *ins
                 tag_dest->value_double = tag_src->value_double;
                 break;
             default:
-                printf("ERR: tag type not supported\n");
                 break;
         }
     }
@@ -955,7 +909,6 @@ long long fieldstat_counter_get(const struct fieldstat *instance, int cube_id, i
 {
     const struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id);
     if (metric == NULL || metric_get_type(metric) != METRIC_TYPE_COUNTER) {
-        printf("ERR: fieldstat_counter_get metrics is not registered yet\n");
         return -1;
     }
 
@@ -966,7 +919,6 @@ double fieldstat_hll_get(const struct fieldstat *instance, int cube_id, int metr
 {
     const struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id);
     if (metric == NULL || metric_get_type(metric) != METRIC_TYPE_HLL) {
-        printf("ERR: fieldstat_hll_get metrics is not registered yet\n");
         return -1;
     }
 
@@ -977,7 +929,6 @@ long long fieldstat_hist_value_at_percentile(const struct fieldstat *instance, i
 {
     const struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id);
     if (metric == NULL || metric_get_type(metric) != METRIC_TYPE_HISTOGRAM) {
-        printf("ERR: fieldstat_histogram_value_at_percentile metrics is not registered yet\n");
         return -1;
     }
 
@@ -988,7 +939,6 @@ long long fieldstat_hist_count_le_value(const struct fieldstat *instance, int cu
 {
     const struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id);
     if (metric == NULL || metric_get_type(metric) != METRIC_TYPE_HISTOGRAM) {
-        printf("ERR: fieldstat_histogram_value_le_value metrics is not registered yet\n");
         return -1;
     }
 
@@ -999,12 +949,10 @@ void fieldstat_get_serialized_blob(const struct fieldstat *instance, int cube_id
 {
     const struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id);
     if (metric == NULL) {
-        printf("ERR: fieldstat_get_serialized_blob metrics is not registered yet\n");
         return;
     }
     enum metric_type type = metric_get_type(metric);
     if (!(type == METRIC_TYPE_HLL || type == METRIC_TYPE_HISTOGRAM)) {
-        printf("ERR: Only metric of hll and histogram support get serialized blob\n");
         return;
     }
 
@@ -1029,7 +977,6 @@ const char *fieldstat_get_metric_name(const struct fieldstat *instance, int cube
 {
     const struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id);
     if (metric == NULL) {
-        printf("ERR: metrics is not registered yet\n");
         return NULL;
     }
 
@@ -1040,7 +987,6 @@ enum metric_type fieldstat_get_metric_type(const struct fieldstat *instance, int
 {
     const struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id);
     if (metric == NULL) {
-        printf("ERR: metrics is not registered yet\n");
         return (enum metric_type)-1;
     }
 
@@ -1078,12 +1024,10 @@ struct fieldstat *fieldstat_dup(const struct fieldstat *instance)
 void fieldstat_cube_read_cell(const struct fieldstat *instance, int cube_id, int **cell_ids, struct fieldstat_tag_list **tag_list, size_t *n_cell)
 {
     if (cube_id < 0 || cube_id >= instance->valid_cube_arr_length) {
-        printf("ERR: fieldstat_cube_read_cell cube id is invalid, cube id: %d\n", cube_id);
         return;
     }
     const struct fs_cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
-        printf("ERR: fieldstat_cube_read_cell cube is not registered yet, cube id: %d\n", cube_id);
         return;
     }
     
@@ -1127,7 +1071,6 @@ int fieldstat_get_max_cell_num(const struct fieldstat *instance, int cube_id)
 {
     const struct fs_cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
-        printf("ERR: fieldstat_get_max_cell_num cube is not registered yet, cube id: %d\n", cube_id);
         return -1;
     }
 

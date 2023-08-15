@@ -119,7 +119,6 @@ cJSON *test_exporter_extract_results_with_standard_global(const struct fieldstat
 
     char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter);
     cJSON *root_arr = cJSON_Parse(json_string);
-    printf("test, fieldstat_json_exporter_export json_string: %s\n", json_string);
     free(json_string);
     fieldstat_json_exporter_free(fieldstat_json_exporter);
 
@@ -132,7 +131,6 @@ cJSON *test_exporter_extract_results(const struct fieldstat *instance)
 
     char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter);
     cJSON *root_arr = cJSON_Parse(json_string);
-    printf("test, fieldstat_json_exporter_export json_string: %s\n", json_string);
     free(json_string);
     fieldstat_json_exporter_free(fieldstat_json_exporter);
 
