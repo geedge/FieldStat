@@ -27,7 +27,7 @@
 #include <pthread.h>
 #include <sys/stat.h>
 
-#include "log.h"
+#include "log_handle.h"
 
 #define ALLOC(type, number) ((type *)calloc(sizeof(type), number))
 

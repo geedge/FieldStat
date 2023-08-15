@@ -65,6 +65,7 @@ if (CMAKE_CXX_CPPCHECK)
             "--suppress=*:${PROJECT_SOURCE_DIR}/vendors/*"
             "--suppress=*:${PROJECT_SOURCE_DIR}/test/utils.hpp"
             "--suppress=*:${PROJECT_SOURCE_DIR}/test/unit_test_serialize.cpp"
+            "--suppress=*:${PROJECT_SOURCE_DIR}/src/logger/log_handle.c"
     )
     set(CMAKE_C_CPPCHECK ${CMAKE_CXX_CPPCHECK})
 else()
@@ -102,6 +103,7 @@ file(GLOB SRC
     "src/metrics/*.c"
     "src/tags/*.c"
     "src/exporter/*.c"
+    "src/logger/*.c"
     "vendors/cjson/*.c"
     "vendors/hdr/*.c"
     "vendors/minheap/*.c"
@@ -127,10 +129,12 @@ if(DEFINED MESA_SHARED_INSTALL_DIR)
 else()
 	set_target_properties(${lib_name}_shared PROPERTIES OUTPUT_NAME ${lib_name})
 endif()
+target_link_libraries(${lib_name}_shared -luuid)
 
 # static Library Output
 add_library(${lib_name}_static STATIC ${SRC})
 set_target_properties(${lib_name}_static PROPERTIES OUTPUT_NAME ${lib_name})
+target_link_libraries(${lib_name}_static -luuid)
 
 install(TARGETS ${lib_name}_shared LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib COMPONENT LIBRARIES)
 install(TARGETS ${lib_name}_static LIBRARY ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib COMPONENT LIBRARIES)
