@@ -145,7 +145,6 @@ int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id
 void fieldstat_reset(struct fieldstat *instance);
 unsigned long fieldstat_get_cell_version(const struct fieldstat *instance);
 
-
 /*
  @brief Merge the instance. The registered cubes and metrics are merged even if there are no cells added.
  @return 0 if success. -1 if failed. Failed when the registered cubes or metrics between dest and src of the same keys has different types or configurations.
@@ -153,7 +152,13 @@ unsigned long fieldstat_get_cell_version(const struct fieldstat *instance);
 int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src);
 struct fieldstat *fieldstat_deserialize(const char *blob, size_t blob_size);
 int fieldstat_serialize(const struct fieldstat *instance, char **blob_out, size_t *blob_size_out);
+/*
+    @ brief Merge the instance and reset the src. The registered cubes and metrics are merged even if there are no cells added
+        This operation is partially thread-safe. Src can be written by other threads, but cannot be read by other threads during the merge operation.
+        Reset will not influence the adding operation of src during the merge operation.
 
+*/
+int fieldstat_merge_and_reset(struct fieldstat *instance, struct fieldstat *src);
 
 /* -------------------------------------------------------------------------- */
 /*                                    query                                   */

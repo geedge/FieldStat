@@ -41,6 +41,8 @@ struct fieldstat {
     size_t valid_cube_arr_length;
     size_t max_n_cube;
 
+    struct fs_cube **cube_to_merge; // read only cube, used only in merge
+
     struct cube_manager *shared_tag_cube_manager; // used only in merge to store shared tags in history
 };
 
@@ -51,6 +53,7 @@ struct fieldstat *fieldstat_new()
 
     instance->max_n_cube = 100;
     instance->cube = calloc(instance->max_n_cube, sizeof(struct fs_cube *));
+    instance->cube_to_merge = calloc(instance->max_n_cube, sizeof(struct fs_cube *));
     instance->cube_version = calloc(instance->max_n_cube, sizeof(unsigned long));
 
     return instance;
@@ -66,12 +69,21 @@ void fieldstat_free(struct fieldstat *instance)
         fieldstat_cube_free(instance, i);
     }
     free(instance->cube);
+    free(instance->cube_to_merge);
     free(instance->cube_version);
     if (instance->shared_tag_cube_manager != NULL){
         cube_manager_free(instance->shared_tag_cube_manager);
     }
 
     free(instance);
+}
+
+void fieldstat_cube_reset(struct fs_cube *cube)
+{
+    for (size_t i = 0; i < cube->n_metric; i++) {
+        metric_reset(cube->metrics[i]);
+    }
+    cell_manager_reset(cube->cell_manager);
 }
 
 void fieldstat_reset(struct fieldstat *instance)
@@ -84,11 +96,7 @@ void fieldstat_reset(struct fieldstat *instance)
         if (cube == NULL) {
             continue;
         }
-        for (size_t j = 0; j < cube->n_metric; j++) {
-            metric_reset(cube->metrics[j]);
-        }
-
-        cell_manager_reset(cube->cell_manager);
+        fieldstat_cube_reset(cube);
     }
     instance->cell_version++;
 }
@@ -269,7 +277,16 @@ int fieldstat_register_cube(struct fieldstat *instance, const struct fieldstat_t
     }
     struct fs_cube *cube = fieldstat_cube_new(shared_tags, n_tag, mode, max_n_cell);
 
+    int max_n_cube_pre = instance->max_n_cube;
     int cube_id = fieldstat_append_cube_to_instance(instance, cube);
+
+    if (max_n_cube_pre != instance->max_n_cube) {
+        struct fs_cube **old_cube_arr = instance->cube_to_merge;
+        instance->cube_to_merge = (struct fs_cube **)calloc(instance->max_n_cube, sizeof(struct fs_cube *));
+        memcpy(instance->cube_to_merge, old_cube_arr, sizeof(struct fs_cube *) * max_n_cube_pre);
+        free(old_cube_arr);
+    }
+    instance->cube_to_merge[cube_id] = fieldstat_cube_new(shared_tags, n_tag, mode, max_n_cell);
     return cube_id;
 }
 
@@ -310,9 +327,8 @@ int fieldstat_cube_add(struct fieldstat *instance, int cube_id, const struct fie
     return ret;
 }
 
-void fieldstat_cube_free(struct fieldstat *instance, int cube_id)
+void cube_free(struct fs_cube *cube)
 {
-    struct fs_cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
         return;
     }
@@ -332,10 +348,28 @@ void fieldstat_cube_free(struct fieldstat *instance, int cube_id)
     }
 
     free(cube);
-    instance->cube[cube_id] = NULL;
 }
 
+void fieldstat_cube_free(struct fieldstat *instance, int cube_id)
+{
+    cube_free(instance->cube[cube_id]);
+    instance->cube[cube_id] = NULL;
 
+    cube_free(instance->cube_to_merge[cube_id]);
+    instance->cube_to_merge[cube_id] = NULL;
+}
+
+static int append_metric_to_cube(struct fs_cube *cube, struct metric *metric);
+struct fs_cube *fieldstat_cube_dup(const struct fs_cube *cube)
+{
+    struct fs_cube *new_cube = fieldstat_cube_new(cube->shared_tags, cube->n_shared_tags, cube->sampling_mode, cube->max_n_cell);
+    for (size_t j = 0; j < cube->n_metric; j++) {
+        const struct metric *metric = cube->metrics[j];
+        struct metric *new_metric = metric_copy_structure(metric);
+        append_metric_to_cube(new_cube, new_metric);
+    }
+    return new_cube;
+}
 /* -------------------------------------------------------------------------- */
 /*                               metric register                              */
 /* -------------------------------------------------------------------------- */
@@ -348,6 +382,7 @@ static int append_metric_to_cube(struct fs_cube *cube, struct metric *metric)
     }
     cube->metrics[cube->n_metric] = metric;
     cube->n_metric++;
+
     return cube->n_metric - 1;
 }
 
@@ -363,8 +398,10 @@ int fieldstat_register_counter(struct fieldstat *instance, int cube_id, const ch
     if (cube == NULL) {
         return -1;
     }
-    struct metric *metric = metric_counter_new(field_name, mode);
+    struct metric *metric_RO = metric_counter_new(field_name, mode);
+    append_metric_to_cube(instance->cube_to_merge[cube_id], metric_RO);
 
+    struct metric *metric = metric_counter_new(field_name, mode);
     return append_metric_to_cube(cube, metric);
 }
 
@@ -383,6 +420,10 @@ int fieldstat_register_hll(struct fieldstat *instance, int cube_id, const char *
     if (precision < 4 || precision > 18) {
         return -1;
     }
+
+    struct metric *metric_RO = metric_hll_new(field_name, precision);
+    append_metric_to_cube(instance->cube_to_merge[cube_id], metric_RO);
+
     struct metric *metric = metric_hll_new(field_name, precision);
 
     return append_metric_to_cube(cube, metric);
@@ -410,6 +451,9 @@ int fieldstat_register_hist(struct fieldstat *instance, int cube_id, const char 
 	{
 		return -1;
 	}
+
+    struct metric *metric_RO = metric_histogram_new(field_name, lowest_trackable_value, highest_trackable_value, significant_figures);
+    append_metric_to_cube(instance->cube_to_merge[cube_id], metric_RO);
 
     struct metric *metric = metric_histogram_new(field_name, lowest_trackable_value, highest_trackable_value, significant_figures);
 
@@ -621,6 +665,16 @@ struct fieldstat *fieldstat_deserialize(const char *blob, size_t blob_size)
 
         fieldstat_append_cube_to_instance(instance, fs_cube);
     }
+    free(instance->cube_to_merge);
+    instance->cube_to_merge = calloc(instance->max_n_cube, sizeof(struct fs_cube *));
+
+    for (int i = 0; i < instance->valid_cube_arr_length; i++) {
+        const struct fs_cube *cube = instance->cube[i];
+        if (cube == NULL) {
+            continue;
+        }
+        instance->cube_to_merge[i] = fieldstat_cube_dup(cube);
+    }
 
     mpack_tree_destroy(&tree);
     return instance;
@@ -630,7 +684,7 @@ struct fieldstat *fieldstat_deserialize(const char *blob, size_t blob_size)
 /*                                    merge                                   */
 /* -------------------------------------------------------------------------- */
 
-struct fs_cube *fieldstat_cube_dup(const struct fs_cube *cube)
+struct fs_cube *fieldstat_cube_copy(const struct fs_cube *cube)
 {
     struct fs_cube *cube_dup = fieldstat_cube_info_init(cube->shared_tags, cube->n_shared_tags, cube->sampling_mode, cube->max_n_cell);
     const struct cell_manager *cm_src = cube->cell_manager;
@@ -736,11 +790,27 @@ void fieldstat_cube_merge(struct fs_cube *dest, const struct fs_cube *src)
     fieldstat_cube_merge_topk(dest, src, metric_id_src_dest_map);
 }
 
-int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
+// void fieldstat_prepare_cube_manager(struct fieldstat *instance)
+// {
+//     if (instance->shared_tag_cube_manager != NULL) {
+//         return;
+//     }
+//     struct cube_manager *tag_cube_id_map = cube_manager_new();
+//     instance->shared_tag_cube_manager = tag_cube_id_map;
+//     size_t n_cube = instance->valid_cube_arr_length;
+//     for (int i = 0; i < n_cube; i++) {
+//         const struct fs_cube *cube = instance->cube_to_merge[i];
+//         if (cube == NULL) {
+//             continue;
+//         }
+//         struct tag_hash_key *shared_tag_key = tag_hash_key_construct_with_fieldstat_tag(cube->shared_tags, cube->n_shared_tags);
+//         cube_manager_add(tag_cube_id_map, shared_tag_key, i);
+//         tag_hash_key_free(shared_tag_key);
+//     }
+// }
+
+int fieldstat_merge_inner(struct fieldstat *instance, const struct fieldstat *src)
 {
-    if (instance == NULL || src == NULL) {
-        return -1;
-    }
     size_t n_cube_dest = instance->valid_cube_arr_length;
     size_t n_cube_src = src->valid_cube_arr_length;
     // tag_cube_id_map use cube shared tag as key, find cubes. Is is not a cell manager.
@@ -761,7 +831,7 @@ int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
 
     int ret = 0;
     for (int i = 0; i < n_cube_src; i++) {
-        const struct fs_cube *cube_src = src->cube[i];
+        const struct fs_cube *cube_src = src->cube_to_merge[i];
         if (cube_src == NULL) {
             continue;
         }
@@ -769,19 +839,41 @@ int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
         struct tag_hash_key *shared_tag_key_src = tag_hash_key_construct_with_fieldstat_tag(cube_src->shared_tags, cube_src->n_shared_tags);
         int cube_id_tmp = cube_manager_find(tag_cube_id_map, shared_tag_key_src);
         if (cube_id_tmp == -1) {
-            struct fs_cube *copied_cube = fieldstat_cube_dup(cube_src);
+            struct fs_cube *copied_cube = fieldstat_cube_copy(cube_src);
             int cube_id = fieldstat_append_cube_to_instance(instance, copied_cube);
             cube_manager_add(tag_cube_id_map, shared_tag_key_src, cube_id);
         } else {
-            if (instance->cube[cube_id_tmp]->sampling_mode != cube_src->sampling_mode) {
+            struct fs_cube *cube_dest = instance->cube_to_merge[cube_id_tmp];
+            if (cube_dest->sampling_mode != cube_src->sampling_mode) {
                 ret = -1;
                 tag_hash_key_free(shared_tag_key_src);
                 continue;
             }
-            fieldstat_cube_merge(instance->cube[cube_id_tmp], cube_src);
+            fieldstat_cube_merge(cube_dest, cube_src);
         }
         tag_hash_key_free(shared_tag_key_src);
     }
+    return ret;
+}
+
+int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
+{
+    if (instance == NULL || src == NULL) {
+        return -1;
+    }
+
+    // fieldstat_merge is not thread-safe, just let the cube to be merge be the one serving add.
+    // save the origin cube_to_merge for recovering later.
+    struct fs_cube **origin_merged_cube_dest = instance->cube_to_merge;
+    struct fs_cube **origin_merged_cube_src = src->cube_to_merge;
+    src->cube_to_merge = src->cube;
+    instance->cube_to_merge = instance->cube;
+
+    int ret = fieldstat_merge_inner(instance, src);
+
+    // recover the origin cube_to_merge
+    src->cube_to_merge = origin_merged_cube_src;
+    instance->cube_to_merge = origin_merged_cube_dest;
 
     return ret;
 }
@@ -997,18 +1089,14 @@ struct fieldstat *fieldstat_dup(const struct fieldstat *instance)
     new_instance->valid_cube_arr_length = instance->valid_cube_arr_length;
     new_instance->max_n_cube = instance->max_n_cube;
     new_instance->cube = calloc(new_instance->max_n_cube, sizeof(struct fs_cube *));
+    new_instance->cube_to_merge = calloc(new_instance->max_n_cube, sizeof(struct fs_cube *));
     for (size_t i = 0; i < new_instance->valid_cube_arr_length; i++) {
-        struct fs_cube *cube = instance->cube[i];
+        const struct fs_cube *cube = instance->cube[i];
         if (cube == NULL) {
             continue;
         }
-        new_instance->cube[i] = fieldstat_cube_new(cube->shared_tags, cube->n_shared_tags, cube->sampling_mode, cube->max_n_cell);
-        // copy registered metrics
-        for (size_t j = 0; j < cube->n_metric; j++) {
-            const struct metric *metric = cube->metrics[j];
-            struct metric *new_metric = metric_copy_structure(metric);
-            append_metric_to_cube(new_instance->cube[i], new_metric);
-        }
+        new_instance->cube[i] = fieldstat_cube_dup(cube);
+        new_instance->cube_to_merge[i] = fieldstat_cube_dup(cube);
     }
 
     new_instance->cube_version = calloc(new_instance->max_n_cube, sizeof(unsigned long));
@@ -1069,4 +1157,26 @@ int fieldstat_get_max_cell_num(const struct fieldstat *instance, int cube_id)
     }
 
     return cube->max_n_cell;
+}
+
+int fieldstat_merge_and_reset(struct fieldstat *instance, struct fieldstat *src)
+{
+    // todo: 性能优化，把cube的结构拷出来，把cube的指针浅拷贝给到dest，src用结构代替，需要重写merge的过程，如果没有cube，把reset和copy改为浅拷贝，如果有，应该还是要reset+copy
+    // 总之会很麻烦，先不做了
+
+    struct fs_cube **next_cube_WO = instance->cube_to_merge;
+    for(int i = 0; i < instance->valid_cube_arr_length; i++) {
+        if (next_cube_WO[i] == NULL) {
+            continue;
+        }
+        fieldstat_cube_reset(next_cube_WO[i]);
+    }
+
+    instance->cube_to_merge = __sync_lock_test_and_set(&instance->cube_to_merge, instance->cube);
+    instance->cube = __sync_lock_test_and_set(&instance->cube, next_cube_WO);
+    src->cube = __sync_lock_test_and_set(&src->cube, NULL); // todo: 这块儿有点乱，再想想, 比如最终的instance 的 tomerge 应该移到cube上
+
+    int ret = fieldstat_merge_inner(instance, src);
+
+    return ret;
 }

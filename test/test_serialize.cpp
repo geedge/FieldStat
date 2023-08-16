@@ -151,6 +151,8 @@ TEST(unit_test_serialize, rearrange_tags_when_serialize)
     fieldstat_tag_list_arr_free(tag_list, n_cell);
 }
 
+// todo: serialzie many cubes
+
 int main(int argc, char *argv[]) 
 {
 	testing::InitGoogleTest(&argc, argv);
