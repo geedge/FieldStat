@@ -560,8 +560,10 @@ long long read_metric_current_value(struct metric *metric)
 	}
 
 	value = threadsafe_counter_read(&(target->changing));
-	value += target->accumulated;
-
+	if(metric->field_type == FIELD_TYPE_GAUGE)
+	{
+		value += target->accumulated;
+	}
 	return value;
 }
 

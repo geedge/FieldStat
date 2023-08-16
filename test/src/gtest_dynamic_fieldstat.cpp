@@ -2587,8 +2587,16 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicMetricValueGet)
 	instance = fieldstat_dynamic_instance_new("firewall", n_thread);
 	EXPECT_NE(nullptr, instance);
 
+	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8700);
+	EXPECT_EQ(0, ret);
+
+	fieldstat_dynamic_instance_start(instance);
+
 	ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_TYPE_GAUGE, "Active_sessions", 1000, NULL, 0, 0);
 	EXPECT_EQ(0, ret);
+	value = fieldstat_dynamic_metric_value_get(instance, "Active_sessions", NULL, 0, 0);
+	EXPECT_EQ(1000, value);
+	sleep(3);
 	value = fieldstat_dynamic_metric_value_get(instance, "Active_sessions", NULL, 0, 0);
 	EXPECT_EQ(1000, value);
 	fieldstat_dynamic_instance_free(instance);
@@ -2611,6 +2619,11 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicTableMetricValueGet)
 	instance = fieldstat_dynamic_instance_new("firewall", n_thread);
 	EXPECT_NE(nullptr, instance);
 
+	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8700);
+	EXPECT_EQ(0, ret);
+
+	fieldstat_dynamic_instance_start(instance);
+
 	table_id = fieldstat_register_dynamic_table(instance, "shaping", column_name, column_type, sizeof(column_name)/sizeof(column_name[0]), out_column_ids);
 	EXPECT_EQ(0, table_id);
 
@@ -2624,6 +2637,14 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicTableMetricValueGet)
 
 	value = fieldstat_dynamic_table_metric_value_get(instance, table_id, out_column_ids[1], "security_rule_hits", NULL, 0, 0);
 	EXPECT_EQ(2000, value);
+
+	sleep(3);
+
+	value = fieldstat_dynamic_table_metric_value_get(instance, table_id, out_column_ids[0], "security_rule_hits", NULL, 0, 0);
+	EXPECT_EQ(0, value);
+
+	value = fieldstat_dynamic_table_metric_value_get(instance, table_id, out_column_ids[1], "security_rule_hits", NULL, 0, 0);
+	EXPECT_EQ(0, value);
 
 	fieldstat_dynamic_instance_free(instance);
 }
