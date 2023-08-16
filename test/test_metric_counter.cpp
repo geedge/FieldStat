@@ -238,7 +238,7 @@ TEST(metric_test_counter, topk_add_and_test_accuracy)
 
         error += abs(fieldstat_counter_get(instance, 0, 0, ret_cell_ids[i]) - flow_cnt[key + value]);
     }
-    printf("error: %lld\n", error);
+    printf("topk_add_and_test_accuracy Mean ratio e: %lld\n", error);
     EXPECT_LT(error, tag_list_num * 0.005);
 
     free(ret_cell_ids);

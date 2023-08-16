@@ -129,12 +129,10 @@ if(DEFINED MESA_SHARED_INSTALL_DIR)
 else()
 	set_target_properties(${lib_name}_shared PROPERTIES OUTPUT_NAME ${lib_name})
 endif()
-target_link_libraries(${lib_name}_shared -luuid)
 
 # static Library Output
 add_library(${lib_name}_static STATIC ${SRC})
 set_target_properties(${lib_name}_static PROPERTIES OUTPUT_NAME ${lib_name})
-target_link_libraries(${lib_name}_static -luuid)
 
 install(TARGETS ${lib_name}_shared LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib COMPONENT LIBRARIES)
 install(TARGETS ${lib_name}_static LIBRARY ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib COMPONENT LIBRARIES)

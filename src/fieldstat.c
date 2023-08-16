@@ -574,7 +574,6 @@ int fieldstat_serialize(const struct fieldstat *instance, char **blob_out, size_
 
     mpack_complete_map(&writer);
     if (mpack_writer_destroy(&writer) != mpack_ok) {
-        // todo: log
         return -1;
     }
 
@@ -589,7 +588,6 @@ struct fieldstat *fieldstat_deserialize(const char *blob, size_t blob_size)
     mpack_node_t root = mpack_tree_root(&tree);
     int ver = mpack_node_i32(mpack_node_map_cstr(root, "ver"));
     if (ver != EXPORT_VER) {
-        // todo: log
         mpack_tree_destroy(&tree);
         return NULL;
     }
@@ -657,8 +655,6 @@ void fieldstat_cube_merge_comprehensive(struct fs_cube *dest, const struct fs_cu
     for (int cell_id_src = 0; cell_id_src < arr_len_src; cell_id_src++) {
         const struct tag_hash_key *tag_src = tag_arr_src[cell_id_src];
         if (tag_src == NULL) {
-            // the tag_src is continuous, so there may not be NULL in the middle
-            // TODO: log
             continue;
         }
 
@@ -668,8 +664,7 @@ void fieldstat_cube_merge_comprehensive(struct fs_cube *dest, const struct fs_cu
         }
         for (int metric_id_src = 0; metric_id_src < src->n_metric; metric_id_src++) {
             int metric_id_dest = metric_id_src_dest_map[metric_id_src];
-            int tmp_ret = metric_merge_or_copy_cell(dest->metrics[metric_id_dest], src->metrics[metric_id_src], cell_id_final, cell_id_src);
-            // todo: log
+            metric_merge_or_copy_cell(dest->metrics[metric_id_dest], src->metrics[metric_id_src], cell_id_final, cell_id_src);
         }
     }
 }
@@ -779,7 +774,6 @@ int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
             cube_manager_add(tag_cube_id_map, shared_tag_key_src, cube_id);
         } else {
             if (instance->cube[cube_id_tmp]->sampling_mode != cube_src->sampling_mode) {
-                // todo: log
                 ret = -1;
                 tag_hash_key_free(shared_tag_key_src);
                 continue;

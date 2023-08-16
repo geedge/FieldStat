@@ -42,7 +42,7 @@ SET(TEST_UTILS_SRC
 
 function (add_unit_test file_name)
     add_executable(${file_name} ${SRC} ${TEST_UTILS_SRC} ${file_name}.cpp)
-    target_link_libraries(${file_name} gtest-static ${ZLIB_LIBRARIES} ${LFLAGS} -luuid stdc++fs) 
+    target_link_libraries(${file_name} gtest-static ${ZLIB_LIBRARIES} ${LFLAGS}) 
     set_property(TARGET ${file_name} PROPERTY CXX_STANDARD 17)
 endfunction()
 
@@ -56,4 +56,3 @@ add_unit_test(test_performance)
 add_unit_test(test_register_and_reset)
 add_unit_test(test_serialize)
 add_unit_test(unit_test_cell_manager)
-add_unit_test(unit_test_logger)
