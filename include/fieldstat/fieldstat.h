@@ -155,9 +155,10 @@ int fieldstat_serialize(const struct fieldstat *instance, char **blob_out, size_
 /*
     @ brief Merge the instance and reset the src. The registered cubes and metrics are merged even if there are no cells added
         This operation is partially thread-safe. Src can be written by other threads, but cannot be read by other threads during the merge operation.
-        Reset will not influence the adding operation in other threads during the running time of this function. (Reset on entering fieldstat_merge_and_reset)
+        Reset will undo the effect of fieldstat_cube_add and 4 adding operation functions below. And increase cell_version by 1.(The same as fieldstat_reset)
+        Reset will not influence the adding operation in other threads during the running time of this function. As if reset take effects before merging
         
-        the following functions can be called while `fieldstat_merge_and_reset` is reading the same instance handle as its argument `src`:
+        the following functions can be called while `fieldstat_merge_and_reset` is reading the same instance handle, its argument `src`:
         -  `fieldstat_get_cell_version`
         -  `fieldstat_hist_record`
         -  `fieldstat_hll_add`
