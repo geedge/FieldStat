@@ -686,6 +686,7 @@ struct fieldstat *fieldstat_deserialize(const char *blob, size_t blob_size)
 
 struct fs_cube *fieldstat_cube_copy(const struct fs_cube *cube)
 {
+    printf("fieldstat_cube_copy\n");
     struct fs_cube *cube_dup = fieldstat_cube_info_init(cube->shared_tags, cube->n_shared_tags, cube->sampling_mode, cube->max_n_cell);
     const struct cell_manager *cm_src = cube->cell_manager;
 
@@ -709,11 +710,13 @@ void fieldstat_cube_merge_comprehensive(struct fs_cube *dest, const struct fs_cu
     for (int cell_id_src = 0; cell_id_src < arr_len_src; cell_id_src++) {
         const struct tag_hash_key *tag_src = tag_arr_src[cell_id_src];
         if (tag_src == NULL) {
+            printf("tag_src is NULL\n");
             continue;
         }
 
         int cell_id_final = cell_manager_add_cell(cell_manager_dest, tag_src);
         if (cell_id_final == -1) { // dest is full
+            printf("dest is full\n");
             break;
         }
         for (int metric_id_src = 0; metric_id_src < src->n_metric; metric_id_src++) {
@@ -843,7 +846,7 @@ int fieldstat_merge_inner(struct fieldstat *instance, const struct fieldstat *sr
             int cube_id = fieldstat_append_cube_to_instance(instance, copied_cube);
             cube_manager_add(tag_cube_id_map, shared_tag_key_src, cube_id);
         } else {
-            struct fs_cube *cube_dest = instance->cube_to_merge[cube_id_tmp];
+            struct fs_cube *cube_dest = instance->cube[cube_id_tmp];
             if (cube_dest->sampling_mode != cube_src->sampling_mode) {
                 ret = -1;
                 tag_hash_key_free(shared_tag_key_src);
@@ -864,16 +867,13 @@ int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
 
     // fieldstat_merge is not thread-safe, just let the cube to be merge be the one serving add.
     // save the origin cube_to_merge for recovering later.
-    struct fs_cube **origin_merged_cube_dest = instance->cube_to_merge;
-    struct fs_cube **origin_merged_cube_src = src->cube_to_merge;
+    struct fs_cube **origin_merged_cube = src->cube_to_merge;
     src->cube_to_merge = src->cube;
-    instance->cube_to_merge = instance->cube;
 
     int ret = fieldstat_merge_inner(instance, src);
 
     // recover the origin cube_to_merge
-    src->cube_to_merge = origin_merged_cube_src;
-    instance->cube_to_merge = origin_merged_cube_dest;
+    src->cube_to_merge = origin_merged_cube;
 
     return ret;
 }
@@ -1163,20 +1163,47 @@ int fieldstat_merge_and_reset(struct fieldstat *instance, struct fieldstat *src)
 {
     // todo: 性能优化，把cube的结构拷出来，把cube的指针浅拷贝给到dest，src用结构代替，需要重写merge的过程，如果没有cube，把reset和copy改为浅拷贝，如果有，应该还是要reset+copy
     // 总之会很麻烦，先不做了
+    // 也不是特别麻烦，实际上就是把reset改成dup，然后把reset放到最后。
 
-    struct fs_cube **next_cube_WO = instance->cube_to_merge;
-    for(int i = 0; i < instance->valid_cube_arr_length; i++) {
-        if (next_cube_WO[i] == NULL) {
+    struct fs_cube **next_cube_WO = (struct fs_cube **)calloc(instance->valid_cube_arr_length, sizeof(struct fs_cube *));
+    for(int i = 0; i < src->valid_cube_arr_length; i++) {
+        if (src->cube_to_merge[i] == NULL) {
             continue;
         }
-        fieldstat_cube_reset(next_cube_WO[i]);
+        next_cube_WO[i] = fieldstat_cube_dup(src->cube_to_merge[i]);
     }
+    /*
+        here we cannot simply let src->cube_to_merge = src->cube only before merge. Because src->cube is always Write only, so we have to keep a copy of it, which is src->cube_to_merge,
+        or the previous initialization of next_cube_WO will be impossible.
 
-    instance->cube_to_merge = __sync_lock_test_and_set(&instance->cube_to_merge, instance->cube);
-    instance->cube = __sync_lock_test_and_set(&instance->cube, next_cube_WO);
-    src->cube = __sync_lock_test_and_set(&src->cube, NULL); // todo: 这块儿有点乱，再想想, 比如最终的instance 的 tomerge 应该移到cube上
+        free src->cube_to_merge before letting it point to src->cube.
+    */
+    for(int i = 0; i < src->valid_cube_arr_length; i++) {
+        if (src->cube_to_merge[i] == NULL) {
+            continue;
+        }
+        cube_free(src->cube_to_merge[i]);
+    }
+    free(src->cube_to_merge);
+    
+    // todo: 加锁
+    
+    (void)__sync_lock_test_and_set(&src->cube_to_merge, src->cube); // src->cube is empty now
+    // src may also serve as a data record, so we need to do atomic operation for src instead of src->cube = next_cube_WO
+    (void)__sync_lock_test_and_set(&src->cube, next_cube_WO); // src->cube is empty now
+    src->cell_version++; // src is reset
+    // todo: 解锁
+
+    
 
     int ret = fieldstat_merge_inner(instance, src);
+
+    // for(int i = 0; i < src->valid_cube_arr_length; i++) {
+    //     if (src->cube_to_merge[i] == NULL) {
+    //         continue;
+    //     }
+    //     fieldstat_cube_reset(src->cube_to_merge[i]);
+    // }
 
     return ret;
 }

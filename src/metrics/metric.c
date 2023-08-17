@@ -166,6 +166,7 @@ static int metric_scheme_counter_merge(struct metric_measure_data *pthis, const 
     }
     switch (counter->mode) {
         case COUNTER_MERGE_BY_SUM:
+            printf("merge counter, from: %lld, to: %lld\n", from_counter->value, counter->value);
             counter->value += from_counter->value;
             break;
         case COUNTER_MERGE_BY_MAX:
@@ -682,6 +683,7 @@ struct metric *metric_deserialize(const char *blob, size_t blob_size)
 
 int metric_merge_or_copy_cell(struct metric *dest, const struct metric *src, int dest_cell_id, int src_cell_id)
 {
+    printf("metric_merge_or_copy_cell\n");
     struct metric_measure_data *src_data = metric_find_one_cell(src, src_cell_id);
     if (src_data == NULL) {
         return 1;
