@@ -497,9 +497,6 @@ static struct metric *fieldstat_find_metric(const struct fieldstat *instance, in
 
 int fieldstat_general_check(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, enum metric_type metric_type)
 {
-    if (instance == NULL) {
-        return -1;
-    }
     if (cube_id < 0 || cube_id >= instance->valid_cube_arr_length) {
         return -1;
     }
@@ -523,6 +520,10 @@ int fieldstat_general_check(struct fieldstat *instance, int cube_id, int metric_
 
 int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long increment)
 {
+    if (instance == NULL) {
+        return -1;
+    }
+
     pthread_mutex_lock(&(instance->mutex_lock));
 
     int ret = fieldstat_general_check(instance, cube_id, metric_id, cell_id, METRIC_TYPE_COUNTER);
@@ -540,6 +541,10 @@ int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric
 
 int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long value)
 {
+    if (instance == NULL) {
+        return -1;
+    }
+
     pthread_mutex_lock(&(instance->mutex_lock));
 
     int ret = fieldstat_general_check(instance, cube_id, metric_id, cell_id, METRIC_TYPE_COUNTER);
@@ -560,6 +565,9 @@ int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id
 
 int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, const char *key, size_t key_len)
 {
+    if (instance == NULL) {
+        return -1;
+    }
     pthread_mutex_lock(&(instance->mutex_lock));
     int ret = fieldstat_general_check(instance, cube_id, metric_id, cell_id, METRIC_TYPE_HLL);
     if (ret < 0) {
@@ -576,6 +584,9 @@ int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, in
 
 int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long value)
 {
+    if (instance == NULL) {
+        return -1;
+    }
     pthread_mutex_lock(&(instance->mutex_lock));
 
     int ret = fieldstat_general_check(instance, cube_id, metric_id, cell_id, METRIC_TYPE_HISTOGRAM);
