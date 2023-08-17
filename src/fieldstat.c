@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <pthread.h>
 
 #include "cjson/cJSON.h"
 #include "uthash.h"
@@ -42,6 +43,8 @@ struct fieldstat {
     size_t max_n_cube;
 
     struct fs_cube **cube_to_merge; // read only cube, used only in merge
+    pthread_mutex_t mutex_lock; /*
+        only a small number of API use this lock, while the others are thread-unsafe. Refer to fieldstat.h to check which API is thread-safe.*/
 
     struct cube_manager *shared_tag_cube_manager; // used only in merge to store shared tags in history
 };
@@ -55,6 +58,8 @@ struct fieldstat *fieldstat_new()
     instance->cube = calloc(instance->max_n_cube, sizeof(struct fs_cube *));
     instance->cube_to_merge = calloc(instance->max_n_cube, sizeof(struct fs_cube *));
     instance->cube_version = calloc(instance->max_n_cube, sizeof(unsigned long));
+
+    pthread_mutex_init(&instance->mutex_lock, NULL);
 
     return instance;
 }
@@ -74,6 +79,8 @@ void fieldstat_free(struct fieldstat *instance)
     if (instance->shared_tag_cube_manager != NULL){
         cube_manager_free(instance->shared_tag_cube_manager);
     }
+
+    pthread_mutex_destroy(&instance->mutex_lock);
 
     free(instance);
 }
@@ -106,7 +113,12 @@ unsigned long fieldstat_get_cell_version(const struct fieldstat *instance)
     if (instance == NULL) {
         return 0;
     }
-    return instance->cell_version;
+
+    pthread_mutex_lock(&((struct fieldstat *)instance)->mutex_lock);
+    unsigned long ret = instance->cell_version;
+    pthread_mutex_unlock(&((struct fieldstat *)instance)->mutex_lock);
+
+    return ret;
 }
 
 int fieldstat_unregister_cube(struct fieldstat *instance, int cube_id)
@@ -298,17 +310,24 @@ int fieldstat_cube_add(struct fieldstat *instance, int cube_id, const struct fie
     if (cube_id < 0 || cube_id >= instance->valid_cube_arr_length) {
         return -1;
     }
+
+    pthread_mutex_lock(&instance->mutex_lock);
     
-    struct fs_cube *cube = instance->cube[cube_id];
-    if (cube == NULL) {
+    if (instance->cube[cube_id] == NULL) {
+        pthread_mutex_unlock(&instance->mutex_lock);
         return -1;
     }
+   
+    struct fs_cube *cube = instance->cube[cube_id];
+
     if (cube->sampling_mode == SAMPLING_MODE_TOPK && increment <= 0) {
+        pthread_mutex_unlock(&instance->mutex_lock);
         return -1;
     }
 
     int ret = -1;
     struct tag_hash_key *tag_key = tag_hash_key_construct_with_fieldstat_tag(tags, n_tag);
+
     if (cube->sampling_mode == SAMPLING_MODE_COMPREHENSIVE) {
         ret = cell_manager_add_cell(cube->cell_manager, tag_key);
     } else {
@@ -321,6 +340,7 @@ int fieldstat_cube_add(struct fieldstat *instance, int cube_id, const struct fie
             }
         }
     }
+    pthread_mutex_unlock(&instance->mutex_lock);
 
     tag_hash_key_free(tag_key);
 
@@ -475,45 +495,63 @@ static struct metric *fieldstat_find_metric(const struct fieldstat *instance, in
     return cube->metrics[metric_id];
 }
 
-#define FIELDSTAT_GENERAL_CHECK(instance, cube_id, metric_id, cell_id, metric_type) \
-do { \
-    if ((instance) == NULL) {   \
-        return -1;  \
-    }   \
-    if ((cube_id) < 0 || (cube_id) >= (instance)->valid_cube_arr_length) {    \
-        return -1;  \
-    }   \
-    const struct fs_cube *cube = (instance)->cube[(cube_id)];   \
-    if (cube == NULL) { \
-        return -1;  \
-    }   \
-    if ((metric_id) < 0 || (metric_id) >= cube->n_metric) { \
-        return -2;  \
-    }   \
-    const struct metric *metric = cube->metrics[(metric_id)]; \
-    if (metric == NULL || metric_get_type(metric) != (metric_type)) { \
-        return -2;  \
-    }   \
-    if ((cell_id) < 0 || cell_manager_get_tag_by_cell_id(cube->cell_manager, cell_id) == NULL) { \
-        return -3;  \
-    }   \
-} while (0)
+int fieldstat_general_check(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, enum metric_type metric_type)
+{
+    if (instance == NULL) {
+        return -1;
+    }
+    if (cube_id < 0 || cube_id >= instance->valid_cube_arr_length) {
+        return -1;
+    }
+
+    struct fs_cube *cube = instance->cube[cube_id];
+    if (cube == NULL) {
+        return -1;
+    }
+    if ((metric_id) < 0 || (metric_id) >= cube->n_metric) {
+        return -2; 
+    }   
+    const struct metric *metric = cube->metrics[(metric_id)];
+    if (metric == NULL || metric_get_type(metric) != (metric_type)) {
+        return -2; 
+    }  
+    if ((cell_id) < 0 || cell_manager_get_tag_by_cell_id(cube->cell_manager, cell_id) == NULL) {
+        return -3; 
+    }  
+    return 0;
+}
 
 int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long increment)
 {
-    FIELDSTAT_GENERAL_CHECK(instance, cube_id, metric_id, cell_id, METRIC_TYPE_COUNTER);
-    struct metric *metric = instance->cube[cube_id]->metrics[metric_id];
+    pthread_mutex_lock(&(instance->mutex_lock));
 
+    int ret = fieldstat_general_check(instance, cube_id, metric_id, cell_id, METRIC_TYPE_COUNTER);
+    if (ret < 0) {
+        pthread_mutex_unlock(&(instance->mutex_lock));
+        return ret;
+    }
+
+    struct metric *metric = instance->cube[cube_id]->metrics[metric_id];
     metric_counter_incrby(metric, cell_id, increment);
+
+    pthread_mutex_unlock(&(instance->mutex_lock));
     return 0;
 }
 
 int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long value)
 {
-    FIELDSTAT_GENERAL_CHECK(instance, cube_id, metric_id, cell_id, METRIC_TYPE_COUNTER);
-    struct metric *metric = instance->cube[cube_id]->metrics[metric_id];
+    pthread_mutex_lock(&(instance->mutex_lock));
 
-    int ret = metric_counter_set(metric, cell_id, value);
+    int ret = fieldstat_general_check(instance, cube_id, metric_id, cell_id, METRIC_TYPE_COUNTER);
+    if (ret < 0) {
+        pthread_mutex_unlock(&(instance->mutex_lock));
+        return ret;
+    }
+    struct metric *metric = instance->cube[cube_id]->metrics[metric_id];
+    ret = metric_counter_set(metric, cell_id, value);
+    
+    pthread_mutex_unlock(&(instance->mutex_lock));
+
     if (ret < 0) {
         return -4;
     }
@@ -522,25 +560,39 @@ int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id
 
 int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, const char *key, size_t key_len)
 {
-    FIELDSTAT_GENERAL_CHECK(instance, cube_id, metric_id, cell_id, METRIC_TYPE_HLL);
+    pthread_mutex_lock(&(instance->mutex_lock));
+    int ret = fieldstat_general_check(instance, cube_id, metric_id, cell_id, METRIC_TYPE_HLL);
+    if (ret < 0) {
+        pthread_mutex_unlock(&(instance->mutex_lock));
+        return ret;
+    }
+
     struct metric *metric = instance->cube[cube_id]->metrics[metric_id];
 
     metric_hll_add(metric, cell_id, key, key_len);
+    pthread_mutex_unlock(&(instance->mutex_lock));
     return 0;
 }
 
 int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long value)
 {
-    FIELDSTAT_GENERAL_CHECK(instance, cube_id, metric_id, cell_id, METRIC_TYPE_HISTOGRAM);
+    pthread_mutex_lock(&(instance->mutex_lock));
+
+    int ret = fieldstat_general_check(instance, cube_id, metric_id, cell_id, METRIC_TYPE_HISTOGRAM);
+    if (ret < 0) {
+        pthread_mutex_unlock(&(instance->mutex_lock));
+        return ret;
+    }
+
     struct metric *metric = instance->cube[cube_id]->metrics[metric_id];
 
-    int ret = metric_histogram_record(metric, cell_id, value);
+    ret = metric_histogram_record(metric, cell_id, value);
+    pthread_mutex_unlock(&(instance->mutex_lock));
     if (ret < 0) {
         return -4;
     }
     return 0;
 }
-
 
 // /* -------------------------------------------------------------------------- */
 // /*                                serialization                               */
@@ -686,7 +738,6 @@ struct fieldstat *fieldstat_deserialize(const char *blob, size_t blob_size)
 
 struct fs_cube *fieldstat_cube_copy(const struct fs_cube *cube)
 {
-    printf("fieldstat_cube_copy\n");
     struct fs_cube *cube_dup = fieldstat_cube_info_init(cube->shared_tags, cube->n_shared_tags, cube->sampling_mode, cube->max_n_cell);
     const struct cell_manager *cm_src = cube->cell_manager;
 
@@ -710,13 +761,12 @@ void fieldstat_cube_merge_comprehensive(struct fs_cube *dest, const struct fs_cu
     for (int cell_id_src = 0; cell_id_src < arr_len_src; cell_id_src++) {
         const struct tag_hash_key *tag_src = tag_arr_src[cell_id_src];
         if (tag_src == NULL) {
-            printf("tag_src is NULL\n");
+            printf("ERR: tag_src is NULL\n");
             continue;
         }
 
         int cell_id_final = cell_manager_add_cell(cell_manager_dest, tag_src);
         if (cell_id_final == -1) { // dest is full
-            printf("dest is full\n");
             break;
         }
         for (int metric_id_src = 0; metric_id_src < src->n_metric; metric_id_src++) {
@@ -1165,19 +1215,16 @@ int fieldstat_merge_and_reset(struct fieldstat *instance, struct fieldstat *src)
     // 总之会很麻烦，先不做了
     // 也不是特别麻烦，实际上就是把reset改成dup，然后把reset放到最后。
 
-    struct fs_cube **next_cube_WO = (struct fs_cube **)calloc(instance->valid_cube_arr_length, sizeof(struct fs_cube *));
-    for(int i = 0; i < src->valid_cube_arr_length; i++) {
+    size_t n_cube_src = src->valid_cube_arr_length;
+    struct fs_cube **next_cube_WO = (struct fs_cube **)calloc(n_cube_src, sizeof(struct fs_cube *));
+    for(int i = 0; i < n_cube_src; i++) {
         if (src->cube_to_merge[i] == NULL) {
             continue;
         }
         next_cube_WO[i] = fieldstat_cube_dup(src->cube_to_merge[i]);
     }
-    /*
-        here we cannot simply let src->cube_to_merge = src->cube only before merge. Because src->cube is always Write only, so we have to keep a copy of it, which is src->cube_to_merge,
-        or the previous initialization of next_cube_WO will be impossible.
 
-        free src->cube_to_merge before letting it point to src->cube.
-    */
+    // free src->cube_to_merge before letting it point to src->cube
     for(int i = 0; i < src->valid_cube_arr_length; i++) {
         if (src->cube_to_merge[i] == NULL) {
             continue;
@@ -1186,24 +1233,13 @@ int fieldstat_merge_and_reset(struct fieldstat *instance, struct fieldstat *src)
     }
     free(src->cube_to_merge);
     
-    // todo: 加锁
-    
-    (void)__sync_lock_test_and_set(&src->cube_to_merge, src->cube); // src->cube is empty now
-    // src may also serve as a data record, so we need to do atomic operation for src instead of src->cube = next_cube_WO
-    (void)__sync_lock_test_and_set(&src->cube, next_cube_WO); // src->cube is empty now
-    src->cell_version++; // src is reset
-    // todo: 解锁
-
-    
+    pthread_mutex_lock(&src->mutex_lock);
+    src->cube_to_merge = src->cube;
+    src->cube = next_cube_WO;
+    src->cell_version++; // src is reset, so version+1
+    pthread_mutex_unlock(&src->mutex_lock);
 
     int ret = fieldstat_merge_inner(instance, src);
-
-    // for(int i = 0; i < src->valid_cube_arr_length; i++) {
-    //     if (src->cube_to_merge[i] == NULL) {
-    //         continue;
-    //     }
-    //     fieldstat_cube_reset(src->cube_to_merge[i]);
-    // }
 
     return ret;
 }
