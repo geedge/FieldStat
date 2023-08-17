@@ -73,6 +73,17 @@ free(json_string);
 fieldstat_json_exporter_free(fieldstat_json_exporter);
 ```
 
+## thread-safety
+In general, fieldstat4 is not thread-safe. But there are some exceptions that can be used by a thread while other threads are using the same instance to merge. 
+
+Or put it in another way, the following functions can be called while `fieldstat_merge_and_reset` is reading the same instance handle as its argument `src`:
+-  `fieldstat_get_cell_version`
+-  `fieldstat_hist_record`
+-  `fieldstat_hll_add`
+-  `fieldstat_counter_set`
+-  `fieldstat_counter_incrby`
+-  `fieldstat_cube_add`
+
 ## benchmark
 ### memory 
 The total memory consumption, approximately composes two parts: the memory used for storing data, and the memory used when processing merge as well as export.
