@@ -364,13 +364,17 @@ static void prometheus_output_instance_metric(struct prometheus_endpoint_instanc
 		for(i = 0; i < prometheus_output->fs_instance_cnt; i++)
 		{
 			instance = prometheus_output->fs_instance[i];
-			payload_offset = prometheus_get_instance_metric_playload(instance, &payload, &payload_size, payload_offset);				
+			int ret = prometheus_get_instance_metric_playload(instance, &payload, &payload_size, payload_offset);
+			if(ret >= 0)
+			{
+				payload_offset = ret;
+			}
 		}
 	}
 	else
 	{
 		instance = prometheus_output->fs_instance[fs_instance_idx];
-		payload_offset = prometheus_get_instance_metric_playload(instance, &payload, &payload_size, payload_offset);	
+		prometheus_get_instance_metric_playload(instance, &payload, &payload_size, payload_offset);
 	}
 
 	if(payload != NULL)
@@ -384,7 +388,6 @@ static void prometheus_output_instance_metric(struct prometheus_endpoint_instanc
 		free(payload);
 		payload=NULL;
 	}
-
 }
 
 void prometheus_endpoint_instance_output(struct http_request_s* request)
