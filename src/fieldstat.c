@@ -220,31 +220,35 @@ struct fs_cube *fieldstat_cube_info_init(const struct fieldstat_tag *shared_tags
     struct fs_cube *cube = calloc(1, sizeof(struct fs_cube));
     cube->sampling_mode = mode;
     cube->max_n_cell = max_n_cell;
-    cube->shared_tags = malloc(sizeof(struct fieldstat_tag) * n_tag);
-    for (int i = 0; i < n_tag; i++) {
-        struct fieldstat_tag *dest_tag = &cube->shared_tags[i];
-        dest_tag->key = strdup(shared_tags[i].key);
-        dest_tag->type = shared_tags[i].type;
-        switch (dest_tag->type)
-        {
-        case TAG_INTEGER:
-            dest_tag->value_longlong = shared_tags[i].value_longlong;
-            break;
-        case TAG_CSTRING:
-            dest_tag->value_str = strdup(shared_tags[i].value_str);
-            break;
-        case TAG_DOUBLE:
-            dest_tag->value_double = shared_tags[i].value_double;
-            break;
-        
-        default:
-            break;
+    if (n_tag == 0) {
+        cube->shared_tags = NULL;
+    } else {
+        cube->shared_tags = malloc(sizeof(struct fieldstat_tag) * n_tag);
+        for (int i = 0; i < n_tag; i++) {
+            struct fieldstat_tag *dest_tag = &cube->shared_tags[i];
+            dest_tag->key = strdup(shared_tags[i].key);
+            dest_tag->type = shared_tags[i].type;
+            switch (dest_tag->type)
+            {
+            case TAG_INTEGER:
+                dest_tag->value_longlong = shared_tags[i].value_longlong;
+                break;
+            case TAG_CSTRING:
+                dest_tag->value_str = strdup(shared_tags[i].value_str);
+                break;
+            case TAG_DOUBLE:
+                dest_tag->value_double = shared_tags[i].value_double;
+                break;
+            
+            default:
+                break;
+            }
         }
     }
 
     cube->n_shared_tags = n_tag;
 
-    cube->max_n_metric = 16;
+    cube->max_n_metric = 128;
     cube->metrics = malloc(sizeof(struct metric *) * cube->max_n_metric);
 
     return cube;
@@ -264,8 +268,10 @@ int fieldstat_register_cube(struct fieldstat *instance, const struct fieldstat_t
     if (instance == NULL) {
         return -1;
     }
+
     if (n_tag == 0 || shared_tags == NULL) {
-        return -1;
+        shared_tags = NULL;
+        n_tag = 0;
     }
     struct fs_cube *cube = fieldstat_cube_new(shared_tags, n_tag, mode, max_n_cell);
 
@@ -276,18 +282,23 @@ int fieldstat_register_cube(struct fieldstat *instance, const struct fieldstat_t
 int fieldstat_cube_add(struct fieldstat *instance, int cube_id, const struct fieldstat_tag *tags, size_t n_tag, long long increment)
 {
     if (instance == NULL) {
-        return -1;
+        return -2;
     }
     if (cube_id < 0 || cube_id >= instance->valid_cube_arr_length) {
-        return -1;
+        return -2;
     }
     
     struct fs_cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
-        return -1;
+        return -2;
     }
     if (cube->sampling_mode == SAMPLING_MODE_TOPK && increment <= 0) {
-        return -1;
+        return -2;
+    }
+
+    if (n_tag == 0 || tags == NULL) {
+        tags = NULL;
+        n_tag = 0;
     }
 
     int ret = -1;
@@ -574,7 +585,7 @@ int fieldstat_serialize(const struct fieldstat *instance, char **blob_out, size_
 
     mpack_complete_map(&writer);
     if (mpack_writer_destroy(&writer) != mpack_ok) {
-        // todo: log
+        assert(0);
         return -1;
     }
 
@@ -589,7 +600,7 @@ struct fieldstat *fieldstat_deserialize(const char *blob, size_t blob_size)
     mpack_node_t root = mpack_tree_root(&tree);
     int ver = mpack_node_i32(mpack_node_map_cstr(root, "ver"));
     if (ver != EXPORT_VER) {
-        // todo: log
+        assert(0);
         mpack_tree_destroy(&tree);
         return NULL;
     }
@@ -657,8 +668,6 @@ void fieldstat_cube_merge_comprehensive(struct fs_cube *dest, const struct fs_cu
     for (int cell_id_src = 0; cell_id_src < arr_len_src; cell_id_src++) {
         const struct tag_hash_key *tag_src = tag_arr_src[cell_id_src];
         if (tag_src == NULL) {
-            // the tag_src is continuous, so there may not be NULL in the middle
-            // TODO: log
             continue;
         }
 
@@ -668,8 +677,7 @@ void fieldstat_cube_merge_comprehensive(struct fs_cube *dest, const struct fs_cu
         }
         for (int metric_id_src = 0; metric_id_src < src->n_metric; metric_id_src++) {
             int metric_id_dest = metric_id_src_dest_map[metric_id_src];
-            int tmp_ret = metric_merge_or_copy_cell(dest->metrics[metric_id_dest], src->metrics[metric_id_src], cell_id_final, cell_id_src);
-            // todo: log
+            (void)metric_merge_or_copy_cell(dest->metrics[metric_id_dest], src->metrics[metric_id_src], cell_id_final, cell_id_src);
         }
     }
 }
@@ -779,7 +787,6 @@ int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
             cube_manager_add(tag_cube_id_map, shared_tag_key_src, cube_id);
         } else {
             if (instance->cube[cube_id_tmp]->sampling_mode != cube_src->sampling_mode) {
-                // todo: log
                 ret = -1;
                 tag_hash_key_free(shared_tag_key_src);
                 continue;
@@ -878,8 +885,15 @@ struct fieldstat_tag_list *fieldstat_get_shared_tags(const struct fieldstat *ins
     if (cube == NULL) {
         return NULL;
     }
-
+   
     struct fieldstat_tag_list *tag_list = (struct fieldstat_tag_list *)malloc(sizeof(struct fieldstat_tag_list));
+
+    if (cube->n_shared_tags == 0) {
+        tag_list->tag = NULL;
+        tag_list->n_tag = 0;
+        return tag_list;
+    }
+
     tag_list->tag = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * cube->n_shared_tags);
     for (int i = 0; i < cube->n_shared_tags; i++) {
         struct fieldstat_tag *tag_dest = &(tag_list->tag[i]);

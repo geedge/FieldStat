@@ -46,6 +46,7 @@ function (add_unit_test file_name)
     set_property(TARGET ${file_name} PROPERTY CXX_STANDARD 17)
 endfunction()
 
+add_unit_test(test_empty_tags)
 add_unit_test(test_exporter_json)
 add_unit_test(test_fuzz_test)
 add_unit_test(test_merge)

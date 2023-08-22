@@ -264,6 +264,9 @@ void tag_list_append_to_tag_object(const struct fieldstat_tag_list *tag_list, cJ
     struct export_kv_pair pairs = {0};
 
     for (int i = 0; i < tag_list_len; i++) {
+        if (tag_list->n_tag == 0) {
+            continue;
+        }
         memset(&pairs, 0, sizeof(struct export_kv_pair));
         pairs.key = (char *)tag_list->tag[i].key;
         pairs.type = tag_list->tag[i].type;

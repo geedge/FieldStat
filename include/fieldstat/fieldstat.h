@@ -16,7 +16,7 @@ enum metric_type
 	METRIC_TYPE_HLL,
 	METRIC_TYPE_HISTOGRAM,
 };
-
+//todo:
 // poc
 // tracing
 // 性能
@@ -55,7 +55,6 @@ struct fieldstat_tag {
 };
 
 // todo: tag 可以为NULL
-// todo: 跟贺岚风说一下，cube的tag里的dev id 要放到exporter里
 
 
 
@@ -70,7 +69,7 @@ struct fieldstat *fieldstat_dup(const struct fieldstat *instance);
     * @param n_tag: number of shared tags.
     * @param mode: sampling mode. Refer to enum sampling_mode.
     * @param max_n_cell: max number of cells in each cube.
-    * @return cube id, if success; otherwise, return -1. Fail when tags are NULL. the uniqueness of shared_tags is not checked, user should guarantee that shared_tags are unique.
+    * @return cube id, if success; otherwise, return -1. Fail only when `instance` == NULL. the uniqueness of shared_tags is not checked, user should guarantee that shared_tags are unique.
 */
 int fieldstat_register_cube(struct fieldstat *instance, const struct fieldstat_tag *shared_tags, size_t n_tag, enum sampling_mode mode, size_t max_n_cell);
 /*
@@ -112,11 +111,11 @@ int fieldstat_register_hist(struct fieldstat *instance, int cube_id, const char 
 /*
     * @brief add a cell to the cube of cube_id. One cell represents a set of tags. In topk sampling mode, this function will update the cell ranking every time it is called.
     * @param cube_id: cube id, previously returned by fieldstat_register_cube.
-    * @param tags: tags of the cell. Cannot be NULL. Must be unique in this cube(user guarantee). which means that {"TAG_KEY": "123", "TAG_KEY2": "456"} and {"TAG_KEY2": "456", "TAG_KEY": "123"} are map to different cell.
+    * @param tags: tags of the cell. Can be NULL, and all NULL tags are mapped to a single cell. Tags are ordered, which means that {"TAG_KEY": "123", "TAG_KEY2": "456"} and {"TAG_KEY2": "456", "TAG_KEY": "123"} are map to different cell.
     * @param n_tag: number of tags.
     * @param increment: the primary metric increment of this cell. For example, if the primary metric is "count", then increment is the count of this cell.
     *                   in comprehensive sampling mode, this parameter is ignored.
-    * @return cell id >= 0, if success; otherwise, return -2 when cube is not registered or tags are NULL.  \
+    * @return cell id >= 0, if success; otherwise, return -2 when cube is not registered, instance are NULL, or increment is <0.  \
     *         return -1 when: mode is (SAMPLING_MODE_COMPREHENSIVE) and cell number >= (max_n_cell) ; or SAMPLING_MODE_TOPK and cell already exists.
     *         in topk sampling mode, the same tags may map to different cell ids.
 */

@@ -14,6 +14,12 @@
 
 void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_tags, char **out_key, size_t *out_key_size)
 {
+    if (n_tags == 0) {
+        // use a default dummy key
+        *out_key = strdup("no tags");
+        *out_key_size = strlen(*out_key);
+        return;
+    }
 	int i = 0;
 	int used_len = 0;
 	struct fieldstat_tag *tag = NULL;
@@ -127,6 +133,9 @@ void fieldtag_copy(struct fieldstat_tag *dest, const struct fieldstat_tag *src)
 
 void fieldtag_list_free(struct fieldstat_tag *tags, size_t n_tags)
 {
+    if (tags == NULL) {
+        return;
+    }
     for (int i = 0; i < (int)n_tags; i++) {
         struct fieldstat_tag *tag = &tags[i];
         free((char *)tag->key);
@@ -170,6 +179,17 @@ int my_cmp_tag(const void *a, const void *b)
 */
 void fieldtag_list_serialize(const struct fieldstat_tag *tag_list, size_t tag_num, char **blob, size_t *blob_size)
 {
+    if (tag_num == 0) {
+        mpack_writer_t writer;
+        mpack_writer_init_growable(&writer, blob, blob_size);
+        mpack_write_nil(&writer);
+
+        if (mpack_writer_destroy(&writer) != mpack_ok) {
+            assert(0);
+        }
+        return;
+    }
+
     struct fieldstat_tag *tag_list_sorted = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * tag_num);
     for (int i = 0; i < tag_num; i++) {
         fieldtag_copy(&tag_list_sorted[i], &tag_list[i]);
@@ -221,6 +241,14 @@ void fieldtag_list_deserialize(const char *blob, size_t blob_size, struct fields
     mpack_tree_parse(&tree);
     mpack_node_t tag_arr = mpack_tree_root(&tree);
 
+    if (mpack_node_is_nil(tag_arr)) {
+        *tag_list_out = NULL;
+        *tag_num_out = 0;
+
+        mpack_tree_destroy(&tree);
+        return;
+    }
+
     size_t tag_num = mpack_node_array_length(tag_arr);
 
     struct fieldstat_tag *tag_list = malloc(sizeof(struct fieldstat_tag) * tag_num);
@@ -267,9 +295,13 @@ struct tag_hash_key *tag_hash_key_construct_with_fieldstat_tag(const struct fiel
     ret_hash_key->compound_key = compound_key;
     ret_hash_key->compound_key_len = compound_key_len;
 
-    ret_hash_key->tags = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * n_src);
-    for (int i = 0; i < n_src; i++) {
-        fieldtag_copy(&ret_hash_key->tags[i], &src[i]);
+    if (n_src == 0) {
+        ret_hash_key->tags = NULL;
+    } else {
+        ret_hash_key->tags = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * n_src);
+        for (int i = 0; i < n_src; i++) {
+            fieldtag_copy(&ret_hash_key->tags[i], &src[i]);
+        }
     }
 
     ret_hash_key->n_my_tag = n_src;
@@ -282,6 +314,11 @@ void tag_hash_key_convert_to_fieldstat_tag(const struct tag_hash_key *tag_key, s
 {
     size_t ret_n_tag = tag_key->n_my_tag;
     *n_out = ret_n_tag;
+    if (ret_n_tag == 0) {
+        *out = NULL;
+        return;
+    }
+
     struct fieldstat_tag *ret_fieldstat_tag = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * ret_n_tag);
     *out = ret_fieldstat_tag;
 
@@ -300,9 +337,13 @@ struct tag_hash_key *tag_hash_key_copy(const struct tag_hash_key *src)
     memcpy(dst->compound_key, src->compound_key, dst->compound_key_len);
     dst->compound_key[dst->compound_key_len] = '\0';
 
-    dst->tags = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * dst->n_my_tag);
-    for (int i = 0; i < dst->n_my_tag; i++) {
-        fieldtag_copy(&dst->tags[i], &src->tags[i]);
+    if (dst->n_my_tag == 0) {
+        dst->tags = NULL;
+    } else {
+        dst->tags = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * dst->n_my_tag);
+        for (int i = 0; i < dst->n_my_tag; i++) {
+            fieldtag_copy(&dst->tags[i], &src->tags[i]);
+        }
     }
 
     return dst;
@@ -334,7 +375,6 @@ unsigned tag_hash_key_cal_fnv_hash(const struct tag_hash_key *tag, unsigned seed
     "tags": [
         <fieldstat tag serialized result>
     ],
-    "hashed":true,
     "hashv": 0,
 }
 */
@@ -353,7 +393,7 @@ void tag_hash_key_serialize(const struct tag_hash_key *tag, char **blob, size_t 
     free(blob_tag);
 
     mpack_write_cstr(&writer, "hashv");
-    // the tags may be changed, so we need to recalculate the hash value
+    // the tags may be changed by sorting, so we need to recalculate the hash value
     char *compound_key;
     size_t compound_key_len;
     build_dynamic_cell_key(tag->tags, tag->n_my_tag, &compound_key, &compound_key_len);
