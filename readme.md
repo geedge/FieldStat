@@ -136,21 +136,24 @@ It is hard to calculate memory usage of CJSON. By experiment, RSS to different c
 
 ### result
 
-| operation                                        | time(us) | corresponding api                                                                |
-| ------------------------------------------------ | -------- | -------------------------------------------------------------------------------- |
-| add a cell(topk)                                 | 0.457940 | fieldstat_cube_add                                                               |
-| add a cell(comprehensive)                        | 0.816540 | fieldstat_cube_add                                                               |
-| histogram record                                 | 0.017060 | fieldstat_histogram_record                                                       |
-| HLL add                                          | 0.018250 | fieldstat_hll_add                                                                |
-| copy 1 cell of a 1 counter metric                | 0.378    | fieldstat_merge(empty destination instance)                                      |
-| copy 1 cell of a HLL metric                      | 0.557    | fieldstat_merge(empty destination instance)                                      |
-| copy 1 cell of a histogram metric                | 3.207    | fieldstat_merge(empty destination instance)                                      |
-| copy 1 cell of a counter metric on topk cube     | 0.574    | fieldstat_merge(empty destination instance)                                      |
-| merge 1000 cell of a counter metric              | 0.110    | fieldstat_merge(destination also has registered cube, metric and cells)          |
-| merge 1000 cell of a HLL metric                  | 0.288    | fieldstat_merge(destination also has registered cube, metric and cells)          |
-| merge 1000 cell of a histogram metric            | 1.347    | fieldstat_merge(destination instance also has registered cube, metric and cells) |
-| merge 1000 cell of a counter metric on topk cube | 1.078    | fieldstat_merge(destination instance also has registered cube, metric and cells) |
-| export a cell                                    | 0.00297  | fieldstat_json_exporter_export                                                   |
+| operation                                     | time(us)  | corresponding api                                                                |
+| --------------------------------------------- | --------- | -------------------------------------------------------------------------------- |
+| add a cell(topk)                              | 0.457940  | fieldstat_cube_add                                                               |
+| add a cell(comprehensive)                     | 0.816540  | fieldstat_cube_add                                                               |
+| histogram record                              | 0.017060  | fieldstat_histogram_record                                                       |
+| HLL add                                       | 0.018250  | fieldstat_hll_add                                                                |
+| copy 1 cell of a 1 counter metric             | 0.7814    | fieldstat_merge(empty destination instance)                                      |
+| copy 1 cell of a HLL metric                   | 1.96      | fieldstat_merge(empty destination instance)                                      |
+| copy 1 cell of a histogram metric             | 0.844     | fieldstat_merge(empty destination instance)                                      |
+| copy 1 cell of a counter metric on topk cube  | 1.77      | fieldstat_merge(empty destination instance)                                      |
+| merge 1 cell of a counter metric              | 0.448     | fieldstat_merge(destination also has registered cube, metric and cells)          |
+| merge 1 cell of a HLL metric                  | 1.70      | fieldstat_merge(destination also has registered cube, metric and cells)          |
+| merge 1 cell of a histogram metric            | 0.659     | fieldstat_merge(destination instance also has registered cube, metric and cells) |
+| merge 1 cell of a counter metric on topk cube | 0.659     | fieldstat_merge(destination instance also has registered cube, metric and cells) |
+| export a cell                                 | 0.72      | fieldstat_json_exporter_export                                                   |
+| serialize 1 cell of a counter metric          | 2.685974  | fieldstat_serialize                                                              |
+| serialize 1 cell of a HLL metric              | 1.9775304 | fieldstat_serialize                                                              |
+| serialize 1 cell of a histogram metric        | 2.329615  | fieldstat_serialize                                                              |
 
 ### Explanation
 #### add a cell(topk)

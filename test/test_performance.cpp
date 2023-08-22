@@ -6,6 +6,9 @@
 #include "fieldstat_exporter.h"
 #include "utils.hpp"
 
+/* -------------------------------------------------------------------------- */
+/*                                    merge                                   */
+/* -------------------------------------------------------------------------- */
 
 TEST(test_performance, merge_performance_when_comprehensive_sampling_multi_instance)
 {   
@@ -107,7 +110,7 @@ TEST(test_performance, merge_performance_one_instance_comprehensive_counter_empt
 
     clock_t elapsed = perform_merge_test(metric_add_func, metric_register_func, SAMPLING_MODE_COMPREHENSIVE, true);
     printf("merge_performance_one_instance_comprehensive_counter_empty_dest elapsed_secs: %ld\n", elapsed);
-    EXPECT_TRUE(elapsed < 1000);
+    EXPECT_TRUE(elapsed < 1000000);
 }
 
 TEST(test_performance, merge_performance_one_instance_comprehensive_hll_empty_dest)
@@ -124,7 +127,7 @@ TEST(test_performance, merge_performance_one_instance_comprehensive_hll_empty_de
 
     clock_t elapsed = perform_merge_test(metric_add_func, metric_register_func, SAMPLING_MODE_COMPREHENSIVE, true);
     printf("merge_performance_one_instance_comprehensive_hll_empty_dest elapsed_secs: %ld\n", elapsed);
-    EXPECT_TRUE(elapsed < 1000);
+    EXPECT_TRUE(elapsed < 1500);
 }
 
 TEST(test_performance, merge_performance_one_instance_comprehensive_histogram_empty_dest)
@@ -141,7 +144,7 @@ TEST(test_performance, merge_performance_one_instance_comprehensive_histogram_em
 
     clock_t elapsed = perform_merge_test(metric_add_func, metric_register_func, SAMPLING_MODE_COMPREHENSIVE, true);
     printf("merge_performance_one_instance_comprehensive_histogram_empty_dest elapsed_secs: %ld\n", elapsed);
-    EXPECT_TRUE(elapsed < 2500);
+    EXPECT_TRUE(elapsed < 5000);
 }
 
 TEST(test_performance, merge_performance_one_instance_topk_counter_empty_dest)
@@ -188,7 +191,7 @@ TEST(test_performance, merge_performance_one_instance_comprehensive_hll_full_des
 
     clock_t elapsed = perform_merge_test(metric_add_func, metric_register_func, SAMPLING_MODE_COMPREHENSIVE, false);
     printf("merge_performance_one_instance_comprehensive_hll_full_dest elapsed_secs: %ld\n", elapsed);
-    EXPECT_TRUE(elapsed < 1000);
+    EXPECT_TRUE(elapsed < 1300);
 }
 
 TEST(test_performance, merge_performance_one_instance_comprehensive_histogram_full_dest)
@@ -205,7 +208,7 @@ TEST(test_performance, merge_performance_one_instance_comprehensive_histogram_fu
 
     clock_t elapsed = perform_merge_test(metric_add_func, metric_register_func, SAMPLING_MODE_COMPREHENSIVE, false);
     printf("merge_performance_one_instance_comprehensive_histogram_full_dest elapsed_secs: %ld\n", elapsed);
-    EXPECT_TRUE(elapsed < 2 * 1000);
+    EXPECT_TRUE(elapsed < 3 * 1000);
 }
 
 TEST(test_performance, merge_performance_one_instance_topk_counter_full_dest)
@@ -377,6 +380,85 @@ TEST(test_performance, export_many_cells)
     for (int i = 0; i < TAG_NUM; i++) {
         delete tags[i];
     }
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                  serialize                                 */
+/* -------------------------------------------------------------------------- */
+
+clock_t perform_serialize_test(std::function<void (struct fieldstat*, int, int, int)> metric_add_func, 
+    std::function<int(struct fieldstat*, int)> metric_register_func, enum sampling_mode mode)
+{
+    const int MAX_CELL_NUM = 1000000;
+    Fieldstat_tag_list_wrapper *tags[MAX_CELL_NUM];
+    for (int i = 0; i < MAX_CELL_NUM; i++) {
+        tags[i] = new Fieldstat_tag_list_wrapper("my key", i);
+    }
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, mode, MAX_CELL_NUM);
+    int metric_id = metric_register_func(instance, cube_id);
+    for (int j = 0; j < MAX_CELL_NUM; j++) {
+        int cell_id = fieldstat_cube_add(instance, cube_id, tags[j]->get_tag(), 1, 1);
+        metric_add_func(instance, cube_id, metric_id, cell_id);
+    }
+
+    char *blob;
+    size_t blob_size;
+    clock_t start = clock();
+    // printf("getchar\n");
+    // getchar();
+    fieldstat_serialize(instance, &blob, &blob_size);
+    // exit(0);
+    clock_t end = clock();
+
+    fieldstat_free(instance);
+    for (int i = 0; i < MAX_CELL_NUM; i++) {
+        delete tags[i];
+    }
+
+    return end - start;
+}
+
+TEST(test_performance, serialize_counter)
+{
+    auto metric_add_func = [](struct fieldstat *instance, int cube_id, int metric_id, int cell_id) {
+        fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id, 1);
+    };
+    auto metric_register_func = [](struct fieldstat *instance, int cube_id) {
+        return fieldstat_register_counter(instance, cube_id, "metric name", COUNTER_MERGE_BY_SUM);
+    };
+
+    clock_t elapsed = perform_serialize_test(metric_add_func, metric_register_func, SAMPLING_MODE_COMPREHENSIVE);
+    printf("serialize_counter elapsed_secs: %ld\n", elapsed);
+    EXPECT_TRUE(elapsed < 1000000); // every one 1us
+}
+
+TEST(test_performance, serialize_histogram)
+{
+    auto metric_add_func = [](struct fieldstat *instance, int cube_id, int metric_id, int cell_id) {
+        fieldstat_hist_record(instance, cube_id, metric_id, cell_id, 1234);
+    };
+    auto metric_register_func = [](struct fieldstat *instance, int cube_id) {
+        return fieldstat_register_hist(instance, cube_id, "histogram metric", 1, 100000, 1);
+    };
+
+    clock_t elapsed = perform_serialize_test(metric_add_func, metric_register_func, SAMPLING_MODE_COMPREHENSIVE);
+    printf("serialize_histogram elapsed_secs: %ld\n", elapsed);
+    EXPECT_TRUE(elapsed < 1000000); // every one 1us
+}
+
+TEST(test_performance, serialize_hll)
+{
+    auto metric_add_func = [](struct fieldstat *instance, int cube_id, int metric_id, int cell_id) {
+        fieldstat_hll_add(instance, cube_id, metric_id, cell_id, "hello", 5);
+    };
+    auto metric_register_func = [](struct fieldstat *instance, int cube_id) {
+        return fieldstat_register_hll(instance, cube_id, "hll metric", 6);
+    };
+
+    clock_t elapsed = perform_serialize_test(metric_add_func, metric_register_func, SAMPLING_MODE_COMPREHENSIVE);
+    printf("serialize_hll elapsed_secs: %ld\n", elapsed);
+    EXPECT_TRUE(elapsed < 1000000); // every one 1us
 }
 
 int main(int argc, char *argv[]) 

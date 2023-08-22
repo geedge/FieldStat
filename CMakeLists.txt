@@ -21,7 +21,7 @@ include(Version)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_MACOSX_RPATH 0)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -fPIC -Wall -lm -lz --std=gnu11 -DCMAKE_BUILD_TYPE=Debug -O0")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -fPIC -Wall -lm -lz --std=gnu11")
 set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} -Wall)
 
 # set(C_INCLUDE_PATH ${C_INCLUDE_PATH} /opt/MESA/include)
