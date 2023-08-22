@@ -21,7 +21,7 @@ include(Version)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_MACOSX_RPATH 0)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -fPIC -Wall -lm -lz --std=gnu11")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -fPIC -Wall -lm -lz --std=gnu11 -DCMAKE_BUILD_TYPE=Debug -O0")
 set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} -Wall)
 
 # set(C_INCLUDE_PATH ${C_INCLUDE_PATH} /opt/MESA/include)
@@ -65,6 +65,7 @@ if (CMAKE_CXX_CPPCHECK)
             "--suppress=*:${PROJECT_SOURCE_DIR}/vendors/*"
             "--suppress=*:${PROJECT_SOURCE_DIR}/test/utils.hpp"
             "--suppress=*:${PROJECT_SOURCE_DIR}/test/unit_test_serialize.cpp"
+            "--suppress=*:${PROJECT_SOURCE_DIR}/src/logger/log_handle.c"
     )
     set(CMAKE_C_CPPCHECK ${CMAKE_CXX_CPPCHECK})
 else()
@@ -102,6 +103,7 @@ file(GLOB SRC
     "src/metrics/*.c"
     "src/tags/*.c"
     "src/exporter/*.c"
+    "src/logger/*.c"
     "vendors/cjson/*.c"
     "vendors/hdr/*.c"
     "vendors/minheap/*.c"

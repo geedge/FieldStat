@@ -22,7 +22,7 @@ struct cell_manager {
         struct heavy_keeper *topk_tag_id_map;
         struct tag_id_map *comprehensive_tag_id_map;
     };
-    const struct tag_hash_key **id_tag_array;
+    struct tag_hash_key **id_tag_array;
     int id_tag_array_len;
     int max_cell_id;
 
@@ -44,7 +44,8 @@ struct cell_manager *cell_manager_new_without_map(enum sampling_mode sampling_mo
     cell_manager->next_cell_id = 0;
 
     cell_manager->id_tag_array_len = max_cell_num;
-    cell_manager->id_tag_array = (const struct tag_hash_key **)calloc(max_cell_num, sizeof(struct tag_hash_key *));
+    cell_manager->id_tag_array = calloc(max_cell_num, sizeof(struct tag_hash_key *));
+    assert(cell_manager->id_tag_array != NULL);
     cell_manager->max_cell_id = -1;
 
     return cell_manager;
@@ -84,11 +85,9 @@ void cell_manager_reset(struct cell_manager *pthis)
     }
 
     pthis->next_cell_id = 0;
-
-    free(pthis->id_tag_array);
     pthis->max_cell_id = -1;
 
-    pthis->id_tag_array = (const struct tag_hash_key **)calloc(pthis->id_tag_array_len, sizeof(struct tag_hash_key *));
+    memset(pthis->id_tag_array, 0, sizeof(struct tag_hash_key *) * pthis->id_tag_array_len);
 }
 
 void cell_manager_free(struct cell_manager *pthis)
@@ -109,7 +108,7 @@ const struct tag_hash_key *cell_manager_get_tag_by_cell_id(const struct cell_man
     return pthis->id_tag_array[cell_id];
 }
 
-void cell_manager_id_tag_array_add(struct cell_manager *pthis, int cell_id, const struct tag_hash_key *tag)
+void cell_manager_id_tag_array_add(struct cell_manager *pthis, int cell_id, struct tag_hash_key *tag)
 {
     if (cell_id >= pthis->id_tag_array_len) {
         int new_len = pthis->id_tag_array_len;
@@ -118,9 +117,10 @@ void cell_manager_id_tag_array_add(struct cell_manager *pthis, int cell_id, cons
         }
 
         struct tag_hash_key **new_array = (struct tag_hash_key **)calloc(new_len, sizeof(struct tag_hash_key *));
+        assert(new_array != NULL);
         memcpy(new_array, pthis->id_tag_array, sizeof(struct tag_hash_key *) * pthis->id_tag_array_len);
         free(pthis->id_tag_array);
-        pthis->id_tag_array = (const struct tag_hash_key **)new_array;
+        pthis->id_tag_array = new_array;
         pthis->id_tag_array_len = new_len;
     }
 

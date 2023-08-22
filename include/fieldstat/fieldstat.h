@@ -17,6 +17,15 @@ enum metric_type
 	METRIC_TYPE_HISTOGRAM,
 };
 
+// poc
+// tracing
+// 性能
+// 配置
+// stream 
+// 怎么和C 对接
+// 类型系统？
+
+
 enum fs_tag_type
 {
 	TAG_INTEGER,
@@ -44,6 +53,11 @@ struct fieldstat_tag {
 		const char *value_str;
 	};
 };
+
+// todo: tag 可以为NULL
+// todo: 跟贺岚风说一下，cube的tag里的dev id 要放到exporter里
+
+
 
 struct fieldstat;
 struct fieldstat *fieldstat_new();
@@ -145,7 +159,6 @@ int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id
 void fieldstat_reset(struct fieldstat *instance);
 unsigned long fieldstat_get_cell_version(const struct fieldstat *instance);
 
-
 /*
  @brief Merge the instance. The registered cubes and metrics are merged even if there are no cells added.
  @return 0 if success. -1 if failed. Failed when the registered cubes or metrics between dest and src of the same keys has different types or configurations.
@@ -153,7 +166,6 @@ unsigned long fieldstat_get_cell_version(const struct fieldstat *instance);
 int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src);
 struct fieldstat *fieldstat_deserialize(const char *blob, size_t blob_size);
 int fieldstat_serialize(const struct fieldstat *instance, char **blob_out, size_t *blob_size_out);
-
 
 /* -------------------------------------------------------------------------- */
 /*                                    query                                   */
