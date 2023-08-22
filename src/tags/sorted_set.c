@@ -277,7 +277,6 @@ void sorted_set_incrby(struct sorted_set *ss, const struct tag_hash_key *tag, un
 {
     heap_entry *entry = sorted_set_find_entry(ss, tag);
     if (entry == NULL) {
-        // printf("ERR: sorted_set_incrby: tag not found. The program will new an entry and continue, but it is not expected.\n");
         sorted_set_insert(ss, (struct tag_hash_key *)tag, count);
         return;
     }

@@ -208,7 +208,7 @@ void fieldtag_list_serialize(const struct fieldstat_tag *tag_list, size_t tag_nu
     mpack_finish_array(&writer);
 
     if (mpack_writer_destroy(&writer) != mpack_ok) {
-        // printf("ERR mpack writer fieldtag_list_serialize destroy failed\n");
+        assert(0);
     }
 
     fieldtag_list_free(tag_list_sorted, tag_num);
@@ -364,7 +364,7 @@ void tag_hash_key_serialize(const struct tag_hash_key *tag, char **blob, size_t 
 
     mpack_complete_map(&writer);
     if (mpack_writer_destroy(&writer) != mpack_ok) {
-        // printf("ERR: An error occurred in tag_hash_key_serialize!\n");
+        assert(0);
     }
 }
 
