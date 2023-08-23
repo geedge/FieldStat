@@ -96,6 +96,7 @@ include_directories(${PROJECT_SOURCE_DIR}/src)
 include_directories(${PROJECT_SOURCE_DIR}/include/fieldstat)
 include_directories(${PROJECT_SOURCE_DIR}/src/metrics)
 include_directories(${PROJECT_SOURCE_DIR}/src/tags)
+include_directories(${PROJECT_SOURCE_DIR}/src/utils)
 
 
 file(GLOB SRC
@@ -103,7 +104,7 @@ file(GLOB SRC
     "src/metrics/*.c"
     "src/tags/*.c"
     "src/exporter/*.c"
-    "src/logger/*.c"
+    "src/utils/*.c"
     "vendors/cjson/*.c"
     "vendors/hdr/*.c"
     "vendors/minheap/*.c"

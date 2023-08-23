@@ -8,6 +8,7 @@
 #include "mpack/mpack.h"
 #include "my_ut_hash_inner.h"
 #include "my_ut_hash.h"
+#include "serializer.h"
 
 // #define USING_BASE_HASH HASH_JEN
 #define USING_BASE_HASH HASH_SFH
@@ -177,112 +178,121 @@ int my_cmp_tag(const void *a, const void *b)
         "value":<tag value, can be int(0) double(1) or str(2)>
     }]
 */
+void fieldtag_serialize(const struct fieldstat_tag *tag_list, char **blob, size_t *blob_size)
+{
+    struct fs_reader *reader = fs_reader_new();
+    fs_reader_read_str(reader, tag_list->key);
+    fs_reader_read_uint(reader, tag_list->type);
+    switch (tag_list->type)
+    {
+        case TAG_INTEGER:
+            fs_reader_read_longlong(reader, tag_list->value_longlong);
+            break;
+        case TAG_DOUBLE:
+            fs_reader_read_double(reader, tag_list->value_double);
+            break;
+        case TAG_CSTRING:
+            fs_reader_read_str(reader, tag_list->value_str);
+            break;
+        default:
+            assert(0);
+            break;
+    }
+    const char *ret = fs_reader_unwrap(reader, blob_size);
+    *blob = (char *)malloc(*blob_size);
+    memcpy(*blob, ret, *blob_size);
+
+    fs_reader_free(reader);
+}
+
+void fieldtag_deserialize(const char *blob, size_t blob_size, struct fieldstat_tag *tag)
+{
+    struct fs_writer *writer = fs_writer_new(blob, blob_size);
+
+    fs_writer_write_str(writer, (char **)&tag->key);
+    fs_writer_write_uint(writer, &tag->type);
+    switch (tag->type)
+    {
+        case TAG_INTEGER:
+            fs_writer_write_longlong(writer, &tag->value_longlong);
+            break;
+        case TAG_DOUBLE:
+            fs_writer_write_double(writer, &tag->value_double);
+            break;
+        case TAG_CSTRING:
+            fs_writer_write_str(writer, (char **)&tag->value_str);
+            break;
+        default:
+            assert(0);
+            break;
+    }
+
+    fs_writer_free(writer);
+}
+
 void fieldtag_list_serialize(const struct fieldstat_tag *tag_list, size_t tag_num, char **blob, size_t *blob_size)
 {
+    struct fs_reader *reader = fs_reader_new();
     if (tag_num == 0) {
-        mpack_writer_t writer;
-        mpack_writer_init_growable(&writer, blob, blob_size);
-        mpack_write_nil(&writer);
+        fs_reader_read_nil(reader);
+    } else {
 
-        if (mpack_writer_destroy(&writer) != mpack_ok) {
-            assert(0);
+        fs_reader_start_bin_array(reader, tag_num);
+
+        for (int j = 0; j < tag_num; j++) {
+            char *blob_inner = NULL;
+            size_t blob_inner_size = 0;
+            fieldtag_serialize(&tag_list[j], &blob_inner, &blob_inner_size);
+            fs_reader_read_bin(reader, blob_inner, blob_inner_size);
+            free(blob_inner);
         }
-        return;
     }
 
-    struct fieldstat_tag *tag_list_sorted = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * tag_num);
-    for (int i = 0; i < tag_num; i++) {
-        fieldtag_copy(&tag_list_sorted[i], &tag_list[i]);
-    }
-    // sort tag so that when merge by blob, we can merge cells with the same tags
-    qsort(tag_list_sorted, tag_num, sizeof(struct fieldstat_tag), my_cmp_tag);
+    const char *ret = fs_reader_unwrap(reader, blob_size);
+    *blob = (char *)malloc(*blob_size);
+    memcpy(*blob, ret, *blob_size);
 
-    mpack_writer_t writer;
-    mpack_writer_init_growable(&writer, blob, blob_size);
-
-    mpack_start_array(&writer, tag_num);
-    for (int j = 0; j < tag_num; j++) {
-        mpack_start_map(&writer, 3);
-        mpack_write_cstr(&writer, "key");
-        mpack_write_cstr(&writer, tag_list_sorted[j].key);
-        mpack_write_cstr(&writer, "type");
-        mpack_write_i8(&writer, tag_list_sorted[j].type);
-        mpack_write_cstr(&writer, "value");
-        switch (tag_list_sorted[j].type)
-        {
-            case TAG_INTEGER:
-                mpack_write_i64(&writer, tag_list_sorted[j].value_longlong);
-                break;
-            case TAG_DOUBLE:
-                mpack_write_double(&writer, tag_list_sorted[j].value_double);
-                break;
-            case TAG_CSTRING:
-                mpack_write_cstr(&writer, tag_list_sorted[j].value_str);
-                break;
-            default:
-                assert(0);
-                break;
-        }
-        mpack_finish_map(&writer);
-    }
-    mpack_finish_array(&writer);
-
-    if (mpack_writer_destroy(&writer) != mpack_ok) {
-        assert(0);
-    }
-
-    fieldtag_list_free(tag_list_sorted, tag_num);
+    fs_reader_free(reader);
 }
 
 void fieldtag_list_deserialize(const char *blob, size_t blob_size, struct fieldstat_tag **tag_list_out, size_t *tag_num_out)
 {
-    mpack_tree_t tree;
-    mpack_tree_init_data(&tree, blob, blob_size);
-    mpack_tree_parse(&tree);
-    mpack_node_t tag_arr = mpack_tree_root(&tree);
+    struct fs_writer *writer = fs_writer_new(blob, blob_size);
+    int ret = fs_writer_expect_nil(writer);
+    if (ret < 0) {
+        printf("fs_writer_expect_nil error: %d\n", ret);
+        assert(0);
+    }
 
-    if (mpack_node_is_nil(tag_arr)) {
+    if (ret == 1) {
         *tag_list_out = NULL;
         *tag_num_out = 0;
-
-        mpack_tree_destroy(&tree);
+        fs_writer_free(writer);
         return;
     }
 
-    size_t tag_num = mpack_node_array_length(tag_arr);
+    char **tag_blob = NULL;
+    size_t tag_num = 0;
+    size_t *tag_blob_len = NULL;
+    ret = fs_writer_write_bin_array(writer, &tag_blob, &tag_num, &tag_blob_len);
+    if (ret < 0) {
+        printf("fs_writer_write_bin_array error: %d\n", ret);
+        assert(0);
+    }
 
     struct fieldstat_tag *tag_list = malloc(sizeof(struct fieldstat_tag) * tag_num);
     for (int j = 0; j < tag_num; j++) {
-        mpack_node_t tag = mpack_node_array_at(tag_arr, j);
-
-        mpack_node_t key = mpack_node_map_cstr(tag, "key");
-        tag_list[j].key = (const char *)malloc(mpack_node_strlen(key) + 1);
-        mpack_node_copy_cstr(key, (char *)tag_list[j].key, mpack_node_strlen(key) + 1);
-        tag_list[j].type = mpack_node_i8(mpack_node_map_cstr(tag, "type"));
-
-        mpack_node_t value = mpack_node_map_cstr(tag, "value");
-
-        switch (tag_list[j].type)
-        {
-            case TAG_INTEGER:
-                tag_list[j].value_longlong = mpack_node_i64(value);
-                break;
-            case TAG_DOUBLE:
-                tag_list[j].value_double = mpack_node_double(value);
-                break;
-            case TAG_CSTRING:
-                tag_list[j].value_str = (const char *)malloc(mpack_node_strlen(value) + 1);
-                mpack_node_copy_cstr(value, (char *)tag_list[j].value_str, mpack_node_strlen(value) + 1);
-                break;
-            default:
-                assert(0);
-                break;
-        }
+        fieldtag_deserialize(tag_blob[j], tag_blob_len[j], &tag_list[j]);
     }
     *tag_list_out = tag_list;
     *tag_num_out = tag_num;
 
-    mpack_tree_destroy(&tree);
+    for (int j = 0; j < tag_num; j++) {
+        free(tag_blob[j]);
+    }
+    free(tag_blob);
+    free(tag_blob_len);
+    fs_writer_free(writer);
 }
 
 struct tag_hash_key *tag_hash_key_construct_with_fieldstat_tag(const struct fieldstat_tag *src, size_t n_src)

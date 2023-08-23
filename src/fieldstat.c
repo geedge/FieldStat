@@ -530,6 +530,15 @@ int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id
 }
 */
 
+/*
+    "ver": <EXPORT_VER>
+    "cube":[<blob>]*
+
+    *the blob is :
+    uint32: sampling_mode | uint32: max_n_cell | uint32: <length of metric blob> | unsigned char[]: <metric blob> [<pad> 0-4] |  uint32: <length of cell_manager_blob> | <cell manager blob> [<pad> 0-4] ]
+
+*/
+
 int fieldstat_serialize(const struct fieldstat *instance, char **blob_out, size_t *blob_size_out)
 {
     if (instance == NULL) {
