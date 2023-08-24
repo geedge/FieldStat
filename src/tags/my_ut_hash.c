@@ -198,9 +198,7 @@ void fieldtag_serialize(const struct fieldstat_tag *tag_list, char **blob, size_
             assert(0);
             break;
     }
-    const char *ret = fs_reader_unwrap(reader, blob_size);
-    *blob = (char *)malloc(*blob_size);
-    memcpy(*blob, ret, *blob_size);
+    fs_reader_finalize(reader, blob, blob_size);
 
     fs_reader_free(reader);
 }
@@ -248,9 +246,7 @@ void fieldtag_list_serialize(const struct fieldstat_tag *tag_list, size_t tag_nu
         }
     }
 
-    const char *ret = fs_reader_unwrap(reader, blob_size);
-    *blob = (char *)malloc(*blob_size);
-    memcpy(*blob, ret, *blob_size);
+    fs_reader_finalize(reader, blob, blob_size);
 
     fs_reader_free(reader);
 }

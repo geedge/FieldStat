@@ -22,7 +22,7 @@ void fs_reader_start_bin_array(struct fs_reader *reader, size_t size);
 void fs_reader_read_int_array(struct fs_reader *reader, const int *value, size_t size); 
 
 const char *fs_reader_unwrap(const struct fs_reader *reader, size_t *size);
-
+void fs_reader_finalize(struct fs_reader *reader, char **blob, size_t *size);
 /* ------------------------------------------------------------------------ */
 struct fs_writer;
 struct fs_writer *fs_writer_new(const char *blob, size_t size);

@@ -391,7 +391,7 @@ clock_t perform_serialize_test(std::function<void (struct fieldstat*, int, int, 
 {
     const int MAX_CELL_NUM = 1000000;
     Fieldstat_tag_list_wrapper *tags[MAX_CELL_NUM];
-    for (int i = 0; i < MAX_CELL_NUM; i++) {,
+    for (int i = 0; i < MAX_CELL_NUM; i++) {
         tags[i] = new Fieldstat_tag_list_wrapper("my key", i);
     }
     struct fieldstat *instance = fieldstat_new();
@@ -405,10 +405,10 @@ clock_t perform_serialize_test(std::function<void (struct fieldstat*, int, int, 
     char *blob;
     size_t blob_size;
     clock_t start = clock();
-    // printf("getchar\n");
-    // getchar();
+    printf("getchar\n");
+    getchar();
     fieldstat_serialize(instance, &blob, &blob_size);
-    // exit(0);
+    exit(0);
     clock_t end = clock();
 
     fieldstat_free(instance);

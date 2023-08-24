@@ -9,6 +9,7 @@
 #include "tags/heavy_keeper.h"
 #include "tags/my_ut_hash_inner.h"
 #include "tags/my_ut_hash.h"
+#include "serializer.h"
 
 
 struct tag_id_map {
@@ -203,80 +204,70 @@ The number 8 was determined through experiment, where multiple tests were conduc
 
 
 /*
-{
-    "mode":<sampling mode int8>
-    "max_n_cell":<max cell number int32>
-
-    "id_tag_array": [{
-        "id": <id in cell manager>,
-        "tags": [<my_tag_key serialized bin blob,...]
-    "topk_map": <topk_serializing_blob>
-}
+mode:uint32 | max_n_cell:uint32 | id_tag_id_array:int_array | id_tag_array:bin_array(tag_hash_key_serialize) | 
+                                | topk_map:bin(heavy_keeper_serialization)
 */
 int cell_manager_serialize(const struct cell_manager *pthis, char **blob, size_t *blob_size)
 {
-    mpack_writer_t writer;
-    mpack_writer_init_growable(&writer, blob, blob_size);
-    mpack_build_map(&writer);
-    mpack_write_cstr(&writer, "mode");
-    mpack_write_i8(&writer, pthis->sampling_mode);
-    mpack_write_cstr(&writer, "max_n_cell");
-    mpack_write_i32(&writer, pthis->max_cell_num);
+    struct fs_reader *reader = fs_reader_new();
+
+    fs_reader_read_uint(reader, (uint32_t)pthis->sampling_mode);
+    fs_reader_read_uint(reader, (uint32_t)pthis->max_cell_num);
 
     if (pthis->sampling_mode == SAMPLING_MODE_COMPREHENSIVE) {
-        mpack_write_cstr(&writer, "id_tag_array");
-        mpack_build_array(&writer);
-        
+        // mpack_write_cstr(&writer, "id_tag_array");
+        // mpack_build_array(&writer);
+        int id_rec[pthis->max_cell_id];
+        int actual_len = 0;
         for (int i = 0; i <= pthis->max_cell_id; i++) {
             if (pthis->id_tag_array[i] == NULL) {
                 continue;
             }
-            mpack_build_map(&writer);
-            mpack_write_cstr(&writer, "id");
-            mpack_write_int(&writer, i);
-            mpack_write_cstr(&writer, "tags");
+            id_rec[actual_len++] = i;
+        }
+        fs_reader_read_int_array(reader, id_rec, actual_len);
+
+        fs_reader_start_bin_array(reader, actual_len);
+        for (int i = 0; i < actual_len; i++) {
+            int tmp_id = id_rec[i];
+
             char *tag_blob = NULL;
             size_t tag_blob_size = 0;
-            tag_hash_key_serialize(pthis->id_tag_array[i], &tag_blob, &tag_blob_size);
-            mpack_write_bin(&writer, tag_blob, tag_blob_size);
+            tag_hash_key_serialize(pthis->id_tag_array[tmp_id], &tag_blob, &tag_blob_size);
+            fs_reader_read_bin(reader, tag_blob, tag_blob_size);
             free(tag_blob);
-            mpack_complete_map(&writer);
         }
-        mpack_complete_array(&writer); // id_tag_array
     } else {
-        mpack_write_cstr(&writer, "topk_map");
         char *topk_blob = NULL;
         size_t topk_blob_size = 0;
         heavy_keeper_serialization(pthis->topk_tag_id_map, &topk_blob, &topk_blob_size);
-        mpack_write_bin(&writer, topk_blob, topk_blob_size);
+        fs_reader_read_bin(reader, topk_blob, topk_blob_size);
         free(topk_blob);
     }
 
-    mpack_complete_map(&writer);
-    if (mpack_writer_destroy(&writer) != mpack_ok) {
-        assert(0);
-    }
+    fs_reader_finalize(reader, blob, blob_size);
 
+    fs_reader_free(reader);
     return 0;
 }
 
 struct cell_manager *cell_manager_deserialize(const char *blob, size_t blob_size)
 {
-    mpack_tree_t tree;
-    mpack_tree_init_data(&tree, blob, blob_size);
-    mpack_tree_parse(&tree);
-    mpack_node_t root = mpack_tree_root(&tree);
+    struct fs_writer *writer = fs_writer_new(blob, blob_size);
 
-    enum sampling_mode mode = (enum sampling_mode) mpack_node_i8(mpack_node_map_cstr(root, "mode"));
-    int max_n_cell = mpack_node_i32(mpack_node_map_cstr(root, "max_n_cell"));
+    enum sampling_mode mode;
+    fs_writer_write_uint(writer, (uint32_t *)&mode);
+    int max_n_cell;
+    fs_writer_write_uint(writer, (uint32_t *)&max_n_cell);
     struct cell_manager *pthis = cell_manager_new_without_map(mode, max_n_cell);
     int cell_id_max = -1;
 
     if (mode == SAMPLING_MODE_TOPK) {
-        mpack_node_t topk_map = mpack_node_map_cstr(root, "topk_map");
-        const char *topk_blob = mpack_node_bin_data(topk_map);
-        size_t topk_blob_size = mpack_node_bin_size(topk_map);
+        char *topk_blob;
+        size_t topk_blob_size;
+        fs_writer_write_bin(writer, &topk_blob, &topk_blob_size);
         pthis->topk_tag_id_map = heavy_keeper_deserialization(topk_blob, topk_blob_size);
+        free(topk_blob);
 
         struct heavy_keeper_result *result = heavy_keeper_query(pthis->topk_tag_id_map);
         for (size_t i = 0; i < result->n_key; i++) {
@@ -288,15 +279,17 @@ struct cell_manager *cell_manager_deserialize(const char *blob, size_t blob_size
         }
         heavy_keeper_result_free(result);
     } else {
-        mpack_node_t id_tag_array = mpack_node_map_cstr(root, "id_tag_array");
-        int n_cell = mpack_node_array_length(id_tag_array);
-        for (int i = 0; i < n_cell; i++) {
-            mpack_node_t cell = mpack_node_array_at(id_tag_array, i);
-            int cell_id = mpack_node_i32(mpack_node_map_cstr(cell, "id"));
-            mpack_node_t tags_node = mpack_node_map_cstr(cell, "tags");
-            const char *tag_blob = mpack_node_bin_data(tags_node);
-            size_t tag_blob_size = mpack_node_bin_size(tags_node);
-            struct tag_hash_key *tag = tag_hash_key_deserialize(tag_blob, tag_blob_size);
+        size_t n_cell;
+        int *cell_id_array;
+        fs_writer_write_int_array(writer, &cell_id_array, &n_cell);
+        char **tag_blob;
+        size_t *tag_blob_size;
+        fs_writer_write_bin_array(writer, &tag_blob, &n_cell, &tag_blob_size);
+    
+        for (size_t i = 0; i < n_cell; i++) {
+            int cell_id = cell_id_array[i];
+
+            struct tag_hash_key *tag = tag_hash_key_deserialize(tag_blob[i], tag_blob_size[i]);
             struct tag_id_map *node = (struct tag_id_map *)malloc(sizeof(struct tag_id_map));
             node->tag = tag;
             node->cell_id = cell_id;
@@ -308,10 +301,17 @@ struct cell_manager *cell_manager_deserialize(const char *blob, size_t blob_size
                 cell_id_max = cell_id;
             }
         }
+
+        for (size_t i = 0; i < n_cell; i++) {
+            free((void *)tag_blob[i]);
+        }
+        free(tag_blob);
+        free(tag_blob_size);
+        free(cell_id_array);
     }
     pthis->next_cell_id = cell_id_max + 1;
 
-    mpack_tree_destroy(&tree);
+    fs_writer_free(writer);
     return pthis;
 }
 

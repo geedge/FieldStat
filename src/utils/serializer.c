@@ -154,6 +154,14 @@ const char *fs_reader_unwrap(const struct fs_reader *reader, size_t *size) {
     return reader->data;
 }
 
+void fs_reader_finalize(struct fs_reader *reader, char **blob, size_t *size) {
+    *size = reader->cursor;
+    *blob = reader->data;
+    reader->data = NULL;
+    reader->cursor = 0;
+    reader->data_buffer_size = 0;
+}
+
 /* -------------------------------------------------------------------------- */
 /*                                   writer                                   */
 /* -------------------------------------------------------------------------- */
