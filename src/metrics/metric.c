@@ -513,7 +513,7 @@ struct metric_parameter *deserialize_parameters(const char *blob, size_t blob_si
         case METRIC_TYPE_HISTOGRAM: {
             long long min;
             long long max;
-            int8_t prec;
+            int prec;
             fs_writer_write_longlong(writer, &min);
             fs_writer_write_longlong(writer, &max);
             fs_writer_write_uint(writer, (uint32_t *)&prec);
