@@ -6,7 +6,7 @@
 
 #include "cjson/cJSON.h"
 #include "uthash.h"
-#include "mpack/mpack.h"
+#include "serializer.h"
 #include "fieldstat.h"
 #include "metrics/metric.h"
 #include "tags/cell_manager.h"
@@ -535,116 +535,144 @@ int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id
     "cube":[<blob>]*
 
     *the blob is :
-    uint32: sampling_mode | uint32: max_n_cell | uint32: <length of metric blob> | unsigned char[]: <metric blob> [<pad> 0-4] |  uint32: <length of cell_manager_blob> | <cell manager blob> [<pad> 0-4] ]
+    bin: shared_tags| uint32: sampling_mode | uint32: max_n_cell | unsigned char[]: <metric blob> [<pad> 0-4] |  uint32: <length of cell_manager_blob> | <cell manager blob> [<pad> 0-4] ]
 
 */
+
+void fieldstat_cube_serialize(const struct fs_cube *cube, char **blob_out, size_t *blob_size_out)
+{
+    struct fs_reader *reader = fs_reader_new();
+
+    char *shared_tag_blob = NULL;
+    size_t shared_tag_blob_size = 0;
+    fieldtag_list_serialize(cube->shared_tags, cube->n_shared_tags, &shared_tag_blob, &shared_tag_blob_size);
+    fs_reader_read_bin(reader, shared_tag_blob, shared_tag_blob_size);
+    free(shared_tag_blob);
+
+    fs_reader_read_uint(reader, cube->sampling_mode);
+    fs_reader_read_uint(reader, cube->max_n_cell);
+
+    fs_reader_start_bin_array(reader, cube->n_metric);
+    for (int j = 0; j < cube->n_metric; j++) {
+        char *metric_blob = NULL;
+        size_t metric_blob_size = 0;
+        metric_serialize(cube->metrics[j], &metric_blob, &metric_blob_size);
+        fs_reader_read_bin(reader, metric_blob, metric_blob_size);
+        free(metric_blob);
+    }
+
+    char *cm_blob = NULL;
+    size_t cm_blob_size = 0;
+    cell_manager_serialize(cube->cell_manager, &cm_blob, &cm_blob_size);
+    fs_reader_read_bin(reader, cm_blob, cm_blob_size);
+    free(cm_blob);
+
+    fs_reader_finalize(reader, blob_out, blob_size_out);
+}
+
+struct fs_cube *fieldstat_cube_deserialize(const char *blob, size_t blob_size) {
+    struct fs_writer *writer = fs_writer_new(blob, blob_size);
+
+    struct fieldstat_tag *shared_tags;
+    size_t n_shared_tags;
+    char *shared_tags_blob = NULL;
+    size_t shared_tags_blob_size = 0;
+    fs_writer_write_bin(writer, &shared_tags_blob, &shared_tags_blob_size);
+    fieldtag_list_deserialize(shared_tags_blob, shared_tags_blob_size, &shared_tags, &n_shared_tags);
+    free(shared_tags_blob);
+
+    enum sampling_mode sampling_mode;
+    fs_writer_write_uint(writer, &sampling_mode);
+    size_t max_n_cell;
+    fs_writer_write_uint(writer, (uint32_t *)&max_n_cell);
+    struct fs_cube *fs_cube = fieldstat_cube_info_init(shared_tags, n_shared_tags, sampling_mode, max_n_cell);
+    fieldtag_list_free(shared_tags, n_shared_tags);
+
+    size_t n_metrics;
+    char **metric_blob_arr = NULL;
+    size_t *metric_blob_size_arr = NULL;
+    fs_writer_write_bin_array(writer, &metric_blob_arr, &n_metrics, &metric_blob_size_arr);
+    for (size_t j = 0; j < n_metrics; j++) {
+        struct metric *metric = metric_deserialize(metric_blob_arr[j], metric_blob_size_arr[j]);
+        append_metric_to_cube(fs_cube, metric);
+    }
+    for (size_t j = 0; j < n_metrics; j++) {
+        free(metric_blob_arr[j]);
+    }
+    free(metric_blob_arr);
+    free(metric_blob_size_arr);
+
+    char *cm_blob = NULL;
+    size_t cm_blob_size = 0;
+    fs_writer_write_bin(writer, &cm_blob, &cm_blob_size);
+    struct cell_manager *cm = cell_manager_deserialize(cm_blob, cm_blob_size);
+    free(cm_blob);
+    fs_cube->cell_manager = cm;
+
+    fs_writer_free(writer);
+    return fs_cube;
+}
 
 int fieldstat_serialize(const struct fieldstat *instance, char **blob_out, size_t *blob_size_out)
 {
     if (instance == NULL) {
         return -1;
     }
-    mpack_writer_t writer;
-    mpack_writer_init_growable(&writer, blob_out, blob_size_out);
-    mpack_build_map(&writer);
+    struct fs_reader *reader = fs_reader_new();
 
-    mpack_write_cstr(&writer, "ver");
-    mpack_write_i32(&writer, EXPORT_VER);
+    fs_reader_read_uint(reader, EXPORT_VER);
 
-    mpack_write_cstr(&writer, "cube");
-    mpack_build_array(&writer);
+    int n_cube = 0;
     for (int i = 0; i < instance->valid_cube_arr_length; i++) {
-        struct fs_cube *cube = instance->cube[i];
+        if (instance->cube[i] != NULL) {
+            n_cube++;
+        }
+    }
+    fs_reader_start_bin_array(reader, n_cube);
+    for (int i = 0; i < instance->valid_cube_arr_length; i++) {
+        const struct fs_cube *cube = instance->cube[i];
         if (cube == NULL) {
             continue;
         }
-        mpack_build_map(&writer);
-        mpack_write_cstr(&writer, "shared_tags");
-        char *shared_tag_blob = NULL;
-        size_t shared_tag_blob_size = 0;
-        fieldtag_list_serialize(cube->shared_tags, cube->n_shared_tags, &shared_tag_blob, &shared_tag_blob_size);
-        mpack_write_bin(&writer, shared_tag_blob, shared_tag_blob_size);
-        free(shared_tag_blob);
-        mpack_write_cstr(&writer, "sampling_mode");
-        mpack_write_i8(&writer, cube->sampling_mode);
-        mpack_write_cstr(&writer, "max_n_cell");
-        mpack_write_i64(&writer, cube->max_n_cell);
-
-        mpack_write_cstr(&writer, "metrics");
-        mpack_start_array(&writer, cube->n_metric);
-        for (int j = 0; j < cube->n_metric; j++) {
-            char *metric_blob = NULL;
-            size_t metric_blob_size = 0;
-            metric_serialize(cube->metrics[j], &metric_blob, &metric_blob_size);
-            mpack_write_bin(&writer, metric_blob, metric_blob_size);
-            free(metric_blob);
-        }
-        mpack_finish_array(&writer);
-
-        mpack_write_cstr(&writer, "cm");
-        char *cm_blob = NULL;
-        size_t cm_blob_size = 0;
-        cell_manager_serialize(cube->cell_manager, &cm_blob, &cm_blob_size);
-        mpack_write_bin(&writer, cm_blob, cm_blob_size);
-        free(cm_blob);
-
-        mpack_complete_map(&writer);
+        char *cube_blob = NULL;
+        size_t cube_blob_size = 0;
+        fieldstat_cube_serialize(cube, &cube_blob, &cube_blob_size);
+        fs_reader_read_bin(reader, cube_blob, cube_blob_size);
+        free(cube_blob);
     }
-    mpack_complete_array(&writer);
 
-    mpack_complete_map(&writer);
-    if (mpack_writer_destroy(&writer) != mpack_ok) {
-        assert(0);
-        return -1;
-    }
+    fs_reader_finalize(reader, blob_out, blob_size_out);
 
     return 0;
 }
 
 struct fieldstat *fieldstat_deserialize(const char *blob, size_t blob_size)
 {
-    mpack_tree_t tree;
-    mpack_tree_init_data(&tree, blob, blob_size);
-    mpack_tree_parse(&tree);
-    mpack_node_t root = mpack_tree_root(&tree);
-    int ver = mpack_node_i32(mpack_node_map_cstr(root, "ver"));
+    struct fs_writer *writer = fs_writer_new(blob, blob_size);
+    uint32_t ver;
+    fs_writer_write_uint(writer, &ver);
     if (ver != EXPORT_VER) {
         assert(0);
-        mpack_tree_destroy(&tree);
+        fs_writer_free(writer);
         return NULL;
     }
 
     struct fieldstat *instance = fieldstat_new();
-    mpack_node_t cube_node = mpack_node_map_cstr(root, "cube");
-    int n_cube = mpack_node_array_length(cube_node);
+    char **cube_blob_arr = NULL;
+    size_t *cube_blob_size_arr = NULL;
+    size_t n_cube;
+    fs_writer_write_bin_array(writer, &cube_blob_arr, &n_cube, &cube_blob_size_arr);
     for (int i = 0; i < n_cube; i++) {
-        mpack_node_t cube = mpack_node_array_at(cube_node, i);
-
-        mpack_node_t shared_tags_node = mpack_node_map_cstr(cube, "shared_tags");
-        struct fieldstat_tag *shared_tags = NULL;
-        size_t n_shared_tags = 0;
-        fieldtag_list_deserialize(mpack_node_bin_data(shared_tags_node), mpack_node_bin_size(shared_tags_node), &shared_tags, &n_shared_tags);
-        int sampling_mode = mpack_node_i8(mpack_node_map_cstr(cube, "sampling_mode"));
-        int max_n_cell = mpack_node_i64(mpack_node_map_cstr(cube, "max_n_cell"));
-        struct fs_cube *fs_cube = fieldstat_cube_info_init(shared_tags, n_shared_tags, sampling_mode, max_n_cell);
-        fieldtag_list_free(shared_tags, n_shared_tags);
-
-        mpack_node_t metrics_node = mpack_node_map_cstr(cube, "metrics");
-        int n_metrics = mpack_node_array_length(metrics_node);
-        for (int j = 0; j < n_metrics; j++) {
-            mpack_node_t metric_node = mpack_node_array_at(metrics_node, j);
-            struct metric *metric = metric_deserialize(mpack_node_bin_data(metric_node), mpack_node_bin_size(metric_node));
-            append_metric_to_cube(fs_cube, metric);
-        }
-
-        mpack_node_t cm_node = mpack_node_map_cstr(cube, "cm");
-        struct cell_manager *cm = cell_manager_deserialize(mpack_node_bin_data(cm_node), mpack_node_bin_size(cm_node));
-        fs_cube->cell_manager = cm;
-
+        struct fs_cube *fs_cube = fieldstat_cube_deserialize(cube_blob_arr[i], cube_blob_size_arr[i]);
         fieldstat_append_cube_to_instance(instance, fs_cube);
     }
+    for (int i = 0; i < n_cube; i++) {
+        free(cube_blob_arr[i]);
+    }
+    free(cube_blob_arr);
+    free(cube_blob_size_arr);
 
-    mpack_tree_destroy(&tree);
+    fs_writer_free(writer);
     return instance;
 }
 

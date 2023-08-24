@@ -5,12 +5,13 @@
  */
 #include "st_hyperloglog.h"
 #include "xxhash/xxhash.h"
-#include "mpack/mpack.h"
 #include "crdt_utils.h"
 
 #include <stdint.h>
 #include <math.h>
 #include <assert.h>
+#include <string.h>
+#include <stdlib.h>
 #include "base64/b64.h"
 
 const size_t BLOB_HDR_SIZE= offsetof(struct ST_hyperloglog, registers);
