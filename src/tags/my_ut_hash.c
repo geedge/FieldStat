@@ -5,7 +5,6 @@
 #include <assert.h>
 #include <string.h>
 
-#include "mpack/mpack.h"
 #include "my_ut_hash_inner.h"
 #include "my_ut_hash.h"
 #include "serializer.h"
@@ -232,7 +231,6 @@ void fieldtag_list_serialize(const struct fieldstat_tag *tag_list, size_t tag_nu
     if (tag_num == 0) {
         fs_reader_read_nil(reader);
     } else {
-
         fs_reader_start_bin_array(reader, tag_num);
 
         for (int j = 0; j < tag_num; j++) {
@@ -374,55 +372,39 @@ unsigned tag_hash_key_cal_fnv_hash(const struct tag_hash_key *tag, unsigned seed
 
 /*
 {
-    "tags": [
-        <fieldstat tag serialized result>
-    ],
+    "tags": <fieldstat tag serialized result>,
     "hashv": 0,
 }
 */
-
 void tag_hash_key_serialize(const struct tag_hash_key *tag, char **blob, size_t *blob_size)
 {
-    mpack_writer_t writer;
-    mpack_writer_init_growable(&writer, blob, blob_size);
-    mpack_build_map(&writer);
+    struct fs_reader *reader = fs_reader_new();
 
-    mpack_write_cstr(&writer, "tags");
     char *blob_tag;
     size_t blob_size_tag;
     fieldtag_list_serialize(tag->tags, tag->n_my_tag, &blob_tag, &blob_size_tag);
-    mpack_write_bin(&writer, blob_tag, blob_size_tag);
+    fs_reader_read_bin(reader, blob_tag, blob_size_tag);
     free(blob_tag);
 
-    mpack_write_cstr(&writer, "hashv");
-    // the tags may be changed by sorting, so we need to recalculate the hash value
-    char *compound_key;
-    size_t compound_key_len;
-    build_dynamic_cell_key(tag->tags, tag->n_my_tag, &compound_key, &compound_key_len);
-    unsigned hashv = 0;
-    USING_BASE_HASH(compound_key, compound_key_len, hashv);
-    mpack_write_u32(&writer, hashv);
-    free(compound_key);
+    fs_reader_read_uint(reader, tag->hashv);
 
-    mpack_complete_map(&writer);
-    if (mpack_writer_destroy(&writer) != mpack_ok) {
-        assert(0);
-    }
+    fs_reader_finalize(reader, blob, blob_size);
 }
 
 struct tag_hash_key *tag_hash_key_deserialize(const char *blob, size_t blob_size)
 {
-    mpack_tree_t tree;
-    mpack_tree_init_data(&tree, blob, blob_size);
-    mpack_tree_parse(&tree);
-    mpack_node_t root = mpack_tree_root(&tree);
+    struct fs_writer *writer = fs_writer_new(blob, blob_size);
 
-    mpack_node_t tags = mpack_node_map_cstr(root, "tags");
+    char *tag_blob;
+    size_t tag_blob_size;
+    fs_writer_write_bin(writer, &tag_blob, &tag_blob_size);
     struct fieldstat_tag *fieldstat_tag_arr;
     size_t n_tag;
-    fieldtag_list_deserialize(mpack_node_bin_data(tags), mpack_node_bin_size(tags), &fieldstat_tag_arr, &n_tag);
+    fieldtag_list_deserialize(tag_blob, tag_blob_size, &fieldstat_tag_arr, &n_tag);
+    free(tag_blob);
 
-    unsigned hashv_val = mpack_node_u32(mpack_node_map_cstr(root, "hashv"));
+    unsigned hashv_val;
+    fs_writer_write_uint(writer, &hashv_val);
     
     char *compound_key;
     size_t compound_key_len;
@@ -435,7 +417,7 @@ struct tag_hash_key *tag_hash_key_deserialize(const char *blob, size_t blob_size
     ret_hash_key->n_my_tag = n_tag;
     ret_hash_key->hashv = hashv_val;
 
-    mpack_tree_destroy(&tree);
+    fs_writer_free(writer);
     return ret_hash_key;
 }
 
