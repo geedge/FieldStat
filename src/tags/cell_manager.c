@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "mpack/mpack.h"
 #include "fieldstat.h"
 #include "tags/cell_manager.h"
 #include "tags/heavy_keeper.h"
@@ -214,12 +213,13 @@ int cell_manager_serialize(const struct cell_manager *pthis, char **blob, size_t
     fs_reader_read_uint(reader, (uint32_t)pthis->sampling_mode);
     fs_reader_read_uint(reader, (uint32_t)pthis->max_cell_num);
 
+
     if (pthis->sampling_mode == SAMPLING_MODE_COMPREHENSIVE) {
-        // mpack_write_cstr(&writer, "id_tag_array");
-        // mpack_build_array(&writer);
-        int id_rec[pthis->max_cell_id];
+        int n_cell = pthis->max_cell_id + 1;
+
+        int id_rec[n_cell];
         int actual_len = 0;
-        for (int i = 0; i <= pthis->max_cell_id; i++) {
+        for (int i = 0; i < n_cell; i++) {
             if (pthis->id_tag_array[i] == NULL) {
                 continue;
             }
@@ -247,7 +247,6 @@ int cell_manager_serialize(const struct cell_manager *pthis, char **blob, size_t
 
     fs_reader_finalize(reader, blob, blob_size);
 
-    fs_reader_free(reader);
     return 0;
 }
 

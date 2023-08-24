@@ -5,9 +5,9 @@
 #include <string.h>
 #include <stdarg.h>
 
-#include "mpack/mpack.h"
 #include "uthash.h"
 
+#include "serializer.h"
 #include "metric.h"
 #include "fieldstat.h"
 #include "tags/cell_manager.h"
@@ -137,23 +137,17 @@ static void metric_scheme_counter_free(struct metric_measure_data *data)
         "value": 0
         "mode": 0(sum) / 1(max)  /  2(min)
     }
+value: long long | mode: uint32
 */
 static void metric_scheme_counter_serialize(const struct metric_measure_data *data, char **blob, size_t *blob_size)
 {
     const struct metric_counter_or_gauge *counter = data->counter;
-    mpack_writer_t writer;
-    mpack_writer_init_growable(&writer, blob, blob_size);
-    mpack_build_map(&writer);
+    struct fs_reader *reader = fs_reader_new();
 
-    mpack_write_cstr(&writer, "value");
-    mpack_write_i64(&writer, counter->value);
-    mpack_write_cstr(&writer, "mode");
-    mpack_write_i8(&writer, counter->mode);
+    fs_reader_read_longlong(reader, counter->value);
+    fs_reader_read_uint(reader, counter->mode);
 
-    mpack_complete_map(&writer);
-    if (mpack_writer_destroy(&writer) != mpack_ok) {
-        assert(0);
-    }
+    fs_reader_finalize(reader, blob, blob_size);
 }
 
 static int metric_scheme_counter_merge(struct metric_measure_data *pthis, const struct metric_measure_data *from)
@@ -193,21 +187,15 @@ static int metric_scheme_counter_copy(struct metric_measure_data *pthis, const s
 
 struct metric_measure_data *metric_scheme_counter_deserialize(const char *blob, size_t blob_size) 
 {
-    mpack_tree_t content_tree;
-    mpack_tree_init_data(&content_tree, blob, blob_size);
-    mpack_tree_parse(&content_tree);
-    mpack_node_t content_root = mpack_tree_root(&content_tree);
-
+    struct fs_writer *writer = fs_writer_new(blob, blob_size);
     struct metric_measure_data *ret = (struct metric_measure_data *)malloc(sizeof(struct metric_measure_data));
     struct metric_counter_or_gauge *counter = (struct metric_counter_or_gauge *)malloc(sizeof(struct metric_counter_or_gauge));
     ret->counter = counter;
 
-    counter->value = mpack_node_i64(mpack_node_map_cstr(content_root, "value"));
-    counter->mode = mpack_node_i8(mpack_node_map_cstr(content_root, "mode"));
+    fs_writer_write_longlong(writer, &counter->value);
+    fs_writer_write_uint(writer, (uint32_t *)&counter->mode);
 
-    if (mpack_tree_destroy(&content_tree) != mpack_ok) {
-        assert(0);
-    }
+    fs_writer_free(writer);
     return ret;
 }
 
@@ -471,75 +459,73 @@ struct metric *metric_copy(const struct metric *src)
     "min": <lowest_trackable_value>
     "max": <highest_trackable_value>
     "prec": <significant_figures>
+
+type:uint32 | min: long long | max: long long | prec: uint32
 }
 */
 void metric_serialize_parameters(const struct metric *metric, char **blob, size_t *blob_size)
 {
     struct metric_parameter *para = metric->info->paras;
-    mpack_writer_t writer;
-    mpack_writer_init_growable(&writer, blob, blob_size);
-    mpack_build_map(&writer);
+    struct fs_reader *reader = fs_reader_new();
 
-    mpack_write_cstr(&writer, "type");
-    mpack_write_i32(&writer, metric->info->type);
+    fs_reader_read_uint(reader, metric->info->type);
 
     switch (metric->info->type)
     {
     case METRIC_TYPE_COUNTER:
-        mpack_write_cstr(&writer, "merge_type");
-        mpack_write_i32(&writer, para->counter.mode);
+        fs_reader_read_uint(reader, para->counter.mode);
     case METRIC_TYPE_HLL:
-        mpack_write_cstr(&writer, "prec");
-        mpack_write_i32(&writer, para->hll.precision);
+        fs_reader_read_uint(reader, para->hll.precision);
         break;
     case METRIC_TYPE_HISTOGRAM:
-        mpack_write_cstr(&writer, "min");
-        mpack_write_i64(&writer, para->hdr.lowest_trackable_value);
-        mpack_write_cstr(&writer, "max");
-        mpack_write_i64(&writer, para->hdr.highest_trackable_value);
-        mpack_write_cstr(&writer, "prec");
-        mpack_write_i8(&writer, para->hdr.significant_figures);
+        fs_reader_read_longlong(reader, para->hdr.lowest_trackable_value);
+        fs_reader_read_longlong(reader, para->hdr.highest_trackable_value);
+        fs_reader_read_uint(reader, para->hdr.significant_figures);
         break;
     default:
         break;
     }
-    mpack_complete_map(&writer);
 
-    mpack_writer_destroy(&writer);
+    fs_reader_finalize(reader, blob, blob_size);
 }
 
 struct metric_parameter *deserialize_parameters(const char *blob, size_t blob_size)
 {
-    mpack_tree_t tree;
-    mpack_tree_init_data(&tree, blob, blob_size);
-    mpack_tree_parse(&tree);
-    mpack_node_t root = mpack_tree_root(&tree);
+    struct fs_writer *writer = fs_writer_new(blob, blob_size);
 
-    mpack_node_t type_obj = mpack_node_map_cstr(root, "type");
-    enum metric_type type = mpack_node_i32(type_obj);
+    enum metric_type type;
+    fs_writer_write_uint(writer, (uint32_t *)&type);
+
     struct metric_parameter *field_para = NULL;
     switch (type) {
         case METRIC_TYPE_COUNTER:{
-            int counter_type = mpack_node_i32(mpack_node_map_cstr(root, "merge_type"));
+            int counter_type;
+            fs_writer_write_uint(writer, (uint32_t *)&counter_type);
             field_para = construct_parameters(type, counter_type);
         }
         break;
         case METRIC_TYPE_HLL: {
-            int precision = mpack_node_i32(mpack_node_map_cstr(root, "prec"));
+            int precision;
+            fs_writer_write_uint(writer, (uint32_t *)&precision);
             field_para = construct_parameters(type, precision);
         }
         break;
         case METRIC_TYPE_HISTOGRAM: {
-            int64_t min = mpack_node_i64(mpack_node_map_cstr(root, "min"));
-            int64_t max = mpack_node_i64(mpack_node_map_cstr(root, "max"));
-            int8_t prec = mpack_node_i8(mpack_node_map_cstr(root, "prec"));
+            long long min;
+            long long max;
+            int8_t prec;
+            fs_writer_write_longlong(writer, &min);
+            fs_writer_write_longlong(writer, &max);
+            fs_writer_write_uint(writer, (uint32_t *)&prec);
+
             field_para = construct_parameters(type, min, max, prec);
         }
         break;
         default:
             break;
     }
-    mpack_tree_destroy(&tree);
+    
+    fs_writer_free(writer);
     return field_para;
 }
 
@@ -547,40 +533,30 @@ struct metric_parameter *deserialize_parameters(const char *blob, size_t blob_si
 {
     "id":<cell_id>,
     "PL":<content_blob>
+
+id:uint | PL:bin
 }
 */
-void mpack_blob_wrap_basic_info(int cell_id, const char *blob, size_t blob_size, char **new_blob, size_t *new_blob_size)
+void blob_wrap_basic_info(int cell_id, const char *blob, size_t blob_size, char **new_blob, size_t *new_blob_size)
 {
-    mpack_writer_t writer;
-    mpack_writer_init_growable(&writer, new_blob, new_blob_size);
-    mpack_start_map(&writer, 2);
-    mpack_write_cstr(&writer, "id");
-    mpack_write_int(&writer, cell_id);
-    mpack_write_cstr(&writer, "PL");
-    mpack_write_bin(&writer, blob, blob_size);
-    mpack_finish_map(&writer);
-    mpack_writer_destroy(&writer);
+    struct fs_reader *reader = fs_reader_new();
+
+    fs_reader_read_uint(reader, cell_id);
+    fs_reader_read_bin(reader, blob, blob_size);
+
+    fs_reader_finalize(reader, new_blob, new_blob_size);
 }
 
 // user must free new_blob
-void mpack_blob_unpack_basic_info(const char *blob, size_t blob_size, char **new_blob, size_t *new_blob_size, int *cell_id)
+void blob_unpack_basic_info(const char *blob, size_t blob_size, char **new_blob, size_t *new_blob_size, int *cell_id)
 {
-    mpack_tree_t tree;
-    mpack_tree_init_data(&tree, blob, blob_size);
-    mpack_tree_parse(&tree);
-    mpack_node_t root = mpack_tree_root(&tree);
+    struct fs_writer *writer = fs_writer_new(blob, blob_size);
 
-    mpack_node_t id_node = mpack_node_map_cstr(root, "id");
-    *cell_id = mpack_node_int(id_node);
+    fs_writer_write_uint(writer, (uint32_t *)cell_id);
+    fs_writer_write_bin(writer, new_blob, new_blob_size);
 
-    mpack_node_t payload_node = mpack_node_map_cstr(root, "PL");
-    *new_blob_size = mpack_node_bin_size(payload_node);
-    *new_blob = (char *)malloc(*new_blob_size);
-    memcpy(*new_blob, mpack_node_bin_data(payload_node), *new_blob_size);
-
-    mpack_tree_destroy(&tree);
+    fs_writer_free(writer);
 }
-
 
 /*
 metric blob:
@@ -593,33 +569,30 @@ metric blob:
             "id":<cell_id>
             "PL":<content_blob(gen by scheme)>
         }]
-}*/
+}
+
+name:string | type:uint | para:bin | data_id:int_array | data_payload:bin_array
+*/
 int metric_serialize(const struct metric *pthis, char **blob, size_t *blob_size)
 {
+    struct fs_reader *reader = fs_reader_new();
+
+    fs_reader_read_str(reader, pthis->info->name);
+    fs_reader_read_uint(reader, pthis->info->type);
+
     char *para_blob = NULL;
     size_t para_blob_size = 0;
-    mpack_writer_t writer;
-    mpack_writer_init_growable(&writer, blob, blob_size);
-
-    mpack_build_map(&writer);
-    mpack_write_cstr(&writer, "name");
-    mpack_write_str(&writer, pthis->info->name, strlen(pthis->info->name));
-    mpack_write_cstr(&writer, "type");
-    mpack_write_i32(&writer, pthis->info->type);
-
-    mpack_write_cstr(&writer, "para");
     metric_serialize_parameters(pthis, &para_blob, &para_blob_size);
-    mpack_write_bin(&writer, para_blob, para_blob_size);
+    fs_reader_read_bin(reader, para_blob, para_blob_size);
     free(para_blob);
 
-    mpack_write_cstr(&writer, "data");
     int *cell_ids = NULL;
     size_t cell_ids_size = 0;
     metric_get_cell_ids(pthis, &cell_ids, &cell_ids_size);
     if (cell_ids == NULL) {
-        mpack_write_nil(&writer);
+        fs_reader_read_nil(reader);
     } else {
-        mpack_build_array(&writer);
+        fs_reader_start_bin_array(reader, cell_ids_size);
         for (int i = 0; i < cell_ids_size; i++) {
             struct metric_measure_data *data = metric_find_one_cell(pthis, cell_ids[i]);
 
@@ -629,54 +602,66 @@ int metric_serialize(const struct metric *pthis, char **blob, size_t *blob_size)
 
             char *tmp_data_wrapped_blob = NULL;
             size_t tmp_data_wrapped_blob_size = 0;
-            mpack_blob_wrap_basic_info(cell_ids[i], data_blob, data_blob_size, &tmp_data_wrapped_blob, &tmp_data_wrapped_blob_size);
-            mpack_write_bin(&writer, tmp_data_wrapped_blob, tmp_data_wrapped_blob_size);
+            blob_wrap_basic_info(cell_ids[i], data_blob, data_blob_size, &tmp_data_wrapped_blob, &tmp_data_wrapped_blob_size);
+            fs_reader_read_bin(reader, tmp_data_wrapped_blob, tmp_data_wrapped_blob_size);
             free(data_blob);
             free(tmp_data_wrapped_blob);
         }
+
         free(cell_ids);
-        mpack_complete_array(&writer);
     }
 
-    mpack_complete_map(&writer);
-    if (mpack_writer_destroy(&writer) != mpack_ok) {
-        return -1;
-    }
+    fs_reader_finalize(reader, blob, blob_size);
 
     return 0;
 }
 
 struct metric *metric_deserialize(const char *blob, size_t blob_size)
 {
-    mpack_tree_t tree;
-    mpack_tree_init_data(&tree, blob, blob_size);
-    mpack_tree_parse(&tree);
-    mpack_node_t root = mpack_tree_root(&tree);
+    struct fs_writer *writer = fs_writer_new(blob, blob_size);
 
-    char *metric_name = mpack_node_cstr_alloc(mpack_node_map_cstr(root, "name"), 0xFFFF); // 0xFFFF: a very large number
-    enum metric_type type = mpack_node_i32(mpack_node_map_cstr(root, "type"));
-    mpack_node_t para_obj = mpack_node_map_cstr(root, "para");
-    struct metric_parameter *metric_para = deserialize_parameters(mpack_node_bin_data(para_obj), mpack_node_bin_size(para_obj));
+    char *metric_name;
+    fs_writer_write_str(writer, &metric_name);
+    enum metric_type type;
+    fs_writer_write_uint(writer, (uint32_t *)&type);
+
+    char *para_blob;
+    size_t para_blob_size;
+    fs_writer_write_bin(writer, &para_blob, &para_blob_size);
+    struct metric_parameter *metric_para = deserialize_parameters(para_blob, para_blob_size);
     struct metric *metric_out = metric_new(metric_name, type, metric_para);
     free(metric_name);
+    free(para_blob);
 
-    mpack_node_t data_arr = mpack_node_map_cstr(root, "data");
-    if (mpack_node_is_nil(data_arr)) {
-        mpack_tree_destroy(&tree);
+    int ret = fs_writer_expect_nil(writer);
+    assert(ret >= 0);
+    if (ret == 1) { // no cells in this metric
+        fs_writer_free(writer);
         return metric_out;
     }
     
-    for (int i = 0; i < mpack_node_array_length(data_arr); i++) {
-        mpack_node_t data_node = mpack_node_array_at(data_arr, i);
+    char **data_blob_raw = NULL;
+    size_t *data_blob_raw_size = NULL;
+    size_t n_data_blob_raw = 0;
+    fs_writer_write_bin_array(writer, &data_blob_raw, &n_data_blob_raw, &data_blob_raw_size);
+
+    for (int i = 0; i < n_data_blob_raw; i++) {
         int cell_id;
         char *data_blob = NULL;
         size_t data_blob_size = 0;
-        mpack_blob_unpack_basic_info(mpack_node_bin_data(data_node), mpack_node_bin_size(data_node), &data_blob, &data_blob_size, &cell_id);
+        blob_unpack_basic_info(data_blob_raw[i], data_blob_raw_size[i], &data_blob, &data_blob_size, &cell_id);
         struct metric_measure_data *data = metric_out->scheme->deserialize(data_blob, data_blob_size);
         free(data_blob);
         metric_add_one_cell(metric_out, cell_id, data);
     }
-    mpack_tree_destroy(&tree);
+    
+    for (int i = 0; i < n_data_blob_raw; i++) {
+        free(data_blob_raw[i]);
+    }
+    free(data_blob_raw);
+    free(data_blob_raw_size);
+    fs_writer_free(writer);
+
     return metric_out;
 }
 

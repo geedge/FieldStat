@@ -389,7 +389,7 @@
 clock_t perform_serialize_test(std::function<void (struct fieldstat*, int, int, int)> metric_add_func, 
     std::function<int(struct fieldstat*, int)> metric_register_func, enum sampling_mode mode)
 {
-    const int MAX_CELL_NUM = 1000000;
+    const int MAX_CELL_NUM = 10000;
     Fieldstat_tag_list_wrapper *tags[MAX_CELL_NUM];
     for (int i = 0; i < MAX_CELL_NUM; i++) {
         tags[i] = new Fieldstat_tag_list_wrapper("my key", i);
@@ -404,17 +404,21 @@ clock_t perform_serialize_test(std::function<void (struct fieldstat*, int, int, 
 
     char *blob;
     size_t blob_size;
+    printf("start\n");
+
     clock_t start = clock();
-    printf("getchar\n");
-    getchar();
+    // printf("getchar\n");
+    // getchar();
     fieldstat_serialize(instance, &blob, &blob_size);
-    exit(0);
+    // exit(0);
     clock_t end = clock();
+    printf("end\n");
 
     fieldstat_free(instance);
     for (int i = 0; i < MAX_CELL_NUM; i++) {
         delete tags[i];
     }
+    free(blob);
 
     return end - start;
 }

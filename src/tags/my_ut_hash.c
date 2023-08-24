@@ -199,8 +199,6 @@ void fieldtag_serialize(const struct fieldstat_tag *tag_list, char **blob, size_
             break;
     }
     fs_reader_finalize(reader, blob, blob_size);
-
-    fs_reader_free(reader);
 }
 
 void fieldtag_deserialize(const char *blob, size_t blob_size, struct fieldstat_tag *tag)
@@ -247,8 +245,6 @@ void fieldtag_list_serialize(const struct fieldstat_tag *tag_list, size_t tag_nu
     }
 
     fs_reader_finalize(reader, blob, blob_size);
-
-    fs_reader_free(reader);
 }
 
 void fieldtag_list_deserialize(const char *blob, size_t blob_size, struct fieldstat_tag **tag_list_out, size_t *tag_num_out)
