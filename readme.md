@@ -151,9 +151,9 @@ It is hard to calculate memory usage of CJSON. By experiment, RSS to different c
 | merge 1 cell of a histogram metric            | 0.659     | fieldstat_merge(destination instance also has registered cube, metric and cells) |
 | merge 1 cell of a counter metric on topk cube | 0.659     | fieldstat_merge(destination instance also has registered cube, metric and cells) |
 | export a cell                                 | 0.72      | fieldstat_json_exporter_export                                                   |
-| serialize 1 cell of a counter metric          | 2.685974  | fieldstat_serialize                                                              |
-| serialize 1 cell of a HLL metric              | 1.9775304 | fieldstat_serialize                                                              |
-| serialize 1 cell of a histogram metric        | 2.329615  | fieldstat_serialize                                                              |
+| serialize 1 cell of a counter metric          | 0.776  | fieldstat_serialize                                                              |
+| serialize 1 cell of a HLL metric              | 0.624 | fieldstat_serialize                                                              |
+| serialize 1 cell of a histogram metric        | 8.30  | fieldstat_serialize                                                              |
 
 ### Explanation
 #### add a cell(topk)
