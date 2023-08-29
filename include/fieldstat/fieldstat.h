@@ -54,9 +54,6 @@ struct fieldstat_tag {
 	};
 };
 
-// todo: tag 可以为NULL
-
-
 
 struct fieldstat;
 struct fieldstat *fieldstat_new();

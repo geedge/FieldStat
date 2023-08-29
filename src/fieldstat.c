@@ -277,7 +277,7 @@ int fieldstat_register_cube(struct fieldstat *instance, const struct fieldstat_t
         return -1;
     }
     if (max_n_cell == 0) {
-        max_n_cell = INTMAX_MAX;
+        max_n_cell = INT32_MAX;
     }
 
     struct fs_cube *cube = fieldstat_cube_new(shared_tags, n_tag, mode, max_n_cell);

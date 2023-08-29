@@ -236,6 +236,27 @@ TEST(test_register, unregister_cube_on_wrong_instance)
     free(cube_ids);
 }
 
+TEST(test_register, register_many_cells_on_unlimited_sized_cube)
+{
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 0);
+    int metric_id = fieldstat_register_counter(instance, cube_id, "counter", COUNTER_MERGE_BY_SUM);
+    int cell_id = 0;
+    struct fieldstat_tag test_tag = {"abc", TAG_INTEGER, {.value_longlong = 0}};
+    for (int i = 0; i < 10000; i++) {
+        test_tag.value_longlong = i;
+        cell_id = fieldstat_cube_add(instance, cube_id, &test_tag, 1, 1);
+        EXPECT_EQ(cell_id, i);
+        fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id, 1);
+    }
+
+    for (int i = 0; i < 10000; i++) {
+        EXPECT_EQ(fieldstat_counter_get(instance, cube_id, metric_id, i), 1);
+    }
+
+    fieldstat_free(instance);
+}
+
 int main(int argc, char *argv[]) 
 {
 	testing::InitGoogleTest(&argc, argv);
