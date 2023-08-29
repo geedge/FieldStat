@@ -328,6 +328,44 @@ int fieldstat_cube_add(struct fieldstat *instance, int cube_id, const struct fie
     return ret;
 }
 
+int fieldstat_cube_remove(struct fieldstat *instance, int cube_id, const struct fieldstat_tag *tags, size_t n_tag)
+{
+    if (instance == NULL) {
+        return -2;
+    }
+    if (cube_id < 0 || cube_id >= instance->valid_cube_arr_length) {
+        return -2;
+    }
+    
+    struct fs_cube *cube = instance->cube[cube_id];
+    if (cube == NULL) {
+        return -2;
+    }
+
+    if (cube->sampling_mode == SAMPLING_MODE_TOPK) {
+        return -3;
+    }
+
+    if (n_tag == 0 || tags == NULL) {
+        tags = NULL;
+        n_tag = 0;
+    }
+    struct tag_hash_key *tag_key = tag_hash_key_construct_with_fieldstat_tag(tags, n_tag);
+    int id = cell_manager_find(cube->cell_manager, tag_key);
+    if (id == -1) {
+        tag_hash_key_free(tag_key);
+        return -1;
+    }
+
+    for (size_t i = 0; i < cube->n_metric; i++) {
+        metric_delete_cell(cube->metrics[i], id);
+    }
+    cell_manager_delete_cell(cube->cell_manager, id);
+
+    tag_hash_key_free(tag_key);
+    return 0;
+}
+
 void fieldstat_cube_free(struct fieldstat *instance, int cube_id)
 {
     struct fs_cube *cube = instance->cube[cube_id];

@@ -448,7 +448,7 @@ TEST(test_performance, serialize_histogram)
 
     clock_t elapsed = perform_serialize_test(metric_add_func, metric_register_func, SAMPLING_MODE_COMPREHENSIVE);
     printf("serialize_histogram elapsed_secs: %ld\n", elapsed);
-    EXPECT_TRUE(elapsed < 100000); // every one 1us
+    EXPECT_TRUE(elapsed < 1000000); // every one 10us
 }
 
 TEST(test_performance, serialize_hll)

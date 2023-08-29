@@ -112,11 +112,19 @@ int fieldstat_register_hist(struct fieldstat *instance, int cube_id, const char 
     * @param n_tag: number of tags.
     * @param increment: the primary metric increment of this cell. For example, if the primary metric is "count", then increment is the count of this cell.
     *                   in comprehensive sampling mode, this parameter is ignored.
-    * @return cell id >= 0, if success; otherwise, return -2 when cube is not registered, instance are NULL, or increment is <0.  \
+    * @return cell id >= 0, if success; otherwise, return -2 when cube is not registered, instance are NULL, or (increment < 0 and mode == topk).  \
     *         return -1 when: mode is (SAMPLING_MODE_COMPREHENSIVE) and cell number >= (max_n_cell) ; or SAMPLING_MODE_TOPK and cell already exists.
     *         in topk sampling mode, the same tags may map to different cell ids.
 */
 int fieldstat_cube_add(struct fieldstat *instance, int cube_id, const struct fieldstat_tag *tags, size_t n_tag, long long increment);
+
+/*
+    * @brief Delete the cell added by fieldstat_cube_add. Increase the cell_version by 1. Also, delete all the metric records of this cell. The cell id will not be reused. Does not support topk sampling mode.
+    * @param refer to fieldstat_cube_add.
+    * @return the deleted cell id >= 0, if success; otherwise, return -2 when cube is not registered, instance is NULL.  \
+    *         return -1 when cell is not found. return -3 when cube is in topk sampling mode.
+*/
+int fieldstat_cube_remove(struct fieldstat *instance, int cube_id, const struct fieldstat_tag *tags, size_t n_tag);
 
 /*
     * @brief let the value of counter metric of cell_id increase by increment.

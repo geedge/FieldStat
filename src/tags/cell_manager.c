@@ -355,6 +355,23 @@ const struct tag_hash_key **cell_manager_dump(const struct cell_manager *pthis, 
     return (const struct tag_hash_key **)pthis->id_tag_array;
 }
 
+int cell_manager_find_cell_id(const struct cell_manager *pthis, const struct tag_hash_key *tag)
+{
+    if (pthis->sampling_mode == SAMPLING_MODE_COMPREHENSIVE) {
+        struct tag_id_map *node = NULL;
+        HASH_FIND_TAG(pthis->comprehensive_tag_id_map, tag, node);
+        if (node == NULL) {
+            return -1;
+        } else {
+            return node->cell_id;
+        }
+    } else {
+        int cell_id = -1;
+        heavy_keeper_query_one(pthis->topk_tag_id_map, tag, NULL, &cell_id);
+        return cell_id;
+    }
+}
+
 void cell_manager_merge_topk(struct cell_manager *dest, const struct cell_manager *src, 
     int **cell_id_popped, int *n_cell_id_popped, int **cell_id_old, int **cell_id_added, int *n_cell_id_added)
 {

@@ -256,6 +256,9 @@ TEST(test_register, register_many_cells_on_unlimited_sized_cube)
 
     fieldstat_free(instance);
 }
+// TEST(test_register, unregister cell)
+
+
 
 int main(int argc, char *argv[]) 
 {
