@@ -16,11 +16,11 @@ void cell_manager_reset(struct cell_manager *pthis);
 const struct tag_hash_key *cell_manager_get_tag_by_cell_id(const struct cell_manager *pthis, int cell_id);
 int cell_manager_get_count_by_tag(const struct cell_manager *pthis, const struct tag_hash_key *tag);
 const struct tag_hash_key **cell_manager_dump(const struct cell_manager *pthis, int *array_len);
-int cell_manager_find_cell_id(const struct cell_manager *pthis, const struct tag_hash_key *tag);
+int cell_manager_find(const struct cell_manager *pthis, const struct tag_hash_key *tag);
 
 int cell_manager_add_cell(struct cell_manager *pthis, const struct tag_hash_key *tag);
 int cell_manager_add_cell_topk(struct cell_manager *pthis, const struct tag_hash_key *tag, unsigned int count, int *popped_cell_id, int *existing_cell_id);
-void cell_manager_delete_cell(struct cell_manager *pthis, int cell_id);
+int cell_manager_delete_cell(struct cell_manager *pthis, const struct tag_hash_key *tag);
 
 int cell_manager_serialize(const struct cell_manager *pthis, char **blob, size_t *blob_size);
 struct cell_manager *cell_manager_deserialize(const char *blob, size_t blob_size);

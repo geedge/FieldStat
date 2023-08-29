@@ -256,7 +256,59 @@ TEST(test_register, register_many_cells_on_unlimited_sized_cube)
 
     fieldstat_free(instance);
 }
-// TEST(test_register, unregister cell)
+
+TEST(test_register, unregister_cell)
+{
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    int metric_id = fieldstat_register_counter(instance, cube_id, "counter", COUNTER_MERGE_BY_SUM);
+    int cell_id1 = fieldstat_cube_add(instance, cube_id, &TEST_TAG_INT, 1, 1);
+    int cell_id2 = fieldstat_cube_add(instance, cube_id, &TEST_TAG_DOUBLE, 1, 1);
+    fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id1, 1);
+    fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id2, 1);
+
+    int cell_id_removed = fieldstat_cube_remove(instance, cube_id, &TEST_TAG_INT, 1);
+    EXPECT_EQ(cell_id_removed, cell_id1);
+    EXPECT_EQ(fieldstat_counter_get(instance, cube_id, metric_id, cell_id1), -1);
+    
+    int *cell_ids = NULL;
+    struct fieldstat_tag_list *tag_list = NULL;
+    size_t n_cell = 0;
+    fieldstat_cube_read_cell(instance, cube_id, &cell_ids, &tag_list, &n_cell);
+    EXPECT_EQ(n_cell, 1);
+    EXPECT_EQ(cell_ids[0], cell_id2);
+    EXPECT_EQ(tag_list[0].tag->type, TEST_TAG_DOUBLE.type);
+    EXPECT_STREQ(tag_list[0].tag->key, TEST_TAG_DOUBLE.key);
+    free(cell_ids);
+    fieldstat_tag_list_arr_free(tag_list, n_cell);
+
+    // test merge and serialize to make sure no changes on basic functions
+    struct fieldstat *instance_dst = fieldstat_new();
+    fieldstat_merge(instance_dst, instance);
+    fieldstat_cube_read_cell(instance, cube_id, &cell_ids, &tag_list, &n_cell);
+    EXPECT_EQ(n_cell, 1);
+    EXPECT_STREQ(tag_list[0].tag->key, TEST_TAG_DOUBLE.key);
+    fieldstat_free(instance_dst);
+    free(cell_ids);
+    fieldstat_tag_list_arr_free(tag_list, n_cell);
+
+    char *blob;
+    size_t blob_size;
+    fieldstat_serialize(instance, &blob, &blob_size);
+    struct fieldstat *instance_ser = fieldstat_deserialize(blob, blob_size);
+    free(blob);
+    fieldstat_cube_read_cell(instance_ser, cube_id, &cell_ids, &tag_list, &n_cell);
+    EXPECT_EQ(n_cell, 1);
+    EXPECT_STREQ(tag_list[0].tag->key, TEST_TAG_DOUBLE.key);
+    fieldstat_free(instance_ser);
+    free(cell_ids);
+    fieldstat_tag_list_arr_free(tag_list, n_cell);
+
+    // completely new tag even with original tag. New posision(not original 0)
+    EXPECT_EQ(fieldstat_cube_add(instance, cube_id, &TEST_TAG_INT, 1, 1), 2);
+
+    fieldstat_free(instance);
+}
 
 
 

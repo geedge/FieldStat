@@ -203,6 +203,27 @@ The number 8 was determined through experiment, where multiple tests were conduc
     return pthis->next_cell_id++;
 }
 
+int cell_manager_delete_cell(struct cell_manager *pthis, const struct tag_hash_key *tag)
+{
+    if (pthis->sampling_mode == SAMPLING_MODE_TOPK) {
+        return -1;
+    }
+
+    struct tag_id_map *node = NULL;
+    HASH_FIND_TAG(pthis->comprehensive_tag_id_map, tag, node);
+    if (node == NULL) {
+        return -1;
+    }
+
+    int cell_id = node->cell_id;
+
+    HASH_DEL(pthis->comprehensive_tag_id_map, node);
+    tag_hash_key_free(node->tag);
+    free(node);
+    pthis->id_tag_array[cell_id] = NULL;
+
+    return cell_id;
+}
 
 /*
 mode:uint32 | max_n_cell:uint32 | id_tag_id_array:int_array | id_tag_array:bin_array(tag_hash_key_serialize) | 
@@ -355,7 +376,7 @@ const struct tag_hash_key **cell_manager_dump(const struct cell_manager *pthis, 
     return (const struct tag_hash_key **)pthis->id_tag_array;
 }
 
-int cell_manager_find_cell_id(const struct cell_manager *pthis, const struct tag_hash_key *tag)
+int cell_manager_find(const struct cell_manager *pthis, const struct tag_hash_key *tag)
 {
     if (pthis->sampling_mode == SAMPLING_MODE_COMPREHENSIVE) {
         struct tag_id_map *node = NULL;
