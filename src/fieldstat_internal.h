@@ -65,6 +65,8 @@
 #define PROMETHEUS_ENDPOINT_DEFAULT_URL "/metrics"
 #define	TABLE_LINE_SCALE_NUM		1024
 
+#define METRIC_SIZE	1024
+
 
 
 enum field_calc_algo
@@ -213,7 +215,7 @@ struct prometheus_endpoint_instance
 
 struct dynamic_metric
 {
-	char metric_key[512];
+	char metric_key[METRIC_SIZE];
 	unsigned int metric_keylen;
 
 	struct metric **metrics;

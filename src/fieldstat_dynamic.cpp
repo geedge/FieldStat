@@ -243,11 +243,21 @@ static int build_dynamic_metric_key(int table_id, const char *field_name, const 
 
     /* part1: field name */
     unsigned int field_name_len = strlen(field_name) + 1;
+
+    if(field_name_len > out_key_size) 
+    {
+        return 0;
+    }
+
     memcpy(out_key + used_len, field_name, field_name_len);
     //escaping_special_chars(out_key);
     used_len += field_name_len;
 
     /* part2: table id */
+    if(used_len + sizeof(table_id) > out_key_size) 
+    {
+        return 0;
+    }
     memcpy(out_key + used_len, &table_id, sizeof(table_id));
     used_len += sizeof(table_id);
 
@@ -258,20 +268,39 @@ static int build_dynamic_metric_key(int table_id, const char *field_name, const 
         /* tag key len */
         unsigned int tag_key_len = strlen(tag->key) + 1;
         unsigned int tag_value_len;
+
+        if(used_len + tag_key_len > out_key_size) 
+        {
+            return 0;
+        }
         memcpy(out_key + used_len, tag->key, tag_key_len);
         used_len += tag_key_len;
 
         switch (tag->value_type) {
             case 0:
+                if(used_len + sizeof(tag->value_int) > out_key_size) 
+                {
+                    return 0;
+                }
                 memcpy(out_key + used_len, &tag->value_int, sizeof(tag->value_int));
                 used_len += sizeof(tag->value_int);
                 break;
             case 1:
+                if(used_len + sizeof(tag->value_double) > out_key_size) 
+                {
+                    return 0;
+                }
+
                 memcpy(out_key + used_len, &tag->value_double, sizeof(tag->value_double));
                 used_len += sizeof(tag->value_double);
                 break;
             case 2:
                 tag_value_len = strlen(tag->value_str) + 1;
+                if(used_len + tag_value_len > out_key_size)
+                {
+                    return 0;
+                }
+
                 memcpy(out_key + used_len, tag->value_str, tag_value_len);
                 used_len += tag_value_len;
                 break;
@@ -291,9 +320,13 @@ static struct metric * read_dynamic_metric(struct fieldstat_dynamic_instance *in
 	struct dynamic_metric **head = &instance->n_thread_dynamic_metric[thread_id];
 	struct dynamic_metric *find = NULL;
 
-	char dynamic_metric_key[512];
+	char dynamic_metric_key[METRIC_SIZE];
     unsigned int dynamic_metric_keylen = 0;
     dynamic_metric_keylen = build_dynamic_metric_key(table_id, field_name, tags, n_tags, sizeof(dynamic_metric_key), dynamic_metric_key);
+    if(dynamic_metric_keylen == 0)
+    {
+        return NULL;
+    }
 
     HASH_FIND(hh, *head, dynamic_metric_key, dynamic_metric_keylen, find);
 	if(find == NULL)
@@ -332,6 +365,13 @@ static struct metric * create_dynamic_table_metric(struct fieldstat_dynamic_inst
 
     unsigned int metric_keylen;
 	metric_keylen = build_dynamic_metric_key(table_id, row_name, tags, n_tags, sizeof(value->metric_key), value->metric_key);
+    if(metric_keylen == 0)
+    {
+        free(value);
+        value = NULL;
+        return NULL;
+    }
+
     value->metric_keylen = metric_keylen;
 
 	table = instance->table_metrics[table_id];
@@ -388,6 +428,12 @@ static struct metric * create_dynamic_metric(struct fieldstat_dynamic_instance *
 
 	insert = (struct dynamic_metric *)calloc(1, sizeof(struct dynamic_metric));
     insert->metric_keylen = build_dynamic_metric_key(-1, field_name, tags, n_tags, sizeof(insert->metric_key), insert->metric_key);
+    if(insert->metric_keylen == 0)
+    {
+        free(insert);
+        insert = NULL;
+        return NULL;
+    }
 
 	insert->metrics = (struct metric **)calloc(1, sizeof(struct metric *));
 	metric = metric_new(type, field_name, tags, n_tags);
@@ -598,11 +644,15 @@ static int table_row_metric_values_operate(
     enum field_op op)
 {
     struct metric **metrics = NULL;
-    char metric_key[512];
+    char metric_key[METRIC_SIZE];
     unsigned int metric_keylen = 0;
 
     metric_keylen = build_dynamic_metric_key(table_id, row_name, tags, n_tags, 
                                              sizeof(metric_key), metric_key);
+    if(metric_keylen == 0)
+    {
+        return -1;
+    }
 
     metrics = read_dynamic_row_metrics(instance, metric_key, metric_keylen, 
                                        thread_id);
