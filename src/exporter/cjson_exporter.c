@@ -460,27 +460,23 @@ int add_object_to_json_array(char **buf, int *buf_len, int start, const char *st
 /*
     Output the fieldstat instance to json string array. User must free the output string.
 */
-char *fieldstat_json_exporter_export(const struct fieldstat_json_exporter *exporter)
+void fieldstat_json_exporter_export_array(const struct fieldstat_json_exporter *exporter, char ***output, size_t *output_size)
 {
     const struct fieldstat *instance = exporter->instance;
 
     size_t n_pair;
     struct cjson_tag_field_pair *tag_field_pair = read_tag_and_field(instance, &n_pair);
-    if (tag_field_pair == NULL) {
-        return NULL;
-    }
-    if (n_pair == 0) {
-        free(tag_field_pair);
-        return NULL;
+    if (tag_field_pair == NULL || n_pair == 0) {
+        free(tag_field_pair); // tag_field_pair is not NULL when there are registered metrics but no valid cells
+        *output = NULL;
+        *output_size = 0;
+        return;
     }
 
     fieldstat_json_exporter_write_global_tags(exporter, tag_field_pair, n_pair);
 
-    int buf_len = 4096;
-    char *cjson_str_arr = (char *)malloc(buf_len);
-    // cjson is so slow, so we construct the json array manually
-    int used_len = add_object_to_json_array_start(cjson_str_arr, buf_len);
-    cJSON *cjson_root;
+    char **cjson_str_arr = (char **)malloc(sizeof(char *) * n_pair);
+    cJSON *cjson_root;  
     for (int i = 0; i < n_pair; i++) {
         struct cjson_tag_field_pair *current = &tag_field_pair[i];
         cjson_root = cJSON_CreateObject();
@@ -492,12 +488,37 @@ char *fieldstat_json_exporter_export(const struct fieldstat_json_exporter *expor
 
         char *cjson_str = cJSON_PrintUnformatted(cjson_root);
         cJSON_Delete(cjson_root);
-        used_len = add_object_to_json_array(&cjson_str_arr, &buf_len, used_len, cjson_str);
-        free(cjson_str);
+        cjson_str_arr[i] = cjson_str;
+        // user are responsible to free the cjson_str
+    }
+
+    *output = cjson_str_arr;
+    *output_size = n_pair;
+    free(tag_field_pair);    // cjson object will be freed with cjson root
+}
+
+char *fieldstat_json_exporter_export(const struct fieldstat_json_exporter *exporter)
+{
+    char **str_arr = NULL;
+    size_t n_pair = 0;
+    fieldstat_json_exporter_export_array(exporter, &str_arr, &n_pair);
+    if (str_arr == NULL || n_pair == 0) {
+        return NULL;
+    }
+
+    int buf_len = 4096;
+    char *cjson_str_arr = (char *)malloc(buf_len);
+    // cjson is so slow, so we construct the json array manually
+    int used_len = add_object_to_json_array_start(cjson_str_arr, buf_len);
+    for (int i = 0; i < n_pair; i++) {
+        used_len = add_object_to_json_array(&cjson_str_arr, &buf_len, used_len, str_arr[i]);
     }
     add_object_to_json_array_end(&cjson_str_arr, buf_len, used_len);
 
-    free(tag_field_pair);    // cjson object will be freed with cjson root
+    for (int i = 0; i < n_pair; i++) {
+        free(str_arr[i]);
+    }
+    free(str_arr);
 
     return cjson_str_arr;
 }

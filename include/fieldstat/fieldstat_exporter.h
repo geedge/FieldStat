@@ -78,13 +78,10 @@ void fieldstat_json_exporter_free(struct fieldstat_json_exporter *exporter);
     Output the fieldstat instance to json string array. User must free the output string.
 */
 char *fieldstat_json_exporter_export(const struct fieldstat_json_exporter *exporter);
-void fieldstat_json_exporter_export_array(const struct fieldstat_json_exporter *exporter, char **output, size_t *output_size);
-// for (size_t i = 0; i < output_size; i++)
-// {
-//     free(output[i]);
-// }
-// free(output);
-// strlen(output[i]);
+/*
+    after call fieldstat_json_exporter_export_array, user must free the output array and each string.
+*/
+void fieldstat_json_exporter_export_array(const struct fieldstat_json_exporter *exporter, char ***output, size_t *output_size);
 
 #ifdef __cplusplus
 }
