@@ -44,8 +44,10 @@ struct cell_manager *cell_manager_new_without_map(enum sampling_mode sampling_mo
     cell_manager->next_cell_id = 0;
 
     cell_manager->id_tag_array_len = max_cell_num;
-    cell_manager->id_tag_array = calloc(max_cell_num, sizeof(struct tag_hash_key *));
-    assert(cell_manager->id_tag_array != NULL);
+    if (cell_manager->id_tag_array_len > 4096) { // support dynamic size cube (especially when max_max_num is unlimited)
+        cell_manager->id_tag_array_len = 4096;
+    }
+    cell_manager->id_tag_array = calloc(cell_manager->id_tag_array_len, sizeof(struct tag_hash_key *));
     cell_manager->max_cell_id = -1;
 
     return cell_manager;

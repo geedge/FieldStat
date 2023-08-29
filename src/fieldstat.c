@@ -273,6 +273,13 @@ int fieldstat_register_cube(struct fieldstat *instance, const struct fieldstat_t
         shared_tags = NULL;
         n_tag = 0;
     }
+    if (mode == SAMPLING_MODE_TOPK && max_n_cell == 0) {
+        return -1;
+    }
+    if (max_n_cell == 0) {
+        max_n_cell = INTMAX_MAX;
+    }
+
     struct fs_cube *cube = fieldstat_cube_new(shared_tags, n_tag, mode, max_n_cell);
 
     int cube_id = fieldstat_append_cube_to_instance(instance, cube);

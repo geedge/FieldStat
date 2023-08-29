@@ -68,7 +68,7 @@ struct fieldstat *fieldstat_dup(const struct fieldstat *instance);
     * @param shared_tags: tags that are shared by all cubes in this instance. This is the key of the cube. Cannot be NULL. Must be unique. shared_tags are ordered.
     * @param n_tag: number of shared tags.
     * @param mode: sampling mode. Refer to enum sampling_mode.
-    * @param max_n_cell: max number of cells in each cube.
+    * @param max_n_cell: max number of cells in each cube. When mode is TOPK, max_n_cell > 0, while in COMPREHENSIVE mode, max_n_cell can be 0, meaning that there is no limit.
     * @return cube id, if success; otherwise, return -1. Fail only when `instance` == NULL. the uniqueness of shared_tags is not checked, user should guarantee that shared_tags are unique.
 */
 int fieldstat_register_cube(struct fieldstat *instance, const struct fieldstat_tag *shared_tags, size_t n_tag, enum sampling_mode mode, size_t max_n_cell);
