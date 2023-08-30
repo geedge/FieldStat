@@ -747,9 +747,7 @@ int metric_counter_set(struct metric *pthis, int cell_id, long long value)
 {
     struct metric_measure_data *data = metric_find_or_new_cell(pthis, cell_id);
     struct metric_counter_or_gauge *counter = data->counter;
-    if (counter->mode == COUNTER_MERGE_BY_SUM) {
-        return -1;
-    }
+
     counter->value = value;
 
     return 0;
