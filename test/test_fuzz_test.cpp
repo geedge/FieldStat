@@ -64,10 +64,10 @@ TEST(Fuzz_test, both_comp_and_topk_cubes_with_merge_and_reset_expecting_correct_
 
     for (int i = 0; i < CUBE_NUM; i++) {
         bool is_topk = rand() % 2 == 0;
-        // bool is_topk = false;
+        // bool is_topk = true;
         cube_is_topk[i] = is_topk;
         cube_ids[i] = fieldstat_register_cube(instance, shared_tag[i]->get_tag(), shared_tag[i]->get_tag_count(), is_topk ? SAMPLING_MODE_TOPK : SAMPLING_MODE_COMPREHENSIVE,
-            is_topk ? 30 : CELL_NUM);
+            is_topk ? 10000 : CELL_NUM);
         std::function<int(int)> *metric_reg_funcs = is_topk ? metric_reg_funcs_topk : metric_reg_funcs_comp;
         for (int metric_id = 0; metric_id < METRIC_NUM; metric_id++) {
             metric_reg_funcs[metric_id](cube_ids[i]);

@@ -316,6 +316,7 @@ int fieldstat_cube_add(struct fieldstat *instance, int cube_id, const struct fie
         int popped_cell_id = -1;
         int existing_cell_id = -1;
         ret = cell_manager_add_cell_topk(cube->cell_manager, tag_key, increment, &popped_cell_id, &existing_cell_id);
+
         if (popped_cell_id != -1) {
             for (size_t i = 0; i < cube->n_metric; i++) {
                 metric_delete_cell(cube->metrics[i], popped_cell_id);

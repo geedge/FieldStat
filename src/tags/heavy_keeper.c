@@ -89,8 +89,6 @@ struct heavy_keeper *heavy_keeper_new(int max_query_num, const struct heavy_keep
 
 struct heavy_keeper *heavy_keeper_with_data_new(int max_query_num) {
     struct heavy_keeper *hk = heavy_keeper_new(max_query_num, NULL);
-
-    sorted_set_hook_function_of_free_user_data(hk->top_K_heap, free);
     return hk;
 }
 
@@ -98,7 +96,6 @@ void heavy_keeper_clear(struct heavy_keeper *hk) {
     memset(hk->sketch, 0, (size_t)hk->params.array_num * (size_t)hk->params.max_bucket_num * sizeof(struct Bucket));
     sorted_set_free(hk->top_K_heap);
     hk->top_K_heap = sorted_set_new(hk->K);
-    sorted_set_hook_function_of_free_user_data(hk->top_K_heap, free);
 }
 
 void heavy_keeper_result_free(struct heavy_keeper_result *stats_hd) {
@@ -159,10 +156,9 @@ unsigned my_max(unsigned a, unsigned b) {
     return b;
 }
 
-static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_keeper, struct tag_hash_key *tag, unsigned int count)
+static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_keeper, struct tag_hash_key *tag, unsigned int count, int cell_id, int *popped_id_out)
 {
-    int ret = -1;
-    unsigned int user_data_cube_id = 0;
+    int user_data_cube_id = 0;
     struct sorted_set *summary = heavy_keeper->top_K_heap;
     unsigned int FP = tag_hash_key_cal_fnv_hash(tag, FP_HASH_KEY);
     unsigned nMin = sorted_set_get_min_count(summary);
@@ -199,36 +195,45 @@ static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_
     unsigned int tmp_cnt = sorted_set_get_count(summary, tag);
     if (tmp_cnt == 0) {  // the flow is not in sorted set
         if ((maxv - nMin <= count && maxv != nMin) || sorted_set_cardinality(summary) != heavy_keeper->K) {
-            int insert_ret = sorted_set_insert_and_record_popped_back(summary, tag, maxv, &user_data_cube_id, sizeof(unsigned int));
+            int insert_ret = sorted_set_insert_and_record_popped_back(summary, tag, maxv, cell_id, &user_data_cube_id);
             if (insert_ret == 2) { // insert success and popped one
-                ret = user_data_cube_id;
+                *popped_id_out = user_data_cube_id;
+                return 0;
+            } else if (insert_ret == 0) { // insert failed
+                return -1;
+            } else { // insert success without popping 
+                return 0;
             }
         }
+        return -1; // the flow is not added to the sorted set
     } else {
         if (maxv > tmp_cnt) {
             sorted_set_incrby(summary, tag, maxv - tmp_cnt);
         }
+        return 1; // no popped, but the tag definitely exists in the sorted set
+    }
+
+    assert(0); // should not reach here
+    return -1;
+}
+
+int heavy_keeper_add(struct heavy_keeper *hk, struct tag_hash_key *tag, unsigned int count, int cell_id, int *popped_id_out)
+{
+    *popped_id_out = -1;
+    int ret = heavy_keeper_add_by_recording_popped_data(hk, tag, count, cell_id, popped_id_out);
+
+    int cell_id_tmp = sorted_set_get_cell_id(hk->top_K_heap, tag);
+    if (cell_id_tmp >= 0) {
+        if (cell_id_tmp == cell_id) {
+            assert(ret == 0);
+        } else {
+            assert(ret == 1);
+        }
+    } else {
+        assert(ret == -1);
     }
 
     return ret;
-}
-
-int heavy_keeper_add(struct heavy_keeper *hk, struct tag_hash_key *tag, unsigned int count, int cube_id, int *popped_id_out)
-{
-    *popped_id_out = heavy_keeper_add_by_recording_popped_data(hk, tag, count);
-
-    int **pst_data_in_rec = (int **)sorted_set_get_pointer_to_user_data(hk->top_K_heap, tag);
-    if (pst_data_in_rec == NULL) { // the key is not added into sorted set
-        return -1;
-    }
-
-    if (*pst_data_in_rec == NULL) { // the key is added in this round, so give it a new id
-        *pst_data_in_rec = (int *)malloc(sizeof(int));
-        **pst_data_in_rec = cube_id;
-        return 0;
-    }
-    // use the original id
-    return 1;
 }
 
 struct heavy_keeper_result *heavy_keeper_query(const struct heavy_keeper *hk) {
@@ -239,15 +244,8 @@ struct heavy_keeper_result *heavy_keeper_query(const struct heavy_keeper *hk) {
     stats->cell_id = (int *)malloc(query_entry_num * sizeof(int));
     stats->n_key = query_entry_num;
 
-    int **user_data = (int **)malloc(query_entry_num * sizeof(int *));
+    sorted_set_dump(hk->top_K_heap, stats->count, stats->tags, stats->cell_id);
 
-    sorted_set_dump(hk->top_K_heap, stats->count, stats->tags, (void **)user_data);
-
-    for (int i = 0; i < query_entry_num; i++) {
-        stats->cell_id[i] = *(user_data[i]);
-    }
-
-    free(user_data);
     return stats;
 }
 
@@ -266,12 +264,12 @@ int heavy_keeper_query_one(const struct heavy_keeper *hk, const struct tag_hash_
         return 0;
     }
 
-    int **pst_data_in_rec = (int **)sorted_set_get_pointer_to_user_data(hk->top_K_heap, tag);
-    if (pst_data_in_rec == NULL) {
+    int cell_id = sorted_set_get_cell_id(hk->top_K_heap, tag);
+    if (cell_id == -1) {
         *cell_id_out = -1;
         return -1;
     }
-    *cell_id_out = **pst_data_in_rec;
+    *cell_id_out = cell_id;
 
     return 0;
 }
@@ -315,7 +313,7 @@ unsigned find_maxv_in_sketch(struct heavy_keeper *hk, const struct tag_hash_key 
     return maxv;
 }
 
-int find_next_unused_cell_id(const int *const *sorted_pst_cell_id_arr, size_t arr_len, int last_find_result, int *next_idx)
+int find_next_unused_cell_id(const int *sorted_cell_id_arr, size_t arr_len, int last_find_result, int *next_idx)
 {
     int cur_idx = *next_idx;
 
@@ -328,7 +326,7 @@ int find_next_unused_cell_id(const int *const *sorted_pst_cell_id_arr, size_t ar
     }
 
     if (cur_idx >= arr_len) {
-        int max_id = *sorted_pst_cell_id_arr[arr_len - 1];
+        int max_id = sorted_cell_id_arr[arr_len - 1];
         if (last_find_result <= max_id) { //  this first time reach the end of sorted_pst_cell_id_arr
             return max_id + 1;
         } else {
@@ -338,7 +336,7 @@ int find_next_unused_cell_id(const int *const *sorted_pst_cell_id_arr, size_t ar
 
     int expected_id = last_find_result + 1;
     while (cur_idx < arr_len) {
-        int cur_id = *sorted_pst_cell_id_arr[cur_idx];
+        int cur_id = sorted_cell_id_arr[cur_idx];
 
         // check if expected_id id is used
         if (cur_id == expected_id) { // used
@@ -353,15 +351,13 @@ int find_next_unused_cell_id(const int *const *sorted_pst_cell_id_arr, size_t ar
     }
 
     // all cell_id in sorted_pst_cell_id_arr is used
-    int max_id = *sorted_pst_cell_id_arr[arr_len - 1];
+    int max_id = sorted_cell_id_arr[arr_len - 1];
     *next_idx = arr_len;
     return max_id + 1;
 }
 
-int cmp_pst_int(const void *a, const void *b) {
-    const int *pa = *(int **)a;
-    const int *pb = *(int **)b;
-    return *pa - *pb;
+int cmp_int(const void *a, const void *b) {
+    return *(int *)a - *(int *)b;
 }
 
 void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *dest, const struct heavy_keeper *src, 
@@ -369,7 +365,6 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
     int **cell_id_in_src_before_merge_out, int **cell_id_in_dest_corresponding_out, int *cell_id_in_src_before_merge_len_out) 
 {
     struct sorted_set *new_rec = sorted_set_new(dest->K); // merging result
-    sorted_set_hook_function_of_free_user_data(new_rec, free);
 
     struct sorted_set *ss_dest = dest->top_K_heap; // original ss in dest
     const struct sorted_set *ss_src = src->top_K_heap; // the ss to be merged
@@ -379,9 +374,9 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
 
     unsigned *count_arr = (unsigned *)malloc(max_size * sizeof(unsigned));
     struct tag_hash_key **tag_arr = (struct tag_hash_key **)malloc(max_size * sizeof(struct tag_hash_key *));
-    int **cell_id_arr_dst = (int **)malloc(size_dest * sizeof(int *));
+    int *cell_id_arr_dst = (int *)malloc(size_dest * sizeof(int));
 
-    sorted_set_dump(ss_dest, count_arr, tag_arr, (void **)cell_id_arr_dst);
+    sorted_set_dump(ss_dest, count_arr, tag_arr, cell_id_arr_dst);
     int cell_id_popped_from_dest_when_merge_src[dest->K];
     int cell_id_popped_from_dest_when_merge_src_len = 0;
     int cell_id_in_src_before_merge[dest->K];
@@ -392,47 +387,44 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
     for (int i = 0; i < size_dest; i++) {
         unsigned maxv = find_maxv_in_sketch(dest, tag_arr[i]);
         struct tag_hash_key *tag_final = tag_hash_key_copy(tag_arr[i]);
-        const int *pst_cell_id_dest = cell_id_arr_dst[i];
-
-        sorted_set_insert(new_rec, tag_final, maxv);
-        int **pst_cell_id_final = (int **)sorted_set_get_pointer_to_user_data(new_rec, tag_final);
-        *pst_cell_id_final = (int *)malloc(sizeof(unsigned int));
-        **pst_cell_id_final = *pst_cell_id_dest;
+        sorted_set_insert(new_rec, tag_final, maxv, cell_id_arr_dst[i]);
     }
 
-    qsort(cell_id_arr_dst, size_dest, sizeof(int *), cmp_pst_int);
+    qsort(cell_id_arr_dst, size_dest, sizeof(int), cmp_int);
 
     /* ------------------------------ merge source ------------------------------ */
-    int **cell_id_arr_src = (int **)malloc(size_src * sizeof(int *));
-    sorted_set_dump(ss_src, count_arr, tag_arr, (void **)cell_id_arr_src);
+    int *cell_id_arr_src = (int *)malloc(size_src * sizeof(int));
+    sorted_set_dump(ss_src, count_arr, tag_arr, cell_id_arr_src);
     int last_find_id = -1;
     int next_idx = 0;
 
     for (int i = 0; i < size_src; i++) {
         const struct tag_hash_key *tag_src = tag_arr[i];
-        int **pst_cell_id_dest = (int **)sorted_set_get_pointer_to_user_data(ss_dest, tag_src);
-        int cell_id_src = *cell_id_arr_src[i];
+        int cell_id_dest = sorted_set_get_cell_id(ss_dest, tag_src);
+        int cell_id_src = cell_id_arr_src[i];
     
-        if (pst_cell_id_dest != NULL) {  // the tag is in both dest and src, so has been processed in the previous loop. Just record some info
+        if (cell_id_dest != -1) {  // the tag is in both dest and src, so has been processed in the previous loop. Just record some info
             cell_id_in_src_before_merge[cell_id_in_src_before_merge_len] = cell_id_src;
-            cell_id_in_dest_corresponding[cell_id_in_src_before_merge_len] = **pst_cell_id_dest;
+            cell_id_in_dest_corresponding[cell_id_in_src_before_merge_len] = cell_id_dest;
             cell_id_in_src_before_merge_len++;
 
             continue;
         }
         // the dest heavy keeper has been merged, so the maxv is the maxv in the merged sketch, instead of the dest sketch
         unsigned maxv = find_maxv_in_sketch(dest, tag_src);
-        int popped_id;
+        int popped_id = -1;
         struct tag_hash_key *tag_final = tag_hash_key_copy(tag_src);
-        int tmp_ret = sorted_set_insert_and_record_popped_back(new_rec, tag_final, maxv, &popped_id, sizeof(int));
+        int now_idx = next_idx;
+        int find_id = find_next_unused_cell_id(cell_id_arr_dst, size_dest, last_find_id, &now_idx);
+        printf("find_id: %d\n", find_id);
+        int tmp_ret = sorted_set_insert_and_record_popped_back(new_rec, tag_final, maxv, find_id, &popped_id);
         if (tmp_ret == 2) { // insert success and popped one. the previous tag_final is already freed by sorted_set
+            assert(popped_id != -1);
             cell_id_popped_from_dest_when_merge_src[cell_id_popped_from_dest_when_merge_src_len++] = popped_id;
         } 
         if (tmp_ret != 0) { // insert success
-            int **pst_cell_id_final = (int **)sorted_set_get_pointer_to_user_data(new_rec, tag_final);
-            *pst_cell_id_final = (int *)malloc(sizeof(unsigned int));
-            last_find_id = find_next_unused_cell_id((const int *const *)cell_id_arr_dst, size_dest, last_find_id, &next_idx);
-            **pst_cell_id_final = last_find_id;
+            last_find_id = find_id;
+            next_idx = now_idx;
         
             cell_id_in_src_before_merge[cell_id_in_src_before_merge_len] = cell_id_src;
             cell_id_in_dest_corresponding[cell_id_in_src_before_merge_len] = last_find_id;
@@ -580,11 +572,11 @@ void heavy_keeper_sorted_set_serialization(const struct heavy_keeper *hk, mpack_
 
     unsigned *key_score = (unsigned *)malloc(heap_entry_num * sizeof(unsigned));
     struct tag_hash_key **tag_arr = (struct tag_hash_key **)malloc(heap_entry_num * sizeof(struct tag_hash_key *));
-    unsigned int **user_data = (unsigned int **)malloc(heap_entry_num * sizeof(unsigned int *));
-    sorted_set_dump(hk->top_K_heap, key_score, tag_arr, (void **)user_data);
+    int *cell_id = (int *)malloc(heap_entry_num * sizeof(int));
+    sorted_set_dump(hk->top_K_heap, key_score, tag_arr, cell_id);
     mpack_build_array(writer);
     for (size_t i = 0; i < heap_entry_num; i++) {
-        heavy_keeper_sorted_set_member_serialization(tag_arr[i], key_score[i], *user_data[i], &element_mpack_buff, &element_mpack_size);
+        heavy_keeper_sorted_set_member_serialization(tag_arr[i], key_score[i], cell_id[i], &element_mpack_buff, &element_mpack_size);
         mpack_write_object_bytes(writer, element_mpack_buff, element_mpack_size);
         free(element_mpack_buff);
         element_mpack_size = 0;
@@ -593,7 +585,7 @@ void heavy_keeper_sorted_set_serialization(const struct heavy_keeper *hk, mpack_
 
     free(key_score);
     free(tag_arr);
-    free(user_data);
+    free(cell_id);
 }
 
 void heavy_keeper_serialization(const struct heavy_keeper *hk, char **blob, size_t *blob_sz) {
@@ -633,11 +625,9 @@ void heavy_keeper_sorted_set_deserialization(const mpack_node_t *root, struct so
 
         unsigned int score = mpack_node_u32(mpack_node_map_cstr(item, "score"));
 
-        unsigned int *id = (unsigned int *)malloc(sizeof(unsigned int)); // will be freed with sorted set
-        *id = mpack_node_u32(mpack_node_map_cstr(item, "id"));
+        int id = mpack_node_u32(mpack_node_map_cstr(item, "id"));
 
-        sorted_set_insert(out, tag, score);
-        sorted_set_insert_user_data(out, tag, (void *)id);
+        sorted_set_insert(out, tag, score, id);
     }
 }
 
@@ -650,7 +640,6 @@ struct heavy_keeper *heavy_keeper_deserialization(const char *blob, size_t size)
     int K = mpack_node_int(mpack_node_map_cstr(root, "K"));
 
     struct heavy_keeper *hk = heavy_keeper_new(K, NULL);
-    sorted_set_hook_function_of_free_user_data(hk->top_K_heap, free);
 
     mpack_node_t item_sketch = mpack_node_map_cstr(root, "sketch");
     size_t bin_size = mpack_node_bin_size(item_sketch);
