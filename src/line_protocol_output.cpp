@@ -470,6 +470,7 @@ int line_protocol_dynamic_metric_output(struct fieldstat_dynamic_instance *insta
 
 	for(int i = 0; i < instance->n_thread; i++)
 	{
+		pthread_spin_lock(instance->uthash_locks + i);
 		head = &instance->n_thread_dynamic_metric[i];
 		HASH_ITER(hh, *head, dyn_metric, tmp_dyn_metric)
 		{
@@ -487,6 +488,7 @@ int line_protocol_dynamic_metric_output(struct fieldstat_dynamic_instance *insta
 			}
 			send_line_buf(&instance->line_protocol_output, line_buf, used_len);
 		}
+		pthread_spin_unlock(instance->uthash_locks + i);
 
 	}
 	flush_send_buf(&instance->line_protocol_output);

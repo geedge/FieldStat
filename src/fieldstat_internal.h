@@ -242,7 +242,7 @@ struct fieldstat_dynamic_instance
 	struct dynamic_metric **n_thread_dynamic_metric;
 	int n_thread;
 	int output_type;   // 0b0000:not output, 0b1000:output file, 0b0100:output line_protocol, 0b0010: output statsd, 0b0001: output prometheus 
-
+	pthread_spinlock_t *uthash_locks;
 };
 
 void prometheus_endpoint_instance_output(struct http_request_s* request);
