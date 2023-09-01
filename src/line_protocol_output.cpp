@@ -1,5 +1,8 @@
 #include "fieldstat_internal.h"
+#include <string>
+#include <vector>
 
+#define  LINE_BUF_SIZE 1460
 
 static void flush_send_buf(struct line_protocol_output *line_protocol_output)
 {
@@ -21,10 +24,17 @@ static void flush_send_buf(struct line_protocol_output *line_protocol_output)
 }
 
 
-static void send_line_buf(struct line_protocol_output *line_protocol_output, char *line_buf, unsigned int line_buf_len)
+void send_line_buf(struct line_protocol_output *line_protocol_output, const char *line_buf, unsigned int line_buf_len)
 {
 	if(line_protocol_output == NULL || line_buf == NULL || line_buf_len == 0)
 	{
+		return;
+	}
+
+	if(line_buf_len > UDP_PAYLOAD_SIZE - 1)
+	{
+		send_udp(line_protocol_output->send_socket, line_protocol_output->server_ip,
+				line_protocol_output->server_port, line_buf, line_buf_len);
 		return;
 	}
 
@@ -363,7 +373,7 @@ static void output_line_protocol_single_metric(struct fieldstat_instance *instan
 	int used_len = 0;
 
 	struct metric *metric = NULL;
-	char line_buf[UDP_PAYLOAD_SIZE];
+	char line_buf[LINE_BUF_SIZE];
 
 	for(i = 0; i < n_cur_metric; i++)
 	{
@@ -406,7 +416,7 @@ static void output_line_protocol_table_row(struct fieldstat_instance *instance, 
 	int i = 0, j = 0, k = 0;
 	int used_len = 0;
 
-	char line_buf[UDP_PAYLOAD_SIZE];
+	char line_buf[LINE_BUF_SIZE];
 	struct table_metric *table = NULL;
 	struct table_line *row = NULL;
 	struct metric *row_metrics[TABLE_COLUMN_SIZE];
@@ -465,32 +475,43 @@ int line_protocol_dynamic_metric_output(struct fieldstat_dynamic_instance *insta
 	struct metric **metrics = NULL;
 	struct metric *metric = NULL;
 
-	char line_buf[UDP_PAYLOAD_SIZE];
-	int used_len = 0;
+	//std::string line_buf_to_send;
+	//std::vector<std::string> line_buf_to_send;
 
 	for(int i = 0; i < instance->n_thread; i++)
 	{
+		std::vector<std::string> line_buf_to_send;
 		pthread_spin_lock(instance->uthash_locks + i);
 		head = &instance->n_thread_dynamic_metric[i];
 		HASH_ITER(hh, *head, dyn_metric, tmp_dyn_metric)
 		{
+			char line_buf[LINE_BUF_SIZE] = "\0";
+
 			metrics = dyn_metric->metrics;
 			metric = metrics[0];
-			used_len = 0;
 			memset(line_buf, 0, sizeof(line_buf));
 			if(metric->table)
 			{
-				used_len = build_table_row_line_buf(instance->name, instance->output_type, metric->table, metrics, line_buf, sizeof(line_buf));
+				build_table_row_line_buf(instance->name, instance->output_type, metric->table, metrics, line_buf, sizeof(line_buf));
 			}
 			else
 			{
-				used_len = build_single_metric_line_buf(instance->name, instance->output_type, metric, line_buf, sizeof(line_buf));
+				build_single_metric_line_buf(instance->name, instance->output_type, metric, line_buf, sizeof(line_buf));
 			}
-			send_line_buf(&instance->line_protocol_output, line_buf, used_len);
+
+			/* copy the line_buf as str to vector line_buf_to_send */
+			line_buf_to_send.push_back(std::string(line_buf));  
 		}
 		pthread_spin_unlock(instance->uthash_locks + i);
 
+		for (auto it = line_buf_to_send.begin(); it != line_buf_to_send.end(); ++it)
+		{
+			const std::string& str = *it;
+			send_line_buf(&instance->line_protocol_output, str.c_str(), str.length());
+		}
 	}
+
 	flush_send_buf(&instance->line_protocol_output);
+
 	return 0;
 }

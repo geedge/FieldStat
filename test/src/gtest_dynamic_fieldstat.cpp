@@ -2821,6 +2821,102 @@ TEST(FeildStatDynamicAPI, SendLenEqualUDPPayload)
 }
 
 
+
+// TEST(FeildStatDynamicAPI, SendTo)
+// {
+// 	unsigned int server_ip = 0;
+// 	int send_socket = startup_udp();
+// 	struct line_protocol_output output;
+
+// 	inet_pton(AF_INET, "127.0.0.1", (void *)&(server_ip));
+
+// 	memset(&output, 0, sizeof(struct line_protocol_output));
+// 	output.send_socket = send_socket;
+// 	output.server_ip = server_ip;
+// 	output.server_port = 8700;
+	
+
+// 	std::vector<std::string> send_buf;
+
+// 	char line_buf[1460];
+// 	int count = 0;
+
+// 	for(int i = 0; i < 90000; i++)
+// 	{
+// 		memset(line_buf, 0, sizeof(line_buf));
+// 		// snprintf(line_buf, sizeof(line_buf),
+// 		// "Active_session_%05d,app_name=firewall Active_session_01=12\n"
+// 		// "Active_session_%05d,app_name=firewall Active_session_02=12\n"
+// 		// "Active_session_%05d,app_name=firewall Active_session_03=12\n"
+// 		// "Active_session_%05d,app_name=firewall Active_session_04=12\n"
+// 		// "Active_session_%05d,app_name=firewall Active_session_05=12\n"
+// 		// "Active_session_%05d,app_name=firewall Active_session_06=12\n"
+// 		// "Active_session_%05d,app_name=firewall Active_session_07=12\n"
+// 		// "Active_session_%05d,app_name=firewall Active_session_08=12\n"
+// 		// "Active_session_%05d,app_name=firewall Active_session_09=12\n"
+// 		// "Active_session_%05d,app_name=firewall Active_session_10=12\n"
+// 		// "Active_session_%05d,app_name=firewall Active_session_11=12\n"
+// 		// "Active_session_%05d,app_name=firewall Active_session_12=12\n"
+// 		// "Active_session_%05d,app_name=firewall Active_session_13=12\n"
+// 		// "Active_session_%05d,app_name=firewall Active_session_14=12\n"
+// 		// "Active_session_%05d,app_name=firewall Active_session_15=12\n"
+// 		// "Active_session_%05d,app_name=firewall Active_session_16=12\n"
+// 		// "Active_session_%05d,app_name=firewall Active_session_17=12\n"
+// 		// "Active_session_%05d,app_name=firewall Active_session_18=12\n"
+// 		// "Active_session_%05d,app_name=firewall Active_session_19=12\n"
+// 		// "Active_session_%05d,app_name=firewall Active_session_20=12\n"
+// 		// "Active_session_%05d,app_name=firewall Active_session_21=12\n"
+// 		// "Active_session_%05d,app_name=firewall Active_session_22=12\n"
+// 		// "Active_session_%05d,app_name=firewall Active_session_23=12\n"
+// 		// "Active_session_%05d,app_name=firewall Active_session_24=12\n", 
+// 		// i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i);
+
+// 		snprintf(line_buf, sizeof(line_buf),
+// 		"Active_sessi01_%05d,app_name=firewall,Active_session_01=12,"
+// 		"Active_sessi02=%05d,app_name=firewa01,Active_session_02=12,"
+// 		"Active_sessi03=%05d,app_name=firewa02,Active_session_03=12,"
+// 		"Active_sessi04=%05d,app_name=firewa03,Active_session_04=12,"
+// 		"Active_sessi05=%05d,app_name=firewa04,Active_session_05=12,"
+// 		"Active_sessi06=%05d,app_name=firewa05,Active_session_06=12,"
+// 		"Active_sessi07=%05d,app_name=firewa06,Active_session_07=12,"
+// 		"Active_sessi08=%05d,app_name=firewa07,Active_session_08=12,"
+// 		"Active_sessi09=%05d,app_name=firewa08,Active_session_09=12,"
+// 		"Active_sessi10=%05d,app_name=firewa09,Active_session_10=12,"
+// 		"Active_sessi11=%05d,app_name=firewa10,Active_session_11=12,"
+// 		"Active_sessi12=%05d,app_name=firewa11,Active_session_12=12,"
+// 		"Active_sessi13=%05d,app_name=firewa12,Active_session_13=12,"
+// 		"Active_sessi14=%05d,app_name=firewa13,Active_session_14=12,"
+// 		"Active_sessi15=%05d,app_name=firewa14,Active_session_15=12,"
+// 		"Active_sessi16=%05d,app_name=firewa15,Active_session_16=12,"
+// 		"Active_sessi17=%05d,app_name=firewa16,Active_session_17=12,"
+// 		"Active_sessi18=%05d,app_name=firewa17,Active_session_18=12,"
+// 		"Active_sessi19=%05d,app_name=firewa18,Active_session_19=12,"
+// 		"Active_sessi20=%05d,app_name=firewa19,Active_session_20=12,"
+// 		"Active_sessi21=%05d,app_name=firewa20,Active_session_21=12,"
+// 		"Active_sessi22=%05d,app_name=firewa21,Active_session_22=12,"
+// 		"Active_sessi23=%05d,app_name=firewa22,Active_session_23=12,"
+// 		"Active_sessi24=%05d,app_name=firewa23 Active_session_24=12\n",
+// 		i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i);
+// 		send_buf.push_back(std::string(line_buf));  
+
+// 	}
+
+// 	system("cat /dev/null > /tmp/metrics.out");
+// 	for (auto it = send_buf.begin(); it != send_buf.end(); ++it) {
+// 		const std::string& str = *it;
+// 		//std::cout << str << " - Length: " << str.length() << std::endl;
+// 		//printf("%s\n", str.c_str());
+// 		send_udp(send_socket, server_ip, 8700, str.c_str(), str.length());
+// 		//printf("%5d,%s\n", (int)str.length(), str.c_str());
+// 		//send_line_buf(&output, str.c_str(), str.length());
+
+// 		count++;
+// 	}
+// 	printf("count:%d\n",count);
+
+// }
+
+
 int main(int argc, char *argv[]) 
 {
 	testing::InitGoogleTest(&argc, argv);

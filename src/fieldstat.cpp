@@ -341,6 +341,24 @@ int startup_udp()
 		return sd_udp;
 	}
 
+	// uint64_t rcvbuf_size = 32 * 1024 * 1024;
+	// if (setsockopt (sd_udp, SOL_SOCKET, SO_RCVBUF, &rcvbuf_size, sizeof(rcvbuf_size) ) < 0) 
+	// {
+	// 	printf("FS2:setsockopt error: %d %s, restart socket.", errno, strerror(errno));
+	// 	close (sd_udp);
+	// 	sd_udp=-1;
+	// 	return sd_udp;
+	// }
+
+	// uint64_t sndbuf_size = 32 * 1024 * 1024;
+	// if (setsockopt (sd_udp, SOL_SOCKET, SO_RCVBUF, &sndbuf_size, sizeof(sndbuf_size) ) < 0) 
+	// {
+	// 	printf("FS2:setsockopt error: %d %s, restart socket.", errno, strerror(errno));
+	// 	close (sd_udp);
+	// 	sd_udp=-1;
+	// 	return sd_udp;
+	// }
+
 	return sd_udp;
 }
 
