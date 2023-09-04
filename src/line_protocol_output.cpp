@@ -504,7 +504,7 @@ int line_protocol_dynamic_metric_output(struct fieldstat_dynamic_instance *insta
 		}
 		pthread_spin_unlock(instance->uthash_locks + i);
 
-		for (auto it = line_buf_to_send.begin(); it != line_buf_to_send.end(); ++it)
+		for (std::vector<std::string>::iterator it = line_buf_to_send.begin(); it != line_buf_to_send.end(); ++it)
 		{
 			const std::string& str = *it;
 			send_line_buf(&instance->line_protocol_output, str.c_str(), str.length());
