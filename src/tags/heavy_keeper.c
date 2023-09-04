@@ -416,7 +416,6 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
         struct tag_hash_key *tag_final = tag_hash_key_copy(tag_src);
         int now_idx = next_idx;
         int find_id = find_next_unused_cell_id(cell_id_arr_dst, size_dest, last_find_id, &now_idx);
-        printf("find_id: %d\n", find_id);
         int tmp_ret = sorted_set_insert_and_record_popped_back(new_rec, tag_final, maxv, find_id, &popped_id);
         if (tmp_ret == 2) { // insert success and popped one. the previous tag_final is already freed by sorted_set
             assert(popped_id != -1);
