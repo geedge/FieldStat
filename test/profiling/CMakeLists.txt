@@ -18,6 +18,7 @@ file(GLOB SRC
     "${PROJECT_SOURCE_DIR}/src/metrics/*.c"
     "${PROJECT_SOURCE_DIR}/src/tags/*.c"
     "${PROJECT_SOURCE_DIR}/src/exporter/*.c"
+    "${PROJECT_SOURCE_DIR}/src/utils/*.c"
     "${PROJECT_SOURCE_DIR}/vendors/cjson/*.c"
     "${PROJECT_SOURCE_DIR}/vendors/hdr/*.c"
     "${PROJECT_SOURCE_DIR}/vendors/minheap/*.c"

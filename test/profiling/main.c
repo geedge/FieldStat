@@ -194,7 +194,7 @@ void determine_K_factor()
 int main () {
     // try_hash_compound_key();
     // topk_K_100_tag_2();
-    // performance_cube_add_comprehensive();
+    performance_cube_add_comprehensive();
     // build_dynamic_cell_key_performance();
-    determine_K_factor();
+    // determine_K_factor();
 }

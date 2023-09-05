@@ -11,6 +11,7 @@
 #include "hdr/hdr_histogram.h"
 #include "hdr/hdr_histogram_log.h"
 #include "st_hyperloglog.h"
+#include "very_fast_json_writer.h"
 
 const size_t OPER_NUM = 10000;
 std::string g_hll_standard_oper[OPER_NUM];
@@ -129,7 +130,11 @@ cJSON *test_exporter_extract_results(const struct fieldstat *instance)
 {
     struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new(instance);
 
+    // printf("going to export, get char\n");
+    // getchar();
     char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter);
+    printf("json_string: %s\n", json_string);
+    // exit(0);
     cJSON *root_arr = cJSON_Parse(json_string);
     free(json_string);
     fieldstat_json_exporter_free(fieldstat_json_exporter);
@@ -439,6 +444,21 @@ TEST(export_unit_test, test_add_json_length_is_on_margin_4095)
     free(buf);
 }
 
+TEST(simple_test_json_writer, test1)
+{
+    struct json_writer *writer = json_writer_init();
+    json_writer_start_map(writer);
+    json_writer_str_field(writer, "key", "value", 5);
+    json_writer_int_field(writer, "key2", 123);
+    json_writer_double_field(writer, "key3", 1.1);
+    json_writer_end_map(writer);
+    char *result;
+    size_t len;
+    json_writer_finish(writer, &result, &len);
+    printf("simple_test_json_writer %s\n", result);
+    free(result);
+}
+
 void init_hll_standard_oper()
 {
     g_hll_standard = ST_hyperloglog_new(12);
@@ -453,10 +473,12 @@ void init_histogram_standard_oper()
 {
     hdr_init(1, 20000, 3, &g_histogram_standard);
     for (size_t i = 0; i < OPER_NUM; i++) {
-        g_histogram_standard_oper[i] = i;
-        hdr_record_value(g_histogram_standard, i);
+        g_histogram_standard_oper[i] = i + 1;
+        hdr_record_value(g_histogram_standard, i + 1);
     }
 }
+
+
 
 int main(int argc, char *argv[]) 
 {

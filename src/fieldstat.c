@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <time.h>   
 
 #include "cjson/cJSON.h"
 #include "uthash.h"
@@ -1161,12 +1162,14 @@ void fieldstat_cube_read_cell(const struct fieldstat *instance, int cube_id, int
     *n_cell = n_cell_ret;
 }
 
-int fieldstat_get_max_cell_num(const struct fieldstat *instance, int cube_id)
+int fieldstat_get_max_cell_id(const struct fieldstat *instance, int cube_id)
 {
     const struct fs_cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
         return -1;
     }
 
-    return cube->max_n_cell;
+    int max_id;
+    (void)cell_manager_dump(cube->cell_manager, &max_id);
+    return max_id;
 }

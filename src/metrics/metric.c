@@ -798,7 +798,12 @@ struct metric *metric_histogram_new(const char *name, long long lowest_trackable
 int metric_histogram_record(struct metric *pthis, int cell_id, long long value)
 {
     struct metric_measure_data *data = metric_find_or_new_cell(pthis, cell_id);
-    
+    if (value > data->hdr->highest_trackable_value) {
+        value = data->hdr->highest_trackable_value;
+    }
+    if (value < data->hdr->lowest_discernible_value) {
+        value = data->hdr->lowest_discernible_value;
+    }
     bool ret = hdr_record_value(data->hdr, value);
     if (!ret) {
         return -1;

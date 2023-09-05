@@ -7,7 +7,7 @@
 #include <time.h>
 #include <stddef.h>
 
-#include "cjson/cJSON.h"
+#include "utils/very_fast_json_writer.h"
 #include "fieldstat.h"
 #include "fieldstat_exporter.h"
 
@@ -77,9 +77,9 @@ struct cell_iter {
     const struct fieldstat *instance;
 };
 
-struct cjson_tag_field_pair {
-    cJSON *cjson_tags;
-    cJSON *cjson_fields;
+struct json_tag_field_pair {
+    struct json_writer *cjson_tags;
+    struct json_writer *cjson_fields;
 };
 
 void kv_pair_free(struct export_kv_pair *pair) {
@@ -240,25 +240,25 @@ struct export_kv_pair *cell_query_with_iter(const struct cell_iter *iter, int me
     return NULL;
 }
 
-void kv_pair_add_to_cjson(const struct export_kv_pair *pairs, cJSON *cjson_pair)
+void kv_pair_write_to_json(const struct export_kv_pair *pairs, struct json_writer *writer)
 {
     switch (pairs->type)
     {
         case TAG_INTEGER:
-            cJSON_AddNumberToObject(cjson_pair, pairs->key, pairs->value_longlong);
+            json_writer_longlong_field(writer, pairs->key, pairs->value_longlong);
             break;
         case TAG_DOUBLE:
-            cJSON_AddNumberToObject(cjson_pair, pairs->key, pairs->value_double);
+            json_writer_double_field(writer, pairs->key, pairs->value_double);
             break;
         case TAG_CSTRING:
-            cJSON_AddStringToObject(cjson_pair, pairs->key, pairs->value_str);
+            json_writer_str_field(writer, pairs->key, pairs->value_str, strlen(pairs->value_str));
             break;
         default:
             break;
     }
 }
 
-void tag_list_append_to_tag_object(const struct fieldstat_tag_list *tag_list, cJSON *cjson_tags)
+void tag_list_append_to_tag_object(const struct fieldstat_tag_list *tag_list, struct json_writer *cjson_tags)
 {
     size_t tag_list_len = tag_list->n_tag;
     struct export_kv_pair pairs = {0};
@@ -284,7 +284,7 @@ void tag_list_append_to_tag_object(const struct fieldstat_tag_list *tag_list, cJ
             default:
                 break;
         }
-        kv_pair_add_to_cjson(&pairs, cjson_tags);
+        kv_pair_write_to_json(&pairs, cjson_tags);
     }
 }
 
@@ -320,41 +320,44 @@ void kv_pair_free_list(struct export_kv_pair *pairs, size_t len)
 }
 
 // return 1 if added, 0 if not added
-int cjson_map_add(struct cjson_tag_field_pair *tag_field_pair, const struct cell_iter *iter)
+int cjson_map_add(struct json_tag_field_pair *tag_field_pair, const struct cell_iter *iter)
 {
-    cJSON *cjson_fields = NULL;
+    struct json_writer *writer = NULL;
+    
     for (int i = 0; i <= iter->max_metric_id; i++) {
         struct export_kv_pair *field = cell_query_with_iter(iter, i);
         if (field == NULL) {
             continue;
         }
-        if (cjson_fields == NULL) {
-            cjson_fields = cJSON_CreateObject();
+        if (writer == NULL) {
+            writer = json_writer_init();
         }
-        kv_pair_add_to_cjson(field, cjson_fields);
+        kv_pair_write_to_json(field, writer);
         kv_pair_free(field);
     }
-    if (cjson_fields == NULL) {
+
+    if (writer == NULL) {
         return 0;
     }
-    tag_field_pair->cjson_fields = cjson_fields;
+    tag_field_pair->cjson_fields = writer;
 
     struct export_kv_pair *tag_list;
     size_t tag_list_len;
     cell_iter_read_tag_list(iter, &tag_list, &tag_list_len);
 
-    cJSON *cjson_tags = cJSON_CreateObject();
+    struct json_writer *writer_tag = json_writer_init();
     for (int i = 0; i < tag_list_len; i++) {
-        kv_pair_add_to_cjson(&tag_list[i], cjson_tags);
+        kv_pair_write_to_json(&tag_list[i], writer_tag);
     }
     kv_pair_free_list(tag_list, tag_list_len);
-    tag_field_pair->cjson_tags = cjson_tags;
+    tag_field_pair->cjson_tags = writer_tag;
 
     return 1;
 }
 
-struct cjson_tag_field_pair *read_tag_and_field(const struct fieldstat *instance, size_t *n_pair_out)
+struct json_tag_field_pair *read_tag_and_field(const struct fieldstat *instance, size_t *n_pair_out)
 {
+    // clock_t prepare_start = clock();
     int *cube_id = NULL;
     int cube_id_len = 0;
     fieldstat_get_cubes(instance, &cube_id, &cube_id_len);
@@ -364,7 +367,7 @@ struct cjson_tag_field_pair *read_tag_and_field(const struct fieldstat *instance
 
     size_t n_cell_total = 0;
     for (int i = 0; i < cube_id_len; i++) {
-        n_cell_total += fieldstat_get_max_cell_num(instance, cube_id[i]);
+        n_cell_total += fieldstat_get_max_cell_id(instance, cube_id[i]);
     }
     free(cube_id);
     if (n_cell_total == 0) {
@@ -372,21 +375,30 @@ struct cjson_tag_field_pair *read_tag_and_field(const struct fieldstat *instance
     }
 
     struct cell_iter *iter = cell_iter_new(instance);
-    struct cjson_tag_field_pair *tag_field_pair = calloc(n_cell_total, sizeof(struct cjson_tag_field_pair));
+    struct json_tag_field_pair *tag_field_pair = calloc(n_cell_total, sizeof(struct json_tag_field_pair));
     int i = 0;
+    // clock_t prepare_end = clock();
+    // printf("[czz]prepare time: %ld us\n", prepare_end - prepare_start);
+    // clock_t read_start = clock();
+    // int next_num = 0;
     while (cell_iter_next(iter)) {
+        // next_num++;
         if (cjson_map_add(&tag_field_pair[i], iter) == 0) {
             continue;
         }
         i++;
     }
+    // clock_t read_end = clock();
+    // printf("[czz]read time: %ld us\n", read_end - read_start);
 
     *n_pair_out = i;
+    // printf("[czz] total cell: %zu, the valid cell: %d, loop num%d\n", n_cell_total, i, next_num);
+
     cell_iter_free(iter);
     return tag_field_pair;
 }
 
-void fieldstat_json_exporter_write_global_tags(const struct fieldstat_json_exporter *exporter, struct cjson_tag_field_pair *tag_field_pair_arr, size_t arr_len)
+void fieldstat_json_exporter_write_global_tags(const struct fieldstat_json_exporter *exporter, struct json_tag_field_pair *tag_field_pair_arr, size_t arr_len)
 {
     if (exporter->global_tag_list == NULL) {
         return;
@@ -465,7 +477,7 @@ void fieldstat_json_exporter_export_array(const struct fieldstat_json_exporter *
     const struct fieldstat *instance = exporter->instance;
 
     size_t n_pair;
-    struct cjson_tag_field_pair *tag_field_pair = read_tag_and_field(instance, &n_pair);
+    struct json_tag_field_pair *tag_field_pair = read_tag_and_field(instance, &n_pair);
     if (tag_field_pair == NULL || n_pair == 0) {
         free(tag_field_pair); // tag_field_pair is not NULL when there are registered metrics but no valid cells
         *output = NULL;
@@ -476,18 +488,22 @@ void fieldstat_json_exporter_export_array(const struct fieldstat_json_exporter *
     fieldstat_json_exporter_write_global_tags(exporter, tag_field_pair, n_pair);
 
     char **cjson_str_arr = (char **)malloc(sizeof(char *) * n_pair);
-    cJSON *cjson_root;  
+    
     for (int i = 0; i < n_pair; i++) {
-        struct cjson_tag_field_pair *current = &tag_field_pair[i];
-        cjson_root = cJSON_CreateObject();
+        struct json_tag_field_pair *current = &tag_field_pair[i];
+        struct json_writer *root = json_writer_init();
 
-        cJSON_AddStringToObject(cjson_root, "name", exporter->name ? exporter->name : "-");
-        cJSON_AddItemToObject(cjson_root, "tags", current->cjson_tags);
-        cJSON_AddItemToObject(cjson_root, "fields", current->cjson_fields);
-        cJSON_AddNumberToObject(cjson_root, "timestamp", get_current_time());
+        json_writer_start_map(root);
+        const char *tmp_name = exporter->name ? exporter->name : "-";
+        json_writer_str_field(root, "name", tmp_name, strlen(tmp_name));
+        json_writer_object_item(root, "tags", current->cjson_tags);
+        json_writer_object_item(root, "fields", current->cjson_fields);
+        json_writer_longlong_field(root, "timestamp", get_current_time());
+        json_writer_end_map(root);
 
-        char *cjson_str = cJSON_PrintUnformatted(cjson_root);
-        cJSON_Delete(cjson_root);
+        char *cjson_str;
+        size_t cjson_str_len;
+        json_writer_finish(root, &cjson_str, &cjson_str_len);
         cjson_str_arr[i] = cjson_str;
         // user are responsible to free the cjson_str
     }

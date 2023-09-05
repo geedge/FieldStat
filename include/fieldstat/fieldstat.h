@@ -231,7 +231,7 @@ struct fieldstat_tag_list *fieldstat_get_shared_tags(const struct fieldstat *ins
 /* 
     get the parameter max_n_cell of fieldstat_register_cube
 */
-int fieldstat_get_max_cell_num(const struct fieldstat *instance, int cube_id);
+int fieldstat_get_max_cell_id(const struct fieldstat *instance, int cube_id);
 
 /*
     * @brief Get the value of a metric of a cell.
