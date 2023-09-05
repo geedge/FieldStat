@@ -25,12 +25,30 @@ struct fieldstat_dynamic_instance * fieldstat_dynamic_instance_new(const char *n
 	instance->n_thread = n_thread;
 	instance->n_thread_dynamic_metric = (struct dynamic_metric **)calloc(instance->n_thread, sizeof(struct dynamic_metric *));
 
+#if USING_SPINLOCK
 	instance->uthash_locks = (struct uthash_spinlock *)calloc(n_thread, sizeof(struct uthash_spinlock));
 	for(int	i = 0; i < n_thread; i++)
 	{
 		struct uthash_spinlock *uthash_lock = instance->uthash_locks + i;
 		pthread_spin_init(&(uthash_lock->lock), PTHREAD_PROCESS_SHARED);
 	}
+#endif
+#if USING_RWLOCK
+	instance->uthash_locks = (struct uthash_rwlock *)calloc(n_thread, sizeof(struct uthash_rwlock));
+	for(int	i = 0; i < n_thread; i++)
+	{
+		struct uthash_rwlock *uthash_lock = instance->uthash_locks + i;
+		pthread_rwlock_init(&(uthash_lock->lock), NULL);
+	}
+#endif
+#if USING_MUTEX
+	instance->uthash_locks = (struct uthash_mutex *)calloc(n_thread, sizeof(struct uthash_mutex));
+	for(int	i = 0; i < n_thread; i++)
+	{
+		struct uthash_mutex *uthash_lock = instance->uthash_locks + i;
+		pthread_mutex_init(&(uthash_lock->lock), NULL);
+	}
+#endif
 
 	return instance;
 }
@@ -97,7 +115,7 @@ void fieldstat_dynamic_instance_free(struct fieldstat_dynamic_instance *instance
 		table_metric_free(instance->table_metrics[i]);
 		instance->table_metrics[i] = NULL;
 	}
-
+#if USING_SPINLOCK
 	if(instance->uthash_locks)
 	{
 		for(i = 0; i < instance->n_thread; i++)
@@ -108,6 +126,31 @@ void fieldstat_dynamic_instance_free(struct fieldstat_dynamic_instance *instance
 		free((void *)instance->uthash_locks);
 		instance->uthash_locks = NULL;
 	}
+#endif
+#if USING_RWLOCK
+	if(instance->uthash_locks)
+	{
+		for(i = 0; i < instance->n_thread; i++)
+		{
+			struct uthash_rwlock *uthash_lock = instance->uthash_locks + i;
+			pthread_rwlock_destroy(&(uthash_lock->lock));
+		}
+		free((void *)instance->uthash_locks);
+		instance->uthash_locks = NULL;
+	}
+#endif
+#if USING_MUTEX
+	if(instance->uthash_locks)
+	{
+		for(i = 0; i < instance->n_thread; i++)
+		{
+			struct uthash_mutex *uthash_lock = instance->uthash_locks + i;
+			pthread_mutex_destroy(&(uthash_lock->lock));
+		}
+		free((void *)instance->uthash_locks);
+		instance->uthash_locks = NULL;
+	}
+#endif
 	free(instance->n_thread_dynamic_metric);
 	instance->n_thread_dynamic_metric = NULL;
 	free(instance);
@@ -345,10 +388,30 @@ static struct metric * read_dynamic_metric(struct fieldstat_dynamic_instance *in
         return NULL;
     }
 
+#if USING_SPINLOCK
 	struct uthash_spinlock *uthash_lock = instance->uthash_locks + thread_id;
 	pthread_spin_lock(&(uthash_lock->lock));
+#endif
+#if USING_RWLOCK
+	struct uthash_rwlock *uthash_lock = instance->uthash_locks + thread_id;
+	pthread_rwlock_rdlock(&(uthash_lock->lock));
+#endif
+
+#if USING_MUTEX
+	struct uthash_mutex *uthash_lock = instance->uthash_locks + thread_id;
+	pthread_mutex_lock(&(uthash_lock->lock));
+#endif
+
     HASH_FIND(hh, *head, dynamic_metric_key, dynamic_metric_keylen, find);
+#if USING_SPINLOCK
 	pthread_spin_unlock(&(uthash_lock->lock));
+#endif
+#if USING_RWLOCK
+	pthread_rwlock_unlock(&(uthash_lock->lock));
+#endif
+#if USING_MUTEX
+	pthread_mutex_unlock(&(uthash_lock->lock));
+#endif
 	if(find == NULL)
 	{
 		return NULL;
@@ -424,10 +487,28 @@ static struct metric * create_dynamic_table_metric(struct fieldstat_dynamic_inst
 		value->metrics[i] = metric;
 	}
 
+#if USING_SPINLOCK
 	struct uthash_spinlock *uthash_lock = instance->uthash_locks + thread_id;
 	pthread_spin_lock(&(uthash_lock->lock));
+#endif
+#if USING_RWLOCK
+	struct uthash_rwlock *uthash_lock = instance->uthash_locks + thread_id;
+	pthread_rwlock_wrlock(&(uthash_lock->lock));
+#endif
+#if USING_MUTEX
+	struct uthash_mutex *uthash_lock = instance->uthash_locks + thread_id;
+	pthread_mutex_lock(&(uthash_lock->lock));
+#endif
     HASH_ADD_KEYPTR(hh, *head, value->metric_key, value->metric_keylen, value);
+#if USING_SPINLOCK
 	pthread_spin_unlock(&(uthash_lock->lock));
+#endif
+#if USING_RWLOCK
+	pthread_rwlock_unlock(&(uthash_lock->lock));
+#endif
+#if USING_MUTEX
+	pthread_mutex_unlock(&(uthash_lock->lock));
+#endif
 	return value->metrics[column_id];
 }
 
@@ -475,10 +556,28 @@ static struct metric * create_dynamic_metric(struct fieldstat_dynamic_instance *
 	}
 
 	*(insert->metrics) = metric;
+#if USING_SPINLOCK
 	struct uthash_spinlock *uthash_lock = instance->uthash_locks + thread_id;
 	pthread_spin_lock(&(uthash_lock->lock));
+#endif
+#if USING_RWLOCK
+	struct uthash_rwlock *uthash_lock = instance->uthash_locks + thread_id;
+	pthread_rwlock_wrlock(&(uthash_lock->lock));
+#endif
+#if USING_MUTEX
+	struct uthash_mutex *uthash_lock = instance->uthash_locks + thread_id;
+	pthread_mutex_lock(&(uthash_lock->lock));
+#endif
     HASH_ADD_KEYPTR(hh, *head, insert->metric_key, insert->metric_keylen, insert);
+#if USING_SPINLOCK
 	pthread_spin_unlock(&(uthash_lock->lock));
+#endif
+#if USING_RWLOCK
+	pthread_rwlock_unlock(&(uthash_lock->lock));
+#endif
+#if USING_MUTEX
+	pthread_mutex_unlock(&(uthash_lock->lock));
+#endif
 	return metric;
 }
 
@@ -588,11 +687,28 @@ static struct metric **read_dynamic_row_metrics(
     struct dynamic_metric *find = NULL;
 
     head = &instance->n_thread_dynamic_metric[thread_id];
-
+#if USING_SPINLOCK
 	struct uthash_spinlock *uthash_lock = instance->uthash_locks + thread_id;
 	pthread_spin_lock(&(uthash_lock->lock));
+#endif
+#if USING_RWLOCK
+	struct uthash_rwlock *uthash_lock = instance->uthash_locks + thread_id;
+	pthread_rwlock_rdlock(&(uthash_lock->lock));
+#endif
+#if USING_MUTEX
+	struct uthash_mutex *uthash_lock = instance->uthash_locks + thread_id;
+	pthread_mutex_lock(&(uthash_lock->lock));
+#endif
     HASH_FIND(hh, *head, metric_key, metric_keylen, find);
+#if USING_SPINLOCK
 	pthread_spin_unlock(&(uthash_lock->lock));
+#endif
+#if USING_RWLOCK
+	pthread_rwlock_unlock(&(uthash_lock->lock));
+#endif
+#if USING_MUTEX
+	pthread_mutex_unlock(&(uthash_lock->lock));
+#endif
     if(find == NULL)
     {
         return NULL;
@@ -656,11 +772,28 @@ static struct metric **create_dynamic_table_row_metrics(
 		metric->table_column_id = i;
 		value->metrics[i] = metric;
 	}
-
+#if USING_SPINLOCK
 	struct uthash_spinlock *uthash_lock = instance->uthash_locks + thread_id;
 	pthread_spin_lock(&(uthash_lock->lock));
+#endif
+#if USING_RWLOCK
+	struct uthash_rwlock *uthash_lock = instance->uthash_locks + thread_id;
+	pthread_rwlock_wrlock(&(uthash_lock->lock));
+#endif
+#if USING_MUTEX
+	struct uthash_mutex *uthash_lock = instance->uthash_locks + thread_id;
+	pthread_mutex_lock(&(uthash_lock->lock));
+#endif
     HASH_ADD_KEYPTR(hh, *head, value->metric_key, value->metric_keylen, value);
+#if USING_SPINLOCK
 	pthread_spin_unlock(&(uthash_lock->lock));
+#endif
+#if USING_RWLOCK
+	pthread_rwlock_unlock(&(uthash_lock->lock));
+#endif
+#if USING_MUTEX
+	pthread_mutex_unlock(&(uthash_lock->lock));
+#endif
 	return value->metrics;
 }
 

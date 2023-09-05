@@ -481,9 +481,18 @@ int line_protocol_dynamic_metric_output(struct fieldstat_dynamic_instance *insta
 	for(int i = 0; i < instance->n_thread; i++)
 	{
 		std::vector<std::string> line_buf_to_send;
+#if USING_SPINLOCK
 		struct uthash_spinlock *uthash_lock = instance->uthash_locks + i;
-
 		pthread_spin_lock(&(uthash_lock->lock));
+#endif
+#if USING_RWLOCK
+	struct uthash_rwlock *uthash_lock = instance->uthash_locks + i;
+	pthread_rwlock_wrlock(&(uthash_lock->lock));
+#endif
+#if USING_MUTEX
+	struct uthash_mutex *uthash_lock = instance->uthash_locks + i;
+	pthread_mutex_lock(&(uthash_lock->lock));
+#endif
 		head = &instance->n_thread_dynamic_metric[i];
 		HASH_ITER(hh, *head, dyn_metric, tmp_dyn_metric)
 		{
@@ -504,8 +513,15 @@ int line_protocol_dynamic_metric_output(struct fieldstat_dynamic_instance *insta
 			/* copy the line_buf as str to vector line_buf_to_send */
 			line_buf_to_send.push_back(std::string(line_buf));  
 		}
+#if USING_SPINLOCK
 		pthread_spin_unlock(&(uthash_lock->lock));
-
+#endif
+#if USING_RWLOCK
+	pthread_rwlock_unlock(&(uthash_lock->lock));
+#endif
+#if USING_MUTEX
+	pthread_mutex_unlock(&(uthash_lock->lock));
+#endif
 		for (std::vector<std::string>::iterator it = line_buf_to_send.begin(); it != line_buf_to_send.end(); ++it)
 		{
 			const std::string& str = *it;

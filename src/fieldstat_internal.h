@@ -68,6 +68,10 @@
 
 #define CACHE_LINE_SIZE 64
 
+#define USING_SPINLOCK 1
+#define USING_RWLOCK   0
+#define USING_MUTEX    0
+
 enum field_calc_algo
 {
 	FS_CALC_CURRENT=0,
@@ -226,6 +230,18 @@ struct uthash_spinlock
 	pthread_spinlock_t lock;
 } __attribute__((aligned(CACHE_LINE_SIZE)));
 
+
+struct uthash_rwlock
+{
+	pthread_rwlock_t lock;
+} __attribute__((aligned(CACHE_LINE_SIZE)));
+
+struct uthash_mutex
+{
+	pthread_mutex_t lock;
+} __attribute__((aligned(CACHE_LINE_SIZE)));
+
+
 struct fieldstat_dynamic_instance
 {
 	char name[INSTANCE_NAME_LEN];
@@ -247,7 +263,15 @@ struct fieldstat_dynamic_instance
 	int n_thread;
 	int output_type;   // 0b0000:not output, 0b1000:output file, 0b0100:output line_protocol, 0b0010: output statsd, 0b0001: output prometheus 
 	//pthread_spinlock_t *uthash_locks;
+#if USING_SPINLOCK
 	struct uthash_spinlock *uthash_locks;
+#endif
+#if USING_RWLOCK
+	struct uthash_rwlock *uthash_locks;
+#endif
+#if USING_MUTEX
+	struct uthash_mutex *uthash_locks;
+#endif
 };
 
 void prometheus_endpoint_instance_output(struct http_request_s* request);
