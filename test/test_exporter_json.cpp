@@ -11,6 +11,7 @@
 #include "hdr/hdr_histogram.h"
 #include "hdr/hdr_histogram_log.h"
 #include "st_hyperloglog.h"
+#include "histogram_encoder.h"
 #include "very_fast_json_writer.h"
 
 const size_t OPER_NUM = 10000;
@@ -66,7 +67,9 @@ void test_check_if_global_tag_is_in_json(cJSON *tag_obj)
 void test_check_if_metric_histogram_correct(cJSON *metric_obj, const char *name)
 {
     char *blob_histogram_benchmark = NULL;
-    hdr_log_encode(g_histogram_standard, &blob_histogram_benchmark);
+    size_t size_dummy = 0;
+    histogram_encode_into_b64(g_histogram_standard, &blob_histogram_benchmark, &size_dummy);
+    // hdr_log_encode(g_histogram_standard, &blob_histogram_benchmark);
 
     cJSON *histogram_obj = cJSON_GetObjectItem(metric_obj, name);
     EXPECT_NE(histogram_obj, nullptr);
@@ -130,7 +133,7 @@ cJSON *test_exporter_extract_results(const struct fieldstat *instance)
 {
     struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new(instance);
 
-    // printf("going to export, get char\n");
+    printf("going to export, get char\n");
     // getchar();
     char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter);
     printf("json_string: %s\n", json_string);

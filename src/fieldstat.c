@@ -3,7 +3,6 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <time.h>   
 
 #include "cjson/cJSON.h"
 #include "uthash.h"

@@ -377,10 +377,6 @@ struct json_tag_field_pair *read_tag_and_field(const struct fieldstat *instance,
     struct cell_iter *iter = cell_iter_new(instance);
     struct json_tag_field_pair *tag_field_pair = calloc(n_cell_total, sizeof(struct json_tag_field_pair));
     int i = 0;
-    // clock_t prepare_end = clock();
-    // printf("[czz]prepare time: %ld us\n", prepare_end - prepare_start);
-    // clock_t read_start = clock();
-    // int next_num = 0;
     while (cell_iter_next(iter)) {
         // next_num++;
         if (cjson_map_add(&tag_field_pair[i], iter) == 0) {
@@ -388,11 +384,8 @@ struct json_tag_field_pair *read_tag_and_field(const struct fieldstat *instance,
         }
         i++;
     }
-    // clock_t read_end = clock();
-    // printf("[czz]read time: %ld us\n", read_end - read_start);
 
     *n_pair_out = i;
-    // printf("[czz] total cell: %zu, the valid cell: %d, loop num%d\n", n_cell_total, i, next_num);
 
     cell_iter_free(iter);
     return tag_field_pair;

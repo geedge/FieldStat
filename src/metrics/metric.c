@@ -6,7 +6,7 @@
 #include <stdarg.h>
 
 #include "uthash.h"
-
+#include "histogram_encoder.h"
 #include "serializer.h"
 #include "metric.h"
 #include "fieldstat.h"
@@ -698,6 +698,10 @@ void metric_get_plain_blob(const struct metric *pthis, int cell_id, char **blob,
     }
     if (pthis->info->type == METRIC_TYPE_HLL) {
         ST_hyperloglog_serialize_for_networking(data->hll, blob, blob_size);
+        return;
+    }
+    if (pthis->info->type == METRIC_TYPE_HISTOGRAM) {
+        histogram_encode_into_b64(data->hdr, blob, blob_size);
         return;
     }
     pthis->scheme->serialize(data, blob, blob_size);
