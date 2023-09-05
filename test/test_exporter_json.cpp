@@ -133,10 +133,8 @@ cJSON *test_exporter_extract_results(const struct fieldstat *instance)
 {
     struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new(instance);
 
-    printf("going to export, get char\n");
     // getchar();
     char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter);
-    printf("json_string: %s\n", json_string);
     // exit(0);
     cJSON *root_arr = cJSON_Parse(json_string);
     free(json_string);
@@ -447,18 +445,43 @@ TEST(export_unit_test, test_add_json_length_is_on_margin_4095)
     free(buf);
 }
 
-TEST(simple_test_json_writer, test1)
+TEST(export_unit_test, json_writer_length_is_on_margin_4095_int)
 {
+    char str[4090];
+    memset(str, 'a', 4089); // 4089 + ':' + '"'*2 + ‘{’ + ‘}’ = 4095
+    str[4089] = '\0';
+
     struct json_writer *writer = json_writer_init();
     json_writer_start_map(writer);
-    json_writer_str_field(writer, "key", "value", 5);
-    json_writer_int_field(writer, "key2", 123);
-    json_writer_double_field(writer, "key3", 1.1);
+    json_writer_int_field(writer, str, 6);
     json_writer_end_map(writer);
     char *result;
     size_t len;
     json_writer_finish(writer, &result, &len);
-    printf("simple_test_json_writer %s\n", result);
+    EXPECT_EQ(len, 4095);
+    std::string target = "{\"" + std::string(str) + "\":6}";
+    EXPECT_STREQ(result, target.c_str());
+
+    free(result);
+}
+
+TEST(export_unit_test, json_writer_length_is_on_margin_4096_string)
+{
+    char str[4090];
+    memset(str, 'a', 4087); // 4087 + ':' + '"'*4 + ‘{’ + ‘}’ + int1 = 4096
+    str[4087] = '\0';
+
+    struct json_writer *writer = json_writer_init();
+    json_writer_start_map(writer);
+    json_writer_str_field(writer, str, "6", 1);
+    json_writer_end_map(writer);
+    char *result;
+    size_t len;
+    json_writer_finish(writer, &result, &len);
+    EXPECT_EQ(len, 4095);
+    std::string target = "{\"" + std::string(str) + "\":\"6\"}";
+    EXPECT_STREQ(result, target.c_str());
+
     free(result);
 }
 

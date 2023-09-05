@@ -517,7 +517,7 @@ char *fieldstat_json_exporter_export(const struct fieldstat_json_exporter *expor
 
     int buf_len = 4096;
     char *cjson_str_arr = (char *)malloc(buf_len);
-    // cjson is so slow, so we construct the json array manually
+    // cjson is so slow, so we construct the json array manually, the reason why we don't use json_writer is simply because I wrote this before implementing json_writer
     int used_len = add_object_to_json_array_start(cjson_str_arr, buf_len);
     for (int i = 0; i < n_pair; i++) {
         used_len = add_object_to_json_array(&cjson_str_arr, &buf_len, used_len, str_arr[i]);
