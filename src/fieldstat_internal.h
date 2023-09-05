@@ -66,7 +66,7 @@
 
 #define METRIC_SIZE	1024
 
-
+#define CACHE_LINE_SIZE 64
 
 enum field_calc_algo
 {
@@ -221,6 +221,11 @@ struct dynamic_metric
 	UT_hash_handle hh;
 };
 
+struct uthash_spinlock
+{
+	pthread_spinlock_t lock;
+} __attribute__((aligned(CACHE_LINE_SIZE)));
+
 struct fieldstat_dynamic_instance
 {
 	char name[INSTANCE_NAME_LEN];
@@ -241,7 +246,8 @@ struct fieldstat_dynamic_instance
 	struct dynamic_metric **n_thread_dynamic_metric;
 	int n_thread;
 	int output_type;   // 0b0000:not output, 0b1000:output file, 0b0100:output line_protocol, 0b0010: output statsd, 0b0001: output prometheus 
-	pthread_spinlock_t *uthash_locks;
+	//pthread_spinlock_t *uthash_locks;
+	struct uthash_spinlock *uthash_locks;
 };
 
 void prometheus_endpoint_instance_output(struct http_request_s* request);
