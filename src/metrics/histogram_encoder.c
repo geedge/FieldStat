@@ -27,6 +27,14 @@ typedef struct /*__attribute__((__packed__))*/
     uint8_t counts[1];
 } encoding_flyweight_v1_t;
 
+struct simple_encoded/*__attribute__((__packed__))*/
+{
+    int32_t significant_figures;
+    int64_t lowest_discernible_value;
+    int64_t highest_trackable_value;
+    uint8_t counts[0];
+};
+
 union uint64_dbl_cvt
 {
     uint64_t l;
@@ -109,4 +117,38 @@ void histogram_encode_into_b64(struct hdr_histogram *hdr, char **buffer, size_t 
     free(encoded_buf);
     *buffer_size = strlen(enc);
     *buffer = enc;
+}
+
+void histogram_encode_into_blob(const struct hdr_histogram *hdr, char **blob, size_t *blob_len)
+{
+    struct simple_encoded *encoded = NULL;
+    size_t counts_size = hdr->counts_len * sizeof(int64_t);
+    const size_t encoded_len = sizeof(struct simple_encoded) + counts_size;
+
+    if ((encoded = (struct simple_encoded *) hdr_calloc(encoded_len, sizeof(uint8_t))) == NULL) {
+        hdr_free(encoded);
+    }
+
+    memcpy(encoded->counts, hdr->counts, counts_size);
+    encoded->significant_figures      = hdr->significant_figures;
+    encoded->lowest_discernible_value   = hdr->lowest_discernible_value;
+    encoded->highest_trackable_value  = hdr->highest_trackable_value;
+
+    *blob = (char *)encoded;
+    *blob_len = encoded_len;
+}
+
+struct hdr_histogram *histogram_decode_from_blob(const char *blob, size_t blob_len)
+{
+    const struct simple_encoded *encoded = (const struct simple_encoded *)blob;
+    struct hdr_histogram *hdr = NULL;
+    int ret = hdr_init(encoded->lowest_discernible_value, encoded->highest_trackable_value, encoded->significant_figures, &hdr);
+    if (ret != 0) {
+        return NULL;
+    }
+
+    memcpy(hdr->counts, encoded->counts, blob_len - sizeof(struct simple_encoded));
+    hdr_reset_internal_counters(hdr);
+    
+    return hdr;
 }

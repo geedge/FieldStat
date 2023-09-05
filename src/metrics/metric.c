@@ -263,9 +263,7 @@ static void metric_scheme_histogram_free(struct metric_measure_data *data)
 
 static void metric_scheme_histogram_serialize(const struct metric_measure_data *data, char **blob, size_t *blob_size)
 {
-    struct hdr_histogram *hdr = data->hdr;
-    hdr_log_encode(hdr, blob);
-    *blob_size = strlen(*blob);
+    histogram_encode_into_blob(data->hdr, blob, blob_size);
 }
 
 static int metric_scheme_histogram_merge(struct metric_measure_data *pthis, const struct metric_measure_data *from)
@@ -282,11 +280,7 @@ static int metric_scheme_histogram_copy(struct metric_measure_data *pthis, const
 
 struct metric_measure_data *metric_scheme_histogram_deserialize(const char *blob, size_t blob_size) 
 {
-    struct hdr_histogram *hdr = NULL;
-    int ret = hdr_log_decode(&hdr, (char *)blob, blob_size);
-    if (ret != 0 || hdr == NULL) {
-        return NULL;
-    }
+    struct hdr_histogram *hdr = histogram_decode_from_blob(blob, blob_size);
     struct metric_measure_data *data = (struct metric_measure_data *)malloc(sizeof(struct metric_measure_data));
     data->hdr = hdr;
     return data;

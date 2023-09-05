@@ -120,31 +120,6 @@ TEST(metric_test_histogram, serialization_and_merge_twice_with_reset)
     fieldstat_free(instance_total);
 }
 
-#include "base64/b64.h"
-#include "hdr/hdr_histogram.h"
-#include "hdr/hdr_histogram_log.h"
-TEST(metric_test_histogram, serialize_with_b64_and_query)
-{
-    struct fieldstat *instance = test_init_standard_instance_one_cube_one_metric_one_cell_hdr();
-    fieldstat_hist_record(instance, 0, 0, 0, 1234);
-    fieldstat_hist_record(instance, 0, 0, 0, 1234);
-    fieldstat_hist_record(instance, 0, 0, 0, 123);
-
-    char *blob = NULL;
-    size_t blob_len = 0;
-    fieldstat_get_serialized_blob(instance, 0, 0, 0, &blob, &blob_len);
-    struct hdr_histogram *histogram = NULL;
-    hdr_log_decode(&histogram, blob, blob_len);
-    EXPECT_TRUE(histogram != NULL);
-    EXPECT_EQ(histogram->total_count, 3);
-    EXPECT_EQ(hdr_value_at_percentile(histogram, 50.0), 1234);
-
-    free(blob);
-    hdr_close(histogram);
-
-    fieldstat_free(instance);
-}
-
 TEST(metric_test_histogram, add_or_set_with_wrong_cell_id_expecting_fail)
 {
     struct fieldstat *instance = fieldstat_new();
