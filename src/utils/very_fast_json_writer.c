@@ -117,6 +117,14 @@ void json_writer_longlong_field(struct json_writer *writer, const char *key, lon
 
 void json_writer_finish(struct json_writer *writer, char **result, size_t *result_len)
 {
+    if (writer->cursor == 0) {
+        free(writer->buffer);
+        *result = NULL;
+        *result_len = 0;
+        free(writer);
+        return;
+    }
+
     writer->buffer[writer->cursor - 1] = '\0'; // replace last comma with \0
     *result = writer->buffer;
     *result_len = writer->cursor - 1; // exclude the comma  
@@ -134,11 +142,12 @@ void json_writer_object_item(struct json_writer *writer, const char *key, struct
     char *str_writer_in;
     size_t str_writer_in_len;
     json_writer_finish(writer_in, &str_writer_in, &str_writer_in_len);
-
-    json_writer_check_and_realloc(writer, str_writer_in_len);
-    memcpy(writer->buffer + writer->cursor, str_writer_in, str_writer_in_len);
-    writer->cursor += str_writer_in_len;
-    free(str_writer_in);
+    if (str_writer_in_len != 0) {
+        json_writer_check_and_realloc(writer, str_writer_in_len);
+        memcpy(writer->buffer + writer->cursor, str_writer_in, str_writer_in_len);
+        writer->cursor += str_writer_in_len;
+        free(str_writer_in);
+    }
 
     json_writer_check_and_realloc(writer, 2);
     writer->buffer[writer->cursor++] = '}';
