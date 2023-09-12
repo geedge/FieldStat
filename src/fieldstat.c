@@ -1173,3 +1173,12 @@ int fieldstat_get_max_cell_id(const struct fieldstat *instance, int cube_id)
     (void)cell_manager_dump(cube->cell_manager, &max_id);
     return max_id;
 }
+
+int fieldstat_find_cube(const struct fieldstat *instance, const struct fieldstat_tag *shared_tags, size_t n_shared_tags)
+{
+    const struct cube_manager *tag_cube_id_map = instance->shared_tag_cube_manager;
+    struct tag_hash_key *shared_tag_key = tag_hash_key_construct_with_fieldstat_tag(shared_tags, n_shared_tags);
+    int cube_id = cube_manager_find(tag_cube_id_map, shared_tag_key);
+    tag_hash_key_free(shared_tag_key);
+    return cube_id;
+}

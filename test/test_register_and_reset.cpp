@@ -320,6 +320,20 @@ TEST(test_register, register_cube_twice) {
     fieldstat_free(instance);
 }
 
+TEST(test_register, find_cube) {
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 10);
+
+    int find_cube_id = fieldstat_find_cube(instance, &TEST_SHARED_TAG, 1);
+    EXPECT_EQ(cube_id, find_cube_id);
+    int find_cube_id2 = fieldstat_find_cube(instance, &TEST_TAG_DOUBLE, 1);
+    EXPECT_EQ(find_cube_id2, -1);
+    
+    fieldstat_free(instance);
+}
+
+// int fieldstat_find_cube(const struct fieldstat *instance, const struct fieldstat_tag *shared_tags, size_t n_shared_tags);
+
 int main(int argc, char *argv[]) 
 {
 	testing::InitGoogleTest(&argc, argv);

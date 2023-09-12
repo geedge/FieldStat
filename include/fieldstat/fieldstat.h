@@ -228,6 +228,11 @@ void fieldstat_get_cells(const struct fieldstat *instance, int cube_id, int metr
 */
 struct fieldstat_tag_list *fieldstat_get_shared_tags(const struct fieldstat *instance, int cube_id);
 
+/*
+    return a cube id corresponding to the shared tags. -1 is returned if the shared tags are not found.
+*/
+int fieldstat_find_cube(const struct fieldstat *instance, const struct fieldstat_tag *shared_tags, size_t n_shared_tags);
+
 /* 
     get the parameter max_n_cell of fieldstat_register_cube
 */
