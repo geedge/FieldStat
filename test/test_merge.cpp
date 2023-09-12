@@ -630,10 +630,10 @@ TEST(unit_test_merge, exception_test_given_cell_added_but_no_metric_operation_gi
     int metric_id = fieldstat_register_counter(instance, cube_id, "metric name1", COUNTER_MERGE_BY_SUM);
     int cell_id = fieldstat_cube_add(instance, cube_id, &TEST_TAG_STRING, 1, 1);
 
-    int cube_id_dst = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 2);
-    int metric_id_dst = fieldstat_register_counter(instance, cube_id_dst, "metric name1", COUNTER_MERGE_BY_SUM);
-    int cell_id_dst = fieldstat_cube_add(instance, cube_id_dst, &TEST_TAG_STRING, 1, 1);
-    fieldstat_counter_incrby(instance, cube_id_dst, metric_id_dst, cell_id_dst, 123);
+    int cube_id_dst = fieldstat_register_cube(instance2, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 2);
+    int metric_id_dst = fieldstat_register_counter(instance2, cube_id_dst, "metric name1", COUNTER_MERGE_BY_SUM);
+    int cell_id_dst = fieldstat_cube_add(instance2, cube_id_dst, &TEST_TAG_STRING, 1, 1);
+    fieldstat_counter_incrby(instance2, cube_id_dst, metric_id_dst, cell_id_dst, 123);
 
     fieldstat_merge(instance2, instance);
 
@@ -641,7 +641,7 @@ TEST(unit_test_merge, exception_test_given_cell_added_but_no_metric_operation_gi
     struct fieldstat_tag_list *tag_list = NULL;
     size_t n_cell = 0;
     fieldstat_get_cells(instance2, cube_id, metric_id, &cell_ids, &tag_list, &n_cell);
-    EXPECT_TRUE(n_cell == 1);
+    EXPECT_EQ(n_cell, 1);
     EXPECT_EQ(fieldstat_counter_get(instance2, cube_id, metric_id, cell_id), 123);
 
     fieldstat_free(instance);
