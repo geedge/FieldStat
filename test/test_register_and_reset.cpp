@@ -94,8 +94,10 @@ TEST(test_register, register_many_cubes)
 {
     struct fieldstat *instance = fieldstat_new();
     int registered_cube = 10000; // will trigger realloc many times
+    struct fieldstat_tag shared_tag = TEST_SHARED_TAG;
     for (int i = 0; i < registered_cube; i++) {
-        int cube_id = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+        shared_tag.value_longlong = i;
+        int cube_id = fieldstat_register_cube(instance, &shared_tag, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
         EXPECT_EQ(cube_id, i);
     }
     // try to use the cube
@@ -310,7 +312,13 @@ TEST(test_register, unregister_cell)
     fieldstat_free(instance);
 }
 
-
+TEST(test_register, register_cube_twice) {
+    struct fieldstat *instance = fieldstat_new();
+    fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 10);
+    int cube_id2 = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 10);
+    EXPECT_EQ(cube_id2, -2);
+    fieldstat_free(instance);
+}
 
 int main(int argc, char *argv[]) 
 {

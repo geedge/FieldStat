@@ -428,6 +428,17 @@ void cube_manager_add(struct cube_manager *pthis, const struct tag_hash_key *tag
     HASH_ADD_TAG(pthis->head, tag, node);
 }
 
+void cube_manager_delete(struct cube_manager *pthis, const struct tag_hash_key *tag)
+{
+    struct tag_id_map *node = NULL;
+    HASH_FIND_TAG(pthis->head, tag, node);
+    if (node != NULL) {
+        HASH_DEL(pthis->head, node);
+        tag_hash_key_free(node->tag);
+        free(node);
+    }
+}
+
 int cube_manager_find(const struct cube_manager *pthis, const struct tag_hash_key *tag)
 {
     struct tag_id_map *node = NULL;

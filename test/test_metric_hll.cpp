@@ -165,7 +165,7 @@ TEST(metric_test_hll, serialize_with_b64_and_query)
     ST_hyperloglog_free(hll_from_blob);
 }
 
-TEST(metric_test_histogram, add_or_set_with_wrong_cell_id_expecting_fail)
+TEST(metric_test_hll, add_or_set_with_wrong_cell_id_expecting_fail)
 {
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
@@ -179,7 +179,7 @@ TEST(metric_test_histogram, add_or_set_with_wrong_cell_id_expecting_fail)
     fieldstat_free(instance);
 }
 
-TEST(metric_test_histogram, add_with_wrong_cube_id_expecting_fail)
+TEST(metric_test_hll, add_with_wrong_cube_id_expecting_fail)
 {
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
@@ -192,7 +192,7 @@ TEST(metric_test_histogram, add_with_wrong_cube_id_expecting_fail)
     fieldstat_free(instance);
 }
 
-TEST(metric_test_histogram, add_with_wrong_metric_id_expecting_fail)
+TEST(metric_test_hll, add_with_wrong_metric_id_expecting_fail)
 {
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
