@@ -161,6 +161,24 @@ TEST(metric_test_histogram, add_with_wrong_metric_id_expecting_fail)
     fieldstat_free(instance);
 }
 
+TEST(metric_test_histogram, can_add_0value) // histogram only allow min_val > 0, but it can accept value == 0
+{
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    int metric_id = fieldstat_register_hist(instance, cube_id, "czz_test", 1, 600000, 3);
+    int cell_id = fieldstat_cube_add(instance, cube_id, &TEST_TAG_INT_collided, 1, 1);
+
+    int ret = fieldstat_hist_record(instance, cube_id, metric_id, cell_id, 0);
+    EXPECT_EQ(ret, 0);
+    ret = fieldstat_hist_record(instance, cube_id, metric_id, cell_id, 0);
+    EXPECT_EQ(ret, 0);
+    ret = fieldstat_hist_record(instance, cube_id, metric_id, cell_id, 500);
+
+    EXPECT_EQ(fieldstat_hist_value_at_percentile(instance, cube_id, metric_id, cell_id, 60.0), 0);
+
+    fieldstat_free(instance);
+}
+
 int main(int argc, char *argv[]) 
 {
 	testing::InitGoogleTest(&argc, argv);

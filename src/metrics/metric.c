@@ -799,9 +799,9 @@ int metric_histogram_record(struct metric *pthis, int cell_id, long long value)
     if (value > data->hdr->highest_trackable_value) {
         value = data->hdr->highest_trackable_value;
     }
-    if (value < data->hdr->lowest_discernible_value) {
-        value = data->hdr->lowest_discernible_value;
-    }
+    // if (value < data->hdr->lowest_discernible_value) {
+    //     value = data->hdr->lowest_discernible_value;
+    // }
     bool ret = hdr_record_value(data->hdr, value);
     if (!ret) {
         return -1;
