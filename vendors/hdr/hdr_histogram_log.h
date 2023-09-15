@@ -229,6 +229,9 @@ int hdr_log_read_entry(
  */
 const char* hdr_strerror(int errnum);
 
+/* ----------------------------- used by my code ---------------------------- */
+int apply_to_counts_zz(struct hdr_histogram* h, const uint8_t* counts_data, const int32_t data_limit);
+
 #ifdef __cplusplus
 }
 #endif

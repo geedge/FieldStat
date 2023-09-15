@@ -16,15 +16,6 @@ enum metric_type
 	METRIC_TYPE_HLL,
 	METRIC_TYPE_HISTOGRAM,
 };
-//todo:
-// poc
-// tracing
-// 性能
-// 配置
-// stream 
-// 怎么和C 对接
-// 类型系统？
-
 
 enum fs_tag_type
 {

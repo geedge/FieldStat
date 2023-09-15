@@ -119,6 +119,81 @@ void histogram_encode_into_b64(struct hdr_histogram *hdr, char **buffer, size_t 
     *buffer = enc;
 }
 
+static uint32_t get_cookie_base(uint32_t cookie)
+{
+    return (cookie & ~0xf0U);
+}
+
+static double int64_bits_to_double(int64_t i)
+{
+    union uint64_dbl_cvt x;
+
+    x.l = (uint64_t) i;
+    return x.d;
+}
+
+static int hdr_decode_v2_buf(const unsigned char* buffer, size_t length, struct hdr_histogram** histogram)
+{
+    struct hdr_histogram* h = NULL;
+    int result = 0;
+    int rc = 0;
+    const uint8_t* counts_array = NULL;
+    uint32_t encoding_cookie;
+    int32_t counts_limit, significant_figures;
+    int64_t lowest_discernible_value, highest_trackable_value;
+
+    encoding_flyweight_v1_t encoding_flyweight;
+    memcpy(&encoding_flyweight, buffer, SIZEOF_ENCODING_FLYWEIGHT_V1);
+
+    encoding_cookie = get_cookie_base(be32toh(encoding_flyweight.cookie));
+    if (V2_ENCODING_COOKIE != encoding_cookie) {
+        return -1;
+    }
+
+    counts_limit = be32toh(encoding_flyweight.payload_len);
+    lowest_discernible_value = be64toh(encoding_flyweight.lowest_discernible_value);
+    highest_trackable_value = be64toh(encoding_flyweight.highest_trackable_value);
+    significant_figures = be32toh(encoding_flyweight.significant_figures);
+
+    rc = hdr_init(lowest_discernible_value, highest_trackable_value, significant_figures, &h);
+    if (rc) {
+        return -1;
+    }
+
+    encoding_flyweight_v1_t *buffer_aligner = (encoding_flyweight_v1_t *)buffer;
+
+    counts_array = buffer_aligner->counts;
+
+    rc = apply_to_counts_zz(h, counts_array, counts_limit);
+    if (rc) {
+        free(h);
+        return -1;
+    }
+
+    h->normalizing_index_offset = be32toh(encoding_flyweight.normalizing_index_offset);
+    h->conversion_ratio = int64_bits_to_double(be64toh(encoding_flyweight.conversion_ratio_bits));
+    hdr_reset_internal_counters(h);
+
+    *histogram = h;
+    return result;
+}
+
+struct hdr_histogram *histogram_decode_from_b64(const char *buffer, size_t buffer_size)
+{
+    size_t dec_size = 0;
+    unsigned char *dec = b64_decode_ex(buffer, buffer_size, &dec_size);
+
+    struct hdr_histogram *hdr = NULL;
+    int ret = hdr_decode_v2_buf(dec, dec_size, &hdr);
+    free(dec);
+
+    if (ret != 0) {
+        return NULL;
+    }
+
+    return hdr;
+}
+
 void histogram_encode_into_blob(const struct hdr_histogram *hdr, char **blob, size_t *blob_len)
 {
     struct simple_encoded *encoded = NULL;
@@ -151,4 +226,17 @@ struct hdr_histogram *histogram_decode_from_blob(const char *blob, size_t blob_l
     hdr_reset_internal_counters(hdr);
     
     return hdr;
+}
+
+long long hdr_count_le_value(const struct hdr_histogram* h, long long value)
+{
+	struct hdr_iter iter;
+	long long count = 0;
+	hdr_iter_recorded_init(&iter, h);
+	while (hdr_iter_next(&iter))
+	{
+		if((long long)iter.value <= value)
+			count ++;
+	}
+	return count;
 }

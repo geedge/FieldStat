@@ -292,7 +292,7 @@ static void apply_to_counts_64(struct hdr_histogram* h, const int64_t* counts_da
     }
 }
 
-static int apply_to_counts_zz(struct hdr_histogram* h, const uint8_t* counts_data, const int32_t data_limit)
+int apply_to_counts_zz(struct hdr_histogram* h, const uint8_t* counts_data, const int32_t data_limit)
 {
     int64_t data_index = 0;
     int32_t counts_index = 0;

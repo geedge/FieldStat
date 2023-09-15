@@ -131,6 +131,15 @@ void json_writer_finish(struct json_writer *writer, char **result, size_t *resul
     free(writer);
 }
 
+const char *json_writer_unwrap(const struct json_writer *writer)
+{
+    if (writer->cursor == 0) {
+        return NULL;
+    }
+
+    return writer->buffer;
+}
+
 void json_writer_object_item(struct json_writer *writer, const char *key, struct json_writer *writer_in)
 {
     json_writer_str_item(writer, key, strlen(key));

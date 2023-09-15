@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "utils.hpp"
 #include "cjson/cJSON.h"
 
 #include "fieldstat.h"
@@ -145,7 +146,7 @@ TEST(test_empty_tag, export)
 {
     struct fieldstat *instance = test_empty_my_init();
     struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new(instance);
-    char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter);
+    char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, &TEST_TIMEVAL);
     // std::cout << "json_string: \n" << json_string << std::endl;
 
     cJSON *root_arr = cJSON_Parse(json_string);

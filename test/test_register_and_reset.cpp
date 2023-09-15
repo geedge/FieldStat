@@ -332,7 +332,15 @@ TEST(test_register, find_cube) {
     fieldstat_free(instance);
 }
 
-// int fieldstat_find_cube(const struct fieldstat *instance, const struct fieldstat_tag *shared_tags, size_t n_shared_tags);
+TEST(test_register, register_metric_twice) {
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 10);
+    fieldstat_register_counter(instance, cube_id, "counter", COUNTER_MERGE_BY_SUM);
+    int metric_id2 = fieldstat_register_counter(instance, cube_id, "counter", COUNTER_MERGE_BY_SUM);
+    EXPECT_EQ(metric_id2, -2);
+    fieldstat_free(instance);
+}
+
 
 int main(int argc, char *argv[]) 
 {

@@ -818,19 +818,6 @@ long long metric_histogram_value_at_percentile(const struct metric *pthis, int c
     return hdr_value_at_percentile(data->hdr, percentile);
 }
 
-static long long hdr_count_le_value(const struct hdr_histogram* h, long long value)
-{
-	struct hdr_iter iter;
-	long long count = 0;
-	hdr_iter_recorded_init(&iter, h);
-	while (hdr_iter_next(&iter))
-	{
-		if((long long)iter.value <= value)
-			count ++;
-	}
-	return count;
-}
-
 long long metric_histogram_count_le_value(const struct metric *pthis, int cell_id, long long value)
 {
     const struct metric_measure_data *data = metric_find_one_cell(pthis, cell_id);

@@ -368,7 +368,7 @@ TEST(test_performance, export_many_cells)
     printf("export_many_cells\n");
     // getchar();
     clock_t start = clock();
-    char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter);
+    char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, &TEST_TIMEVAL);
     clock_t end = clock();
     // exit(0);
     free(json_string);
