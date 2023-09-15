@@ -11,6 +11,7 @@ const struct fieldstat_tag TEST_TAG_DOUBLE = {"DOUBLE key_", TAG_DOUBLE, {.value
 const struct fieldstat_tag TEST_TAG_DOUBLE_collided = {"collided", TAG_DOUBLE, {.value_double = 2.0}};
 const struct fieldstat_tag TEST_SHARED_TAG = {"shared", TAG_INTEGER, {.value_longlong = 1}};
 const struct timeval TEST_TIMEVAL = {100, 10000};
+const long long TEST_TIMEVAL_LONG = 100010; // 100s * 1000 + 10000us / 1000 = 100010ms
 
 std::string gen_rand_string(int len);
 

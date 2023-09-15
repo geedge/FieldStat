@@ -165,6 +165,32 @@ TEST(metric_test_hll, serialize_with_b64_and_query)
     ST_hyperloglog_free(hll_from_blob);
 }
 
+
+extern "C" {
+    void *hll_base64_decode(char *buf);
+    bool is_hll(char *buf);
+}
+TEST(metric_test_hll, serialize_with_b64_and_query_with_python_api)
+{
+    struct fieldstat *instance = test_init_standard_instance_one_cube_one_metric_one_cell_hll();
+    fieldstat_hll_add(instance, 0, 0, 0, "hello", 5);
+    fieldstat_hll_add(instance, 0, 0, 0, "wor", 3);
+    fieldstat_hll_add(instance, 0, 0, 0, "world", 5);
+
+    char *blob = NULL;
+    size_t blob_len = 0;
+    fieldstat_get_serialized_blob(instance, 0, 0, 0, &blob, &blob_len);
+
+    bool flag = is_hll(blob);
+    EXPECT_EQ(flag, true);
+
+    void *hll_from_blob = hll_base64_decode(blob);
+    EXPECT_NEAR(ST_hyperloglog_count((struct ST_hyperloglog *)hll_from_blob), 3, 0.5);
+    free(blob);
+    fieldstat_free(instance);
+    ST_hyperloglog_free((struct ST_hyperloglog *)hll_from_blob);
+}
+
 TEST(metric_test_hll, add_or_set_with_wrong_cell_id_expecting_fail)
 {
     struct fieldstat *instance = fieldstat_new();

@@ -53,6 +53,7 @@ struct fieldstat *fieldstat_new()
     instance->max_n_cube = 100;
     instance->cube = calloc(instance->max_n_cube, sizeof(struct fs_cube *));
     instance->cube_version = calloc(instance->max_n_cube, sizeof(unsigned long));
+
     instance->shared_tag_cube_manager = cube_manager_new();
 
     return instance;
@@ -170,16 +171,6 @@ void name_id_map_free(struct metric_name_id_map *map)
         HASH_DEL(map, entry);
         free(entry->name);
         free(entry);
-    }
-}
-
-void name_id_map_init(struct metric_name_id_map **map, const struct fs_cube *cube)
-{
-    *map = NULL;
-    const char *name;
-    for (int i = 0; i < cube->n_metric; i++) {
-        name = metric_get_name(cube->metrics[i]);
-        name_id_map_add(map, name, i);
     }
 }
 
@@ -398,9 +389,7 @@ void fieldstat_cube_free(struct fieldstat *instance, int cube_id)
     }
     free(cube->metrics);
 
-    if (cube->metric_name_id_map != NULL) {
-        name_id_map_free(cube->metric_name_id_map);
-    }
+    name_id_map_free(cube->metric_name_id_map);
 
     free(cube);
     instance->cube[cube_id] = NULL;
@@ -417,8 +406,10 @@ static int append_metric_to_cube(struct fs_cube *cube, struct metric *metric)
         cube->max_n_metric *= 2;
         cube->metrics = realloc(cube->metrics, sizeof(struct metric *) * cube->max_n_metric);
     }
+    name_id_map_add(&cube->metric_name_id_map, metric_get_name(metric), cube->n_metric);
     cube->metrics[cube->n_metric] = metric;
     cube->n_metric++;
+
     return cube->n_metric - 1;
 }
 
@@ -434,6 +425,11 @@ int fieldstat_register_counter(struct fieldstat *instance, int cube_id, const ch
     if (cube == NULL) {
         return -1;
     }
+
+    if (name_id_map_get_id_by_name(cube->metric_name_id_map, field_name) != -1) {
+        return -2;
+    }
+
     struct metric *metric = metric_counter_new(field_name, mode);
 
     return append_metric_to_cube(cube, metric);
@@ -823,10 +819,6 @@ void fieldstat_cube_merge_topk(struct fs_cube *dest, const struct fs_cube *src, 
 void fieldstat_cube_merge(struct fs_cube *dest, const struct fs_cube *src)
 {
     struct metric_name_id_map *name_id_map_dest = dest->metric_name_id_map;
-    if (name_id_map_dest == NULL) {
-        name_id_map_init(&name_id_map_dest, dest);
-        dest->metric_name_id_map = name_id_map_dest;
-    }
 
     int metric_id_src_dest_map[src->n_metric];
     for (int metric_id_src = 0; metric_id_src < src->n_metric; metric_id_src++) {

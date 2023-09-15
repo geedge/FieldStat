@@ -84,6 +84,16 @@ char *fieldstat_json_exporter_export(const struct fieldstat_json_exporter *expor
 */
 void fieldstat_json_exporter_export_array(const struct fieldstat_json_exporter *exporter, const struct timeval *timestamp, char ***output, size_t *output_size);
 
+/*
+    let json exporter output delta value by the side of the original value(accumulated). If a cell / metric is new, the delta value is the same as the original value.
+    Outputting delta value is disabled by default.
+    When the exporter name or exporter global tags are changed, or the fieldstat instance is reset, or one of the cube is deleted, the delta value will be reset. (next output will be the original value)
+    it is recommended to call this function after fieldstat_json_exporter_set_name and fieldstat_json_exporter_set_global_tag.
+    Only affects the metrics of counter type.
+    Outputting delta value is time-consuming.
+*/
+void fieldstat_json_exporter_enable_delta(struct fieldstat_json_exporter *exporter);
+
 #ifdef __cplusplus
 }
 #endif

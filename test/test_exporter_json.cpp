@@ -402,6 +402,433 @@ TEST(export_test, skip_empty_metrics_given_cube_deleted) {
     cJSON_Delete(root_arr);
 }
 
+TEST(export_test, enable_delta_and_export_twice_without_new_metric)
+{
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_register_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 10);
+    int id_counter = fieldstat_register_counter(instance, cube_id, "counter", COUNTER_MERGE_BY_SUM);
+    int cell_id = fieldstat_cube_add(instance, cube_id, &TEST_TAG_INT, 1, 1);
+    fieldstat_counter_incrby(instance, cube_id, id_counter, cell_id, 1);
+
+    // export test
+    struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new(instance);
+    fieldstat_json_exporter_enable_delta(fieldstat_json_exporter);
+    char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, &TEST_TIMEVAL);
+    cJSON *root_arr = cJSON_Parse(json_string);
+    free(json_string);
+
+    int arr_num = cJSON_GetArraySize(root_arr);
+    EXPECT_EQ(arr_num, 1);
+    for (int i = 0; i < arr_num; i++)
+    {
+        cJSON *root = cJSON_GetArrayItem(root_arr, i);
+
+        // check metrics
+        cJSON *metrics = cJSON_GetObjectItem(root, "fields");
+        cJSON *counter = cJSON_GetObjectItem(metrics, "counter");
+        EXPECT_EQ(counter->valueint, 1);
+        cJSON *counter_delta = cJSON_GetObjectItem(metrics, "counter_delta");
+        EXPECT_EQ(counter_delta->valueint, 1);
+
+        // timestamp
+        cJSON *timestamp = cJSON_GetObjectItem(root, "timestamp_ms");
+        EXPECT_EQ(timestamp->valueint, TEST_TIMEVAL_LONG);
+        cJSON *timestamp_delta = cJSON_GetObjectItem(root, "timestamp_ms_delta");
+        EXPECT_EQ(timestamp_delta->valueint, TEST_TIMEVAL_LONG);
+    }
+    cJSON_Delete(root_arr);
+
+    struct timeval new_ts = TEST_TIMEVAL;
+    new_ts.tv_sec += 1;
+    json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, &new_ts);
+    root_arr = cJSON_Parse(json_string);
+    free(json_string);
+
+    arr_num = cJSON_GetArraySize(root_arr);
+    EXPECT_EQ(arr_num, 1);
+    for (int i = 0; i < arr_num; i++)
+    {
+        cJSON *root = cJSON_GetArrayItem(root_arr, i);
+
+        // check metrics
+        cJSON *metrics = cJSON_GetObjectItem(root, "fields");
+        cJSON *counter = cJSON_GetObjectItem(metrics, "counter");
+        EXPECT_EQ(counter->valueint, 1);
+        cJSON *counter_delta = cJSON_GetObjectItem(metrics, "counter_delta");
+        EXPECT_EQ(counter_delta->valueint, 0);
+
+        // timestamp
+        cJSON *timestamp = cJSON_GetObjectItem(root, "timestamp_ms");
+        EXPECT_EQ(timestamp->valueint, TEST_TIMEVAL_LONG + 1000);
+        cJSON *timestamp_delta = cJSON_GetObjectItem(root, "timestamp_ms_delta");
+        EXPECT_EQ(timestamp_delta->valueint, 1000);
+    }
+    cJSON_Delete(root_arr);
+
+    fieldstat_json_exporter_free(fieldstat_json_exporter);
+
+    fieldstat_free(instance);
+} 
+
+TEST(export_test, enable_delta_and_export_twice_with_new_metric_and_omit_histogram)
+{
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_register_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 10);
+    int id_counter = fieldstat_register_counter(instance, cube_id, "counter", COUNTER_MERGE_BY_SUM);
+    int id_histogram = fieldstat_register_hist(instance, cube_id, "histogram",
+        g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
+    int cell_id = fieldstat_cube_add(instance, cube_id, &TEST_TAG_INT, 1, 1);
+    fieldstat_counter_incrby(instance, cube_id, id_counter, cell_id, 1);
+    fieldstat_hist_record(instance, cube_id, id_histogram, cell_id, 123);
+
+    // export test
+    struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new(instance);
+    fieldstat_json_exporter_enable_delta(fieldstat_json_exporter);
+    char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, &TEST_TIMEVAL);
+    cJSON *root_arr = cJSON_Parse(json_string);
+    free(json_string);
+
+    int arr_num = cJSON_GetArraySize(root_arr);
+    EXPECT_EQ(arr_num, 1);
+    for (int i = 0; i < arr_num; i++)
+    {
+        cJSON *root = cJSON_GetArrayItem(root_arr, i);
+
+        // check metrics
+        cJSON *metrics = cJSON_GetObjectItem(root, "fields");
+        cJSON *counter = cJSON_GetObjectItem(metrics, "counter");
+        EXPECT_EQ(counter->valueint, 1);
+        cJSON *counter_delta = cJSON_GetObjectItem(metrics, "counter_delta");
+        EXPECT_EQ(counter_delta->valueint, 1);
+        EXPECT_TRUE(cJSON_GetObjectItem(metrics, "histogram") != nullptr);
+        EXPECT_TRUE(cJSON_GetObjectItem(metrics, "histogram_delta") == NULL);
+
+        // timestamp
+        cJSON *timestamp = cJSON_GetObjectItem(root, "timestamp_ms");
+        EXPECT_EQ(timestamp->valueint, TEST_TIMEVAL_LONG);
+        cJSON *timestamp_delta = cJSON_GetObjectItem(root, "timestamp_ms_delta");
+        EXPECT_EQ(timestamp_delta->valueint, TEST_TIMEVAL_LONG);
+    }
+    cJSON_Delete(root_arr);
+
+    struct timeval new_ts = TEST_TIMEVAL;
+    new_ts.tv_sec += 1;
+    int id_counter2 = fieldstat_register_counter(instance, cube_id, "counter2", COUNTER_MERGE_BY_SUM);
+    fieldstat_counter_incrby(instance, cube_id, id_counter2, cell_id, 1);
+    fieldstat_counter_incrby(instance, cube_id, id_counter, cell_id, 10);
+
+    json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, &new_ts);
+    root_arr = cJSON_Parse(json_string);
+    free(json_string);
+
+    arr_num = cJSON_GetArraySize(root_arr);
+    EXPECT_EQ(arr_num, 1);
+    for (int i = 0; i < arr_num; i++)
+    {
+        cJSON *root = cJSON_GetArrayItem(root_arr, i);
+
+        // check metrics
+        cJSON *metrics = cJSON_GetObjectItem(root, "fields");
+        cJSON *counter = cJSON_GetObjectItem(metrics, "counter");
+        EXPECT_EQ(counter->valueint, 11);
+        cJSON *counter_delta = cJSON_GetObjectItem(metrics, "counter_delta");
+        EXPECT_EQ(counter_delta->valueint, 10);
+        EXPECT_TRUE(cJSON_GetObjectItem(metrics, "histogram") != nullptr);
+        EXPECT_TRUE(cJSON_GetObjectItem(metrics, "histogram_delta") == NULL);
+        cJSON *counter2 = cJSON_GetObjectItem(metrics, "counter2");
+        EXPECT_EQ(counter2->valueint, 1);
+        cJSON *counter2_delta = cJSON_GetObjectItem(metrics, "counter2_delta");
+        EXPECT_EQ(counter2_delta->valueint, 1);
+
+        // timestamp
+        cJSON *timestamp = cJSON_GetObjectItem(root, "timestamp_ms");
+        EXPECT_EQ(timestamp->valueint, TEST_TIMEVAL_LONG + 1000);
+        cJSON *timestamp_delta = cJSON_GetObjectItem(root, "timestamp_ms_delta");
+        EXPECT_EQ(timestamp_delta->valueint, 1000);
+    }
+    cJSON_Delete(root_arr);
+    fieldstat_json_exporter_free(fieldstat_json_exporter);
+    fieldstat_free(instance);
+} 
+
+TEST(export_test, enable_delta_and_export_three_times_skipping_cube_with_no_counter)
+{
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_register_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 10);
+    int id_counter = fieldstat_register_counter(instance, cube_id, "counter", COUNTER_MERGE_BY_SUM);
+    int id_histogram = fieldstat_register_hist(instance, cube_id, "histogram",
+        g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
+    int cell_with_counter = fieldstat_cube_add(instance, cube_id, &TEST_TAG_INT, 1, 1);
+    int cell_with_hdr = fieldstat_cube_add(instance, cube_id, &TEST_TAG_STRING, 1, 1);
+    fieldstat_counter_incrby(instance, cube_id, id_counter, cell_with_counter, 1);
+    fieldstat_hist_record(instance, cube_id, id_histogram, cell_with_hdr, 123);
+
+    /* -------------------------- export test, 1st time ------------------------- */
+    struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new(instance);
+    fieldstat_json_exporter_enable_delta(fieldstat_json_exporter);
+    char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, &TEST_TIMEVAL);
+    cJSON *root_arr = cJSON_Parse(json_string);
+    free(json_string);
+
+    int arr_num = cJSON_GetArraySize(root_arr);
+    EXPECT_EQ(arr_num, 2);
+
+    cJSON *root = cJSON_GetArrayItem(root_arr, 0);
+    cJSON *metrics = cJSON_GetObjectItem(root, "fields");
+    cJSON *counter = cJSON_GetObjectItem(metrics, "counter");
+    EXPECT_EQ(counter->valueint, 1);
+    cJSON *counter_delta = cJSON_GetObjectItem(metrics, "counter_delta");
+    EXPECT_EQ(counter_delta->valueint, 1);
+    EXPECT_TRUE(cJSON_GetObjectItem(metrics, "histogram") == NULL);
+    EXPECT_TRUE(cJSON_GetObjectItem(metrics, "histogram_delta") == NULL);
+
+    root = cJSON_GetArrayItem(root_arr, 1);
+    metrics = cJSON_GetObjectItem(root, "fields");
+    EXPECT_TRUE(cJSON_GetObjectItem(metrics, "counter") == NULL);
+    EXPECT_TRUE(cJSON_GetObjectItem(metrics, "counter_delta") == NULL);
+    EXPECT_TRUE(cJSON_GetObjectItem(metrics, "histogram_delta") == NULL);
+    EXPECT_TRUE(cJSON_GetObjectItem(metrics, "histogram") != NULL);
+    cJSON_Delete(root_arr);
+
+    /* -------------------------------- 2nd time -------------------------------- */
+    json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, &TEST_TIMEVAL);
+    root_arr = cJSON_Parse(json_string);
+    free(json_string);
+    root = cJSON_GetArrayItem(root_arr, 0);
+    metrics = cJSON_GetObjectItem(root, "fields");
+    counter = cJSON_GetObjectItem(metrics, "counter");
+    EXPECT_EQ(counter->valueint, 1);
+    counter_delta = cJSON_GetObjectItem(metrics, "counter_delta");
+    EXPECT_EQ(counter_delta->valueint, 0);
+    EXPECT_TRUE(cJSON_GetObjectItem(metrics, "histogram") == NULL);
+    EXPECT_TRUE(cJSON_GetObjectItem(metrics, "histogram_delta") == NULL);
+    root = cJSON_GetArrayItem(root_arr, 1);
+    metrics = cJSON_GetObjectItem(root, "fields");
+    EXPECT_TRUE(cJSON_GetObjectItem(metrics, "counter") == NULL);
+    EXPECT_TRUE(cJSON_GetObjectItem(metrics, "counter_delta") == NULL);
+    EXPECT_TRUE(cJSON_GetObjectItem(metrics, "histogram_delta") == NULL);
+    EXPECT_TRUE(cJSON_GetObjectItem(metrics, "histogram") != NULL);
+    cJSON_Delete(root_arr);
+
+    /* -------------------------------- 3rd time -------------------------------- */
+    // add some new recs
+    fieldstat_counter_incrby(instance, cube_id, id_counter, cell_with_counter, 10);
+    fieldstat_hist_record(instance, cube_id, id_histogram, cell_with_hdr, 1234);
+    json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, &TEST_TIMEVAL);
+    root_arr = cJSON_Parse(json_string);
+    free(json_string);
+    root = cJSON_GetArrayItem(root_arr, 0);
+    metrics = cJSON_GetObjectItem(root, "fields");
+    counter = cJSON_GetObjectItem(metrics, "counter");
+    EXPECT_EQ(counter->valueint, 11);
+    counter_delta = cJSON_GetObjectItem(metrics, "counter_delta");
+    EXPECT_EQ(counter_delta->valueint, 10);
+    EXPECT_TRUE(cJSON_GetObjectItem(metrics, "histogram") == NULL);
+    EXPECT_TRUE(cJSON_GetObjectItem(metrics, "histogram_delta") == NULL);
+    root = cJSON_GetArrayItem(root_arr, 1);
+    metrics = cJSON_GetObjectItem(root, "fields");
+    EXPECT_TRUE(cJSON_GetObjectItem(metrics, "counter") == NULL);
+    EXPECT_TRUE(cJSON_GetObjectItem(metrics, "counter_delta") == NULL);
+    EXPECT_TRUE(cJSON_GetObjectItem(metrics, "histogram_delta") == NULL);
+    EXPECT_TRUE(cJSON_GetObjectItem(metrics, "histogram") != NULL);
+
+    cJSON_Delete(root_arr);
+    fieldstat_json_exporter_free(fieldstat_json_exporter);
+    fieldstat_free(instance);
+}
+
+void test_check_delta_for_one_json(const struct fieldstat_tag_list *expect_cell_tag, const struct fieldstat_tag_list *expect_shared_tag, long long expect_value, long long expect_delta, cJSON *root)
+{
+    // check tag
+    cJSON *tag = cJSON_GetObjectItem(root, "tags");
+    Fieldstat_tag_list_wrapper cell_wrapper = Fieldstat_tag_list_wrapper(expect_cell_tag);
+    test_check_if_tag_list_is_in_json(tag, &cell_wrapper);
+    Fieldstat_tag_list_wrapper shared_wrapper = Fieldstat_tag_list_wrapper(expect_shared_tag);
+    test_check_if_tag_list_is_in_json(tag, &shared_wrapper);
+    test_check_if_global_tag_is_in_json(tag);
+
+    // check metrics
+    cJSON *metrics = cJSON_GetObjectItem(root, "fields");
+    cJSON *counter = cJSON_GetObjectItem(metrics, "counter");
+    EXPECT_EQ(counter->valueint, expect_value);
+    cJSON *counter_delta = cJSON_GetObjectItem(metrics, "counter_delta");
+    EXPECT_EQ(counter_delta->valueint, expect_delta);
+}
+
+TEST(export_test, enable_delta_and_export_instance_with_many_cells_with_global_tags)
+{
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id1 = fieldstat_register_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 10);
+    int id_counter1 = fieldstat_register_counter(instance, cube_id1, "counter", COUNTER_MERGE_BY_SUM);
+    int cell_id1_1 = fieldstat_cube_add(instance, cube_id1, &TEST_TAG_INT, 1, 1);
+    fieldstat_counter_incrby(instance, cube_id1, id_counter1, cell_id1_1, 11);
+    int cell_id1_2 = fieldstat_cube_add(instance, cube_id1, &TEST_TAG_STRING, 1, 1);
+    fieldstat_counter_incrby(instance, cube_id1, id_counter1, cell_id1_2, 12);
+
+    int cube_id2 = fieldstat_register_cube(instance, TEST_TAG_SHARED3, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    int id_counter2 = fieldstat_register_counter(instance, cube_id2, "counter", COUNTER_MERGE_BY_SUM);
+    int cell_id2_1 = fieldstat_cube_add(instance, cube_id2, &TEST_TAG_INT, 1, 1);
+    fieldstat_counter_incrby(instance, cube_id2, id_counter2, cell_id2_1, 21);
+    int cell_id2_2 = fieldstat_cube_add(instance, cube_id2, &TEST_TAG_DOUBLE, 1, 1);
+    fieldstat_counter_incrby(instance, cube_id2, id_counter2, cell_id2_2, 22);
+
+    // export test
+    struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new(instance);
+    fieldstat_json_exporter_set_global_tag(fieldstat_json_exporter, TEST_TAG_GLOBAL, 3);
+    fieldstat_json_exporter_set_name(fieldstat_json_exporter, "test_instance");
+    fieldstat_json_exporter_enable_delta(fieldstat_json_exporter);
+    char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, &TEST_TIMEVAL);
+    cJSON *root_arr = cJSON_Parse(json_string);
+    free(json_string);
+
+    int arr_num = cJSON_GetArraySize(root_arr);
+    EXPECT_EQ(arr_num, 4);
+
+    /* ------------------------------ cube 0 cell 0 ----------------------------- */
+    cJSON *root = cJSON_GetArrayItem(root_arr, 0);
+    struct fieldstat_tag_list tmp_tag_cell = {(struct fieldstat_tag *)&TEST_TAG_INT, 1};
+    struct fieldstat_tag_list tmp_tag_shared = {(struct fieldstat_tag *)&TEST_TAG_SHARED1, 3};
+    test_check_delta_for_one_json(&tmp_tag_cell, &tmp_tag_shared, 11, 11, root);
+    /* ------------------------------ cube 0 cell 1 ----------------------------- */
+    root = cJSON_GetArrayItem(root_arr, 1);
+    tmp_tag_cell = (struct fieldstat_tag_list){(struct fieldstat_tag *)&TEST_TAG_STRING, 1};
+    test_check_delta_for_one_json(&tmp_tag_cell, &tmp_tag_shared, 12, 12, root);
+    /* ------------------------------ cube 1 cell 0 ----------------------------- */
+    root = cJSON_GetArrayItem(root_arr, 2);
+    tmp_tag_cell = (struct fieldstat_tag_list){(struct fieldstat_tag *)&TEST_TAG_INT, 1};
+    tmp_tag_shared = (struct fieldstat_tag_list){(struct fieldstat_tag *)&TEST_TAG_SHARED3, 1};
+    test_check_delta_for_one_json(&tmp_tag_cell, &tmp_tag_shared, 21, 21, root);
+    /* ------------------------------ cube 1 cell 1 ----------------------------- */
+    root = cJSON_GetArrayItem(root_arr, 3);
+    tmp_tag_cell = (struct fieldstat_tag_list){(struct fieldstat_tag *)&TEST_TAG_DOUBLE, 1};
+    test_check_delta_for_one_json(&tmp_tag_cell, &tmp_tag_shared, 22, 22, root);
+
+    // new turn 
+    fieldstat_counter_incrby(instance, cube_id1, id_counter1, cell_id1_1, 100);
+    fieldstat_counter_incrby(instance, cube_id1, id_counter1, cell_id1_2, 200);
+    fieldstat_counter_incrby(instance, cube_id2, id_counter2, cell_id2_1, 300);
+    fieldstat_counter_incrby(instance, cube_id2, id_counter2, cell_id2_2, 400);
+
+    cJSON_Delete(root_arr);
+
+    struct timeval new_ts = TEST_TIMEVAL;
+    new_ts.tv_sec += 1;
+    json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, &new_ts);
+    root_arr = cJSON_Parse(json_string);
+    free(json_string);
+
+    arr_num = cJSON_GetArraySize(root_arr);
+    EXPECT_EQ(arr_num, 4);
+
+    /* ------------------------------ cube 0 cell 0 ----------------------------- */
+    root = cJSON_GetArrayItem(root_arr, 0);
+    tmp_tag_cell = (struct fieldstat_tag_list){(struct fieldstat_tag *)&TEST_TAG_INT, 1};
+    tmp_tag_shared = (struct fieldstat_tag_list){(struct fieldstat_tag *)&TEST_TAG_SHARED1, 3};
+    test_check_delta_for_one_json(&tmp_tag_cell, &tmp_tag_shared, 111, 100, root);
+    /* ------------------------------ cube 0 cell 1 ----------------------------- */
+    root = cJSON_GetArrayItem(root_arr, 1);
+    tmp_tag_cell = (struct fieldstat_tag_list){(struct fieldstat_tag *)&TEST_TAG_STRING, 1};
+    test_check_delta_for_one_json(&tmp_tag_cell, &tmp_tag_shared, 212, 200, root);
+    /* ------------------------------ cube 1 cell 0 ----------------------------- */
+    root = cJSON_GetArrayItem(root_arr, 2);
+    tmp_tag_cell = (struct fieldstat_tag_list){(struct fieldstat_tag *)&TEST_TAG_INT, 1};
+    tmp_tag_shared = (struct fieldstat_tag_list){(struct fieldstat_tag *)&TEST_TAG_SHARED3, 1};
+    test_check_delta_for_one_json(&tmp_tag_cell, &tmp_tag_shared, 321, 300, root);
+    /* ------------------------------ cube 1 cell 1 ----------------------------- */
+    root = cJSON_GetArrayItem(root_arr, 3);
+    tmp_tag_cell = (struct fieldstat_tag_list){(struct fieldstat_tag *)&TEST_TAG_DOUBLE, 1};
+    test_check_delta_for_one_json(&tmp_tag_cell, &tmp_tag_shared, 422, 400, root);
+
+    cJSON_Delete(root_arr);
+
+    fieldstat_json_exporter_free(fieldstat_json_exporter);
+    fieldstat_free(instance);
+}
+
+void test_reset_one_round(std::function<void(struct fieldstat *, struct fieldstat_json_exporter *)> trigger_reset)
+{
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 1);
+    int id_counter = fieldstat_register_counter(instance, cube_id, "counter", COUNTER_MERGE_BY_SUM);
+    int cell_id = fieldstat_cube_add(instance, cube_id, &TEST_TAG_INT, 1, 1);
+    fieldstat_counter_incrby(instance, cube_id, id_counter, cell_id, 11);
+
+    // export test
+    struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new(instance);
+    fieldstat_json_exporter_enable_delta(fieldstat_json_exporter);
+    char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, &TEST_TIMEVAL);
+    cJSON *root_arr = cJSON_Parse(json_string);
+    free(json_string);
+
+    int arr_num = cJSON_GetArraySize(root_arr);
+    EXPECT_EQ(arr_num, 1);
+    cJSON *root = cJSON_GetArrayItem(root_arr, 0);
+    cJSON *metrics = cJSON_GetObjectItem(root, "fields");
+    cJSON *counter = cJSON_GetObjectItem(metrics, "counter");
+    EXPECT_EQ(counter->valueint, 11);
+    cJSON *counter_delta = cJSON_GetObjectItem(metrics, "counter_delta");
+    EXPECT_EQ(counter_delta->valueint, 11);
+    cJSON_Delete(root_arr);
+
+    trigger_reset(instance, fieldstat_json_exporter);
+
+    cell_id = fieldstat_cube_add(instance, cube_id, &TEST_TAG_INT, 1, 1);
+    fieldstat_counter_set(instance, cube_id, id_counter, cell_id, 123);
+
+    json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, &TEST_TIMEVAL);
+    root_arr = cJSON_Parse(json_string);
+    free(json_string);
+
+    arr_num = cJSON_GetArraySize(root_arr);
+    EXPECT_EQ(arr_num, 1);
+    root = cJSON_GetArrayItem(root_arr, 0);
+    metrics = cJSON_GetObjectItem(root, "fields");
+    counter = cJSON_GetObjectItem(metrics, "counter");
+    EXPECT_EQ(counter->valueint, 123);
+    counter_delta = cJSON_GetObjectItem(metrics, "counter_delta");
+    EXPECT_EQ(counter_delta->valueint, 123);
+    cJSON_Delete(root_arr);
+
+    fieldstat_json_exporter_free(fieldstat_json_exporter);
+    fieldstat_free(instance);
+}
+
+TEST(export_test, enable_delta_and_reset_on_change_exporter_name) {
+    auto trigger = [](struct fieldstat *instance, struct fieldstat_json_exporter *fieldstat_json_exporter) {
+        fieldstat_json_exporter_set_name(fieldstat_json_exporter, "test_instance");
+    };
+
+    test_reset_one_round(trigger);
+}
+
+TEST(export_test, enable_delta_and_reset_on_change_exporter_tag) {
+    auto trigger = [](struct fieldstat *instance, struct fieldstat_json_exporter *fieldstat_json_exporter) {
+        fieldstat_json_exporter_set_global_tag(fieldstat_json_exporter, TEST_TAG_GLOBAL, 3);
+    };
+
+    test_reset_one_round(trigger);
+}
+
+TEST(export_test, enable_delta_and_reset_on_reset_instance) {
+    auto trigger = [](struct fieldstat *instance, struct fieldstat_json_exporter *fieldstat_json_exporter) {
+        fieldstat_reset(instance);
+    };
+
+    test_reset_one_round(trigger);
+}
+
+TEST(export_test, enable_delta_and_reset_on_delete_cube) {
+    auto trigger = [](struct fieldstat *instance, struct fieldstat_json_exporter *fieldstat_json_exporter) {
+        fieldstat_unregister_cube(instance, 0);
+        fieldstat_register_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
+        fieldstat_register_counter(instance, 0, "counter", COUNTER_MERGE_BY_SUM);
+        fieldstat_cube_add(instance, 0, &TEST_TAG_INT, 1, 1);
+    };
+
+    test_reset_one_round(trigger);
+}
+
+
 extern "C" {
 extern int add_object_to_json_array_start(char *buf, int buf_len);
 extern int add_object_to_json_array_end(char **buf, int buf_len, int start);

@@ -26,6 +26,9 @@ extern "C"
     exported buffer is after base64 encoding./
 */
 void histogram_encode_into_b64(struct hdr_histogram *hdr, char **buffer, size_t *buffer_size);
+
+struct hdr_histogram *histogram_decode_from_b64(const char *buffer, size_t buffer_size);
+
 /*
     the most simple and fast version of encoding. No compression, no base64 encoding, no LEB128 encoding, no user-defined extra parameters, only carry the most basic information.
 */
@@ -34,6 +37,8 @@ void histogram_encode_into_blob(const struct hdr_histogram *hdr, char **buffer, 
     decode from buffer output by histogram_encode_into_blob.
 */
 struct hdr_histogram *histogram_decode_from_blob(const char *buffer, size_t blob_len);
+
+long long hdr_count_le_value(const struct hdr_histogram* h, long long value);
 
 #ifdef __cplusplus
 }
