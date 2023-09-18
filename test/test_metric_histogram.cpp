@@ -165,7 +165,7 @@ TEST(metric_test_histogram, add_with_wrong_metric_id_expecting_fail)
 }
 
 extern "C" {
-    bool is_hll(char *buf);
+    bool fieldstat_is_hll(char *buf);
 }
 
 TEST(metric_test_histogram, encode_decode_b64)
@@ -180,7 +180,7 @@ TEST(metric_test_histogram, encode_decode_b64)
     size_t b64_len = 0;
     histogram_encode_into_b64(h, &b64, &b64_len);
 
-    EXPECT_FALSE(is_hll(b64));
+    EXPECT_FALSE(fieldstat_is_hll(b64));
     
     struct hdr_histogram *h2 = histogram_decode_from_b64(b64, b64_len);
 

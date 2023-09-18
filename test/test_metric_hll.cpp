@@ -168,7 +168,7 @@ TEST(metric_test_hll, serialize_with_b64_and_query)
 
 extern "C" {
     void *hll_base64_decode(char *buf);
-    bool is_hll(char *buf);
+    bool fieldstat_is_hll(char *buf);
 }
 TEST(metric_test_hll, serialize_with_b64_and_query_with_python_api)
 {
@@ -181,7 +181,7 @@ TEST(metric_test_hll, serialize_with_b64_and_query_with_python_api)
     size_t blob_len = 0;
     fieldstat_get_serialized_blob(instance, 0, 0, 0, &blob, &blob_len);
 
-    bool flag = is_hll(blob);
+    bool flag = fieldstat_is_hll(blob);
     EXPECT_EQ(flag, true);
 
     void *hll_from_blob = hll_base64_decode(blob);
