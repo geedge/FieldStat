@@ -1,5 +1,6 @@
 #pragma once
 #include <stdio.h>
+#include <time.h>
 #include "fieldstat.h"
 
 #ifdef __cplusplus
@@ -77,11 +78,11 @@ void fieldstat_json_exporter_free(struct fieldstat_json_exporter *exporter);
 /*
     Output the fieldstat instance to json string array. User must free the output string.
 */
-char *fieldstat_json_exporter_export(const struct fieldstat_json_exporter *exporter);
+char *fieldstat_json_exporter_export(const struct fieldstat_json_exporter *exporter, const struct timeval *timestamp);
 /*
     after call fieldstat_json_exporter_export_array, user must free the output array and each string.
 */
-void fieldstat_json_exporter_export_array(const struct fieldstat_json_exporter *exporter, char ***output, size_t *output_size);
+void fieldstat_json_exporter_export_array(const struct fieldstat_json_exporter *exporter, const struct timeval *timestamp, char ***output, size_t *output_size);
 
 #ifdef __cplusplus
 }

@@ -121,7 +121,7 @@ cJSON *test_exporter_extract_results_with_standard_global(const struct fieldstat
     struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new(instance);
     fieldstat_json_exporter_set_global_tag(fieldstat_json_exporter, TEST_TAG_GLOBAL, 3);
 
-    char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter);
+    char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, &TEST_TIMEVAL);
     cJSON *root_arr = cJSON_Parse(json_string);
     free(json_string);
     fieldstat_json_exporter_free(fieldstat_json_exporter);
@@ -134,7 +134,7 @@ cJSON *test_exporter_extract_results(const struct fieldstat *instance)
     struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new(instance);
 
     // getchar();
-    char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter);
+    char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, &TEST_TIMEVAL);
     // exit(0);
     cJSON *root_arr = cJSON_Parse(json_string);
     free(json_string);
