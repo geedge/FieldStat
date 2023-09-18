@@ -109,11 +109,9 @@ void kv_pair_fill_with_tags(struct export_kv_pair *dest, const struct fieldstat_
     }
 }
 
-long long get_current_time()
+long long cal_ms_time(const struct timeval *ts)
 {
-    struct timeval current_time;
-    gettimeofday(&current_time, NULL);
-    long long time_stamp_in_ms = current_time.tv_sec * 1000LL + current_time.tv_usec / 1000;
+    long long time_stamp_in_ms = ts->tv_sec * 1000LL + ts->tv_usec / 1000;
 
     return time_stamp_in_ms;
 }
@@ -465,7 +463,7 @@ int add_object_to_json_array(char **buf, int *buf_len, int start, const char *st
 /*
     Output the fieldstat instance to json string array. User must free the output string.
 */
-void fieldstat_json_exporter_export_array(const struct fieldstat_json_exporter *exporter, char ***output, size_t *output_size)
+void fieldstat_json_exporter_export_array(const struct fieldstat_json_exporter *exporter, const struct timeval *timestamp, char ***output, size_t *output_size)
 {
     const struct fieldstat *instance = exporter->instance;
 
@@ -491,7 +489,7 @@ void fieldstat_json_exporter_export_array(const struct fieldstat_json_exporter *
         json_writer_str_field(root, "name", tmp_name, strlen(tmp_name));
         json_writer_object_item(root, "tags", current->cjson_tags);
         json_writer_object_item(root, "fields", current->cjson_fields);
-        json_writer_longlong_field(root, "timestamp", get_current_time());
+        json_writer_longlong_field(root, "timestamp", cal_ms_time(timestamp));
         json_writer_end_map(root);
 
         char *cjson_str;
@@ -506,11 +504,11 @@ void fieldstat_json_exporter_export_array(const struct fieldstat_json_exporter *
     free(tag_field_pair);    // cjson object will be freed with cjson root
 }
 
-char *fieldstat_json_exporter_export(const struct fieldstat_json_exporter *exporter)
+char *fieldstat_json_exporter_export(const struct fieldstat_json_exporter *exporter, const struct timeval *timestamp)
 {
     char **str_arr = NULL;
     size_t n_pair = 0;
-    fieldstat_json_exporter_export_array(exporter, &str_arr, &n_pair);
+    fieldstat_json_exporter_export_array(exporter, timestamp, &str_arr, &n_pair);
     if (str_arr == NULL || n_pair == 0) {
         return NULL;
     }
