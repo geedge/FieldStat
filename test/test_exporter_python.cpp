@@ -146,7 +146,8 @@ TEST(ExporterLocal, TableBuild)
     fieldstat_merge(merger, hll);
     fieldstat_merge(merger, hist);
     fieldstat_merge(merger, table);
-    struct fieldstat_json_exporter *exporter = fieldstat_json_exporter_new(hll);
+    struct fieldstat_json_exporter *exporter = fieldstat_json_exporter_new(merger);
+    fieldstat_json_exporter_enable_delta(exporter);
     char *str_json = fieldstat_json_exporter_export(exporter, &current);
     printf(str_json);
 }
