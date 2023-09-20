@@ -462,7 +462,7 @@ static struct metric * create_dynamic_table_metric(struct fieldstat_dynamic_inst
 	for(i = 0; i < table->column_cnt; i ++)
 	{
 		metric = metric_new(table->column_type[i], row_name, tags, n_tags);
-
+		metric->is_atomic_counter = 1;
 		switch(table->column_type[i])
 		{
 			case FIELD_TYPE_COUNTER:
@@ -541,7 +541,7 @@ static struct metric * create_dynamic_metric(struct fieldstat_dynamic_instance *
 
 	insert->metrics = (struct metric **)calloc(1, sizeof(struct metric *));
 	metric = metric_new(type, field_name, tags, n_tags);
-
+	metric->is_atomic_counter = 1;
 	switch(metric->field_type)
 	{
 		case FIELD_TYPE_COUNTER:
@@ -755,7 +755,7 @@ static struct metric **create_dynamic_table_row_metrics(
 	for(i = 0; i < table->column_cnt; i ++)
 	{
 		metric = metric_new(table->column_type[i], row_name, tags, n_tags);
-
+		metric->is_atomic_counter = 1;
 		switch(table->column_type[i])
 		{
 			case FIELD_TYPE_COUNTER:
@@ -889,4 +889,41 @@ int fieldstat_dynamic_table_row_metric_values_set(
                                           values, n_values, tags, n_tags,
                                           thread_id, FS_OP_SET);
     return ret;
+}
+
+
+unsigned int fieldstat_dynamic_read_htable_item_cnt(
+    struct fieldstat_dynamic_instance *instance,
+    int thread_id)
+{
+	struct dynamic_metric **head = NULL; 
+	head = &instance->n_thread_dynamic_metric[thread_id];	
+	return HASH_COUNT(*head);
+}
+
+
+unsigned int fieldstat_dynamic_read_metrics_cnt(
+	struct fieldstat_dynamic_instance *instance,
+	int thread_id)
+{
+	struct dynamic_metric **head = NULL;
+	struct dynamic_metric *dyn_metric, *tmp_dyn_metric;
+	unsigned int n_metrics = 0;
+
+	head = &instance->n_thread_dynamic_metric[thread_id];
+
+	HASH_ITER(hh, *head, dyn_metric, tmp_dyn_metric)
+	{
+		struct metric **metrics = dyn_metric->metrics;
+		struct metric  *metric  = metrics[0];
+		if(metric->table)
+		{
+			n_metrics += metric->table->column_cnt;
+		}
+		else 
+		{
+			n_metrics++;
+		}
+	}
+	return n_metrics;
 }

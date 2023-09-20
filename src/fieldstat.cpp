@@ -267,6 +267,31 @@ void metric_free(struct metric *metric)
 			h->bins = NULL;
 		}
 	}
+	else 
+	{
+		if(metric->is_atomic_counter == 0)
+		{
+			switch(metric->field_type)
+			{
+				case FIELD_TYPE_COUNTER:
+					if(metric->counter.changing != NULL)
+					{
+						free(metric->counter.changing);
+						metric->counter.changing = NULL;
+					}
+					break;
+				case FIELD_TYPE_GAUGE:
+					if(metric->gauge.changing != NULL)
+					{
+						free(metric->gauge.changing);
+						metric->gauge.changing = NULL;
+					}
+					break;
+				default:
+					assert(0);
+			}
+		}
+	}
 
 	free(metric);
 
@@ -504,14 +529,16 @@ int fieldstat_register(struct fieldstat_instance *instance, enum field_type type
 	metric_id = atomic_inc(&instance->metric_cnt) - 1;
 	metric_slot = read_metric_slot(instance, metric_id);
 	metric = metric_new(type, field_name, tags, n_tag);
-
+	metric->is_atomic_counter = 0;
 	switch(type)
 	{
 		case FIELD_TYPE_COUNTER:
 			memset(&(metric->counter), 0, sizeof(metric->counter));
+			metric->counter.changing = (struct threadsafe_counter *)calloc(1, sizeof(struct threadsafe_counter));
 			break;
 		case FIELD_TYPE_GAUGE:
 			memset(&(metric->gauge), 0, sizeof(metric->gauge));
+			metric->gauge.changing   = (struct threadsafe_counter *)calloc(1, sizeof(struct threadsafe_counter));
 			break;
 		default:
 			assert(0);
@@ -536,15 +563,21 @@ long long get_metric_unit_val(struct metric *metric,enum field_calc_algo calc_ty
 			assert(0);
 			return 0;
 	}
-
-	value = threadsafe_counter_read(&(target->changing));
+	if(metric->is_atomic_counter == 0)
+		value = threadsafe_counter_read(target->changing);
+	else
+		value = atomic_read(&(target->atomic_changing));
+	
 	//value= threadsafe_counter_read(&(target->changing));
 	if(is_refer == 0)
 	{
 		target->previous_changed = value;
 		target->accumulated += value;
 //		threadsafe_counter_set(&(target->changing), 0);
-		threadsafe_counter_sub(&(target->changing), value);
+		if(metric->is_atomic_counter == 0)
+			threadsafe_counter_sub(target->changing, value);
+		else
+			atomic_sub(&(target->atomic_changing), value);
 	}
 	switch(calc_type)
 	{
@@ -577,7 +610,11 @@ long long read_metric_current_value(struct metric *metric)
 			break;
 	}
 
-	value = threadsafe_counter_read(&(target->changing));
+	if(metric->is_atomic_counter == 0)
+		value = threadsafe_counter_read(target->changing);
+	else
+	 	value = atomic_read(&(target->atomic_changing));
+
 	if(metric->field_type == FIELD_TYPE_GAUGE)
 	{
 		value += target->accumulated;
@@ -977,13 +1014,22 @@ void metric_value_operate(struct metric *metric, enum field_op op, long long val
 	switch(op)
 	{
 		case	FS_OP_ADD:
-			threadsafe_counter_add(&(target->changing), value);
+			if(metric->is_atomic_counter == 0)
+				threadsafe_counter_add(target->changing, value);
+			else
+				atomic_add(&(target->atomic_changing), value);
 			break;
 		case	FS_OP_SET:
-			threadsafe_counter_set(&(target->changing), value-target->accumulated);
+			if(metric->is_atomic_counter == 0)
+				threadsafe_counter_set(target->changing, value - target->accumulated);
+			else
+			 	atomic_set(&(target->atomic_changing), value - target->accumulated);
 			break;
 		case	FS_OP_SUB:
-			threadsafe_counter_sub(&(target->changing), value);
+			if(metric->is_atomic_counter == 0)
+				threadsafe_counter_sub(target->changing, value);
+			else
+			 	atomic_sub(&(target->atomic_changing), value);
 			break;
 		default:
 			assert(0);

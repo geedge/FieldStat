@@ -444,6 +444,27 @@ int fieldstat_dynamic_table_row_metric_values_set(
     int thread_id);
 
 
+/**
+ * fieldstat dynamic read hash table item numbers of per thread.
+ * @param instance The fieldstat dynamic instance.
+ * @param thread_id The thread id of the call.
+ * @return The number of items in the hash table of per thread.
+ */
+unsigned int fieldstat_dynamic_read_htable_item_cnt(
+    struct fieldstat_dynamic_instance *instance,
+    int thread_id);
+
+/**
+ * fieldstat dynamic read metrics numbers in per thread hash table.
+ * @param instance The fieldstat dynamic instance.
+ * @param thread_id The thread id of the call.
+ * @return The number of metrics in the hash table of per thread.
+ */
+unsigned int fieldstat_dynamic_read_metrics_cnt(
+	struct fieldstat_dynamic_instance *instance,
+	int thread_id);
+
+
 #ifdef __cplusplus
 }
 #endif

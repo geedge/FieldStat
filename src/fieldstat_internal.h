@@ -68,7 +68,7 @@
 
 #define CACHE_LINE_SIZE 64
 
-#define USING_SPINLOCK 1
+#define USING_SPINLOCK 0
 #define USING_RWLOCK   0
 #define USING_MUTEX    0
 
@@ -88,10 +88,15 @@ enum field_op
 
 struct stat_unit_t
 {
-	struct threadsafe_counter changing;
+	union
+	{
+		struct threadsafe_counter *changing;
+		long long  atomic_changing;
+	};
 	long long accumulated;
 	long long previous_changed;
 };
+
 struct histogram_t
 {
 	struct hdr_histogram* changing;
@@ -144,7 +149,7 @@ struct metric
 	struct table_metric *table;
 	int table_column_id;
 	int output_window;
-
+	int is_atomic_counter;
 	union
 	{
 		struct stat_unit_t counter;
