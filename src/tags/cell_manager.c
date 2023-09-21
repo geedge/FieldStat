@@ -172,8 +172,9 @@ int cell_manager_add_cell(struct cell_manager *pthis, const struct tag_hash_key 
 
     if (node != NULL) {
         node->discarded = false;
-        cell_manager_id_tag_array_add(pthis, node->cell_id, node->tag);
-        return node->cell_id;
+        node->cell_id = pthis->next_cell_id;
+        cell_manager_id_tag_array_add(pthis, pthis->next_cell_id, node->tag);
+        return pthis->next_cell_id++;
     }
 
     struct tag_hash_key *tag_copy = tag_hash_key_copy(tag);

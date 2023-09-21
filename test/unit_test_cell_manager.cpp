@@ -657,9 +657,8 @@ TEST(unit_test_cell_manager, add_after_reset_and_ensure_performance_improvement)
     start = clock();
     for (int i = 0; i < TEST_ROUND; i++)
     {
-        int expected_id = (i+12345) % TEST_ROUND;
-        int cell_id = cell_manager_add_cell(cm, keys[expected_id]); // in the previous round, the cell_id is expected_id, so this time add just recover them
-        EXPECT_EQ(cell_id, expected_id);
+        int cell_id = cell_manager_add_cell(cm, keys[i]);
+        EXPECT_EQ(cell_id, i);
     }
     end = clock();
     clock_t time_reset_once = end - start;
@@ -670,8 +669,7 @@ TEST(unit_test_cell_manager, add_after_reset_and_ensure_performance_improvement)
     start = clock();
     for (int i = 0; i < TEST_ROUND; i++)
     {
-        int id_as_previous_loop = (i+12345) % TEST_ROUND;
-        int cell_id = cell_manager_add_cell(cm, keys[id_as_previous_loop]);
+        int cell_id = cell_manager_add_cell(cm, keys[i]);
         EXPECT_EQ(cell_id, i); // completely new cell
     }
     end = clock();
