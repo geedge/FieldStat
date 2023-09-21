@@ -403,7 +403,7 @@ void metric_info_copy(struct metric_info *dst, const struct metric_info *src)
     dst->id = src->id;
 }
 
-struct metric *metric_copy_structure(const struct metric *src)
+struct metric *metric_fork(const struct metric *src)
 {
     struct metric *dst = (struct metric *)malloc(sizeof(struct metric));
     dst->info = (struct metric_info *)malloc(sizeof(struct metric_info));
@@ -419,7 +419,7 @@ struct metric *metric_copy_structure(const struct metric *src)
 
 struct metric *metric_copy(const struct metric *src)
 {
-    struct metric *dst = metric_copy_structure(src);
+    struct metric *dst = metric_fork(src);
     dst->n_array_item = src->n_array_item;
 
     for (int i = 0; i < src->n_array_item; i++) {

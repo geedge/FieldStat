@@ -22,6 +22,7 @@ void fieldtag_list_free(struct fieldstat_tag *tags, size_t n_tags);
 void fieldtag_list_serialize(const struct fieldstat_tag *tag_list, size_t tag_num, char **blob, size_t *blob_size);
 void fieldtag_list_deserialize(const char *blob, size_t blob_size, struct fieldstat_tag **tag_list_out, size_t *tag_num_out);
 const char *tag_hash_key_get_compound_key(const struct tag_hash_key *tag);
+int tag_hash_key_cmp(const struct tag_hash_key *a, const struct tag_hash_key *b);
 
 #ifdef __cplusplus
 }

@@ -395,6 +395,10 @@ void fieldstat_cube_free(struct fieldstat *instance, int cube_id)
     instance->cube[cube_id] = NULL;
 }
 
+struct fs_cube *fieldstat_cube_fork(const struct fs_cube *cube) {
+    return fieldstat_cube_new(cube->shared_tags, cube->n_shared_tags, cube->sampling_mode, cube->max_n_cell);
+}
+
 
 /* -------------------------------------------------------------------------- */
 /*                               metric register                              */
@@ -836,7 +840,7 @@ void fieldstat_cube_merge(struct fs_cube *dest, const struct fs_cube *src)
         const char *name_src = metric_get_name(src->metrics[metric_id_src]);
         int metric_id_dest = name_id_map_get_id_by_name(name_id_map_dest, name_src);
         if (metric_id_dest == -1) { // dest does not have this metric
-            struct metric *metric_dup = metric_copy_structure(src->metrics[metric_id_src]);
+            struct metric *metric_dup = metric_fork(src->metrics[metric_id_src]);
             metric_id_dest = append_metric_to_cube(dest, metric_dup);
             name_id_map_add(&dest->metric_name_id_map, name_src, metric_id_dest);
         }
@@ -1110,7 +1114,7 @@ struct fieldstat *fieldstat_fork(const struct fieldstat *instance)
         // copy registered metrics
         for (size_t j = 0; j < cube->n_metric; j++) {
             const struct metric *metric = cube->metrics[j];
-            struct metric *new_metric = metric_copy_structure(metric);
+            struct metric *new_metric = metric_fork(metric);
             append_metric_to_cube(new_instance->cube[i], new_metric);
         }
     }
@@ -1184,4 +1188,53 @@ int fieldstat_find_cube(const struct fieldstat *instance, const struct fieldstat
     int cube_id = cube_manager_find(tag_cube_id_map, shared_tag_key);
     tag_hash_key_free(shared_tag_key);
     return cube_id;
+}
+
+void calibrate_metrics(const struct fs_cube *master, struct fs_cube *target)
+{
+    // metric won't be deleted or modified, so master always has more metrics than target, and metric under the same id must be the same. Just take care of the rest.
+    for (int i = target->n_metric; i < master->n_metric; i++) { // i starts from target->n_metric, because target->n_metric is the first metric that is not in target.
+        const struct metric *metric_master = master->metrics[i];
+        struct metric *metric_dup = metric_fork(metric_master);
+        append_metric_to_cube(target, metric_dup);
+    }
+}
+
+void fieldstat_calibrate(const struct fieldstat *master, struct fieldstat *target)
+{
+    if (target->max_n_cube < master->max_n_cube) {
+        target->cube = (struct fs_cube **)realloc(target->cube, sizeof(struct fs_cube *) * master->max_n_cube);
+        target->cube_version = (unsigned long *)realloc(target->cube_version, sizeof(unsigned long) * master->max_n_cube);
+        target->max_n_cube = master->max_n_cube;
+    }
+
+    size_t longer_arr_len = master->valid_cube_arr_length > target->valid_cube_arr_length ? master->valid_cube_arr_length : target->valid_cube_arr_length;
+    for (size_t i = 0; i < longer_arr_len; i++) {
+        const struct fs_cube *cube_master = i >= master->valid_cube_arr_length ? NULL : master->cube[i];
+        struct fs_cube *cube_target = i >= target->valid_cube_arr_length ? NULL : target->cube[i];
+        if (cube_master == NULL && cube_target == NULL) {
+            continue;
+        }
+        if (cube_master == NULL && cube_target != NULL) {
+            fieldstat_cube_free(target, i);
+            continue;
+        }
+        if (cube_master != NULL && cube_target == NULL) {
+            struct fs_cube *cube_dup = fieldstat_cube_fork(cube_master);
+            target->cube[i] = cube_dup;
+            continue;
+        }
+
+        if (master->cube_version[i] == target->cube_version[i] && tag_hash_key_cmp(cube_master->key_tag, cube_target->key_tag) == 0) {
+            calibrate_metrics(cube_master, cube_target);
+            continue;
+        }
+        
+        struct fs_cube *cube_dup = fieldstat_cube_fork(cube_target);
+        fieldstat_cube_free(target, i);
+        target->cube[i] = cube_dup;
+    }
+
+    memcpy(target->cube_version, master->cube_version, sizeof(unsigned long) * master->max_n_cube);
+    target->valid_cube_arr_length = master->valid_cube_arr_length;
 }
