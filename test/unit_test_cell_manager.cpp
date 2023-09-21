@@ -593,6 +593,98 @@ TEST(unit_test_cell_manager, find_next_id_given_empty_arr)
     free(arr);
 }
 
+TEST(unit_test_cell_manager, reset_once_and_query)
+{
+    const int TEST_ROUND = 10;
+    struct cell_manager *cm = cell_manager_new(SAMPLING_MODE_COMPREHENSIVE, TEST_ROUND);
+
+    vector<struct tag_hash_key *> keys;
+    for (int i = 0; i < TEST_ROUND; i++)
+    {
+        struct tag_hash_key *key = test_gen_tag_key("key", i);
+        keys.push_back(key);
+    }
+    for (int i = 0; i < TEST_ROUND; i++) {
+        int cell_id = cell_manager_add_cell(cm, keys[i]);
+        EXPECT_EQ(cell_id, i);
+    }
+
+    cell_manager_reset(cm);
+    for (int i = 0; i < TEST_ROUND; i++) {
+        EXPECT_EQ(cell_manager_find(cm, keys[i]), -1);
+        EXPECT_TRUE(cell_manager_get_tag_by_cell_id(cm, i) == NULL);
+    }
+    int array_len = 0;
+    cell_manager_dump(cm, &array_len);
+    EXPECT_EQ(array_len, 0);
+
+    // do it again, to see the effect of reset on a recovered cell_manager(instead of which just newed)
+    for (int i = 0; i < TEST_ROUND; i++) {
+        int cell_id = cell_manager_add_cell(cm, keys[i]);
+        EXPECT_EQ(cell_id, i);
+    }
+    cell_manager_reset(cm);
+    for (int i = 0; i < TEST_ROUND; i++) {
+        EXPECT_EQ(cell_manager_find(cm, keys[i]), -1);
+        EXPECT_TRUE(cell_manager_get_tag_by_cell_id(cm, i) == NULL);
+    }
+    cell_manager_dump(cm, &array_len);
+    EXPECT_EQ(array_len, 0);
+
+    cell_manager_free(cm);
+    for (int i = 0; i < TEST_ROUND; i++) {
+        tag_hash_key_free(keys[i]);
+    }
+}
+
+// reset once will not delete the cells, just let them be discared, so in such case, cube_add will just add to the same cell.
+TEST(unit_test_cell_manager, add_after_reset_and_ensure_performance_improvement) {
+    clock_t start, end;
+    const int TEST_ROUND = 100000;
+    struct cell_manager *cm = cell_manager_new(SAMPLING_MODE_COMPREHENSIVE, TEST_ROUND);
+    vector<struct tag_hash_key *> keys;
+    for (int i = 0; i < TEST_ROUND; i++)
+    {
+        struct tag_hash_key *key = test_gen_tag_key("key", i);
+        keys.push_back(key);
+    }
+    for (int i = 0; i < TEST_ROUND; i++) {
+        int cell_id = cell_manager_add_cell(cm, keys[i]);
+        EXPECT_EQ(cell_id, i);
+    }
+
+    cell_manager_reset(cm);
+    start = clock();
+    for (int i = 0; i < TEST_ROUND; i++)
+    {
+        int expected_id = (i+12345) % TEST_ROUND;
+        int cell_id = cell_manager_add_cell(cm, keys[expected_id]); // in the previous round, the cell_id is expected_id, so this time add just recover them
+        EXPECT_EQ(cell_id, expected_id);
+    }
+    end = clock();
+    clock_t time_reset_once = end - start;
+
+
+    cell_manager_reset(cm);
+    cell_manager_reset(cm);
+    start = clock();
+    for (int i = 0; i < TEST_ROUND; i++)
+    {
+        int id_as_previous_loop = (i+12345) % TEST_ROUND;
+        int cell_id = cell_manager_add_cell(cm, keys[id_as_previous_loop]);
+        EXPECT_EQ(cell_id, i); // completely new cell
+    }
+    end = clock();
+    clock_t time_reset_twice = end - start;
+
+    EXPECT_GT(time_reset_twice, time_reset_once * 2); // * 2: just indicate much greater than, not exactly 2 times
+
+    cell_manager_free(cm);
+    for (int i = 0; i < TEST_ROUND; i++) {
+        tag_hash_key_free(keys[i]);
+    }
+}
+
 int main(int argc, char *argv[]) 
 {
 	testing::InitGoogleTest(&argc, argv);
