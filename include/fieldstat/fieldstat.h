@@ -50,7 +50,7 @@ struct fieldstat;
 struct fieldstat *fieldstat_new();
 void fieldstat_free(struct fieldstat *instance);
 // copy only registered cubes and metrics, not including cells. Used to new a instance of the same schema.
-struct fieldstat *fieldstat_dup(const struct fieldstat *instance);
+struct fieldstat *fieldstat_fork(const struct fieldstat *instance);
 /*
     * @brief add an cube to this instance. Cube represents an template with a user-defined set of cells and metrics.
     * @param shared_tags: tags that are shared by all cubes in this instance. This is the key of the cube. Cannot be NULL. Must be unique. shared_tags are ordered.which means that {"TAG_KEY": "123", "TAG_KEY2": "456"} and {"TAG_KEY2": "456", "TAG_KEY": "123"} are map to different cube.

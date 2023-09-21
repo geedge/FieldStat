@@ -1089,7 +1089,7 @@ enum metric_type fieldstat_get_metric_type(const struct fieldstat *instance, int
     return metric_get_type(metric);
 }
 
-struct fieldstat *fieldstat_dup(const struct fieldstat *instance)
+struct fieldstat *fieldstat_fork(const struct fieldstat *instance)
 {
     if (instance == NULL) {
         return NULL;

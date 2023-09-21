@@ -157,7 +157,7 @@ TEST(test_register, dup_registered_info_from_empty_one)
 {
     struct fieldstat *instance = fieldstat_new();
     
-    struct fieldstat *dup = fieldstat_dup(instance);
+    struct fieldstat *dup = fieldstat_fork(instance);
 
     int *cube_ids;
     int cube_num;
@@ -180,7 +180,7 @@ TEST(test_register, dup_registered_info_with_cube_and_metric_without_cell)
     int cube_id2 = fieldstat_register_cube(instance, &TEST_TAG_DOUBLE, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
     fieldstat_unregister_cube(instance, cube_id_del);
 
-    struct fieldstat *dup = fieldstat_dup(instance);
+    struct fieldstat *dup = fieldstat_fork(instance);
 
     int *cube_ids;
     int cube_num;
