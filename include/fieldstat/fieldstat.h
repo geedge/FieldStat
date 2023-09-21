@@ -49,15 +49,15 @@ struct fieldstat_tag {
 struct fieldstat;
 struct fieldstat *fieldstat_new();
 void fieldstat_free(struct fieldstat *instance);
-// copy only registered cubes and metrics, not including cells.
+// copy only registered cubes and metrics, not including cells. Used to new a instance of the same schema.
 struct fieldstat *fieldstat_dup(const struct fieldstat *instance);
 /*
     * @brief add an cube to this instance. Cube represents an template with a user-defined set of cells and metrics.
-    * @param shared_tags: tags that are shared by all cubes in this instance. This is the key of the cube. Cannot be NULL. Must be unique. shared_tags are ordered.
+    * @param shared_tags: tags that are shared by all cubes in this instance. This is the key of the cube. Cannot be NULL. Must be unique. shared_tags are ordered.which means that {"TAG_KEY": "123", "TAG_KEY2": "456"} and {"TAG_KEY2": "456", "TAG_KEY": "123"} are map to different cube.
     * @param n_tag: number of shared tags.
     * @param mode: sampling mode. Refer to enum sampling_mode.
     * @param max_n_cell: max number of cells in each cube. When mode is TOPK, max_n_cell > 0, while in COMPREHENSIVE mode, max_n_cell can be 0, meaning that there is no limit.
-    * @return cube id, if success; otherwise, return -1. Fail only when `instance` == NULL. the uniqueness of shared_tags is not checked, user should guarantee that shared_tags are unique.
+    * @return cube id, if success; otherwise, return -1 when `instance` == NULL, or max_n_cell == 0 && mode == TOPK. return -2 when the shared_tags is not unique.
 */
 int fieldstat_register_cube(struct fieldstat *instance, const struct fieldstat_tag *shared_tags, size_t n_tag, enum sampling_mode mode, size_t max_n_cell);
 /*
@@ -76,14 +76,14 @@ long long fieldstat_get_cube_version(const struct fieldstat *instance, int cube_
     * @param cube_id: cube id, previously returned by fieldstat_register_cube.
     * @param field_name: name of the metric. Cannot be NULL. Must be unique in this cube.
     * @param counter_mode: merge method of the metric. Refer to enum counter_mode.
-    * @return metric id, if success; otherwise, return -1. Fail when cube is not registered, or the parameter is invalid.
+    * @return metric id, if success; return -1 when cube is not registered. return -3 when the field_name is not unique.
 */
 int fieldstat_register_counter(struct fieldstat *instance, int cube_id, const char *field_name, enum counter_mode mode);
 
 /*
     * @brief add a metric to the cube of cube_id. One metric may have multiple sub-metric that are associated with different cells. other parameters are the same as fieldstat_register_counter.
     * @param precision: the bigger, the larger memory consumption, while accuracy improved. Must be in [4, 18].
-    * @return metric id, if success; otherwise, return -1. Fail when cube is not registered, or the parameter is invalid.
+    * @return metric id, if success; otherwise, return -1 when cube is not registered, -2 when the parameter is invalid; return -3 when the field_name is not unique.
 */
 int fieldstat_register_hll(struct fieldstat *instance, int cube_id, const char *field_name, unsigned char precision);
 
@@ -92,19 +92,21 @@ int fieldstat_register_hll(struct fieldstat *instance, int cube_id, const char *
     * @param lowest_trackable_value: the lowest value that can be tracked (distinguishable from 0) by the histogram. Must be >= 1.
     * @param highest_trackable_value: the highest value to be tracked by the histogram. Must be >= 2 * lowest_trackable_value.
     * @param significant_figures: the precision of the histogram. Must be in [1, 5].
-    * @return metric id, if success; otherwise, return -1. Fail when cube is not registered, or the parameter is invalid.
+    * @return metric id, if success; otherwise, return -1 when cube is not registered. -2 when the parameter is invalid, -3 when the field_name is not unique.
 */
 int fieldstat_register_hist(struct fieldstat *instance, int cube_id, const char *field_name, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures);
 
 /*
-    * @brief add a cell to the cube of cube_id. One cell represents a set of tags. In topk sampling mode, this function will update the cell ranking every time it is called.
+    * @brief add a cell to the cube of cube_id. One cell represents a set of tags. If the cell already exists, just return the cell id. Otherwise, create a new cell and return the cell id. In topk sampling mode, this function will update the cell ranking every time it is called. 
     * @param cube_id: cube id, previously returned by fieldstat_register_cube.
     * @param tags: tags of the cell. Can be NULL, and all NULL tags are mapped to a single cell. Tags are ordered, which means that {"TAG_KEY": "123", "TAG_KEY2": "456"} and {"TAG_KEY2": "456", "TAG_KEY": "123"} are map to different cell.
     * @param n_tag: number of tags.
     * @param increment: the primary metric increment of this cell. For example, if the primary metric is "count", then increment is the count of this cell.
     *                   in comprehensive sampling mode, this parameter is ignored.
-    * @return cell id >= 0, if success; otherwise, return -2 when cube is not registered, instance are NULL, or (increment < 0 and mode == topk).  \
+    * @return cell id >= 0, if successfully add a new cell, or the cell has already been added; otherwise, 
+    *         return -2 when cube is not registered, instance are NULL
     *         return -1 when: mode is (SAMPLING_MODE_COMPREHENSIVE) and cell number >= (max_n_cell) ; or SAMPLING_MODE_TOPK and cell already exists.
+    *         return -3 when: increment <= 0 and mode == topk). 
     *         in topk sampling mode, the same tags may map to different cell ids.
 */
 int fieldstat_cube_add(struct fieldstat *instance, int cube_id, const struct fieldstat_tag *tags, size_t n_tag, long long increment);
@@ -143,15 +145,21 @@ int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, in
 
 /* 
     * @brief Add a value to the histogram metric of cell_id. Histogram will record the distribution of the values.
+             The value bigger than highest_trackable_value will be set to highest_trackable_value. The value less than lowest_trackable_value will be tried to record, and, if succeed, remains in the record as -inf(most of the time) or 0(if value == 0)
     * @param value: value of the histogram metric.
     * @return 0 if success. -1 if cube_id is invalid. -2 if metric_id is invalid, or the metric is not a METRIC_TYPE_HISTOGRAM. -3 if cell_id is invalid.
+    *         -4 if record failed(only when value is too small)
 */
 int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long value);
 
 /*
     * @brief Delete all the cells, also the content of every metrics. The cube and metrics are not deleted. Increase cell_version by 1.
+             Note that the cell record won't be deleted at once, they just seem to be deleted. The cell record will be deleted when they are not used ever since the last reset and until the next reset.
 */
 void fieldstat_reset(struct fieldstat *instance);
+/*
+    cell version is increased by 1 when we call fieldstat_reset and fieldstat_cube_remove. All cells share the same cell version.
+*/
 unsigned long fieldstat_get_cell_version(const struct fieldstat *instance);
 
 /*

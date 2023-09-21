@@ -306,7 +306,7 @@ int fieldstat_cube_add(struct fieldstat *instance, int cube_id, const struct fie
         return -2;
     }
     if (cube->sampling_mode == SAMPLING_MODE_TOPK && increment <= 0) {
-        return -2;
+        return -3;
     }
 
     if (n_tag == 0 || tags == NULL) {
@@ -361,12 +361,12 @@ int fieldstat_cube_remove(struct fieldstat *instance, int cube_id, const struct 
         tag_hash_key_free(tag_key);
         return -1;
     }
-
     for (size_t i = 0; i < cube->n_metric; i++) {
         metric_delete_cell(cube->metrics[i], id);
     }
-
     tag_hash_key_free(tag_key);
+
+    instance->cell_version++;
     return id;
 }
 
@@ -427,7 +427,7 @@ int fieldstat_register_counter(struct fieldstat *instance, int cube_id, const ch
     }
 
     if (name_id_map_get_id_by_name(cube->metric_name_id_map, field_name) != -1) {
-        return -2;
+        return -3;
     }
 
     struct metric *metric = metric_counter_new(field_name, mode);
@@ -448,8 +448,13 @@ int fieldstat_register_hll(struct fieldstat *instance, int cube_id, const char *
         return -1;
     }
     if (precision < 4 || precision > 18) {
-        return -1;
+        return -2;
     }
+
+    if (name_id_map_get_id_by_name(cube->metric_name_id_map, field_name) != -1) {
+        return -3;
+    }
+
     struct metric *metric = metric_hll_new(field_name, precision);
 
     return append_metric_to_cube(cube, metric);
@@ -467,16 +472,22 @@ int fieldstat_register_hist(struct fieldstat *instance, int cube_id, const char 
     if (cube == NULL) {
         return -1;
     }
+
+    // refer to hdr_histogram.h for the rules of parameters. Just copy them here
     if (lowest_trackable_value < 1) {
-        return -1;
+        return -2;
     }
     if (significant_figures < 1 || significant_figures > 5) {
-        return -1;
+        return -2;
     }
     if (lowest_trackable_value * 2 > highest_trackable_value)
 	{
-		return -1;
+		return -2;
 	}
+
+    if (name_id_map_get_id_by_name(cube->metric_name_id_map, field_name) != -1) {
+        return -3;
+    }
 
     struct metric *metric = metric_histogram_new(field_name, lowest_trackable_value, highest_trackable_value, significant_figures);
 
