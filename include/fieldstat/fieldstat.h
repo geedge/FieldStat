@@ -242,9 +242,10 @@ int fieldstat_get_max_cell_id(const struct fieldstat *instance, int cube_id);
     * @param cube_id: cube id, previously returned by fieldstat_get_cubes.
     * @param metric_id: metric id, previously returned by fieldstat_get_max_metric_id.
     * @param cell_id: cell id, previously returned by fieldstat_get_cells.
-    * @return -1 if cube_id or metric_id or cell_id is invalid.
+    * @param value_out: the value of the metric. If the cell is not found, *value_out is set to 0.
+    * @return -1 if cube_id or metric_id or cell_id is invalid. 
 */
-long long fieldstat_counter_get(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id);
+int fieldstat_counter_get(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long *value_out);
 double fieldstat_hll_get(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id);
 long long fieldstat_hist_value_at_percentile(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, double percentile);
 long long fieldstat_hist_count_le_value(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long value);

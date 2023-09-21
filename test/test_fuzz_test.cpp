@@ -174,7 +174,7 @@ TEST(Fuzz_test, both_comp_and_topk_cubes_with_merge_and_reset_expecting_correct_
         } else {
             for (size_t j = 0; j < cell_num0; j++) {
                 string cell_key = Fieldstat_tag_list_wrapper(&tags0[j]).to_string();
-                EXPECT_EQ(comp_count[cubes[i]][cell_key], fieldstat_counter_get(instance_in_focus, cubes[i], 0, cells0[j]));
+                EXPECT_EQ(comp_count[cubes[i]][cell_key], my_fieldstat_counter_get(instance_in_focus, cubes[i], 0, cells0[j]));
                 EXPECT_NEAR(comp_hll[cubes[i]][cell_key].size(), fieldstat_hll_get(instance_in_focus, cubes[i], 1, cells0[j]), comp_hll[cubes[i]][cell_key].size() * 0.2);
             }
         }

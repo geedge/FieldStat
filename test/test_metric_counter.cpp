@@ -57,7 +57,7 @@ TEST(metric_test_counter, simple_register_and_query_counter)
     fieldstat_counter_incrby(instance, 0, 0, 0, 86);
 
     test_assert_standard_instance(instance);
-    EXPECT_EQ(fieldstat_counter_get(instance, 0, 0, 0), 10086);
+    EXPECT_EQ(my_fieldstat_counter_get(instance, 0, 0, 0), 10086);
 
     fieldstat_free(instance);
 }
@@ -79,7 +79,7 @@ TEST(metric_test_counter, serialize_and_merge_counter)
     // query
     test_assert_standard_instance(instance_total);
 
-    long long measure = fieldstat_counter_get(instance_total, 0, 0, 0);
+    long long measure = my_fieldstat_counter_get(instance_total, 0, 0, 0);
     EXPECT_EQ(measure, -9900);
 
     fieldstat_free(instance);
@@ -112,7 +112,7 @@ TEST(metric_test_counter, serialization_and_merge_counter_twice_with_reset)
     fieldstat_merge(instance_total, instance_from_blob);
 
     test_assert_standard_instance(instance_total);
-    long long measure = fieldstat_counter_get(instance_total, 0, 0, 0);
+    long long measure = my_fieldstat_counter_get(instance_total, 0, 0, 0);
     EXPECT_EQ(measure, 10086 + 4);
 
     fieldstat_free(instance);
@@ -128,7 +128,7 @@ TEST(metric_test_counter, simple_register_and_query_gauge)
     fieldstat_counter_set(instance, 0, 0, 0, 86);
 
     test_assert_standard_instance(instance);
-    EXPECT_EQ(fieldstat_counter_get(instance, 0, 0, 0), 86);
+    EXPECT_EQ(my_fieldstat_counter_get(instance, 0, 0, 0), 86);
 
     fieldstat_free(instance);
 }
@@ -149,7 +149,7 @@ TEST(metric_test_counter, serialize_and_merge_gauge)
 
     test_assert_standard_instance(instance_total);
 
-    long long measure = fieldstat_counter_get(instance_total, 0, 0, 0);
+    long long measure = my_fieldstat_counter_get(instance_total, 0, 0, 0);
     EXPECT_EQ(measure, 10);
 
     fieldstat_free(instance);
@@ -182,7 +182,7 @@ TEST(metric_test_counter, serialization_and_merge_gauge_twice_with_reset)
     fieldstat_merge(instance_total, instance_from_blob);
 
     test_assert_standard_instance(instance_total);
-    long long measure = fieldstat_counter_get(instance_total, 0, 0, 0);
+    long long measure = my_fieldstat_counter_get(instance_total, 0, 0, 0);
     EXPECT_EQ(measure, 1234);
 
     fieldstat_free(instance);
@@ -236,7 +236,7 @@ TEST(metric_test_counter, topk_add_and_test_accuracy)
 
         EXPECT_STREQ(key.c_str(), "elephant ");
 
-        error += abs(fieldstat_counter_get(instance, 0, 0, ret_cell_ids[i]) - flow_cnt[key + value]);
+        error += abs(my_fieldstat_counter_get(instance, 0, 0, ret_cell_ids[i]) - flow_cnt[key + value]);
     }
     printf("topk_add_and_test_accuracy Mean ratio e: %lld\n", error);
     EXPECT_LT(error, tag_list_num * 0.005);

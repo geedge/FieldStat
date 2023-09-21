@@ -85,7 +85,7 @@ TEST(test_register, reset_and_try_to_query_cell)
 
     fieldstat_reset(instance);
     EXPECT_EQ(fieldstat_get_max_metric_id(instance, cube_id), 0);
-    EXPECT_EQ(fieldstat_counter_get(instance, cube_id, metric_id, cell_id), -1);
+    EXPECT_EQ(my_fieldstat_counter_get(instance, cube_id, metric_id, cell_id), -1);
 
     fieldstat_free(instance);
 }
@@ -108,7 +108,7 @@ TEST(test_register, register_many_cubes)
     }
 
     for (int i = 0; i < registered_cube; i++) {
-        long long result = fieldstat_counter_get(instance, i, 0, 0);
+        long long result = my_fieldstat_counter_get(instance, i, 0, 0);
         EXPECT_EQ(result, i);
     }
 
@@ -129,7 +129,7 @@ TEST(test_register, add_long_tagged_cells)
     int metric_id = fieldstat_register_counter(instance, cube_id, "counter", COUNTER_MERGE_BY_SUM);
     fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id, 10086);
 
-    EXPECT_EQ(fieldstat_counter_get(instance, cube_id, metric_id, cell_id), 10086);
+    EXPECT_EQ(my_fieldstat_counter_get(instance, cube_id, metric_id, cell_id), 10086);
 
     fieldstat_free(instance);
 }
@@ -228,9 +228,9 @@ TEST(test_register, unregister_cube_on_wrong_instance)
 
     fieldstat_merge(instance_dst, instance);
 
-    long long val_deleted_once = fieldstat_counter_get(instance_dst, cube_id, metric_id, cell_id);
+    long long val_deleted_once = my_fieldstat_counter_get(instance_dst, cube_id, metric_id, cell_id);
     EXPECT_EQ(val_deleted_once, 1);
-    long long val_merged_twice = fieldstat_counter_get(instance_dst, cube_id2, metric_id2, cell_id2);
+    long long val_merged_twice = my_fieldstat_counter_get(instance_dst, cube_id2, metric_id2, cell_id2);
     EXPECT_EQ(val_merged_twice, 2);
 
     fieldstat_free(instance);
@@ -253,7 +253,7 @@ TEST(test_register, register_many_cells_on_unlimited_sized_cube)
     }
 
     for (int i = 0; i < 10000; i++) {
-        EXPECT_EQ(fieldstat_counter_get(instance, cube_id, metric_id, i), 1);
+        EXPECT_EQ(my_fieldstat_counter_get(instance, cube_id, metric_id, i), 1);
     }
 
     fieldstat_free(instance);
@@ -271,7 +271,7 @@ TEST(test_register, unregister_cell)
 
     int cell_id_removed = fieldstat_cube_remove(instance, cube_id, &TEST_TAG_INT, 1);
     EXPECT_EQ(cell_id_removed, cell_id1);
-    EXPECT_EQ(fieldstat_counter_get(instance, cube_id, metric_id, cell_id1), -1);
+    EXPECT_EQ(my_fieldstat_counter_get(instance, cube_id, metric_id, cell_id1), -1);
     
     int *cell_ids = NULL;
     struct fieldstat_tag_list *tag_list = NULL;

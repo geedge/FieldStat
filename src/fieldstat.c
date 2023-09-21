@@ -1001,14 +1001,14 @@ struct fieldstat_tag_list *fieldstat_get_shared_tags(const struct fieldstat *ins
     return tag_list;
 }
 
-long long fieldstat_counter_get(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id)
+int fieldstat_counter_get(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long *value)
 {
     const struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id);
     if (metric == NULL || metric_get_type(metric) != METRIC_TYPE_COUNTER) {
         return -1;
     }
 
-    return metric_counter_get(metric, cell_id);
+    return metric_counter_get(metric, cell_id, value);
 }
 
 double fieldstat_hll_get(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id)

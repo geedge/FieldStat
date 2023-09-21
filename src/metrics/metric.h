@@ -23,7 +23,7 @@ void metric_delete_cell(struct metric *pthis, int cell_id);
 struct metric *metric_counter_new(const char *name, enum counter_mode mode);
 void metric_counter_incrby(struct metric *pthis, int cell_id, long long value);
 int metric_counter_set(struct metric *pthis, int cell_id, long long value);
-long long metric_counter_get(const struct metric *pthis, int cell_id);
+int metric_counter_get(const struct metric *pthis, int cell_id, long long *value_out);
 
 struct metric *metric_hll_new(const char *name, unsigned char precision);
 void metric_hll_add(struct metric *pthis, int cell_id, const char *key, size_t key_len);

@@ -486,8 +486,9 @@ struct export_kv_pair *cell_query_with_iter(const struct cell_iter *iter, int me
     enum metric_type type = fieldstat_get_metric_type(iter->instance, iter->cube_ids[iter->curr_cube_idx], metric_id);
     struct export_kv_pair *ret = NULL;
     if (type == METRIC_TYPE_COUNTER) {
-        long long value = fieldstat_counter_get(iter->instance, iter->cube_ids[iter->curr_cube_idx], metric_id, iter->cell_ids[iter->curr_cell_idx]);
-        if (value == -1) {
+        long long value;
+        int tmp_ret = fieldstat_counter_get(iter->instance, iter->cube_ids[iter->curr_cube_idx], metric_id, iter->cell_ids[iter->curr_cell_idx], &value);
+        if (tmp_ret == -1) {
             return NULL;
         }
         ret = malloc(sizeof(struct export_kv_pair));
@@ -639,12 +640,14 @@ void cjson_map_record_metrics(struct cellwise_rec_for_export *tag_field_pair, co
         if (fieldstat_get_metric_type(iter->instance, cube_id, metric_id) != METRIC_TYPE_COUNTER) {
             continue;
         }
-        if (fieldstat_counter_get(iter->instance, cube_id, metric_id, iter->cell_ids[iter->curr_cell_idx]) == -1) { // no value, happens when the two cells in one cube has different metrics
+        long long value;
+        int ret = fieldstat_counter_get(iter->instance, cube_id, metric_id, iter->cell_ids[iter->curr_cell_idx], &value);
+        if (ret == -1) { // no value, happens when the two cells in one cube has different metrics
             continue;
         }
 
         tag_field_pair->metric_name[n_counter_metric] = strdup(fieldstat_get_metric_name(iter->instance, cube_id, metric_id));
-        tag_field_pair->metric_value[n_counter_metric] = fieldstat_counter_get(iter->instance, cube_id, metric_id, iter->cell_ids[iter->curr_cell_idx]);
+        tag_field_pair->metric_value[n_counter_metric] = value;
 
         n_counter_metric++;
     }

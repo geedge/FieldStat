@@ -56,7 +56,7 @@ TEST(test_empty_tag, add_many_times) // test hash find ok
     fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id, 1);
     fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id, 1);
 
-    EXPECT_EQ(fieldstat_counter_get(instance, cube_id, metric_id, cell_id), 2);
+    EXPECT_EQ(my_fieldstat_counter_get(instance, cube_id, metric_id, cell_id), 2);
 
     fieldstat_free(instance);
 }
@@ -101,7 +101,7 @@ TEST(test_empty_tag, merge)
     free(ret_cell_ids);
     fieldstat_tag_list_arr_free(tag_list, n_cell);
 
-    EXPECT_EQ(fieldstat_counter_get(instance_dst, 0, 0, 0), 2);
+    EXPECT_EQ(my_fieldstat_counter_get(instance_dst, 0, 0, 0), 2);
 
     fieldstat_free(instance_dst);
     fieldstat_free(instance_src);
@@ -136,7 +136,7 @@ TEST(test_empty_tag, merge_topk)
     free(ret_cell_ids);
     fieldstat_tag_list_arr_free(tag_list, n_cell);
 
-    EXPECT_EQ(fieldstat_counter_get(instance_dst, 0, 0, 0), 2);
+    EXPECT_EQ(my_fieldstat_counter_get(instance_dst, 0, 0, 0), 2);
 
     fieldstat_free(instance_dst);
     fieldstat_free(instance_src);

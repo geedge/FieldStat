@@ -39,3 +39,6 @@ private:
 
 
 double test_cal_topk_accuracy(std::vector<struct Fieldstat_tag_list_wrapper *> &test_result, std::unordered_map<std::string, int> &expected_count);
+
+// after we change fieldstat_counter_get return a error code in, all the tests should change correspondingly, so just use a adapter aliasing the old function
+long long my_fieldstat_counter_get(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id);

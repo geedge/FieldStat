@@ -65,9 +65,9 @@ TEST(unit_test_merge, test_metric_name_mapping_with_new_metric_on_existing_cube)
     EXPECT_STREQ(fieldstat_get_metric_name(instance_dest, cube_id_dest, 1), "metric_name cube1 cube2");
     EXPECT_STREQ(fieldstat_get_metric_name(instance_dest, cube_id[1], 0), "metric_name cube1 cube2");
 
-    EXPECT_EQ(fieldstat_counter_get(instance_dest, cube_id_dest, 0, 0), 2); // shared name
-    EXPECT_EQ(fieldstat_counter_get(instance_dest, cube_id_dest, 1, 0), 1); // metric_name cube1 cube2 on cube1
-    EXPECT_EQ(fieldstat_counter_get(instance_dest, cube_id[1], 0, 0), 3); // metric_name cube1 cube2 on cube2
+    EXPECT_EQ(my_fieldstat_counter_get(instance_dest, cube_id_dest, 0, 0), 2); // shared name
+    EXPECT_EQ(my_fieldstat_counter_get(instance_dest, cube_id_dest, 1, 0), 1); // metric_name cube1 cube2 on cube1
+    EXPECT_EQ(my_fieldstat_counter_get(instance_dest, cube_id[1], 0, 0), 3); // metric_name cube1 cube2 on cube2
 
     fieldstat_free(instance);
     fieldstat_free(instance_dest);
@@ -153,7 +153,7 @@ TEST(unit_test_merge, new_cell_on_existing_cube_and_metric_comprehensive)
     free(cube_id_dest);
     int ret_metric_id = fieldstat_get_max_metric_id(instance, ret_cube_id);
     EXPECT_EQ(ret_metric_id, 0);
-    long long measure = fieldstat_counter_get(instance, cube_id, metric_id, cell_id);
+    long long measure = my_fieldstat_counter_get(instance, cube_id, metric_id, cell_id);
     EXPECT_EQ(measure, 10086);
 
     int *ret_cell_ids = NULL;
@@ -190,7 +190,7 @@ TEST(unit_test_merge, merge_existing_cell_on_existing_cube_and_metric_comprehens
     free(cube_id_dest);
     int ret_metric_id = fieldstat_get_max_metric_id(instance_dest, ret_cube_id);
     EXPECT_EQ(ret_metric_id, 0);
-    long long measure = fieldstat_counter_get(instance_dest, cube_id, metric_id, 0);
+    long long measure = my_fieldstat_counter_get(instance_dest, cube_id, metric_id, 0);
     EXPECT_EQ(measure, 10);
 
     fieldstat_free(instance);
@@ -313,7 +313,7 @@ TEST(unit_test_merge, new_cell_on_existing_cube_and_metric_topk)
     free(cube_id_dest);
     int ret_metric_id = fieldstat_get_max_metric_id(instance, ret_cube_id);
     EXPECT_EQ(ret_metric_id, 0);
-    long long measure = fieldstat_counter_get(instance, cube_id, metric_id, cell_id);
+    long long measure = my_fieldstat_counter_get(instance, cube_id, metric_id, cell_id);
     EXPECT_EQ(measure, 10086);
 
     int *ret_cell_ids = NULL;
@@ -356,7 +356,7 @@ TEST(unit_test_merge, merge_existing_cell_on_existing_cube_and_metric_topk)
     size_t n_cell = 0;
     fieldstat_get_cells(instance_dest, ret_cube_id, ret_metric_id, &ret_cell_ids, &tag_list, &n_cell);
     EXPECT_EQ(n_cell, 1);
-    long long measure = fieldstat_counter_get(instance_dest, cube_id, metric_id, ret_cell_ids[0]);
+    long long measure = my_fieldstat_counter_get(instance_dest, cube_id, metric_id, ret_cell_ids[0]);
     EXPECT_EQ(measure, 10);
 
     free(ret_cell_ids);
@@ -616,7 +616,7 @@ TEST(unit_test_merge, exception_test_given_cell_added_but_no_metric_operation_gi
     size_t n_cell = 0;
     fieldstat_get_cells(instance2, cube_id, metric_id, &cell_ids, &tag_list, &n_cell);
     EXPECT_TRUE(n_cell == 0);
-    EXPECT_EQ(fieldstat_counter_get(instance2, cube_id, metric_id, cell_id), -1);
+    EXPECT_EQ(my_fieldstat_counter_get(instance2, cube_id, metric_id, cell_id), -1);
 
     fieldstat_free(instance);
     fieldstat_free(instance2);
@@ -642,7 +642,7 @@ TEST(unit_test_merge, exception_test_given_cell_added_but_no_metric_operation_gi
     size_t n_cell = 0;
     fieldstat_get_cells(instance2, cube_id, metric_id, &cell_ids, &tag_list, &n_cell);
     EXPECT_EQ(n_cell, 1);
-    EXPECT_EQ(fieldstat_counter_get(instance2, cube_id, metric_id, cell_id), 123);
+    EXPECT_EQ(my_fieldstat_counter_get(instance2, cube_id, metric_id, cell_id), 123);
 
     fieldstat_free(instance);
     fieldstat_free(instance2);

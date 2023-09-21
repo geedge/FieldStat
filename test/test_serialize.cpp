@@ -29,7 +29,7 @@ TEST(unit_test_serialize, serialize_and_deserialize_fieldstat_instance_comprehen
     EXPECT_EQ(ret_cell_id, 0);
     int ret_metric_id = fieldstat_get_max_metric_id(instance2, ret_cell_id);
     EXPECT_EQ(ret_metric_id, 0);
-    long long measure = fieldstat_counter_get(instance2, cube_id, metric_id, cell_id1);
+    long long measure = my_fieldstat_counter_get(instance2, cube_id, metric_id, cell_id1);
     EXPECT_EQ(measure, 10086);
     const char *name = fieldstat_get_metric_name(instance2, cube_id, metric_id);
     EXPECT_STREQ(name, "czz_test counter metric");
@@ -78,7 +78,7 @@ TEST(unit_test_serialize, serialize_and_deserialize_fieldstat_instance_topk)
     EXPECT_EQ(ret_cell_id, 0);
     int ret_metric_id = fieldstat_get_max_metric_id(instance2, ret_cell_id);
     EXPECT_EQ(ret_metric_id, 0);
-    long long measure = fieldstat_counter_get(instance2, cube_id, metric_id, cell_id1);
+    long long measure = my_fieldstat_counter_get(instance2, cube_id, metric_id, cell_id1);
     EXPECT_EQ(measure, 10086);
     const char *name = fieldstat_get_metric_name(instance2, cube_id, metric_id);
     EXPECT_STREQ(name, "czz_test counter metric");

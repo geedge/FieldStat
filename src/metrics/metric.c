@@ -751,14 +751,15 @@ int metric_counter_set(struct metric *pthis, int cell_id, long long value)
     return 0;
 }
 
-long long metric_counter_get(const struct metric *pthis, int cell_id)
+int metric_counter_get(const struct metric *pthis, int cell_id, long long *value_out)
 {
     const struct metric_measure_data *data = metric_find_one_cell(pthis, cell_id);
     if (data == NULL) {
         return -1;
     }
     const struct metric_counter_or_gauge *counter = data->counter;
-    return counter->value;
+    *value_out = counter->value;
+    return 0;
 }
 
 struct metric *metric_hll_new(const char *name, unsigned char precision)
