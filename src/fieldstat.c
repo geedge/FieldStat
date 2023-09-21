@@ -1119,7 +1119,7 @@ struct fieldstat *fieldstat_dup(const struct fieldstat *instance)
     return new_instance;
 }
 
-void fieldstat_cube_read_cell(const struct fieldstat *instance, int cube_id, int **cell_ids, struct fieldstat_tag_list **tag_list, size_t *n_cell)
+void fieldstat_get_cells_from_cube(const struct fieldstat *instance, int cube_id, int **cell_ids, struct fieldstat_tag_list **tag_list, size_t *n_cell)
 {
     if (cube_id < 0 || cube_id >= instance->valid_cube_arr_length) {
         return;

@@ -208,7 +208,7 @@ enum metric_type fieldstat_get_metric_type(const struct fieldstat *instance, int
     * @param tag_list tag_list[i] is the tag list of i-th cell. User free them by calling fieldstat_tag_list_arr_free.
     * @param n_cell: Length of cell_ids and tag_list.
 */
-void fieldstat_cube_read_cell(const struct fieldstat *instance, int cube_id,
+void fieldstat_get_cells_from_cube(const struct fieldstat *instance, int cube_id,
     int **cell_ids, struct fieldstat_tag_list **tag_list, size_t *n_cell);
 
 /*

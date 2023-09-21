@@ -436,7 +436,7 @@ int cell_iter_next_cube(struct cell_iter *iter) {
         }
 
         // get cell info 
-        fieldstat_cube_read_cell(instance, cube_id_next, &iter->cell_ids, &iter->tag_list, &iter->n_cell);
+        fieldstat_get_cells_from_cube(instance, cube_id_next, &iter->cell_ids, &iter->tag_list, &iter->n_cell);
         if (iter->n_cell == 0) {
             continue;
         }

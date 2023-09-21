@@ -30,7 +30,7 @@ TEST(test_empty_tag, serialize)
     int *ret_cell_ids = NULL;
     struct fieldstat_tag_list *tag_list = NULL;
     size_t n_cell = 0;
-    fieldstat_cube_read_cell(instance2, ret_cell_id, &ret_cell_ids, &tag_list, &n_cell);
+    fieldstat_get_cells_from_cube(instance2, ret_cell_id, &ret_cell_ids, &tag_list, &n_cell);
     EXPECT_EQ(n_cell, 1);
     EXPECT_EQ(ret_cell_ids[0], 0);
     EXPECT_EQ(tag_list[0].n_tag, 0);
@@ -93,7 +93,7 @@ TEST(test_empty_tag, merge)
     int *ret_cell_ids = NULL;
     struct fieldstat_tag_list *tag_list = NULL;
     size_t n_cell = 0;
-    fieldstat_cube_read_cell(instance_dst, ret_cell_id, &ret_cell_ids, &tag_list, &n_cell);
+    fieldstat_get_cells_from_cube(instance_dst, ret_cell_id, &ret_cell_ids, &tag_list, &n_cell);
     EXPECT_EQ(n_cell, 1);
     EXPECT_EQ(ret_cell_ids[0], 0);
     EXPECT_EQ(tag_list[0].n_tag, 0);
@@ -128,7 +128,7 @@ TEST(test_empty_tag, merge_topk)
     int *ret_cell_ids = NULL;
     struct fieldstat_tag_list *tag_list = NULL;
     size_t n_cell = 0;
-    fieldstat_cube_read_cell(instance_dst, ret_cell_id, &ret_cell_ids, &tag_list, &n_cell);
+    fieldstat_get_cells_from_cube(instance_dst, ret_cell_id, &ret_cell_ids, &tag_list, &n_cell);
     EXPECT_EQ(n_cell, 1);
     EXPECT_EQ(ret_cell_ids[0], 0);
     EXPECT_EQ(tag_list[0].n_tag, 0);
