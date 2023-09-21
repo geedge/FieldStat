@@ -616,7 +616,8 @@ TEST(unit_test_merge, exception_test_given_cell_added_but_no_metric_operation_gi
     size_t n_cell = 0;
     fieldstat_get_cells(instance2, cube_id, metric_id, &cell_ids, &tag_list, &n_cell);
     EXPECT_TRUE(n_cell == 0);
-    EXPECT_EQ(my_fieldstat_counter_get(instance2, cube_id, metric_id, cell_id), -1);
+    long long value;
+    EXPECT_EQ(fieldstat_counter_get(instance2, cube_id, metric_id, cell_id, &value), -1);
 
     fieldstat_free(instance);
     fieldstat_free(instance2);

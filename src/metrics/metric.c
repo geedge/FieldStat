@@ -755,6 +755,7 @@ int metric_counter_get(const struct metric *pthis, int cell_id, long long *value
 {
     const struct metric_measure_data *data = metric_find_one_cell(pthis, cell_id);
     if (data == NULL) {
+        *value_out = 0;
         return -1;
     }
     const struct metric_counter_or_gauge *counter = data->counter;

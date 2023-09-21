@@ -255,6 +255,8 @@ void fieldstat_get_serialized_blob(const struct fieldstat *instance, int cube_id
 
 void fieldstat_tag_list_arr_free(struct fieldstat_tag_list *tag_list, size_t n_cell);
 
+// todo: 这些查询接口的返回值也搞好点。
+
 #ifdef __cplusplus
 }
 #endif
