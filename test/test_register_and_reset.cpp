@@ -343,6 +343,196 @@ TEST(test_register, register_metric_twice) {
     fieldstat_free(instance);
 }
 
+TEST(calibrate, target_one_more_metric)
+{
+    struct fieldstat *master = fieldstat_new();
+    int cube_id = fieldstat_register_cube(master, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    fieldstat_register_counter(master, cube_id, "counter", COUNTER_MERGE_BY_SUM);
+    struct fieldstat *target = fieldstat_fork(master);
+    EXPECT_EQ(fieldstat_register_counter(target, cube_id, "counter2", COUNTER_MERGE_BY_SUM), 1);
+
+    fieldstat_calibrate(master, target);
+
+    EXPECT_EQ(fieldstat_get_max_metric_id(target, cube_id), 0);
+    EXPECT_STREQ(fieldstat_get_metric_name(target, cube_id, 0), "counter");
+    struct fieldstat_tag_list *tag_list = fieldstat_get_shared_tags(target, cube_id);
+    EXPECT_STREQ(tag_list->tag[0].key, TEST_SHARED_TAG.key);
+
+    fieldstat_free(master);
+    fieldstat_free(target);
+    fieldstat_tag_list_arr_free(tag_list, 1);
+}
+
+TEST(calibrate, master_one_more_metric)
+{
+    struct fieldstat *master = fieldstat_new();
+    int cube_id = fieldstat_register_cube(master, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    fieldstat_register_counter(master, cube_id, "counter", COUNTER_MERGE_BY_SUM);
+    struct fieldstat *target = fieldstat_fork(master);
+    EXPECT_EQ(fieldstat_register_counter(master, cube_id, "counter2", COUNTER_MERGE_BY_SUM), 1);
+
+    fieldstat_calibrate(master, target);
+
+    EXPECT_EQ(fieldstat_get_max_metric_id(target, cube_id), 1);
+    EXPECT_STREQ(fieldstat_get_metric_name(target, cube_id, 0), "counter");
+    EXPECT_STREQ(fieldstat_get_metric_name(target, cube_id, 1), "counter2");
+    struct fieldstat_tag_list *tag_list = fieldstat_get_shared_tags(target, cube_id);
+    EXPECT_STREQ(tag_list->tag[0].key, TEST_SHARED_TAG.key);
+
+    fieldstat_free(master);
+    fieldstat_free(target);
+    fieldstat_tag_list_arr_free(tag_list, 1);
+}
+
+// different metric on same cube
+TEST(calibrate, different_metric)
+{
+    struct fieldstat *master = fieldstat_new();
+    int cube_id = fieldstat_register_cube(master, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    fieldstat_register_counter(master, cube_id, "counter", COUNTER_MERGE_BY_SUM);
+    struct fieldstat *target = fieldstat_fork(master);
+    EXPECT_EQ(fieldstat_register_counter(target, cube_id, "counter2", COUNTER_MERGE_BY_SUM), 1);
+    EXPECT_EQ(fieldstat_register_counter(master, cube_id, "hi i am master new", COUNTER_MERGE_BY_SUM), 1);
+
+    fieldstat_calibrate(master, target);
+
+    EXPECT_EQ(fieldstat_get_max_metric_id(target, cube_id), 1);
+    EXPECT_STREQ(fieldstat_get_metric_name(target, cube_id, 0), "counter");
+    EXPECT_STREQ(fieldstat_get_metric_name(target, cube_id, 1), "hi i am master new");
+    struct fieldstat_tag_list *tag_list = fieldstat_get_shared_tags(target, cube_id);
+    EXPECT_STREQ(tag_list->tag[0].key, TEST_SHARED_TAG.key);
+
+    fieldstat_free(master);
+    fieldstat_free(target);
+    fieldstat_tag_list_arr_free(tag_list, 1);
+}
+
+TEST(calibrate, target_more_cube)
+{
+    struct fieldstat *master = fieldstat_new();
+    int cube_id = fieldstat_register_cube(master, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    fieldstat_register_counter(master, cube_id, "counter", COUNTER_MERGE_BY_SUM);
+    struct fieldstat *target = fieldstat_fork(master);
+    int cube_id2 = fieldstat_register_cube(target, &TEST_TAG_STRING, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    EXPECT_EQ(cube_id2, 1);
+    fieldstat_register_counter(target, cube_id2, "counter2", COUNTER_MERGE_BY_SUM);
+
+    fieldstat_calibrate(master, target);
+
+    int n_cube;
+    int *cube_ids;
+    fieldstat_get_cubes(target, &cube_ids, &n_cube);
+    EXPECT_EQ(n_cube, 1);
+    EXPECT_EQ(cube_ids[0], cube_id);
+    free(cube_ids);
+
+    EXPECT_EQ(fieldstat_get_max_metric_id(target, cube_id), 0);
+    EXPECT_STREQ(fieldstat_get_metric_name(target, cube_id, 0), "counter");
+    struct fieldstat_tag_list *tag_list = fieldstat_get_shared_tags(target, cube_id);
+    EXPECT_STREQ(tag_list->tag[0].key, TEST_SHARED_TAG.key);
+
+    fieldstat_free(master);
+    fieldstat_free(target);
+    fieldstat_tag_list_arr_free(tag_list, 1);
+}
+
+TEST(calibrate, master_more_cube)
+{
+    struct fieldstat *master = fieldstat_new();
+    int cube_id = fieldstat_register_cube(master, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    fieldstat_register_counter(master, cube_id, "counter", COUNTER_MERGE_BY_SUM);
+    struct fieldstat *target = fieldstat_fork(master);
+    int cube_id2 = fieldstat_register_cube(master, &TEST_TAG_STRING, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    fieldstat_register_counter(master, cube_id2, "counter2", COUNTER_MERGE_BY_SUM);
+
+    fieldstat_calibrate(master, target);
+
+    int n_cube;
+    int *cube_ids;
+    fieldstat_get_cubes(target, &cube_ids, &n_cube);
+    EXPECT_EQ(n_cube, 2);
+    EXPECT_EQ(cube_ids[0], cube_id);
+    EXPECT_EQ(cube_ids[1], cube_id2);
+    free(cube_ids);
+
+    EXPECT_EQ(fieldstat_get_max_metric_id(target, cube_id), 0);
+    EXPECT_STREQ(fieldstat_get_metric_name(target, cube_id, 0), "counter");
+    struct fieldstat_tag_list *tag_list = fieldstat_get_shared_tags(target, cube_id);
+    EXPECT_STREQ(tag_list->tag[0].key, TEST_SHARED_TAG.key);
+
+    EXPECT_EQ(fieldstat_get_max_metric_id(target, cube_id2), 0);
+    EXPECT_STREQ(fieldstat_get_metric_name(target, cube_id2, 0), "counter2");
+    struct fieldstat_tag_list *tag_list2 = fieldstat_get_shared_tags(target, cube_id2);
+    EXPECT_STREQ(tag_list2->tag[0].key, TEST_TAG_STRING.key);
+
+    EXPECT_EQ(fieldstat_find_cube(target, &TEST_TAG_STRING, 1), 1);
+    EXPECT_EQ(fieldstat_find_cube(target, &TEST_SHARED_TAG, 1), 0);
+
+    fieldstat_free(master);
+    fieldstat_free(target);
+    fieldstat_tag_list_arr_free(tag_list, 1);
+    fieldstat_tag_list_arr_free(tag_list2, 1);
+}
+
+TEST(calibrate, master_change_cube)
+{
+    struct fieldstat *master = fieldstat_new();
+    int cube_id = fieldstat_register_cube(master, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    fieldstat_register_counter(master, cube_id, "counter", COUNTER_MERGE_BY_SUM);
+    struct fieldstat *target = fieldstat_fork(master);
+    fieldstat_unregister_cube(master, cube_id);
+    fieldstat_register_cube(master, &TEST_TAG_STRING, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    fieldstat_register_counter(master, cube_id, "counter2", COUNTER_MERGE_BY_SUM);
+
+    fieldstat_calibrate(master, target);
+
+    EXPECT_EQ(fieldstat_get_max_metric_id(target, cube_id), 0);
+    EXPECT_STREQ(fieldstat_get_metric_name(target, cube_id, 0), "counter2");
+    struct fieldstat_tag_list *tag_list = fieldstat_get_shared_tags(target, cube_id);
+    EXPECT_STREQ(tag_list->tag[0].key, TEST_TAG_STRING.key);
+
+    EXPECT_EQ(fieldstat_find_cube(target, &TEST_TAG_STRING, 1), 0);
+
+    fieldstat_free(master);
+    fieldstat_free(target);
+    fieldstat_tag_list_arr_free(tag_list, 1);
+}
+
+TEST(calibrate, master_many_cube)
+{
+    struct fieldstat *master = fieldstat_new();
+    int registered_cube = 3000; // will trigger realloc 1 times
+    struct fieldstat_tag shared_tag = TEST_SHARED_TAG;
+    for (int i = 0; i < registered_cube; i++) {
+        shared_tag.value_longlong = i;
+        int cube_id = fieldstat_register_cube(master, &shared_tag, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+        EXPECT_EQ(cube_id, i);
+    }
+    struct fieldstat *target = fieldstat_fork(master);
+    int new_registered = 5000;
+    for (int i = 0; i < new_registered; i++) {
+        shared_tag.value_longlong = i + registered_cube;
+        int cube_id = fieldstat_register_cube(master, &shared_tag, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+        EXPECT_EQ(cube_id, i + registered_cube);
+    }
+
+    fieldstat_calibrate(master, target);
+
+    int n_cube;
+    int *cube_ids;
+    fieldstat_get_cubes(target, &cube_ids, &n_cube);
+    EXPECT_EQ(n_cube, registered_cube + new_registered);
+    free(cube_ids);
+
+    for (int i = 0; i < registered_cube + new_registered; i++) {
+        shared_tag.value_longlong = i;
+        EXPECT_EQ(fieldstat_find_cube(target, &shared_tag, 1), i);
+    }
+
+    fieldstat_free(master);
+    fieldstat_free(target);
+}
+
 
 int main(int argc, char *argv[]) 
 {

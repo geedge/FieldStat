@@ -51,6 +51,12 @@ struct fieldstat *fieldstat_new();
 void fieldstat_free(struct fieldstat *instance);
 // copy only registered cubes and metrics, not including cells. Used to new a instance of the same schema.
 struct fieldstat *fieldstat_fork(const struct fieldstat *instance);
+
+/*
+ * let the configuration of target be the same as master, no matter what the configuration of target is.
+ * the configurations will be kept as much as possible, like cells in the same cube will be kept, but the cells in different cubes will be deleted.
+*/
+void fieldstat_calibrate(const struct fieldstat *master, struct fieldstat *target);
 /*
     * @brief add an cube to this instance. Cube represents an template with a user-defined set of cells and metrics.
     * @param shared_tags: tags that are shared by all cubes in this instance. This is the key of the cube. Cannot be NULL. Must be unique. shared_tags are ordered.which means that {"TAG_KEY": "123", "TAG_KEY2": "456"} and {"TAG_KEY2": "456", "TAG_KEY": "123"} are map to different cube.
