@@ -205,7 +205,6 @@ int cell_manager_add_cell_topk(struct cell_manager *pthis, const struct tag_hash
     }
     
     struct tag_hash_key *tag_ret = heavy_keeper_get_true_pst_tag(pthis->topk_tag_id_map, tag);
-    assert(tag_ret != NULL); // todo: 删了
 
     /* -------------------------------- new cell added-------------------------------- */
 /*

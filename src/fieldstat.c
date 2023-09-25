@@ -820,7 +820,6 @@ void fieldstat_cube_merge_comprehensive(struct fs_cube *dest, const struct fs_cu
 
 void fieldstat_cube_merge_topk(struct fs_cube *dest, const struct fs_cube *src, const int *metric_id_src_dest_map)
 {
-    printf("merge topk enter\n");
     const struct cell_manager *cell_manager_src = src->cell_manager;
     struct cell_manager *cell_manager_dest = dest->cell_manager;
     int *cell_id_added = NULL;
@@ -844,7 +843,6 @@ void fieldstat_cube_merge_topk(struct fs_cube *dest, const struct fs_cube *src, 
     // Since all cells are counter, which is easy to merge, we just delete these cells after merging them.
     for (int i = 0; i < n_cell_id_popped;i++) {
         int id = cell_id_popped[i];
-        printf("delete metric for cell %d\n", id);
 
         for (int j = 0; j < dest->n_metric; j++) {
             metric_delete_cell(dest->metrics[j], id);

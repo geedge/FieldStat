@@ -244,7 +244,6 @@ int sorted_set_insert_and_record_popped_back(struct sorted_set *ss, const struct
     // if there is a dying record, reborn it to use.
     heap_entry *entry = sorted_set_find_entry(ss, tag);
     if (entry != NULL) {
-        printf("sorted_set_insert_and_record_popped_back reborn\n");
         if (!sorted_set_entry_dying(entry)) {
             return -1;
         }
@@ -257,12 +256,10 @@ int sorted_set_insert_and_record_popped_back(struct sorted_set *ss, const struct
     bool popped = false;
     if (sorted_set_check_is_full(ss)) {
         if (cnt <= sorted_set_get_min_count(ss)) {
-            printf("sorted_set_insert_and_record_popped_back not insert, mincount: %u, my count: %u\n", sorted_set_get_min_count(ss), cnt);
             return 0;
         }
         sorted_set_pop_and_record_popped_back(ss, popped_user_data);
         if (*popped_user_data == -1) { // popped a dying entry, not a real entry.
-            printf("sorted_set_insert_and_record_popped_back dying one\n");
             popped = false;
         } else {
             popped = true;

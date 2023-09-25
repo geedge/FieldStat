@@ -396,15 +396,11 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
     int cell_id_in_src_before_merge_len = 0;
     int cell_id_in_dest_corresponding[dest->K]; // length == cell_id_in_src_before_merge_len
 
-    printf("size dest: %d, size src: %d\n", size_dest, size_src);
     /* ------------------------------ merge dest ------------------------------ */
     for (int i = 0; i < size_dest; i++) {
         unsigned maxv = find_maxv_in_sketch(dest, tag_arr[i]);
-        printf("merge dest tag: %s, maxv: %u\n", tag_hash_key_get_compound_key(tag_arr[i]), maxv);
         sorted_set_insert(new_rec, tag_arr[i], maxv, cell_id_arr_dst[i]);
     }
-
-    printf("merged dest, the min count: %u\n", sorted_set_get_min_count(new_rec));
 
     qsort(cell_id_arr_dst, size_dest, sizeof(int), cmp_int);
 
@@ -416,7 +412,6 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
 
     for (int i = 0; i < size_src; i++) {
         const struct tag_hash_key *tag_src = tag_arr[i];
-        printf("merge src tag: %s\n", tag_hash_key_get_compound_key(tag_src));
 
         int cell_id_dest = sorted_set_get_cell_id(ss_dest, tag_src);
         int cell_id_src = cell_id_arr_src[i];
@@ -425,7 +420,6 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
             cell_id_in_src_before_merge[cell_id_in_src_before_merge_len] = cell_id_src;
             cell_id_in_dest_corresponding[cell_id_in_src_before_merge_len] = cell_id_dest;
             cell_id_in_src_before_merge_len++;
-            printf("the this one is merged by dest, id dest: %d, id src: %d\n", cell_id_dest, cell_id_src);
 
             continue;
         }
@@ -435,9 +429,7 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
         int now_idx = next_idx;
         int find_id = find_next_unused_cell_id(cell_id_arr_dst, size_dest, last_find_id, &now_idx);
         int tmp_ret = sorted_set_insert_and_record_popped_back(new_rec, tag_src, maxv, find_id, &popped_id);
-        printf("insert tag(src): %s, maxv: %u, ret %d, min count: %u \n", tag_hash_key_get_compound_key(tag_src), maxv, tmp_ret, sorted_set_get_min_count(new_rec));
         if (tmp_ret == 2) { // insert success and popped one. the previous tag_final is already freed by sorted_set
-            printf("popped_id: %d\n", popped_id);
             cell_id_popped_from_dest_when_merge_src[cell_id_popped_from_dest_when_merge_src_len++] = popped_id;
         } 
         if (tmp_ret != 0) { // insert success
@@ -447,11 +439,6 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
             cell_id_in_src_before_merge[cell_id_in_src_before_merge_len] = cell_id_src;
             cell_id_in_dest_corresponding[cell_id_in_src_before_merge_len] = last_find_id;
             cell_id_in_src_before_merge_len++;
-
-            printf("insert success: cell_id_src %d, last_find_id %d\n", cell_id_src, last_find_id);
-        }
-        if (tmp_ret == 0) { // insert failed
-            printf("insert failed, so will not change metrics\n");
         }
     }
 
@@ -495,20 +482,8 @@ int heavy_keeper_merge_recording_id_details(struct heavy_keeper *dest, const str
         dest->K != src->K) {
         return -1;
     }
-
-    unsigned *count_arr = (unsigned *)malloc(2 * sizeof(unsigned));
-    struct tag_hash_key **tag_arr = (struct tag_hash_key **)malloc(2 * sizeof(struct tag_hash_key *));
-    int *cell_id_arr = (int *)malloc(2 * sizeof(int));
-    sorted_set_dump(dest->top_K_heap, count_arr, tag_arr, cell_id_arr);
-    for (int i = 0; i < 1; i++) {
-        unsigned maxv = find_maxv_in_sketch(dest, tag_arr[i]);
-        printf("merge dest tag: %s, count: %u, cell_id: %d, maxv: %u\n", tag_hash_key_get_compound_key(tag_arr[i]), count_arr[i], cell_id_arr[i], maxv);
-    }
-
     
     heavy_keeper_merge_sketch(dest, src);
-    printf("after merge sketch, maxv:%u\n", find_maxv_in_sketch(dest, tag_arr[0]));
-
     heavy_keeper_merge_sorted_set_recording_id_details(dest, src,
         cell_id_popped_from_dest_when_merge_src_out, cell_id_popped_from_dest_when_merge_src_len_out,
         cell_id_in_src_before_merge_out, cell_id_in_dest_corresponding_out, cell_id_in_src_before_merge_len_out);
