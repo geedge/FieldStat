@@ -21,6 +21,8 @@ struct entry_data {
 struct sorted_set {
     heap *heap;
     struct hash_node *hash_tbl;
+
+    int n_living_entry;
 };
 
 struct hash_node {
@@ -93,6 +95,7 @@ struct sorted_set *sorted_set_new(int set_size)
 {
     struct sorted_set *ret = (struct sorted_set *)malloc(sizeof(struct sorted_set));
     ret->hash_tbl = NULL;
+    ret->n_living_entry = 0;
     heap *h = (heap *)malloc(sizeof(heap));
     init_heap(h, set_size, cmp_int, my_entry_get_index, my_entry_set_index);
 
@@ -142,11 +145,12 @@ void sorted_set_entry_set_key(struct sorted_set *ss, heap_entry *entry, unsigned
     adjust_heap_node(ss->heap, entry);
 }
 
+// todo: 和下面的合为一个
 unsigned sorted_set_pop(struct sorted_set *ss)
 {
     struct hash_node *hash_tbl = ss->hash_tbl;
     heap_entry *entry = (heap_entry *)pop_heap(ss->heap);
-    if (entry == NULL) {
+    if (entry == NULL) { // empty
         return 0;
     }
     unsigned count_ret = sorted_set_entry_get_count(entry);
@@ -166,6 +170,11 @@ unsigned sorted_set_pop(struct sorted_set *ss)
     free(entry->key);
     free(entry);
 
+    if (sorted_set_entry_dying(entry)) {
+        return 0;
+    }
+
+    ss->n_living_entry--;
     return count_ret;
 }
 
@@ -193,6 +202,7 @@ unsigned sorted_set_pop_and_record_popped_back(struct sorted_set *ss, int *poppe
         *popped_cell_id = -1;
     } else {
         *popped_cell_id = tmp_data->cell_id;
+        ss->n_living_entry--;
     }
 
     entry_data_destroy(tmp_data);
@@ -225,6 +235,8 @@ void sorted_set_insert_to_available_heap(struct sorted_set *ss, const struct tag
     s->val = node;
     HASH_ADD_TAG(hash_tbl, key, s);
     ss->hash_tbl = hash_tbl;
+
+    ss->n_living_entry++;
 }
 
 int sorted_set_insert(struct sorted_set *ss, const struct tag_hash_key *tag, unsigned cnt, int cell_id)
@@ -250,6 +262,7 @@ int sorted_set_insert_and_record_popped_back(struct sorted_set *ss, const struct
         sorted_set_entry_set_key(ss, entry, cnt + 1); // count 0 for dying entry.
         struct entry_data *data = sorted_set_entry_get_data(entry);
         data->cell_id = cell_id;
+        ss->n_living_entry++;
         return 3;
     }
 
@@ -313,18 +326,9 @@ int sorted_set_get_cell_id(const struct sorted_set *ss, const struct tag_hash_ke
     return sorted_set_entry_get_data(entry)->cell_id;
 }
 
-// todo: 改成一个计数，提高性能
 int sorted_set_cardinality(const struct sorted_set *ss)
 {
-    int valid_cnt = 0;
-    for (int i = 0; i < ss->heap->cur_size; i++) {
-        const heap_entry *entry = (heap_entry *)ss->heap->nodes[i];
-        if (sorted_set_entry_dying(entry)) {
-            continue;
-        }
-        valid_cnt++;
-    }
-    return valid_cnt;
+    return ss->n_living_entry;
 }
 
 int sorted_set_incrby(struct sorted_set *ss, const struct tag_hash_key *tag, unsigned count)
@@ -412,6 +416,8 @@ void sorted_set_reset(struct sorted_set *ss)
         entry = (heap_entry *)heap->nodes[i];
         *(unsigned *)entry->key = 0;
     }
+
+    ss->n_living_entry = 0;
 }
 
 struct tag_hash_key *sorted_set_get_true_pst_tag(const struct sorted_set *ss, const struct tag_hash_key *tag)
