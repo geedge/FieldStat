@@ -145,39 +145,6 @@ void sorted_set_entry_set_key(struct sorted_set *ss, heap_entry *entry, unsigned
     adjust_heap_node(ss->heap, entry);
 }
 
-// todo: 和下面的合为一个
-unsigned sorted_set_pop(struct sorted_set *ss)
-{
-    struct hash_node *hash_tbl = ss->hash_tbl;
-    heap_entry *entry = (heap_entry *)pop_heap(ss->heap);
-    if (entry == NULL) { // empty
-        return 0;
-    }
-    unsigned count_ret = sorted_set_entry_get_count(entry);
-    struct entry_data *tmp_data = sorted_set_entry_get_data(entry);
-
-    struct hash_node *s = NULL;
-    HASH_FIND_TAG(hash_tbl, tmp_data->key, s);
-    if (s == NULL) {
-        return 0;
-    }
-
-    HASH_DEL(hash_tbl, s);
-    free(s);
-    ss->hash_tbl = hash_tbl;
-
-    entry_data_destroy(tmp_data);
-    free(entry->key);
-    free(entry);
-
-    if (sorted_set_entry_dying(entry)) {
-        return 0;
-    }
-
-    ss->n_living_entry--;
-    return count_ret;
-}
-
 unsigned sorted_set_pop_and_record_popped_back(struct sorted_set *ss, int *popped_cell_id)
 {
     struct hash_node *hash_tbl = ss->hash_tbl;
@@ -209,6 +176,14 @@ unsigned sorted_set_pop_and_record_popped_back(struct sorted_set *ss, int *poppe
     free(entry->key);
     free(entry);
 
+    return count_ret;
+}
+
+unsigned sorted_set_pop(struct sorted_set *ss)
+{
+    int dummy;
+    unsigned count_ret = sorted_set_pop_and_record_popped_back(ss, &dummy);
+    
     return count_ret;
 }
 
@@ -360,7 +335,6 @@ int cmp_tmp_heap_node(const void *a, const void *b)
     }
 }
 
-// todo: 改一下接口，自己申请，自己返回
 void sorted_set_dump(const struct sorted_set *ss, unsigned *scores_out, struct tag_hash_key **tags_out, int *user_data_out)
 {
     struct minheap *h = ss->heap;

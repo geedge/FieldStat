@@ -944,17 +944,17 @@ struct fieldstat *fieldstat_fork(const struct fieldstat *instance)
 }
 
 
-void calibrate_metrics(const struct fs_cube *master, struct fs_cube *target)
+void calibrate_metrics(const struct fs_cube *master, struct fs_cube *replica)
 {
-    if (target->max_n_metric < master->max_n_metric) {
-        target->metrics = (struct metric **)realloc(target->metrics, sizeof(struct metric *) * master->max_n_metric);
-        target->max_n_metric = master->max_n_metric;
+    if (replica->max_n_metric < master->max_n_metric) {
+        replica->metrics = (struct metric **)realloc(replica->metrics, sizeof(struct metric *) * master->max_n_metric);
+        replica->max_n_metric = master->max_n_metric;
     }
 
-    size_t longer_arr_len = master->n_metric > target->n_metric ? master->n_metric : target->n_metric;
+    size_t longer_arr_len = master->n_metric > replica->n_metric ? master->n_metric : replica->n_metric;
     for (size_t i = 0; i < longer_arr_len; i++) {
         const struct metric *metric_master = i >= master->n_metric ? NULL : master->metrics[i];
-        struct metric *metric_target = i >= target->n_metric ? NULL : target->metrics[i];
+        struct metric *metric_target = i >= replica->n_metric ? NULL : replica->metrics[i];
         if (metric_master == NULL && metric_target == NULL) {
             continue;
         }
@@ -964,7 +964,7 @@ void calibrate_metrics(const struct fs_cube *master, struct fs_cube *target)
         }
         if (metric_master != NULL && metric_target == NULL) {
             struct metric *metric_dup = metric_fork(metric_master);
-            add_metric_to_position(target, metric_dup, i);
+            add_metric_to_position(replica, metric_dup, i);
             continue;
         }
 
@@ -973,56 +973,56 @@ void calibrate_metrics(const struct fs_cube *master, struct fs_cube *target)
             ) {
             metric_free(metric_target);
             struct metric *metric_dup = metric_fork(metric_master);
-            add_metric_to_position(target, metric_dup, i);
+            add_metric_to_position(replica, metric_dup, i);
             continue;
         }
     }
-    target->n_metric = master->n_metric;
+    replica->n_metric = master->n_metric;
 }
 
-int fieldstat_calibrate(const struct fieldstat *master, struct fieldstat *target)
+int fieldstat_calibrate(const struct fieldstat *master, struct fieldstat *replica)
 {
-    if (master == NULL || target == NULL) {
+    if (master == NULL || replica == NULL) {
         return FS_ERR_NULL_HANDLER;
     }
 
-    if (target->max_n_cube < master->max_n_cube) {
-        target->cube = (struct fs_cube **)realloc(target->cube, sizeof(struct fs_cube *) * master->max_n_cube);
-        target->cube_version = (unsigned long *)realloc(target->cube_version, sizeof(unsigned long) * master->max_n_cube);
-        target->max_n_cube = master->max_n_cube;
+    if (replica->max_n_cube < master->max_n_cube) {
+        replica->cube = (struct fs_cube **)realloc(replica->cube, sizeof(struct fs_cube *) * master->max_n_cube);
+        replica->cube_version = (unsigned long *)realloc(replica->cube_version, sizeof(unsigned long) * master->max_n_cube);
+        replica->max_n_cube = master->max_n_cube;
     }
 
-    size_t longer_arr_len = master->valid_cube_arr_length > target->valid_cube_arr_length ? master->valid_cube_arr_length : target->valid_cube_arr_length;
+    size_t longer_arr_len = master->valid_cube_arr_length > replica->valid_cube_arr_length ? master->valid_cube_arr_length : replica->valid_cube_arr_length;
     for (size_t i = 0; i < longer_arr_len; i++) {
         const struct fs_cube *cube_master = i >= master->valid_cube_arr_length ? NULL : master->cube[i];
-        struct fs_cube *cube_target = i >= target->valid_cube_arr_length ? NULL : target->cube[i];
+        struct fs_cube *cube_target = i >= replica->valid_cube_arr_length ? NULL : replica->cube[i];
         if (cube_master == NULL && cube_target == NULL) {
             continue;
         }
         if (cube_master == NULL && cube_target != NULL) {
-            fieldstat_cube_free(target, i);
+            fieldstat_cube_free(replica, i);
             continue;
         }
         if (cube_master != NULL && cube_target == NULL) {
             struct fs_cube *cube_dup = fieldstat_cube_fork(cube_master);
             calibrate_metrics(cube_master, cube_dup);
-            add_cube_to_position(target, cube_dup, i);
+            add_cube_to_position(replica, cube_dup, i);
             continue;
         }
 
-        if (master->cube_version[i] == target->cube_version[i] && tag_hash_key_cmp(cube_master->key_tag, cube_target->key_tag) == 0) {
+        if (master->cube_version[i] == replica->cube_version[i] && tag_hash_key_cmp(cube_master->key_tag, cube_target->key_tag) == 0) {
             calibrate_metrics(cube_master, cube_target);
             continue;
         }
         
-        fieldstat_cube_free(target, i);
+        fieldstat_cube_free(replica, i);
         struct fs_cube *cube_dup = fieldstat_cube_fork(cube_master);
         calibrate_metrics(cube_master, cube_dup);
-        add_cube_to_position(target, cube_dup, i);
+        add_cube_to_position(replica, cube_dup, i);
     }
 
-    memcpy(target->cube_version, master->cube_version, sizeof(unsigned long) * master->max_n_cube);
-    target->valid_cube_arr_length = master->valid_cube_arr_length;
+    memcpy(replica->cube_version, master->cube_version, sizeof(unsigned long) * master->max_n_cube);
+    replica->valid_cube_arr_length = master->valid_cube_arr_length;
 
     return FS_OK;
 }

@@ -65,8 +65,7 @@ struct fieldstat *fieldstat_fork(const struct fieldstat *instance);
  * the configurations will be kept as much as possible, like cells in the same cube will be kept, but the cells in different cubes will be deleted.
  * @ return FS_OK or FS_ERR_NULL_HANDLER 
 */
-// todo: target 改名replica
-int fieldstat_calibrate(const struct fieldstat *master, struct fieldstat *target);
+int fieldstat_calibrate(const struct fieldstat *master, struct fieldstat *replica);
 /*
     * @brief add an cube to this instance. Cube represents an template with a user-defined set of cells and metrics.
     * @param shared_tags: tags that are shared by all cubes in this instance. This is the key of the cube. Cannot be NULL. Must be unique. shared_tags are ordered.which means that {"TAG_KEY": "123", "TAG_KEY2": "456"} and {"TAG_KEY2": "456", "TAG_KEY": "123"} are map to different cube.
