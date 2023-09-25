@@ -74,6 +74,7 @@ int fieldstat_calibrate(const struct fieldstat *master, struct fieldstat *replic
     * @param max_n_cell: max number of cells in each cube. When mode is TOPK, max_n_cell > 0, while in COMPREHENSIVE mode, max_n_cell can be 0, meaning that there is no limit.
     * @return cube id, if success; otherwise, return FS_ERR_NULL_HANDLER, or FS_ERR_INVALID_PARAM when (max_n_cell == 0 && mode == TOPK). return FS_ERR_INVALID_KEY when the shared_tags is not unique.
 */
+// todo: 命名为 create cube
 int fieldstat_register_cube(struct fieldstat *instance, const struct fieldstat_tag *shared_tags, size_t n_tag, enum sampling_mode mode, size_t max_n_cell);
 int fieldstat_cube_set_primary_metric(struct fieldstat *instance, int cube_id, int metric_id);
 /*
@@ -89,29 +90,27 @@ int fieldstat_unregister_cube(struct fieldstat *instance, int cube_id);
 long long fieldstat_get_cube_version(const struct fieldstat *instance, int cube_id);
 /*
     * @brief add a metric to the cube of cube_id. One metric may have multiple sub-metric that are associated with different cells.
-    * @param cube_id: cube id, previously returned by fieldstat_register_cube.
-    * @param field_name: name of the metric. Cannot be NULL. Must be unique in this cube.
+    * @param metric_name: name of the metric. Cannot be NULL. Must be unique in this cube.
     * @param counter_mode: merge method of the metric. Refer to enum counter_mode.
-    * @return metric id if success. If failed, return FS_ERR_NULL_HANDLER, FS_ERR_INVALID_CUBE_ID, FS_ERR_INVALID_KEY(when field_name is not unique in this cube)
+    * @return metric id if success. If failed, return FS_ERR_NULL_HANDLER, FS_ERR_INVALID_KEY(when metric_name is not unique in this cube)
 */
-// todo：不再需要cube id
-int fieldstat_register_counter(struct fieldstat *instance, int cube_id, const char *field_name, enum counter_mode mode);
+int fieldstat_register_counter(struct fieldstat *instance, const char *metric_name, enum counter_mode mode);
 
 /*
     * @brief add a metric to the cube of cube_id. One metric may have multiple sub-metric that are associated with different cells. other parameters are the same as fieldstat_register_counter.
     * @param precision: the bigger, the larger memory consumption, while accuracy improved. Must be in [4, 18].
-    * @return metric id if success. If failed, return FS_ERR_NULL_HANDLER, FS_ERR_INVALID_CUBE_ID, FS_ERR_INVALID_KEY(when field_name is not unique in this cube), or FS_ERR_INVALID_PARAM.
+    * @return metric id if success. If failed, return FS_ERR_NULL_HANDLER, FS_ERR_INVALID_KEY(when metric_name is not unique in this cube), or FS_ERR_INVALID_PARAM.
 */
-int fieldstat_register_hll(struct fieldstat *instance, int cube_id, const char *field_name, unsigned char precision);
+int fieldstat_register_hll(struct fieldstat *instance, const char *metric_name, unsigned char precision);
 
 /*
     * @brief add a metric to the cube of cube_id. One metric may have multiple sub-metric that are associated with different cells. other parameters are the same as fieldstat_register_counter.
     * @param lowest_trackable_value: the lowest value that can be tracked (distinguishable from 0) by the histogram. Must be >= 1.
     * @param highest_trackable_value: the highest value to be tracked by the histogram. Must be >= 2 * lowest_trackable_value.
     * @param significant_figures: the precision of the histogram. Must be in [1, 5].
-        * @return metric id if success. If failed, return FS_ERR_NULL_HANDLER, FS_ERR_INVALID_CUBE_ID, FS_ERR_INVALID_KEY(when field_name is not unique in this cube), or FS_ERR_INVALID_PARAM.
+        * @return metric id if success. If failed, return FS_ERR_NULL_HANDLER, FS_ERR_INVALID_KEY(when metric_name is not unique in this cube), or FS_ERR_INVALID_PARAM.
 */
-int fieldstat_register_hist(struct fieldstat *instance, int cube_id, const char *field_name, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures);
+int fieldstat_register_hist(struct fieldstat *instance, const char *metric_name, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures);
 
 /*
     * @brief add a cell to the cube of cube_id. One cell represents a set of tags. If the cell already exists, just return the cell id.

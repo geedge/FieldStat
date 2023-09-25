@@ -371,6 +371,9 @@ struct metric *metric_new(const char *name, enum metric_type type, struct metric
 
 void metric_free(struct metric *pthis)
 {
+    if (pthis == NULL) {
+        return;
+    }
     metric_info_free(pthis->info);
 
     for (size_t i = 0; i < pthis->n_array_item; i++) {
@@ -555,7 +558,7 @@ void blob_unpack_basic_info(const char *blob, size_t blob_size, char **new_blob,
 /*
 metric blob:
     {
-        "name":<field_name>
+        "name":<metric_name>
         "type":<field_type>
         "id":<field_id>
         "para":[may be null, one number, or a double array]
@@ -801,9 +804,7 @@ int metric_histogram_record(struct metric *pthis, int cell_id, long long value)
     if (value > data->hdr->highest_trackable_value) {
         value = data->hdr->highest_trackable_value;
     }
-    if (value < data->hdr->lowest_discernible_value) {
-        value = data->hdr->lowest_discernible_value;
-    }
+
     bool ret = hdr_record_value(data->hdr, value);
     if (!ret) {
         return -1;

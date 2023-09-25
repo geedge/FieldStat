@@ -165,10 +165,10 @@ void topk_standard_oper(const std::function<void(Fieldstat_tag_list_wrapper *, u
 
 void topk_init(struct fieldstat *instance, unsigned int test_expected_big_count)
 {
-    const char *field_name[TEST_METRIC_NUM] = {"topk1", "topk2"};
+    const char *metric_name[TEST_METRIC_NUM] = {"topk1", "topk2"};
     int cube_id = fieldstat_register_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_TOPK, TEST_TOPK_STANDARD_K);
-    int m1 = fieldstat_register_counter(instance, cube_id, field_name[0], COUNTER_MERGE_BY_SUM);
-    int m2 = fieldstat_register_counter(instance, cube_id, field_name[1], COUNTER_MERGE_BY_SUM);
+    int m1 = fieldstat_register_counter(instance, cube_id, metric_name[0], COUNTER_MERGE_BY_SUM);
+    int m2 = fieldstat_register_counter(instance, cube_id, metric_name[1], COUNTER_MERGE_BY_SUM);
 
     std::function<void(Fieldstat_tag_list_wrapper *, unsigned int *)> topk_add = [instance, cube_id, m1, m2](
             const Fieldstat_tag_list_wrapper *my_tags, unsigned int counts[TEST_METRIC_NUM]) {
