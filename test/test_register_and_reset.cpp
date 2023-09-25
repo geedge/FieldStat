@@ -26,7 +26,7 @@ TEST(test_register, delete_cube_and_version_increase)
     EXPECT_EQ(ret, 0);
     EXPECT_EQ(fieldstat_get_cube_version(instance, cube_id), 1);
     ret = fieldstat_unregister_cube(instance, cube_id);
-    EXPECT_EQ(ret, -1);
+    EXPECT_EQ(ret, FS_ERR_INVALID_CUBE_ID);
     EXPECT_EQ(fieldstat_get_cube_version(instance, cube_id), 1);
 
     fieldstat_free(instance);
@@ -34,10 +34,10 @@ TEST(test_register, delete_cube_and_version_increase)
 
 TEST(test_register, query_on_wrong_version)
 {
-    EXPECT_EQ(fieldstat_get_cube_version(NULL, 1), -1);
+    EXPECT_EQ(fieldstat_get_cube_version(NULL, 1), FS_ERR_NULL_HANDLER);
     struct fieldstat *instance = fieldstat_new();
-    EXPECT_EQ(fieldstat_get_cube_version(instance, 1), -3);
-    EXPECT_EQ(fieldstat_get_cube_version(instance, -1), -2);
+    EXPECT_EQ(fieldstat_get_cube_version(instance, 1), FS_ERR_INVALID_CUBE_ID);
+    EXPECT_EQ(fieldstat_get_cube_version(instance, -1), FS_ERR_INVALID_CUBE_ID);
     fieldstat_free(instance);
 }
 
@@ -318,7 +318,7 @@ TEST(test_register, register_cube_twice) {
     struct fieldstat *instance = fieldstat_new();
     fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 10);
     int cube_id2 = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 10);
-    EXPECT_EQ(cube_id2, -2);
+    EXPECT_EQ(cube_id2, FS_ERR_INVALID_KEY);
     fieldstat_free(instance);
 }
 
@@ -329,7 +329,7 @@ TEST(test_register, find_cube) {
     int find_cube_id = fieldstat_find_cube(instance, &TEST_SHARED_TAG, 1);
     EXPECT_EQ(cube_id, find_cube_id);
     int find_cube_id2 = fieldstat_find_cube(instance, &TEST_TAG_DOUBLE, 1);
-    EXPECT_EQ(find_cube_id2, -1);
+    EXPECT_EQ(find_cube_id2, FS_ERR_INVALID_KEY);
     
     fieldstat_free(instance);
 }
@@ -339,7 +339,7 @@ TEST(test_register, register_metric_twice) {
     int cube_id = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 10);
     fieldstat_register_counter(instance, cube_id, "counter", COUNTER_MERGE_BY_SUM);
     int metric_id2 = fieldstat_register_counter(instance, cube_id, "counter", COUNTER_MERGE_BY_SUM);
-    EXPECT_EQ(metric_id2, -3);
+    EXPECT_EQ(metric_id2, FS_ERR_INVALID_KEY);
     fieldstat_free(instance);
 }
 

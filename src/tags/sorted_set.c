@@ -244,6 +244,7 @@ int sorted_set_insert_and_record_popped_back(struct sorted_set *ss, const struct
     // if there is a dying record, reborn it to use.
     heap_entry *entry = sorted_set_find_entry(ss, tag);
     if (entry != NULL) {
+        printf("sorted_set_insert_and_record_popped_back reborn\n");
         if (!sorted_set_entry_dying(entry)) {
             return -1;
         }
@@ -256,10 +257,12 @@ int sorted_set_insert_and_record_popped_back(struct sorted_set *ss, const struct
     bool popped = false;
     if (sorted_set_check_is_full(ss)) {
         if (cnt <= sorted_set_get_min_count(ss)) {
+            printf("sorted_set_insert_and_record_popped_back not insert, mincount: %u, my count: %u\n", sorted_set_get_min_count(ss), cnt);
             return 0;
         }
         sorted_set_pop_and_record_popped_back(ss, popped_user_data);
         if (*popped_user_data == -1) { // popped a dying entry, not a real entry.
+            printf("sorted_set_insert_and_record_popped_back dying one\n");
             popped = false;
         } else {
             popped = true;
@@ -277,8 +280,11 @@ unsigned sorted_set_get_min_count(const struct sorted_set *ss)
     }
     const heap_entry *ret = (heap_entry *)(heap->nodes[0]);
 
-    const unsigned* key = ret->key;
-    return *key;
+    unsigned int count = *(unsigned int *)ret->key;
+    if (count == 0) {
+        return 0;
+    }
+    return count - 1; // sorted set will let the count start from 1, 0 for dying entry.
 }
 
 unsigned sorted_set_get_count(const struct sorted_set *ss, const struct tag_hash_key *tag)

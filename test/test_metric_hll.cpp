@@ -198,9 +198,9 @@ TEST(metric_test_hll, add_or_set_with_wrong_cell_id_expecting_fail)
     int metric_id = fieldstat_register_hll(instance, cube_id, "czz_test hll metric", 10);
 
     int ret = fieldstat_hll_add(instance, cube_id, metric_id, 1, "hello", 5);
-    EXPECT_EQ(ret, -3);
+    EXPECT_EQ(ret, FS_ERR_INVALID_CELL_ID);
     ret = fieldstat_hll_add(instance, cube_id, metric_id, -1, "hello", 5);
-    EXPECT_EQ(ret, -3);
+    EXPECT_EQ(ret, FS_ERR_INVALID_CELL_ID);
 
     fieldstat_free(instance);
 }
@@ -211,9 +211,9 @@ TEST(metric_test_hll, add_with_wrong_cube_id_expecting_fail)
     int cube_id = fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
 
     int ret = fieldstat_hll_add(instance, cube_id + 1, 0, 0, "hello", 5);
-    EXPECT_EQ(ret, -1);
+    EXPECT_EQ(ret, FS_ERR_INVALID_CUBE_ID);
     ret = fieldstat_hll_add(instance, -1, 0, 0, "hello", 5);
-    EXPECT_EQ(ret, -1);
+    EXPECT_EQ(ret, FS_ERR_INVALID_CUBE_ID);
 
     fieldstat_free(instance);
 }
@@ -225,9 +225,9 @@ TEST(metric_test_hll, add_with_wrong_metric_id_expecting_fail)
     int metric_id = fieldstat_register_hll(instance, cube_id, "czz_test hll metric", 10);
 
     int ret = fieldstat_hll_add(instance, cube_id, metric_id + 1, 0, "hello", 5);
-    EXPECT_EQ(ret, -2);
+    EXPECT_EQ(ret, FS_ERR_INVALID_METRIC_ID);
     ret = fieldstat_hll_add(instance, cube_id, -1, 0, "hello", 5);
-    EXPECT_EQ(ret, -2);
+    EXPECT_EQ(ret, FS_ERR_INVALID_METRIC_ID);
 
     fieldstat_free(instance);
 }
