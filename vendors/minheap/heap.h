@@ -19,8 +19,8 @@ typedef struct minheap
 
 typedef struct heap_entry {
 	int index;
-    void* key;   // Key for this entry
-    void* value; // Value for this entry
+    void* key;   // Key for this entry, *unsigned int
+    void* value; // Value for this entry, refer to struct entry_data
 } heap_entry;
 
 typedef min_heap_t heap;

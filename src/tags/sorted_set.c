@@ -29,11 +29,11 @@ struct hash_node {
     UT_hash_handle hh;
 };
 
-struct entry_data *entry_data_construct(struct tag_hash_key *tag, int cell_id)
+struct entry_data *entry_data_construct(const struct tag_hash_key *tag, int cell_id)
 {
     struct entry_data *entry_data = (struct entry_data *)malloc(sizeof(struct entry_data));
 
-    entry_data->key = tag;
+    entry_data->key = tag_hash_key_copy(tag);
     entry_data->cell_id = cell_id;
     return entry_data;
 }
@@ -49,12 +49,25 @@ void entry_data_destroy(struct entry_data *entry_data)
 
 unsigned sorted_set_entry_get_count(const heap_entry *entry)
 {
-    return *(unsigned *)entry->key;
+    unsigned count = *(unsigned *)entry->key;
+    if (count == 0) {
+        return 0;
+    }
+    return count - 1; // sorted set will let the count start from 1, 0 for dying entry.
 }
 
 struct entry_data *sorted_set_entry_get_data(const heap_entry *entry)
 {
     return entry->value;
+}
+
+/*
+    dying: To reduce the time of HASH_ADD, and to support merely recording a key without any value, give a dying status.
+*/
+bool sorted_set_entry_dying(const heap_entry *entry)
+{
+    unsigned count = *(unsigned *)entry->key;
+    return count == 0;    
 }
 
 // cppcheck-suppress [constParameterCallback, unmatchedSuppression]
@@ -122,6 +135,13 @@ heap_entry *sorted_set_find_entry(const struct sorted_set *ss, const struct tag_
     return (heap_entry *)s->val;
 }
 
+void sorted_set_entry_set_key(struct sorted_set *ss, heap_entry *entry, unsigned count)
+{
+    *(unsigned *)(entry->key) = count;
+
+    adjust_heap_node(ss->heap, entry);
+}
+
 unsigned sorted_set_pop(struct sorted_set *ss)
 {
     struct hash_node *hash_tbl = ss->hash_tbl;
@@ -169,7 +189,11 @@ unsigned sorted_set_pop_and_record_popped_back(struct sorted_set *ss, int *poppe
     free(s);
     ss->hash_tbl = hash_tbl;
 
-    *popped_cell_id = tmp_data->cell_id;
+    if (sorted_set_entry_dying(entry)) {
+        *popped_cell_id = -1;
+    } else {
+        *popped_cell_id = tmp_data->cell_id;
+    }
 
     entry_data_destroy(tmp_data);
     free(entry->key);
@@ -183,8 +207,9 @@ bool sorted_set_check_is_full(const struct sorted_set *ss)
     return ss->heap->cur_size >= ss->heap->max_size;
 }
 
-void sorted_set_insert_to_available_heap(struct sorted_set *ss, struct tag_hash_key *tag, unsigned cnt, int cell_id)
+void sorted_set_insert_to_available_heap(struct sorted_set *ss, const struct tag_hash_key *tag, unsigned cnt, int cell_id)
 {
+    cnt += 1; // sorted set will let the count start from 1, 0 for dying entry.
     unsigned *tmp_cnt = (unsigned *)malloc(sizeof(unsigned));
     *tmp_cnt = cnt;
     struct entry_data *tmp_data = entry_data_construct(tag, cell_id);
@@ -202,7 +227,7 @@ void sorted_set_insert_to_available_heap(struct sorted_set *ss, struct tag_hash_
     ss->hash_tbl = hash_tbl;
 }
 
-int sorted_set_insert(struct sorted_set *ss, struct tag_hash_key *tag, unsigned cnt, int cell_id)
+int sorted_set_insert(struct sorted_set *ss, const struct tag_hash_key *tag, unsigned cnt, int cell_id)
 {
     if (sorted_set_check_is_full(ss)) {
         if (cnt <= sorted_set_get_min_count(ss)) {
@@ -214,15 +239,31 @@ int sorted_set_insert(struct sorted_set *ss, struct tag_hash_key *tag, unsigned 
     return 1;
 }
 
-int sorted_set_insert_and_record_popped_back(struct sorted_set *ss, struct tag_hash_key *tag, unsigned cnt, int cell_id, int *popped_user_data)
+int sorted_set_insert_and_record_popped_back(struct sorted_set *ss, const struct tag_hash_key *tag, unsigned cnt, int cell_id, int *popped_user_data)
 {
+    // if there is a dying record, reborn it to use.
+    heap_entry *entry = sorted_set_find_entry(ss, tag);
+    if (entry != NULL) {
+        if (!sorted_set_entry_dying(entry)) {
+            return -1;
+        }
+        sorted_set_entry_set_key(ss, entry, cnt + 1); // count 0 for dying entry.
+        struct entry_data *data = sorted_set_entry_get_data(entry);
+        data->cell_id = cell_id;
+        return 3;
+    }
+
     bool popped = false;
     if (sorted_set_check_is_full(ss)) {
         if (cnt <= sorted_set_get_min_count(ss)) {
             return 0;
         }
         sorted_set_pop_and_record_popped_back(ss, popped_user_data);
-        popped = true;
+        if (*popped_user_data == -1) { // popped a dying entry, not a real entry.
+            popped = false;
+        } else {
+            popped = true;
+        }
     }
     sorted_set_insert_to_available_heap(ss, tag, cnt, cell_id);
     return popped ? 2 : 1;
@@ -262,31 +303,35 @@ int sorted_set_get_cell_id(const struct sorted_set *ss, const struct tag_hash_ke
     if (entry == NULL) {
         return -1;
     }
+    if (sorted_set_entry_dying(entry)) {
+        return -1;
+    }
 
     return sorted_set_entry_get_data(entry)->cell_id;
 }
 
-
+// todo: 改成一个计数，提高性能
 int sorted_set_cardinality(const struct sorted_set *ss)
 {
-    return ss->heap->cur_size;
+    int valid_cnt = 0;
+    for (int i = 0; i < ss->heap->cur_size; i++) {
+        const heap_entry *entry = (heap_entry *)ss->heap->nodes[i];
+        if (sorted_set_entry_dying(entry)) {
+            continue;
+        }
+        valid_cnt++;
+    }
+    return valid_cnt;
 }
 
-void sorted_set_entry_set_key(struct sorted_set *ss, heap_entry *entry, unsigned count)
-{
-    *(unsigned *)(entry->key) = count;
-
-    adjust_heap_node(ss->heap, entry);
-}
-
-void sorted_set_incrby(struct sorted_set *ss, const struct tag_hash_key *tag, unsigned count)
+int sorted_set_incrby(struct sorted_set *ss, const struct tag_hash_key *tag, unsigned count)
 {
     heap_entry *entry = sorted_set_find_entry(ss, tag);
     if (entry == NULL) {
-        assert(0);
-        return;
+        return -1;
     }
     sorted_set_entry_set_key(ss, entry, sorted_set_entry_get_count(entry) + count);
+    return 0;
 }
 
 typedef struct {
@@ -308,17 +353,23 @@ int cmp_tmp_heap_node(const void *a, const void *b)
     }
 }
 
+// todo: 改一下接口，自己申请，自己返回
 void sorted_set_dump(const struct sorted_set *ss, unsigned *scores_out, struct tag_hash_key **tags_out, int *user_data_out)
 {
     struct minheap *h = ss->heap;
     tmp_heap_node *tmp_nodes = (tmp_heap_node *)malloc(sizeof(tmp_heap_node) * h->cur_size);
+    size_t n_living_entry = 0;
     for (int i = 0; i < h->cur_size; i++) {
         const heap_entry *entry = (heap_entry *)h->nodes[i];
-        tmp_nodes[i].key = sorted_set_entry_get_count(entry);
-        tmp_nodes[i].val = sorted_set_entry_get_data(entry);
+        if (sorted_set_entry_dying(entry)) {
+            continue;
+        }
+        tmp_nodes[n_living_entry].key = sorted_set_entry_get_count(entry);
+        tmp_nodes[n_living_entry].val = sorted_set_entry_get_data(entry);
+        n_living_entry++;
     }
-    qsort(tmp_nodes, h->cur_size, sizeof(tmp_heap_node), cmp_tmp_heap_node);
-    for (int i = 0; i < h->cur_size; i++) {
+    qsort(tmp_nodes, n_living_entry, sizeof(tmp_heap_node), cmp_tmp_heap_node);
+    for (int i = 0; i < n_living_entry; i++) {
         scores_out[i] = tmp_nodes[i].key;
         tags_out[i] = tmp_nodes[i].val->key;
         user_data_out[i] = tmp_nodes[i].val->cell_id;
@@ -332,10 +383,43 @@ struct sorted_set *sorted_set_copy(const struct sorted_set *ss)
     
     for (int i = 0; i < ss->heap->cur_size; i++) {
         const heap_entry *entry = (heap_entry *)ss->heap->nodes[i];
+        if (sorted_set_entry_dying(entry)) {
+            continue;
+        }
         const struct entry_data *data = sorted_set_entry_get_data(entry);
-        struct tag_hash_key *new_key = tag_hash_key_copy(data->key);
-        sorted_set_insert(ret, new_key, sorted_set_entry_get_count(entry), data->cell_id);
+        sorted_set_insert(ret, data->key, sorted_set_entry_get_count(entry), data->cell_id);
     }
 
     return ret;
+}
+
+// set all the entry to dying status. They will be the first to be popped.
+void sorted_set_reset(struct sorted_set *ss)
+{
+    struct hash_node *tbl = ss->hash_tbl;
+    struct hash_node *h_node, *tmp;
+    HASH_ITER(hh, tbl, h_node, tmp) {
+        heap_entry *entry = (heap_entry *)h_node->val;
+        *(unsigned *)entry->key = 0;
+    }
+
+    heap *heap = ss->heap;
+    heap_entry *entry;
+    for (int i = 0; i < heap->cur_size; i++) {
+        entry = (heap_entry *)heap->nodes[i];
+        *(unsigned *)entry->key = 0;
+    }
+}
+
+struct tag_hash_key *sorted_set_get_true_pst_tag(const struct sorted_set *ss, const struct tag_hash_key *tag)
+{
+    const heap_entry *entry = sorted_set_find_entry(ss, tag);
+    if (entry == NULL) {
+        return NULL;
+    }
+    if (sorted_set_entry_dying(entry)) {
+        return NULL;
+    }
+    const struct entry_data *data = sorted_set_entry_get_data(entry);
+    return data->key;
 }

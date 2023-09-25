@@ -87,7 +87,7 @@ void cell_manager_reset(struct cell_manager *pthis)
     memset(pthis->id_tag_array, 0, sizeof(struct tag_hash_key *) * pthis->id_tag_array_len);
 
     if (pthis->sampling_mode == SAMPLING_MODE_TOPK) {
-        heavy_keeper_clear(pthis->topk_tag_id_map);
+        heavy_keeper_reset(pthis->topk_tag_id_map);
         return;
     }
 
@@ -190,12 +190,10 @@ int cell_manager_add_cell(struct cell_manager *pthis, const struct tag_hash_key 
 
 int cell_manager_add_cell_topk(struct cell_manager *pthis, const struct tag_hash_key *tag, unsigned int count, int *popped_cell_id, int *existing_cell_id)
 {
-    struct tag_hash_key *tag_copy = tag_hash_key_copy(tag);
-    int ret = heavy_keeper_add(pthis->topk_tag_id_map, tag_copy, count, pthis->next_cell_id, popped_cell_id);
+    int ret = heavy_keeper_add(pthis->topk_tag_id_map, tag, count, pthis->next_cell_id, popped_cell_id);
     if (ret == -1) { // didn't add
         *existing_cell_id = -1;
         *popped_cell_id = -1;
-        tag_hash_key_free(tag_copy);
         return -1;
     }
 
@@ -203,9 +201,12 @@ int cell_manager_add_cell_topk(struct cell_manager *pthis, const struct tag_hash
         heavy_keeper_query_one(pthis->topk_tag_id_map, tag, NULL, existing_cell_id);
 
         *popped_cell_id = -1;
-        tag_hash_key_free(tag_copy);
         return *existing_cell_id;
     }
+    
+    struct tag_hash_key *tag_ret = heavy_keeper_get_true_pst_tag(pthis->topk_tag_id_map, tag);
+    assert(tag_ret != NULL); // todo: 删了
+
     /* -------------------------------- new cell added-------------------------------- */
 /*
 To mitigate the risk of unbounded array size due to potentially infinite growth of cell IDs, a maximum limit is set for cell IDs in the metric.
@@ -221,7 +222,7 @@ The number 8 was determined through experiment, where multiple tests were conduc
     if (*popped_cell_id != -1) { // popped, no need to free the tag
         pthis->id_tag_array[*popped_cell_id] = NULL;
     }
-    cell_manager_id_tag_array_add(pthis, pthis->next_cell_id, tag_copy);
+    cell_manager_id_tag_array_add(pthis, pthis->next_cell_id, tag_ret);
     return pthis->next_cell_id++;
 }
 

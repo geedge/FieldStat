@@ -54,7 +54,6 @@ struct fieldstat_tag {
 	};
 };
 
-
 struct fieldstat;
 struct fieldstat *fieldstat_new();
 void fieldstat_free(struct fieldstat *instance);
@@ -66,6 +65,7 @@ struct fieldstat *fieldstat_fork(const struct fieldstat *instance);
  * the configurations will be kept as much as possible, like cells in the same cube will be kept, but the cells in different cubes will be deleted.
  * @ return FS_OK or FS_ERR_NULL_HANDLER 
 */
+// todo: target 改名replica
 int fieldstat_calibrate(const struct fieldstat *master, struct fieldstat *target);
 /*
     * @brief add an cube to this instance. Cube represents an template with a user-defined set of cells and metrics.
@@ -76,9 +76,7 @@ int fieldstat_calibrate(const struct fieldstat *master, struct fieldstat *target
     * @return cube id, if success; otherwise, return FS_ERR_NULL_HANDLER, or FS_ERR_INVALID_PARAM when (max_n_cell == 0 && mode == TOPK). return FS_ERR_INVALID_KEY when the shared_tags is not unique.
 */
 int fieldstat_register_cube(struct fieldstat *instance, const struct fieldstat_tag *shared_tags, size_t n_tag, enum sampling_mode mode, size_t max_n_cell);
-
 int fieldstat_cube_set_primary_metric(struct fieldstat *instance, int cube_id, int metric_id);
-int fieldstat_counter_incrby_with_tags(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long increment);
 /*
     * @brief Delete the cube of cube_id. All the cells and metrics are deleted. The cube_id may be reused by other new cubes. Increase the corresponding cube_version by 1.
     * @return FS_OK, FS_ERR_NULL_HANDLER or FS_ERR_INVALID_CUBE_ID
@@ -97,6 +95,7 @@ long long fieldstat_get_cube_version(const struct fieldstat *instance, int cube_
     * @param counter_mode: merge method of the metric. Refer to enum counter_mode.
     * @return metric id if success. If failed, return FS_ERR_NULL_HANDLER, FS_ERR_INVALID_CUBE_ID, FS_ERR_INVALID_KEY(when field_name is not unique in this cube)
 */
+// todo：不再需要cube id
 int fieldstat_register_counter(struct fieldstat *instance, int cube_id, const char *field_name, enum counter_mode mode);
 
 /*
@@ -129,7 +128,9 @@ int fieldstat_register_hist(struct fieldstat *instance, int cube_id, const char 
     *         return FS_ERR_TOO_MANY_CELLS when: mode is (SAMPLING_MODE_COMPREHENSIVE) and cell number >= (max_n_cell) ; or mode is SAMPLING_MODE_TOPK and cell already exists.
     *                or FS_ERR_NULL_HANDLER, FS_ERR_INVALID_CUBE_ID, FS_ERR_INVALID_PARAM(if occurrences <= 0 and cube mode is TOPK).
 */  
+// todo；这个接口以后没了
 int fieldstat_cube_add(struct fieldstat *instance, int cube_id, const struct fieldstat_tag *tags, size_t n_tag, long long occurrences);
+
 
 /*
     * @brief Delete the cell added by fieldstat_cube_add. Increase the cell_version by 1. Also, delete all the metric records of this cell. The cell id will not be reused. Does not support topk sampling mode.
@@ -149,6 +150,7 @@ int fieldstat_cube_remove(struct fieldstat *instance, int cube_id, const struct 
     * @param increment: increment of the counter metric. Can be negative.
     * @return FS_OK if success. FS_ERR_NULL_HANDLER, FS_ERR_INVALID_CUBE_ID, FS_ERR_INVALID_METRIC_ID, FS_ERR_INVALID_CELL_ID if fail.
 */
+// todo: 现在没cell id 了
 int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long increment);
 
 /*
@@ -181,6 +183,7 @@ int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id
 void fieldstat_reset(struct fieldstat *instance);
 /*
     cell version is increased by 1 when we call fieldstat_reset and fieldstat_cube_remove. All cells share the same cell version.
+    todo: 直接命名成version
 */
 unsigned long fieldstat_get_cell_version(const struct fieldstat *instance);
 
@@ -235,6 +238,7 @@ enum metric_type fieldstat_get_metric_type(const struct fieldstat *instance, int
     * @param tag_list tag_list[i] is the tag list of i-th cell. User free them by calling fieldstat_tag_list_arr_free.
     * @param n_cell: Length of cell_ids and tag_list.
 */
+// todo: get 不到cell id了
 void fieldstat_get_cells_from_cube(const struct fieldstat *instance, int cube_id,
     int **cell_ids, struct fieldstat_tag_list **tag_list, size_t *n_cell);
 
@@ -272,6 +276,7 @@ int fieldstat_get_max_cell_id(const struct fieldstat *instance, int cube_id);
     * @param value_out: the value of the metric. If the cell is not found, *value_out is set to 0.
     * @return FS_OK if success. FS_ERR_NULL_HANDLER, FS_ERR_INVALID_CUBE_ID, FS_ERR_INVALID_METRIC_ID, FS_ERR_INVALID_CELL_ID if fail.
 */
+// todo： cell id 改成tag
 int fieldstat_counter_get(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long *value_out);
 
 /*

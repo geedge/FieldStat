@@ -92,10 +92,9 @@ struct heavy_keeper *heavy_keeper_with_data_new(int max_query_num) {
     return hk;
 }
 
-void heavy_keeper_clear(struct heavy_keeper *hk) {
+void heavy_keeper_reset(struct heavy_keeper *hk) {
     memset(hk->sketch, 0, (size_t)hk->params.array_num * (size_t)hk->params.max_bucket_num * sizeof(struct Bucket));
-    sorted_set_free(hk->top_K_heap);
-    hk->top_K_heap = sorted_set_new(hk->K);
+    sorted_set_reset(hk->top_K_heap);
 }
 
 void heavy_keeper_result_free(struct heavy_keeper_result *stats_hd) {
@@ -114,6 +113,13 @@ void heavy_keeper_free(struct heavy_keeper *hk) {
 /*********************************add and query*************************************/
 /***********************************************************************************/
 bool if_need_to_decay(struct heavy_keeper *hk, struct Bucket *bucket, unsigned count) {
+    if (bucket->count == 0) {
+        return true;
+    }
+    if (count == 0) {
+        return false;
+    }
+
     double exp = (double)bucket->count / count;
     if (exp > 250) {  // decay_exp_rate ^ (-250) is very small, so regard the chance as 0.
         return false;
@@ -156,7 +162,7 @@ unsigned my_max(unsigned a, unsigned b) {
     return b;
 }
 
-static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_keeper, struct tag_hash_key *tag, unsigned int count, int cell_id, int *popped_id_out)
+static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_keeper, const struct tag_hash_key *tag, unsigned int count, int cell_id, int *popped_id_out)
 {
     int user_data_cube_id = 0;
     struct sorted_set *summary = heavy_keeper->top_K_heap;
@@ -172,7 +178,7 @@ static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_
             // The flows whose counts are both larger than nmin and not in min-heap must have the same xxhash value, and its FP stored in bucket represents another tag,
             // In this case, the sketch won't be updated. This flow is expected to be taken into account in another array,
             //  where its FP is different from the one it should collided with, so that element flows won't be missed.
-            if (bucket->count > nMin && sorted_set_get_count(summary, tag) == 0) {
+            if (bucket->count > nMin && sorted_set_get_cell_id(summary, tag) == -1) {
                 continue;
             }
             bucket->count = count_add(bucket->count, count);
@@ -201,8 +207,10 @@ static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_
                 return 0;
             } else if (insert_ret == 0) { // insert failed
                 return -1;
-            } else { // insert success without popping 
+            } else if (insert_ret == 1) { // insert success without popping 
                 return 0;
+            } else {
+                return 2;
             }
         }
         return -1; // the flow is not added to the sorted set
@@ -213,11 +221,11 @@ static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_
         return 1; // no popped, but the tag definitely exists in the sorted set
     }
 
-    assert(0); // should not reach here
+    // should not reach here
     return -1;
 }
 
-int heavy_keeper_add(struct heavy_keeper *hk, struct tag_hash_key *tag, unsigned int count, int cell_id, int *popped_id_out)
+int heavy_keeper_add(struct heavy_keeper *hk, const struct tag_hash_key *tag, unsigned int count, int cell_id, int *popped_id_out)
 {
     *popped_id_out = -1;
     int ret = heavy_keeper_add_by_recording_popped_data(hk, tag, count, cell_id, popped_id_out);
@@ -225,7 +233,7 @@ int heavy_keeper_add(struct heavy_keeper *hk, struct tag_hash_key *tag, unsigned
     int cell_id_tmp = sorted_set_get_cell_id(hk->top_K_heap, tag);
     if (cell_id_tmp >= 0) {
         if (cell_id_tmp == cell_id) {
-            assert(ret == 0);
+            assert(ret == 0 || ret == 2);
         } else {
             assert(ret == 1);
         }
@@ -234,6 +242,11 @@ int heavy_keeper_add(struct heavy_keeper *hk, struct tag_hash_key *tag, unsigned
     }
 
     return ret;
+}
+
+struct tag_hash_key *heavy_keeper_get_true_pst_tag(const struct heavy_keeper *hk, const struct tag_hash_key *tag)
+{
+    return sorted_set_get_true_pst_tag(hk->top_K_heap, tag);
 }
 
 struct heavy_keeper_result *heavy_keeper_query(const struct heavy_keeper *hk) {
@@ -386,8 +399,7 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
     /* ------------------------------ merge dest ------------------------------ */
     for (int i = 0; i < size_dest; i++) {
         unsigned maxv = find_maxv_in_sketch(dest, tag_arr[i]);
-        struct tag_hash_key *tag_final = tag_hash_key_copy(tag_arr[i]);
-        sorted_set_insert(new_rec, tag_final, maxv, cell_id_arr_dst[i]);
+        sorted_set_insert(new_rec, tag_arr[i], maxv, cell_id_arr_dst[i]);
     }
 
     qsort(cell_id_arr_dst, size_dest, sizeof(int), cmp_int);
@@ -413,10 +425,9 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
         // the dest heavy keeper has been merged, so the maxv is the maxv in the merged sketch, instead of the dest sketch
         unsigned maxv = find_maxv_in_sketch(dest, tag_src);
         int popped_id = -1;
-        struct tag_hash_key *tag_final = tag_hash_key_copy(tag_src);
         int now_idx = next_idx;
         int find_id = find_next_unused_cell_id(cell_id_arr_dst, size_dest, last_find_id, &now_idx);
-        int tmp_ret = sorted_set_insert_and_record_popped_back(new_rec, tag_final, maxv, find_id, &popped_id);
+        int tmp_ret = sorted_set_insert_and_record_popped_back(new_rec, tag_src, maxv, find_id, &popped_id);
         if (tmp_ret == 2) { // insert success and popped one. the previous tag_final is already freed by sorted_set
             assert(popped_id != -1);
             cell_id_popped_from_dest_when_merge_src[cell_id_popped_from_dest_when_merge_src_len++] = popped_id;
@@ -428,8 +439,6 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
             cell_id_in_src_before_merge[cell_id_in_src_before_merge_len] = cell_id_src;
             cell_id_in_dest_corresponding[cell_id_in_src_before_merge_len] = last_find_id;
             cell_id_in_src_before_merge_len++;
-        } else {
-            tag_hash_key_free(tag_final);
         }
     }
 
@@ -627,6 +636,7 @@ void heavy_keeper_sorted_set_deserialization(const mpack_node_t *root, struct so
         int id = mpack_node_u32(mpack_node_map_cstr(item, "id"));
 
         sorted_set_insert(out, tag, score, id);
+        tag_hash_key_free(tag);
     }
 }
 

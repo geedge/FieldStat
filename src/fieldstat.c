@@ -543,7 +543,7 @@ int check_before_add(const struct fieldstat *instance, int cube_id, int metric_i
     if (metric_id < 0 || metric_id >= cube->n_metric) {
         return FS_ERR_INVALID_METRIC_ID;
     }
-    struct metric *metric = cube->metrics[metric_id];
+    const struct metric *metric = cube->metrics[metric_id];
     if (metric == NULL || metric_get_type(metric) != type) {
         return FS_ERR_INVALID_METRIC_ID;
     }
@@ -600,7 +600,7 @@ int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id
     }
     struct metric *metric = instance->cube[cube_id]->metrics[metric_id];
 
-    int ret = metric_histogram_record(metric, cell_id, value);
+    ret = metric_histogram_record(metric, cell_id, value);
     if (ret < 0) {
         return FS_ERR_INVALID_PARAM;
     }
@@ -1164,6 +1164,10 @@ double fieldstat_hll_get(const struct fieldstat *instance, int cube_id, int metr
 {
     int ret;
     const struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id, &ret);
+    if (ret != FS_OK) {
+        return ret;
+    }
+
     if (metric == NULL || metric_get_type(metric) != METRIC_TYPE_HLL) {
         return FS_ERR_INVALID_METRIC_ID;
     }
@@ -1175,6 +1179,10 @@ long long fieldstat_hist_value_at_percentile(const struct fieldstat *instance, i
 {
     int ret;
     const struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id, &ret);
+    if (ret != FS_OK) {
+        return ret;
+    }
+
     if (metric == NULL || metric_get_type(metric) != METRIC_TYPE_HISTOGRAM) {
         return FS_ERR_INVALID_METRIC_ID;
     }
@@ -1184,7 +1192,11 @@ long long fieldstat_hist_value_at_percentile(const struct fieldstat *instance, i
 
 long long fieldstat_hist_count_le_value(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long value)
 {
-    const struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id);
+    int ret;
+    const struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id, &ret);
+    if (ret != FS_OK) {
+        return ret;
+    }
     if (metric == NULL || metric_get_type(metric) != METRIC_TYPE_HISTOGRAM) {
         return FS_ERR_INVALID_METRIC_ID;
     }
@@ -1194,7 +1206,13 @@ long long fieldstat_hist_count_le_value(const struct fieldstat *instance, int cu
 
 void fieldstat_get_serialized_blob(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, char **blob, size_t *blob_size)
 {
-    const struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id);
+    *blob = NULL;
+    *blob_size = 0;
+    int ret;
+    const struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id, &ret);
+    if (ret != FS_OK) {
+        return;
+    }
     if (metric == NULL) {
         return;
     }
@@ -1222,7 +1240,8 @@ void fieldstat_tag_list_arr_free(struct fieldstat_tag_list *tag_list, size_t n_c
 
 const char *fieldstat_get_metric_name(const struct fieldstat *instance, int cube_id, int metric_id)
 {
-    const struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id);
+    int ret;
+    const struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id, &ret);
     if (metric == NULL) {
         return NULL;
     }
@@ -1232,7 +1251,8 @@ const char *fieldstat_get_metric_name(const struct fieldstat *instance, int cube
 
 enum metric_type fieldstat_get_metric_type(const struct fieldstat *instance, int cube_id, int metric_id)
 {
-    const struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id);
+    int ret;
+    const struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id, &ret);
     if (metric == NULL) {
         return (enum metric_type)-1;
     }
