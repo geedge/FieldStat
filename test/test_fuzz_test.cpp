@@ -146,11 +146,11 @@ TEST(Fuzz_test, both_comp_and_topk_cubes_with_merge_and_reset_expecting_correct_
         int *cells0;
         size_t cell_num0;
         struct fieldstat_tag_list *tags0;
-        fieldstat_get_cells(instance_in_focus, cubes[i], 0, &cells0, &tags0, &cell_num0);
+        fieldstat_get_cells_used_by_metric(instance_in_focus, cubes[i], 0, &cells0, &tags0, &cell_num0);
         int *cells1;
         size_t cell_num1;
         struct fieldstat_tag_list *tags1;
-        fieldstat_get_cells(instance_in_focus, cubes[i], 1, &cells1, &tags1, &cell_num1);
+        fieldstat_get_cells_used_by_metric(instance_in_focus, cubes[i], 1, &cells1, &tags1, &cell_num1);
 
         EXPECT_EQ(cell_num0, cell_num1);
         for (size_t j = 0; j < cell_num0; j++) {

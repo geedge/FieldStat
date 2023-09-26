@@ -38,7 +38,7 @@ void test_assert_standard_instance(const struct fieldstat *instance)
     int *ret_cell_ids = NULL;
     struct fieldstat_tag_list *tag_list = NULL;
     size_t n_cell = 0;
-    fieldstat_get_cells(instance, 0, 0, &ret_cell_ids, &tag_list, &n_cell);
+    fieldstat_get_cells_used_by_metric(instance, 0, 0, &ret_cell_ids, &tag_list, &n_cell);
     EXPECT_EQ(n_cell, 1);
     EXPECT_EQ(ret_cell_ids[0], 0);
     EXPECT_EQ(tag_list->n_tag, 1);

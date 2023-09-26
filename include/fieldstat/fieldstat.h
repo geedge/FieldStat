@@ -188,15 +188,6 @@ void fieldstat_get_cells_used_by_metric(const struct fieldstat *instance, int cu
 
 void fieldstat_get_cells_used_by_cube(const struct fieldstat *instance, int cube_id, struct fieldstat_tag_list **tag_list, size_t *n_cell);
 
-/*
-    * @brief Get all the cells in a cube and their tags in a specific metric. Different metrics may have different cells.
-    * @param metric_id: metric id, previously returned by fieldstat_get_max_metric_id.
-    * @param cell_ids cell_ids[i] is the cell id of i-th cell. User free them.
-    * @param tag_list tag_list[i] is the tag list of i-th cell. User free them by calling fieldstat_tag_list_arr_free.
-    * @param n_cell: Length of cell_ids and tag_list.
-*/
-void fieldstat_get_cells(const struct fieldstat *instance, int cube_id, int metric_id,
-    int **cell_ids, struct fieldstat_tag_list **tag_list, size_t *n_cell);
 
 /*
     get the shared tag of fieldstat_create_cube. User free them by calling fieldstat_tag_list_arr_free(struct fieldstat_tag_list *, 1)
@@ -218,7 +209,7 @@ int fieldstat_get_max_cell_id(const struct fieldstat *instance, int cube_id);
     * @brief Get the value of a metric of a cell.
     * @param cube_id: cube id, previously returned by fieldstat_get_cubes.
     * @param metric_id: metric id, previously returned by fieldstat_get_max_metric_id.
-    * @param cell_id: cell id, previously returned by fieldstat_get_cells.
+    * @param cell_id: cell id, previously returned by fieldstat_get_cells_used_by_metric.
     * @param value_out: the value of the metric. If the cell is not found, *value_out is set to 0.
     * @return FS_OK if success. FS_ERR_NULL_HANDLER, FS_ERR_INVALID_CUBE_ID, FS_ERR_INVALID_METRIC_ID if fail.
 */

@@ -1058,6 +1058,8 @@ void fieldstat_get_cells_used_by_metric(const struct fieldstat *instance, int cu
         }
         tag_hash_key_convert_to_fieldstat_tag(tag_key, &(tag_list_ret[i].tag), &(tag_list_ret[i].n_tag));
     }
+
+    free(cell_ids);
 }
 
 struct fieldstat_tag_list *fieldstat_get_shared_tags(const struct fieldstat *instance, int cube_id)

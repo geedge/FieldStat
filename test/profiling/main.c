@@ -164,7 +164,7 @@ int topk_and_find_max_cell_id(int K, int *tag_vals, int n_tags)
     int *ret_cell_ids = NULL;
     struct fieldstat_tag_list *tag_list = NULL;
     size_t n_cell = 0;
-    fieldstat_get_cells(instance, 0, 0, &ret_cell_ids, &tag_list, &n_cell);
+    fieldstat_get_cells_used_by_metric(instance, 0, 0, &ret_cell_ids, &tag_list, &n_cell);
     qsort(ret_cell_ids, n_cell, sizeof(int), my_cmp_int);
     int max_cell_id = ret_cell_ids[n_cell - 1];
 

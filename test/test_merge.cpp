@@ -159,7 +159,7 @@ TEST(unit_test_merge, new_cell_on_existing_cube_and_metric_comprehensive)
     int *ret_cell_ids = NULL;
     struct fieldstat_tag_list *tag_list = NULL;
     size_t n_cell = 0;
-    fieldstat_get_cells(instance, cube_id, metric_id, &ret_cell_ids, &tag_list, &n_cell);
+    fieldstat_get_cells_used_by_metric(instance, cube_id, metric_id, &ret_cell_ids, &tag_list, &n_cell);
     EXPECT_EQ(n_cell, 1);
     EXPECT_EQ(tag_list->n_tag, 1);
     EXPECT_STREQ(tag_list->tag[0].key, TEST_TAG_STRING.key);
@@ -218,7 +218,7 @@ TEST(unit_test_merge, new_too_many_cells_on_one_metric_given_source_cube_reset_a
     int *cell_ids = NULL;
     struct fieldstat_tag_list *tag_list = NULL;
     size_t n_cell = 0;
-    fieldstat_get_cells(instance_dest, 0, 0, &cell_ids, &tag_list, &n_cell);
+    fieldstat_get_cells_used_by_metric(instance_dest, 0, 0, &cell_ids, &tag_list, &n_cell);
     Fieldstat_tag_list_wrapper tag_list_wrapper(tag_list);
     tag_list_wrapper.print_tag_list();
     EXPECT_EQ(n_cell, 2);
@@ -252,16 +252,16 @@ TEST(unit_test_merge, new_too_many_cells_on_multiple_metric_given_source_cube_re
     int *cell_ids = NULL;
     struct fieldstat_tag_list *tag_list = NULL;
     size_t n_cell = 0;
-    fieldstat_get_cells(instance_dest, 0, metric_id1, &cell_ids, &tag_list, &n_cell);
+    fieldstat_get_cells_used_by_metric(instance_dest, 0, metric_id1, &cell_ids, &tag_list, &n_cell);
     EXPECT_EQ(n_cell, 1);
     EXPECT_STREQ(tag_list->tag[0].key, TEST_TAG_STRING.key);
     free(cell_ids);
     fieldstat_tag_list_arr_free(tag_list, n_cell);
 
-    fieldstat_get_cells(instance_dest, 0, metric_id2, &cell_ids, &tag_list, &n_cell);
+    fieldstat_get_cells_used_by_metric(instance_dest, 0, metric_id2, &cell_ids, &tag_list, &n_cell);
     EXPECT_EQ(n_cell, 0);
 
-    fieldstat_get_cells(instance_dest, 0, metric_id3, &cell_ids, &tag_list, &n_cell);
+    fieldstat_get_cells_used_by_metric(instance_dest, 0, metric_id3, &cell_ids, &tag_list, &n_cell);
     EXPECT_EQ(n_cell, 1);
     EXPECT_STREQ(tag_list->tag[0].key, TEST_TAG_INT.key);
     free(cell_ids);
@@ -319,7 +319,7 @@ TEST(unit_test_merge, new_cell_on_existing_cube_and_metric_topk)
     int *ret_cell_ids = NULL;
     struct fieldstat_tag_list *tag_list = NULL;
     size_t n_cell = 0;
-    fieldstat_get_cells(instance, cube_id, metric_id, &ret_cell_ids, &tag_list, &n_cell);
+    fieldstat_get_cells_used_by_metric(instance, cube_id, metric_id, &ret_cell_ids, &tag_list, &n_cell);
     EXPECT_EQ(n_cell, 1);
     EXPECT_EQ(tag_list->n_tag, 1);
     EXPECT_STREQ(tag_list->tag[0].key, TEST_TAG_STRING.key);
@@ -354,7 +354,7 @@ TEST(unit_test_merge, merge_existing_cell_on_existing_cube_and_metric_topk)
     int *ret_cell_ids = NULL;
     struct fieldstat_tag_list *tag_list = NULL;
     size_t n_cell = 0;
-    fieldstat_get_cells(instance_dest, ret_cube_id, ret_metric_id, &ret_cell_ids, &tag_list, &n_cell);
+    fieldstat_get_cells_used_by_metric(instance_dest, ret_cube_id, ret_metric_id, &ret_cell_ids, &tag_list, &n_cell);
     EXPECT_EQ(n_cell, 1);
     long long measure = my_fieldstat_counter_get(instance_dest, cube_id, metric_id, ret_cell_ids[0]);
     EXPECT_EQ(measure, 10);
@@ -386,7 +386,7 @@ TEST(unit_test_merge, new_too_many_cells_on_one_metric_given_source_cube_reset_a
     int *cell_ids = NULL;
     struct fieldstat_tag_list *tag_list = NULL;
     size_t n_cell = 0;
-    fieldstat_get_cells(instance_dest, 0, 0, &cell_ids, &tag_list, &n_cell);
+    fieldstat_get_cells_used_by_metric(instance_dest, 0, 0, &cell_ids, &tag_list, &n_cell);
     EXPECT_EQ(n_cell, 2);
 
     fieldstat_free(instance);
@@ -418,7 +418,7 @@ TEST(unit_test_merge, new_too_many_cells_on_multiple_metric_given_source_cube_re
     int *cell_ids = NULL;
     struct fieldstat_tag_list *tag_list = NULL;
     size_t n_cell = 0;
-    fieldstat_get_cells(instance_dest, 0, metric_id1, &cell_ids, &tag_list, &n_cell);
+    fieldstat_get_cells_used_by_metric(instance_dest, 0, metric_id1, &cell_ids, &tag_list, &n_cell);
     int pop_cell_cnt = 0;
     bool int_tag_found = false;
     bool double_tag_found = false;
@@ -437,7 +437,7 @@ TEST(unit_test_merge, new_too_many_cells_on_multiple_metric_given_source_cube_re
         pop_cell_cnt++;
     }
 
-    fieldstat_get_cells(instance_dest, 0, metric_id2, &cell_ids, &tag_list, &n_cell);
+    fieldstat_get_cells_used_by_metric(instance_dest, 0, metric_id2, &cell_ids, &tag_list, &n_cell);
     if (n_cell == 1) {
         if (strcmp(tag_list->tag[0].key, TEST_TAG_INT.key) == 0) {
             int_tag_found = true;
@@ -453,7 +453,7 @@ TEST(unit_test_merge, new_too_many_cells_on_multiple_metric_given_source_cube_re
         pop_cell_cnt++;
     }
 
-    fieldstat_get_cells(instance_dest, 0, metric_id3, &cell_ids, &tag_list, &n_cell);
+    fieldstat_get_cells_used_by_metric(instance_dest, 0, metric_id3, &cell_ids, &tag_list, &n_cell);
     if (n_cell == 1) {
         if (strcmp(tag_list->tag[0].key, TEST_TAG_INT.key) == 0) {
             int_tag_found = true;
@@ -503,7 +503,7 @@ TEST(unit_test_merge, merge_accuracy_test_with_K_large_enough_topk)
     int *cell_ids = NULL;
     struct fieldstat_tag_list *tag_list = NULL;
     size_t n_cell = 0;
-    fieldstat_get_cells(instance_dest, 0, 0, &cell_ids, &tag_list, &n_cell);
+    fieldstat_get_cells_used_by_metric(instance_dest, 0, 0, &cell_ids, &tag_list, &n_cell);
 
     vector<Fieldstat_tag_list_wrapper *> flows_in_merged;
     for (size_t i = 0; i < n_cell; i++) {
@@ -543,7 +543,7 @@ TEST(unit_test_merge, merge_accuracy_test_gen_dest_full_all_inserted_given_src_f
     int *cell_ids = NULL;
     struct fieldstat_tag_list *tag_list = NULL;
     size_t n_cell = 0;
-    fieldstat_get_cells(instance_dest, 0, 0, &cell_ids, &tag_list, &n_cell);
+    fieldstat_get_cells_used_by_metric(instance_dest, 0, 0, &cell_ids, &tag_list, &n_cell);
     vector<Fieldstat_tag_list_wrapper *> flows_in_merged;
     for (size_t i = 0; i < n_cell; i++) {
         flows_in_merged.push_back(new Fieldstat_tag_list_wrapper(&tag_list[i]));
@@ -578,7 +578,7 @@ TEST(unit_test_merge, merge_accuracy_test_gen_dest_full_some_inserted_and_some_m
     int *cell_ids = NULL;
     struct fieldstat_tag_list *tag_list = NULL;
     size_t n_cell = 0;
-    fieldstat_get_cells(instance_dest, 0, 0, &cell_ids, &tag_list, &n_cell);
+    fieldstat_get_cells_used_by_metric(instance_dest, 0, 0, &cell_ids, &tag_list, &n_cell);
     vector<Fieldstat_tag_list_wrapper *> flows_in_merged;
     for (size_t i = 0; i < n_cell; i++) {
         flows_in_merged.push_back(new Fieldstat_tag_list_wrapper(&tag_list[i]));
@@ -614,7 +614,7 @@ TEST(unit_test_merge, exception_test_given_cell_added_but_no_metric_operation_gi
     int *cell_ids = NULL;
     struct fieldstat_tag_list *tag_list = NULL;
     size_t n_cell = 0;
-    fieldstat_get_cells(instance2, cube_id, metric_id, &cell_ids, &tag_list, &n_cell);
+    fieldstat_get_cells_used_by_metric(instance2, cube_id, metric_id, &cell_ids, &tag_list, &n_cell);
     EXPECT_TRUE(n_cell == 0);
     long long value;
     EXPECT_EQ(fieldstat_counter_get(instance2, cube_id, metric_id, cell_id, &value), -1);
@@ -641,7 +641,7 @@ TEST(unit_test_merge, exception_test_given_cell_added_but_no_metric_operation_gi
     int *cell_ids = NULL;
     struct fieldstat_tag_list *tag_list = NULL;
     size_t n_cell = 0;
-    fieldstat_get_cells(instance2, cube_id, metric_id, &cell_ids, &tag_list, &n_cell);
+    fieldstat_get_cells_used_by_metric(instance2, cube_id, metric_id, &cell_ids, &tag_list, &n_cell);
     EXPECT_EQ(n_cell, 1);
     EXPECT_EQ(my_fieldstat_counter_get(instance2, cube_id, metric_id, cell_id), 123);
 
