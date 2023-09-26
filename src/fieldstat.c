@@ -153,7 +153,7 @@ void fieldstat_reset(struct fieldstat *instance)
     instance->cell_version++;
 }
 
-unsigned long fieldstat_get_cell_version(const struct fieldstat *instance)
+unsigned long fieldstat_get_version(const struct fieldstat *instance)
 {
     if (instance == NULL) {
         return 0;
@@ -354,44 +354,6 @@ int fieldstat_cube_add(struct fieldstat *instance, int cube_id, const struct fie
         return -1;
     }
     return ret;
-}
-
-int fieldstat_cube_remove(struct fieldstat *instance, int cube_id, const struct fieldstat_tag *tags, size_t n_tag)
-{
-    if (instance == NULL) {
-        return FS_ERR_NULL_HANDLER;
-    }
-    if (cube_id < 0 || cube_id >= instance->valid_cube_arr_length) {
-        return FS_ERR_INVALID_CUBE_ID;
-    }
-    struct fs_cube *cube = instance->cube[cube_id];
-    if (cube == NULL) {
-        return FS_ERR_INVALID_CUBE_ID;
-    }
-    if (cube->sampling_mode == SAMPLING_MODE_TOPK) {
-        return FS_ERR_INVALID_PARAM;
-    }
-    if (n_tag == 0 || tags == NULL) {
-        tags = NULL;
-        n_tag = 0;
-    }
-
-    struct tag_hash_key *tag_key = tag_hash_key_construct_with_fieldstat_tag(tags, n_tag);
-    int id = cell_manager_delete_cell(cube->cell_manager, tag_key);
-    if (id == -1) {
-        tag_hash_key_free(tag_key);
-        return FS_ERR_INVALID_KEY;
-    }
-    for (size_t i = 0; i < cube->n_metric; i++) {
-        if (cube->metrics[i] == NULL) {
-            continue;
-        }
-        metric_delete_cell(cube->metrics[i], id);
-    }
-    tag_hash_key_free(tag_key);
-
-    instance->cell_version++;
-    return FS_OK;
 }
 
 void fieldstat_cube_free(struct fieldstat *instance, int cube_id)

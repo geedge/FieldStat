@@ -7,12 +7,12 @@
 TEST(test_register, reset_and_version)
 {
     struct fieldstat *instance = fieldstat_new();
-    EXPECT_EQ(fieldstat_get_cell_version(instance), 0);
+    EXPECT_EQ(fieldstat_get_version(instance), 0);
     fieldstat_reset(instance);
-    EXPECT_EQ(fieldstat_get_cell_version(instance), 1);
+    EXPECT_EQ(fieldstat_get_version(instance), 1);
     fieldstat_reset(instance);
     fieldstat_reset(instance);
-    EXPECT_EQ(fieldstat_get_cell_version(instance), 3);
+    EXPECT_EQ(fieldstat_get_version(instance), 3);
 
     fieldstat_free(instance);
 }
@@ -262,37 +262,6 @@ TEST(test_register, register_many_cells_on_unlimited_sized_cube)
         EXPECT_EQ(value, 1);
     }
 
-    fieldstat_free(instance);
-}
-
-TEST(test_register, unregister_cell)
-{
-    struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
-    int metric_id = fieldstat_register_counter(instance, "counter", COUNTER_MERGE_BY_SUM);
-    fieldstat_counter_incrby(instance, cube_id, metric_id, &TEST_TAG_INT, 1, 1);
-    fieldstat_counter_incrby(instance, cube_id, metric_id, &TEST_TAG_DOUBLE, 1, 1);
-
-    fieldstat_cube_remove(instance, cube_id, &TEST_TAG_INT, 1);
-    long long value;
-    EXPECT_EQ(fieldstat_counter_get(instance, cube_id, metric_id, &TEST_TAG_LIST_INT, &value), FS_ERR_INVALID_TAG);
-    
-    struct fieldstat_tag_list *tag_list = NULL;
-    size_t n_cell = 0;
-    fieldstat_get_cells_used_by_cube(instance, cube_id, &tag_list, &n_cell);
-    EXPECT_EQ(n_cell, 1);
-    EXPECT_EQ(tag_list[0].tag->type, TEST_TAG_DOUBLE.type);
-    EXPECT_STREQ(tag_list[0].tag->key, TEST_TAG_DOUBLE.key);
-    fieldstat_tag_list_arr_free(tag_list, n_cell);
-
-    // test merge and serialize to make sure no changes on basic functions
-    struct fieldstat *instance_dst = fieldstat_new();
-    fieldstat_merge(instance_dst, instance);
-    fieldstat_get_cells_used_by_cube(instance, cube_id, &tag_list, &n_cell);
-    EXPECT_EQ(n_cell, 1);
-    EXPECT_STREQ(tag_list[0].tag->key, TEST_TAG_DOUBLE.key);
-    fieldstat_free(instance_dst);
-    fieldstat_tag_list_arr_free(tag_list, n_cell);
     fieldstat_free(instance);
 }
 

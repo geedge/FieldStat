@@ -38,12 +38,6 @@ enum sampling_mode {
     SAMPLING_MODE_TOPK,
 };
 
-enum counter_mode {
-    COUNTER_MERGE_BY_SUM,
-    COUNTER_MERGE_BY_MAX,
-    COUNTER_MERGE_BY_MIN,
-};
-
 struct fieldstat_tag {
 	const char *key;
     enum fs_tag_type type;
@@ -74,7 +68,6 @@ int fieldstat_calibrate(const struct fieldstat *master, struct fieldstat *replic
     * @param max_n_cell: max number of cells in each cube. When mode is TOPK, max_n_cell > 0, while in COMPREHENSIVE mode, max_n_cell can be 0, meaning that there is no limit.
     * @return cube id, if success; otherwise, return FS_ERR_NULL_HANDLER, or FS_ERR_INVALID_PARAM when (max_n_cell == 0 && mode == TOPK). return FS_ERR_INVALID_KEY when the shared_tags is not unique.
 */
-// todo: 命名为 create cube
 int fieldstat_create_cube(struct fieldstat *instance, const struct fieldstat_tag *shared_tags, size_t n_tag, enum sampling_mode mode, size_t max_n_cell);
 int fieldstat_cube_set_primary_metric(struct fieldstat *instance, int cube_id, int metric_id);
 /*
@@ -91,10 +84,9 @@ long long fieldstat_get_cube_version(const struct fieldstat *instance, int cube_
 /*
     * @brief add a metric to the cube of cube_id. One metric may have multiple sub-metric that are associated with different cells.
     * @param metric_name: name of the metric. Cannot be NULL. Must be unique in this cube.
-    * @param counter_mode: merge method of the metric. Refer to enum counter_mode.
     * @return metric id if success. If failed, return FS_ERR_NULL_HANDLER, FS_ERR_INVALID_KEY(when metric_name is not unique in this cube)
 */
-int fieldstat_register_counter(struct fieldstat *instance, const char *metric_name, enum counter_mode mode);
+int fieldstat_register_counter(struct fieldstat *instance, const char *metric_name);
 
 /*
     * @brief add a metric to the cube of cube_id. One metric may have multiple sub-metric that are associated with different cells. other parameters are the same as fieldstat_register_counter.
@@ -111,17 +103,6 @@ int fieldstat_register_hll(struct fieldstat *instance, const char *metric_name, 
         * @return metric id if success. If failed, return FS_ERR_NULL_HANDLER, FS_ERR_INVALID_KEY(when metric_name is not unique in this cube), or FS_ERR_INVALID_PARAM.
 */
 int fieldstat_register_hist(struct fieldstat *instance, const char *metric_name, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures);
-
-
-/*
-    * @brief Delete the cell added by fieldstat_cube_add. Increase the cell_version by 1. Also, delete all the metric records of this cell. The cell id will not be reused. Does not support topk sampling mode.
-    * @param refer to fieldstat_cube_add.
-    * @return FS_OK if success; 
-    *         return FS_ERR_NULL_HANDLER, FS_ERR_INVALID_CUBE_ID, 
-    *         return FS_ERR_INVALID_PARAM when mode is TOPK.
-    *         return FS_ERR_INVALID_KEY when the cell is not found.
-*/
-int fieldstat_cube_remove(struct fieldstat *instance, int cube_id, const struct fieldstat_tag *tags, size_t n_tag);
 
 /*
     * @brief let the value of counter metric of cell_id increase by increment.
@@ -161,23 +142,15 @@ int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id
 */
 void fieldstat_reset(struct fieldstat *instance);
 /*
-    cell version is increased by 1 when we call fieldstat_reset and fieldstat_cube_remove. All cells share the same cell version.
-    todo: 直接命名成version
+    version is increased by 1 when we call fieldstat_reset.
 */
-unsigned long fieldstat_get_cell_version(const struct fieldstat *instance);
+unsigned long fieldstat_get_version(const struct fieldstat *instance);
 
 /*
  @brief Merge the instance. The registered cubes and metrics are merged even if there are no cells added.
  @return 0 if success. return FS_ERR_INVALID_PARAM when the registered cubes or metrics between dest and src of the same keys has different types or configurations.
 */
 int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src);
-/*
-    * @brief Serialize the instance to a blob. The blob can be deserialized by fieldstat_deserialize.
-    * @param blob_out: the serialized blob. The caller should free it. Use it like: char *blob; fieldstat_serialize(instance, &blob, &blob_size); free(blob);
-    * @param blob_size_out: the size of the serialized blob.
-*/
-struct fieldstat *fieldstat_deserialize(const char *blob, size_t blob_size);
-void fieldstat_serialize(const struct fieldstat *instance, char **blob_out, size_t *blob_size_out);
 
 /* -------------------------------------------------------------------------- */
 /*                                    query                                   */

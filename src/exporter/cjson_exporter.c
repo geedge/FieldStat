@@ -286,7 +286,7 @@ bool counter_history_check_if_need_to_update(const struct fieldstat_json_exporte
         return false; // delta export disabled
     }
 
-    unsigned long cur_cell_version = fieldstat_get_cell_version(exporter->instance);
+    unsigned long cur_cell_version = fieldstat_get_version(exporter->instance);
     const char *cur_exporter_name = exporter->name ? exporter->name : DEFAULT_EXPORTER_NAME;
     const struct fieldstat_tag_list *cur_global_tag_list = exporter->global_tag_list;
 
@@ -328,7 +328,7 @@ bool counter_history_check_if_need_to_update(const struct fieldstat_json_exporte
 
 void counter_history_fill_version_info(struct counter_history *history, struct fieldstat_json_exporter *exporter)
 {
-    unsigned long cur_cell_version = fieldstat_get_cell_version(exporter->instance);
+    unsigned long cur_cell_version = fieldstat_get_version(exporter->instance);
     const char *cur_exporter_name = exporter->name ? exporter->name : DEFAULT_EXPORTER_NAME;
     const struct fieldstat_tag_list *cur_global_tag_list = exporter->global_tag_list;
 
