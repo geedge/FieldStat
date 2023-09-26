@@ -188,20 +188,20 @@ int cell_manager_add_cell(struct cell_manager *pthis, const struct tag_hash_key 
     return pthis->next_cell_id++;
 }
 
-int cell_manager_add_cell_topk(struct cell_manager *pthis, const struct tag_hash_key *tag, unsigned int count, int *popped_cell_id, int *existing_cell_id)
+int cell_manager_add_cell_topk(struct cell_manager *pthis, const struct tag_hash_key *tag, unsigned int count, int *popped_cell_id)
 {
     int ret = heavy_keeper_add(pthis->topk_tag_id_map, tag, count, pthis->next_cell_id, popped_cell_id);
     if (ret == -1) { // didn't add
-        *existing_cell_id = -1;
         *popped_cell_id = -1;
         return -1;
     }
 
     if (ret == 1) { // use the original id
-        heavy_keeper_query_one(pthis->topk_tag_id_map, tag, NULL, existing_cell_id);
+        int existing_cell_id = -1;
+        heavy_keeper_query_one(pthis->topk_tag_id_map, tag, NULL, &existing_cell_id);
 
         *popped_cell_id = -1;
-        return *existing_cell_id;
+        return existing_cell_id;
     }
     
     struct tag_hash_key *tag_ret = heavy_keeper_get_true_pst_tag(pthis->topk_tag_id_map, tag);

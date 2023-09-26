@@ -475,17 +475,17 @@ struct metric *find_or_add_metric(struct fieldstat *instance, int cube_id, int m
     return metric;
 }
 
-// int find_or_add_tag(struct fs_cube *cube, struct fieldstat_tag *tags, size_t n_tag)
-// {
-//     struct tag_hash_key *tag_key = tag_hash_key_construct_with_fieldstat_tag(tags, n_tag);
-//     if (cube->sampling_mode == SAMPLING_MODE_TOPK) {
-//         cell_manager_add_cell_topk(cube->cell_manager, tag_key, 0, NULL, NULL);
-//     }
+int find_or_add_tag(struct fs_cube *cube, struct fieldstat_tag *tags, size_t n_tag)
+{
+    struct tag_hash_key *tag_key = tag_hash_key_construct_with_fieldstat_tag(tags, n_tag);
+    if (cube->sampling_mode == SAMPLING_MODE_TOPK) {
+        cell_manager_add_cell_topk(cube->cell_manager, tag_key, 0, NULL, NULL);
+    }
 
-//     int cell_id = cell_manager_add_cell(cube->cell_manager, tag_key);
-//     tag_hash_key_free(tag_key);
-//     return cell_id;
-// }
+    int cell_id = cell_manager_add_cell(cube->cell_manager, tag_key);
+    tag_hash_key_free(tag_key);
+    return cell_id;
+}
 
 static int append_metric_to_instance(struct fieldstat *instance, struct metric *metric)
 {
