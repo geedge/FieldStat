@@ -52,7 +52,7 @@ TEST(test_empty_tag, add_many_times) // test hash find ok
     cell_id = fieldstat_cube_add(instance, cube_id, NULL, 0, 1);
     EXPECT_EQ(cell_id, 0);
 
-    int metric_id = fieldstat_register_counter(instance, cube_id, "metric", COUNTER_MERGE_BY_MAX);
+    int metric_id = fieldstat_register_counter(instance, cube_id, "metric");
     fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id, 1);
     fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id, 1);
 
@@ -66,7 +66,7 @@ struct fieldstat *test_empty_my_init(enum sampling_mode mode = SAMPLING_MODE_COM
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_create_cube(instance, NULL, 0, mode, 1);
     int cell_id = fieldstat_cube_add(instance, cube_id, NULL, 0, 1);
-    int metric_id = fieldstat_register_counter(instance, cube_id, "metric", COUNTER_MERGE_BY_SUM);
+    int metric_id = fieldstat_register_counter(instance, cube_id, "metric");
     fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id, 1);
 
     return instance;

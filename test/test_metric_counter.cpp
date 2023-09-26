@@ -194,7 +194,7 @@ TEST(metric_test_counter, topk_add_and_test_accuracy)
 {
     struct fieldstat *instance = fieldstat_new();
     fieldstat_create_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_TOPK, 10);
-    fieldstat_register_counter(instance, 0, "test", COUNTER_MERGE_BY_SUM);
+    fieldstat_register_counter(instance, 0, "test");
 
     int tag_list_num = 10000;
     Fieldstat_tag_list_wrapper *tags[tag_list_num];
@@ -253,7 +253,7 @@ TEST(metric_test_counter, topk_add_with_monotonically_increasing_flow_expecting_
 {
     struct fieldstat *instance = fieldstat_new();
     fieldstat_create_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_TOPK, 10);
-    fieldstat_register_counter(instance, 0, "test", COUNTER_MERGE_BY_SUM);
+    fieldstat_register_counter(instance, 0, "test");
 
     const int end_cell_id = 10 * 8;
     const int tag_list_num = 100;
@@ -282,7 +282,7 @@ TEST(metric_test_counter, add_or_set_with_wrong_cell_id_expecting_fail)
 {
     struct fieldstat *instance = fieldstat_new();
     fieldstat_create_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_TOPK, 10);
-    fieldstat_register_counter(instance, 0, "test", COUNTER_MERGE_BY_SUM);
+    fieldstat_register_counter(instance, 0, "test");
 
     int ret = fieldstat_counter_incrby(instance, 0, 0, 1, 1);
     EXPECT_EQ(ret, FS_ERR_INVALID_TAG);
@@ -309,7 +309,7 @@ TEST(metric_test_counter, add_with_wrong_metric_id_expecting_fail)
 {
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_create_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_TOPK, 10);
-    int metric_id = fieldstat_register_counter(instance, cube_id, "test", COUNTER_MERGE_BY_SUM);
+    int metric_id = fieldstat_register_counter(instance, cube_id, "test");
 
     int ret = fieldstat_counter_incrby(instance, cube_id, metric_id + 1, 1, 1);
     EXPECT_EQ(ret, FS_ERR_INVALID_METRIC_ID);
@@ -323,7 +323,7 @@ TEST(metric_test_counter, set_with_wrong_cell_id_expecting_fail)
 {
     struct fieldstat *instance = fieldstat_new();
     fieldstat_create_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_TOPK, 10);
-    fieldstat_register_counter(instance, 0, "test", COUNTER_MERGE_BY_MAX);
+    fieldstat_register_counter(instance, 0, "test");
 
     int ret = fieldstat_counter_set(instance, 0, 0, 1, 1);
     EXPECT_EQ(ret, FS_ERR_INVALID_TAG);
@@ -350,7 +350,7 @@ TEST(metric_test_counter, set_with_wrong_metric_id_expecting_fail)
 {
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_create_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_TOPK, 10);
-    int metric_id = fieldstat_register_counter(instance, cube_id, "test", COUNTER_MERGE_BY_MAX);
+    int metric_id = fieldstat_register_counter(instance, cube_id, "test");
 
     int ret = fieldstat_counter_set(instance, cube_id, metric_id + 1, 1, 1);
     EXPECT_EQ(ret, FS_ERR_INVALID_METRIC_ID);

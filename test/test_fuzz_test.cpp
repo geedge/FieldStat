@@ -54,12 +54,12 @@ TEST(Fuzz_test, both_comp_and_topk_cubes_with_merge_and_reset_expecting_correct_
     }
 
     std::function<int(int)> metric_reg_funcs_comp[METRIC_NUM] = {
-        std::bind(fieldstat_register_counter, instance, std::placeholders::_1, metric_name_of_comprehensive[0], COUNTER_MERGE_BY_SUM),
+        std::bind(fieldstat_register_counter, instance, std::placeholders::_1, metric_name_of_comprehensive[0]),
         std::bind(fieldstat_register_hll, instance, std::placeholders::_1, metric_name_of_comprehensive[1], 10), // 4: precision
     };
     std::function<int(int)> metric_reg_funcs_topk[METRIC_NUM] = {
-        std::bind(fieldstat_register_counter, instance, std::placeholders::_1, metric_name_of_topk[0], COUNTER_MERGE_BY_SUM),
-        std::bind(fieldstat_register_counter, instance, std::placeholders::_1, metric_name_of_topk[1], COUNTER_MERGE_BY_SUM),
+        std::bind(fieldstat_register_counter, instance, std::placeholders::_1, metric_name_of_topk[0]),
+        std::bind(fieldstat_register_counter, instance, std::placeholders::_1, metric_name_of_topk[1]),
     };
 
     for (int i = 0; i < CUBE_NUM; i++) {

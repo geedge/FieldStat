@@ -452,14 +452,14 @@ int check_before_register_metric(const struct fieldstat *instance, const char *m
     return FS_OK;
 }
 
-int fieldstat_register_counter(struct fieldstat *instance, const char *metric_name, enum counter_mode mode)
+int fieldstat_register_counter(struct fieldstat *instance, const char *metric_name)
 {
     int ret = check_before_register_metric(instance, metric_name);
     if (ret != FS_OK) {
         return ret;
     }
 
-    const struct metric *metric = metric_counter_new(metric_name, mode);
+    const struct metric *metric = metric_counter_new(metric_name);
 
     return append_metric_to_instance(instance, metric);
 }
