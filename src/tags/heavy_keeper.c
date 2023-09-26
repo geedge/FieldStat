@@ -164,12 +164,26 @@ unsigned my_max(unsigned a, unsigned b) {
 
 static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_keeper, const struct tag_hash_key *tag, unsigned int count, int cell_id, int *popped_id_out)
 {
+    if (count == 0) {
+        int cell_id_old = sorted_set_get_cell_id(heavy_keeper->top_K_heap, tag);
+        if (cell_id_old > 0) {
+            return 1; // the flow is in the sorted set. Use original cell id.
+        }
+
+        if (sorted_set_cardinality(heavy_keeper->top_K_heap) < heavy_keeper->K) {
+            sorted_set_insert_and_record_popped_back(heavy_keeper->top_K_heap, tag, 0, cell_id, popped_id_out);
+            return 0; // newly added
+        }
+        return -1; // not added
+    }
+
     int user_data_cube_id = 0;
     struct sorted_set *summary = heavy_keeper->top_K_heap;
-    unsigned int FP = tag_hash_key_cal_fnv_hash(tag, FP_HASH_KEY);
+
     unsigned nMin = sorted_set_get_min_count(summary);
     unsigned maxv = 0;
-
+    
+    unsigned int FP = tag_hash_key_cal_fnv_hash(tag, FP_HASH_KEY);
     for (int j = 0; j < heavy_keeper->params.array_num; j++) {
         struct Bucket *bucket = map_flow_id_hash_to_bucket(heavy_keeper, j, tag, FP);
 

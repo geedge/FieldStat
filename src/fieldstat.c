@@ -19,6 +19,7 @@ struct fs_cube {
     struct cell_manager *cell_manager;
     size_t max_n_cell;
     int next_cell_id;
+    int primary_metric_id; // todo
 
     // the key of cube is the combination of shared tags
     struct fieldstat_tag *shared_tags;
@@ -314,26 +315,9 @@ int fieldstat_register_cube(struct fieldstat *instance, const struct fieldstat_t
     return cube_id;
 }
 
-int fieldstat_cube_add(struct fieldstat *instance, int cube_id, const struct fieldstat_tag *tags, size_t n_tag, long long increment)
+int fieldstat_cube_add(struct fieldstat *instance, int cube_id, const struct fieldstat_tag *tags, size_t n_tag, long long occurrence)
 {
-    if (instance == NULL) {
-        return FS_ERR_NULL_HANDLER;
-    }
-    if (cube_id < 0 || cube_id >= instance->valid_cube_arr_length) {
-        return FS_ERR_INVALID_CUBE_ID;
-    }
     struct fs_cube *cube = instance->cube[cube_id];
-    if (cube == NULL) {
-        return FS_ERR_INVALID_CUBE_ID;
-    }
-    if (cube->sampling_mode == SAMPLING_MODE_TOPK && increment <= 0) {
-        return FS_ERR_INVALID_PARAM;
-    }
-
-    if (n_tag == 0 || tags == NULL) {
-        tags = NULL;
-        n_tag = 0;
-    }
 
     int ret = -1;
     struct tag_hash_key *tag_key = tag_hash_key_construct_with_fieldstat_tag(tags, n_tag);
@@ -341,8 +325,7 @@ int fieldstat_cube_add(struct fieldstat *instance, int cube_id, const struct fie
         ret = cell_manager_add_cell(cube->cell_manager, tag_key);
     } else {
         int popped_cell_id = -1;
-        int existing_cell_id = -1;
-        ret = cell_manager_add_cell_topk(cube->cell_manager, tag_key, increment, &popped_cell_id, &existing_cell_id);
+        ret = cell_manager_add_cell_topk(cube->cell_manager, tag_key, occurrence, &popped_cell_id);
 
         if (popped_cell_id != -1) {
             for (size_t i = 0; i < cube->n_metric; i++) {
@@ -357,7 +340,7 @@ int fieldstat_cube_add(struct fieldstat *instance, int cube_id, const struct fie
     tag_hash_key_free(tag_key);
 
     if (ret < 0) {
-        return FS_ERR_INVALID_KEY;
+        return -1;
     }
     return ret;
 }
@@ -582,7 +565,7 @@ static struct metric *fieldstat_find_metric(const struct fieldstat *instance, in
     return cube->metrics[metric_id];
 }
 
-int check_before_add(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, enum metric_type type)
+int check_before_add(const struct fieldstat *instance, int cube_id, int metric_id, enum metric_type type)
 {
     if (instance == NULL) {
         return FS_ERR_NULL_HANDLER;
@@ -604,59 +587,105 @@ int check_before_add(const struct fieldstat *instance, int cube_id, int metric_i
         return FS_ERR_INVALID_METRIC_ID;
     }
 
-    if (cell_id < 0 || cell_manager_get_tag_by_cell_id(cube->cell_manager, cell_id) == NULL) {
-        return FS_ERR_INVALID_CELL_ID;
-    }
     return FS_OK;
 }
 
-int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long increment)
+int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long increment)
 {
-    int ret = check_before_add(instance, cube_id, metric_id, cell_id, METRIC_TYPE_COUNTER);
+    int ret = check_before_add(instance, cube_id, metric_id, METRIC_TYPE_COUNTER);
     if (ret != FS_OK) {
         return ret;
     }
+    struct fs_cube *cube = instance->cube[cube_id];
+    long long occurrence = 0;
+    if (cube->sampling_mode == SAMPLING_MODE_TOPK && cube->primary_metric_id == metric_id) {
+        if (increment < 0) {
+            return FS_ERR_INVALID_PARAM;
+        }
+
+        occurrence = increment;
+    }
+    int cell_id = fieldstat_cube_add(instance, cube_id, tags, n_tag, occurrence);
+    if (cell_id < 0) {
+        return FS_ERR_TOO_MANY_CELLS;
+    }
+
     struct metric *metric = find_or_add_metric(instance, cube_id, metric_id);
 
     metric_counter_incrby(metric, cell_id, increment);
-    return 0;
+    return FS_OK;
 }
 
-int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long value)
+int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long value)
 {
-    int ret = check_before_add(instance, cube_id, metric_id, cell_id, METRIC_TYPE_COUNTER);
+    int ret = check_before_add(instance, cube_id, metric_id, METRIC_TYPE_COUNTER);
     if (ret != FS_OK) {
         return ret;
     }
-
+    struct fs_cube *cube = instance->cube[cube_id];
     struct metric *metric = find_or_add_metric(instance, cube_id, metric_id);
+    int cell_id = -1;
+
+    // get the occurrence
+    long long occurrence = 0;
+    if (cube->sampling_mode == SAMPLING_MODE_TOPK && cube->primary_metric_id == metric_id) {
+        struct tag_hash_key *tag_key = tag_hash_key_construct_with_fieldstat_tag(tags, n_tag);
+        cell_id = cell_manager_find(cube->cell_manager, tag_key);
+        if (cell_id >= 0) {
+            long long old_value;
+            int exist_flag = metric_counter_get(metric, cell_id, &old_value);
+            if (exist_flag == 0) { // cell already exist in metric
+                occurrence = value - old_value;
+            } else {
+                occurrence = value;
+            }
+        }
+        tag_hash_key_free(tag_key);
+        if (occurrence < 0) {
+            return FS_ERR_INVALID_PARAM;
+        }
+    }
+
+    cell_id = fieldstat_cube_add(instance, cube_id, tags, n_tag, occurrence);
+    if (cell_id < 0) {
+        return FS_ERR_TOO_MANY_CELLS;
+    }
 
     metric_counter_set(metric, cell_id, value);
     return 0;
 }
 
-int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, const char *key, size_t key_len)
+int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, const char *key, size_t key_len)
 {
-    int ret = check_before_add(instance, cube_id, metric_id, cell_id, METRIC_TYPE_HLL);
+    int ret = check_before_add(instance, cube_id, metric_id, METRIC_TYPE_HLL);
     if (ret != FS_OK) {
         return ret;
     }
+    if (instance->cube[cube_id]->sampling_mode == SAMPLING_MODE_TOPK) {
+        return FS_ERR_INVALID_PARAM;
+    }
+    int cell_id = fieldstat_cube_add(instance, cube_id, tags, n_tag, 0);
     struct metric *metric = find_or_add_metric(instance, cube_id, metric_id);
 
     metric_hll_add(metric, cell_id, key, key_len);
     return 0;
 }
 
-int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long value)
+int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long value)
 {
-    int ret = check_before_add(instance, cube_id, metric_id, cell_id, METRIC_TYPE_HISTOGRAM);
+    int ret = check_before_add(instance, cube_id, metric_id, METRIC_TYPE_HISTOGRAM);
     if (ret != FS_OK) {
         return ret;
     }
+    if (instance->cube[cube_id]->sampling_mode == SAMPLING_MODE_TOPK) {
+        return FS_ERR_INVALID_PARAM;
+    }
+
+    int cell_id = fieldstat_cube_add(instance, cube_id, tags, n_tag, 0);
     struct metric *metric = find_or_add_metric(instance, cube_id, metric_id);
 
     ret = metric_histogram_record(metric, cell_id, value);
-    if (ret < 0) { // even if fail, there is no need to free metric if it is a new one, because an operation has been related to the metric.
+    if (ret < 0) { // it's ok not to recover the cell and metrics even if they are new ones, since unused ones will not be exported.
         return FS_ERR_INVALID_PARAM;
     }
     return 0;

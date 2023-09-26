@@ -149,13 +149,13 @@ int fieldstat_cube_remove(struct fieldstat *instance, int cube_id, const struct 
     * @return FS_OK if success. FS_ERR_NULL_HANDLER, FS_ERR_INVALID_CUBE_ID, FS_ERR_INVALID_METRIC_ID, FS_ERR_INVALID_CELL_ID if fail.
 */
 // todo: 现在没cell id 了
-int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long increment);
+int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long increment);
 
 /*
     * @brief let the value of counter metric equal to value. Other annotations refer to fieldstat_counter_incrby.
     * @return FS_OK if success. FS_ERR_NULL_HANDLER, FS_ERR_INVALID_CUBE_ID, FS_ERR_INVALID_METRIC_ID, FS_ERR_INVALID_CELL_ID if fail.
 */
-int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long value);
+int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long value);
 
 /*
     * @brief add a key to the hll metric of cell_id. HLL approximates the number of distinct elements in a set of `key`s.
@@ -163,7 +163,7 @@ int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id
     * @param key_len: strlen(key).
     * @return FS_OK if success. FS_ERR_NULL_HANDLER, FS_ERR_INVALID_CUBE_ID, FS_ERR_INVALID_METRIC_ID, FS_ERR_INVALID_CELL_ID if fail.
 */
-int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, const char *key, size_t key_len);
+int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, const char *key, size_t key_len);
 
 /* 
     * @brief Add a value to the histogram metric of cell_id. Histogram will record the distribution of the values.
@@ -172,7 +172,7 @@ int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, in
     * @return FS_OK if success. FS_ERR_NULL_HANDLER, FS_ERR_INVALID_CUBE_ID, FS_ERR_INVALID_METRIC_ID, FS_ERR_INVALID_CELL_ID if fail.
     *         FS_ERR_INVALID_PARAM when value is less than 0.
 */
-int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long value);
+int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long value);
 
 /*
     * @brief Delete all the cells, also the content of every metrics. The cube and metrics are not deleted. Increase cell_version by 1.
