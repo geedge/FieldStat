@@ -19,15 +19,14 @@ struct fs_cube {
     struct cell_manager *cell_manager;
     size_t max_n_cell;
     int next_cell_id;
-    int primary_metric_id; // todo
+    int primary_metric_id;
 
     // the key of cube is the combination of shared tags
     struct fieldstat_tag *shared_tags;
     size_t n_shared_tags;
     struct tag_hash_key *key_tag;
 
-    // todo: 这个结构cube和instance重合了，之后改成一个新的struct，把什么append 一堆的放进来
-    struct metric **metrics; // todo: 依然按照metric id 索引，但是现在metric中间有坑。
+    struct metric **metrics;
     size_t n_metric; // todo: rename: valid_arr_length
     size_t max_n_metric;
 };
@@ -48,7 +47,7 @@ struct fieldstat {
     struct metric **metric_masters;
     size_t n_metric_master;
     size_t max_n_metric_master;
-    struct metric_name_id_map *metric_name_id_map; // todo: new 和 free 的位置
+    struct metric_name_id_map *metric_name_id_map;
 
     struct cube_manager *shared_tag_cube_manager;
 };
@@ -384,9 +383,41 @@ void fieldstat_cube_free(struct fieldstat *instance, int cube_id)
 }
 
 struct fs_cube *fieldstat_cube_fork(const struct fs_cube *cube) {
-    return fieldstat_cube_new(cube->shared_tags, cube->n_shared_tags, cube->sampling_mode, cube->max_n_cell);
+    struct fs_cube *ret = fieldstat_cube_new(cube->shared_tags, cube->n_shared_tags, cube->sampling_mode, cube->max_n_cell);
+    ret->primary_metric_id = cube->primary_metric_id;
+
+    return ret;
 }
 
+int fieldstat_cube_set_primary_metric(struct fieldstat *instance, int cube_id, int metric_id)
+{
+    if (instance == NULL) {
+        return FS_ERR_NULL_HANDLER;
+    }
+    if (cube_id < 0 || cube_id >= instance->valid_cube_arr_length) {
+        return FS_ERR_INVALID_CUBE_ID;
+    }
+    struct fs_cube *cube = instance->cube[cube_id];
+    if (cube == NULL) {
+        return FS_ERR_INVALID_CUBE_ID;
+    }
+    if (cube->sampling_mode != SAMPLING_MODE_TOPK) {
+        return FS_ERR_INVALID_PARAM;
+    }
+    if (metric_id < 0 || metric_id >= instance->n_metric_master) {
+        return FS_ERR_INVALID_METRIC_ID;
+    }
+    if (instance->metric_masters[metric_id] == NULL) {
+        return FS_ERR_INVALID_METRIC_ID;
+    }
+    if (metric_get_type(instance->metric_masters[metric_id]) != METRIC_TYPE_COUNTER) {
+        return FS_ERR_INVALID_PARAM;
+    }
+
+    cube->primary_metric_id = metric_id;
+
+    return FS_OK;
+}
 
 /* -------------------------------------------------------------------------- */
 /*                               metric register                              */
@@ -663,6 +694,7 @@ struct fs_cube *fieldstat_cube_dup(const struct fs_cube *cube, const int *metric
 
     struct cell_manager *cm_dup = cell_manager_copy(cm_src);
     cube_dup->cell_manager = cm_dup;
+    cube_dup->primary_metric_id = metric_id_map[cube->primary_metric_id];
 
     for (int i = 0; i < cube->n_metric; i ++) {
         if (cube->metrics[i] == NULL) {
@@ -802,11 +834,19 @@ int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
             struct fs_cube *copied_cube = fieldstat_cube_dup(cube_src, metric_id_src_dest_map);
             fieldstat_append_cube_to_instance(instance, copied_cube);
         } else {
-            if (instance->cube[cube_id_tmp]->sampling_mode != cube_src->sampling_mode) {
+            struct fs_cube *cube_dst = instance->cube[cube_id_tmp];
+            if (cube_dst->sampling_mode != cube_src->sampling_mode) {
                 ret = FS_ERR_INVALID_PARAM;
                 continue;
             }
-            fieldstat_cube_merge(instance->cube[cube_id_tmp], cube_src, metric_id_src_dest_map);
+            if (strcmp(
+                    metric_get_name(cube_dst->metrics[cube_dst->primary_metric_id]), 
+                    metric_get_name(cube_src->metrics[cube_src->primary_metric_id])
+                ) != 0) {
+                ret = FS_ERR_INVALID_PARAM;
+                continue;
+            }
+            fieldstat_cube_merge(cube_dst, cube_src, metric_id_src_dest_map);
         }
     }
 
@@ -829,7 +869,7 @@ struct fieldstat *fieldstat_fork(const struct fieldstat *instance)
         if (cube == NULL) {
             continue;
         }
-        new_instance->cube[i] = fieldstat_cube_new(cube->shared_tags, cube->n_shared_tags, cube->sampling_mode, cube->max_n_cell);
+        new_instance->cube[i] = fieldstat_cube_fork(cube);
         cube_manager_add(new_instance->shared_tag_cube_manager, cube->key_tag, i);
         // copy registered metrics
         for (size_t j = 0; j < cube->n_metric; j++) {
