@@ -428,13 +428,13 @@ int cell_iter_next_cube(struct cell_iter *iter) {
     while (iter->curr_cube_idx < iter->n_cube - 1) {
         int cube_id_next = iter->cube_ids[++iter->curr_cube_idx];
 
-        fieldstat_get_metrics_using_by_cube(instance, cube_id_next, &iter->metric_ids, &iter->n_metric);
+        fieldstat_get_metrics_used_by_cube(instance, cube_id_next, &iter->metric_ids, &iter->n_metric);
         if (iter->n_metric == 0) {
             continue;
         }
 
         // get cell info 
-        fieldstat_get_cells_using_by_cube(instance, cube_id_next, &iter->tag_list, &iter->n_cell);
+        fieldstat_get_cells_used_by_cube(instance, cube_id_next, &iter->tag_list, &iter->n_cell);
         if (iter->n_cell == 0) {
             continue;
         }

@@ -116,7 +116,7 @@ int fieldstat_register_hist(struct fieldstat *instance, const char *metric_name,
 /*
     * @brief Delete the cell added by fieldstat_cube_add. Increase the cell_version by 1. Also, delete all the metric records of this cell. The cell id will not be reused. Does not support topk sampling mode.
     * @param refer to fieldstat_cube_add.
-    * @return the deleted cell id >= 0, if success; 
+    * @return FS_OK if success; 
     *         return FS_ERR_NULL_HANDLER, FS_ERR_INVALID_CUBE_ID, 
     *         return FS_ERR_INVALID_PARAM when mode is TOPK.
     *         return FS_ERR_INVALID_KEY when the cell is not found.
@@ -200,7 +200,7 @@ void fieldstat_get_cubes(const struct fieldstat *instance, int **cube_ids, int *
     * @brief Get all the registered metrics of a cube.
     * @return return FS_ERR_NULL_HANDLER or FS_ERR_INVALID_CUBE_ID. Or FS_OK
 */
-int fieldstat_get_metrics_using_by_cube(const struct fieldstat *instance, int cube_id, int **metric_id_out, size_t *n_metric);
+int fieldstat_get_metrics_used_by_cube(const struct fieldstat *instance, int cube_id, int **metric_id_out, size_t *n_metric);
 
 void fieldstat_get_metrics(const struct fieldstat *instance, int **metric_id_out, size_t *n_metric);
 
@@ -210,10 +210,10 @@ const char *fieldstat_get_metric_name(const struct fieldstat *instance, int metr
 // query the type of the metric. return -1 if cube_id or metric_id is invalid.
 enum metric_type fieldstat_get_metric_type(const struct fieldstat *instance, int metric_id);
 
-void fieldstat_get_cells_using_by_metric(const struct fieldstat *instance, int cube_id, int metric_id,
+void fieldstat_get_cells_used_by_metric(const struct fieldstat *instance, int cube_id, int metric_id,
     struct fieldstat_tag_list **tag_list, size_t *n_cell);
 
-void fieldstat_get_cells_using_by_cube(const struct fieldstat *instance, int cube_id, struct fieldstat_tag_list **tag_list, size_t *n_cell);
+void fieldstat_get_cells_used_by_cube(const struct fieldstat *instance, int cube_id, struct fieldstat_tag_list **tag_list, size_t *n_cell);
 
 /*
     * @brief Get all the cells in a cube and their tags in a specific metric. Different metrics may have different cells.
