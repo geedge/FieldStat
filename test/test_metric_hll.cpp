@@ -198,9 +198,9 @@ TEST(metric_test_hll, add_or_set_with_wrong_cell_id_expecting_fail)
     int metric_id = fieldstat_register_hll(instance, cube_id, "czz_test hll metric", 10);
 
     int ret = fieldstat_hll_add(instance, cube_id, metric_id, 1, "hello", 5);
-    EXPECT_EQ(ret, FS_ERR_INVALID_CELL_ID);
+    EXPECT_EQ(ret, FS_ERR_INVALID_TAG);
     ret = fieldstat_hll_add(instance, cube_id, metric_id, -1, "hello", 5);
-    EXPECT_EQ(ret, FS_ERR_INVALID_CELL_ID);
+    EXPECT_EQ(ret, FS_ERR_INVALID_TAG);
 
     fieldstat_free(instance);
 }

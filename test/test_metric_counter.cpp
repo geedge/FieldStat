@@ -285,9 +285,9 @@ TEST(metric_test_counter, add_or_set_with_wrong_cell_id_expecting_fail)
     fieldstat_register_counter(instance, 0, "test", COUNTER_MERGE_BY_SUM);
 
     int ret = fieldstat_counter_incrby(instance, 0, 0, 1, 1);
-    EXPECT_EQ(ret, FS_ERR_INVALID_CELL_ID);
+    EXPECT_EQ(ret, FS_ERR_INVALID_TAG);
     ret = fieldstat_counter_incrby(instance, 0, 0, -1, 1);
-    EXPECT_EQ(ret, FS_ERR_INVALID_CELL_ID);
+    EXPECT_EQ(ret, FS_ERR_INVALID_TAG);
 
     fieldstat_free(instance);
 }
@@ -326,9 +326,9 @@ TEST(metric_test_counter, set_with_wrong_cell_id_expecting_fail)
     fieldstat_register_counter(instance, 0, "test", COUNTER_MERGE_BY_MAX);
 
     int ret = fieldstat_counter_set(instance, 0, 0, 1, 1);
-    EXPECT_EQ(ret, FS_ERR_INVALID_CELL_ID);
+    EXPECT_EQ(ret, FS_ERR_INVALID_TAG);
     ret = fieldstat_counter_set(instance, 0, 0, -1, 1);
-    EXPECT_EQ(ret, FS_ERR_INVALID_CELL_ID);
+    EXPECT_EQ(ret, FS_ERR_INVALID_TAG);
 
     fieldstat_free(instance);
 }

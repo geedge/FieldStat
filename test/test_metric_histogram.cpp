@@ -130,9 +130,9 @@ TEST(metric_test_histogram, add_or_set_with_wrong_cell_id_expecting_fail)
     int metric_id = fieldstat_register_hist(instance, cube_id, "czz_test", 1, 600000, 3);
 
     int ret = fieldstat_hist_record(instance, cube_id, metric_id, 1, 1234);
-    EXPECT_EQ(ret, FS_ERR_INVALID_CELL_ID);
+    EXPECT_EQ(ret, FS_ERR_INVALID_TAG);
     ret = fieldstat_hist_record(instance, cube_id, metric_id, -1, 1234);
-    EXPECT_EQ(ret, FS_ERR_INVALID_CELL_ID);
+    EXPECT_EQ(ret, FS_ERR_INVALID_TAG);
 
     fieldstat_free(instance);
 }

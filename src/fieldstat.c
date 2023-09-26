@@ -1051,9 +1051,10 @@ void fieldstat_get_cubes(const struct fieldstat *instance, int **cube_ids, int *
     free(tmp_ids);
 }
 
-// todo: 要改成返回一个数组了
-int fieldstat_get_max_metric_id(const struct fieldstat *instance, int cube_id)
+int fieldstat_get_metrics_using_by_cube(const struct fieldstat *instance, int cube_id, int **metric_id_out, size_t *n_metric)
 {
+    *metric_id_out = NULL;
+    *n_metric = 0;
     if (cube_id >= instance->valid_cube_arr_length || cube_id < 0) {
         return FS_ERR_INVALID_CUBE_ID;
     }
@@ -1061,11 +1062,51 @@ int fieldstat_get_max_metric_id(const struct fieldstat *instance, int cube_id)
     if (cube == NULL) {
         return FS_ERR_INVALID_CUBE_ID;
     }
-    return cube->n_metric - 1;
+
+    int all_available_metric_count = 0;
+    if (cube->n_metric == 0) {
+        return 0;
+    }
+    int *tmp_ids = (int *)malloc(sizeof(int) * cube->n_metric);
+    for (int i = 0; i < cube->n_metric; i++) {
+        const struct metric *tmp_metric = cube->metrics[i];
+        if (tmp_metric == NULL) {
+            continue;
+        }
+        tmp_ids[all_available_metric_count] = i;
+        all_available_metric_count ++;
+    }
+    if (all_available_metric_count == 0) {
+        free(tmp_ids);
+        return 0;
+    }
+
+    *metric_id_out = tmp_ids;
+    *n_metric = all_available_metric_count;
+
+    return FS_OK;
 }
 
-void fieldstat_get_cells(const struct fieldstat *instance, int cube_id, int metric_id,
-    int **cell_ids, struct fieldstat_tag_list **tag_list, size_t *n_cell)
+void fieldstat_get_metrics(const struct fieldstat *instance, int **metric_id_out, size_t *n_metric)
+{
+    if (instance->n_metric_master == 0) {
+        *metric_id_out = NULL;
+        *n_metric = 0;
+        return;
+    }
+
+    int *tmp_ids = (int *)malloc(sizeof(int) * instance->n_metric_master);
+    *metric_id_out = tmp_ids;
+    *n_metric = instance->n_metric_master;
+    for (int i = 0; i < instance->n_metric_master; i++) {
+        tmp_ids[i] = i;
+    }
+
+    return;
+}
+
+void fieldstat_get_cells_using_by_metric(const struct fieldstat *instance, int cube_id, int metric_id,
+    struct fieldstat_tag_list **tag_list, size_t *n_cell)
 {
     int ret = FS_OK;
     const struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id, &ret);
@@ -1074,7 +1115,8 @@ void fieldstat_get_cells(const struct fieldstat *instance, int cube_id, int metr
     }
 
     size_t n_cell_ret = 0;
-    metric_get_cell_ids(metric, cell_ids, &n_cell_ret);
+    int *cell_ids = NULL;
+    metric_get_cell_ids(metric, &cell_ids, &n_cell_ret);
     *n_cell = n_cell_ret;
     if (n_cell_ret == 0) {
         *tag_list = NULL;
@@ -1084,7 +1126,7 @@ void fieldstat_get_cells(const struct fieldstat *instance, int cube_id, int metr
     struct fieldstat_tag_list *tag_list_ret = (struct fieldstat_tag_list *)malloc(sizeof(struct fieldstat_tag_list) * n_cell_ret);
     *tag_list = tag_list_ret;
     for (int i = 0; i < n_cell_ret; i++) {
-        const struct tag_hash_key *tag_key = cell_manager_get_tag_by_cell_id(instance->cube[cube_id]->cell_manager, (*cell_ids)[i]);
+        const struct tag_hash_key *tag_key = cell_manager_get_tag_by_cell_id(instance->cube[cube_id]->cell_manager, cell_ids[i]);
         if (tag_key == NULL) {
             continue;
         }
@@ -1135,9 +1177,18 @@ struct fieldstat_tag_list *fieldstat_get_shared_tags(const struct fieldstat *ins
     return tag_list;
 }
 
-int fieldstat_counter_get(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long *value)
+int get_cell_id_by_tag_list(const struct fieldstat *instance, int cube_id, const struct fieldstat_tag_list *tags)
+{
+    struct tag_hash_key *tag_key = tag_hash_key_construct_with_fieldstat_tag(tags->tag, tags->n_tag);
+    int cell_id = cell_manager_find(instance->cube[cube_id]->cell_manager, tag_key);
+    tag_hash_key_free(tag_key);
+    return cell_id;
+}
+
+int fieldstat_counter_get(const struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag_list *tags, long long *value)
 {
     int ret;
+    *value = 0;
     const struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id, &ret);
     if (ret != FS_OK) {
         return ret;
@@ -1147,40 +1198,68 @@ int fieldstat_counter_get(const struct fieldstat *instance, int cube_id, int met
         return FS_ERR_INVALID_METRIC_ID;
     }
 
-    return metric_counter_get(metric, cell_id, value);
+    int cell_id = get_cell_id_by_tag_list(instance, cube_id, tags);
+    if (cell_id == -1) {
+        return FS_ERR_INVALID_TAG;
+    }
+
+    ret = metric_counter_get(metric, cell_id, value);
+    if (ret < 0) {
+        return FS_ERR_INVALID_TAG;
+    }
+
+    return FS_OK;
 }
 
-double fieldstat_hll_get(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id)
+int fieldstat_hll_get(const struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag_list *tags, double *value)
 {
     int ret;
     const struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id, &ret);
     if (ret != FS_OK) {
         return ret;
     }
-
     if (metric == NULL || metric_get_type(metric) != METRIC_TYPE_HLL) {
         return FS_ERR_INVALID_METRIC_ID;
     }
 
-    return metric_hll_get(metric, cell_id);
+    int cell_id = get_cell_id_by_tag_list(instance, cube_id, tags);
+    if (cell_id == -1) {
+        return FS_ERR_INVALID_TAG;
+    }
+
+    double ret2 = metric_hll_get(metric, cell_id);
+    if (ret2 < 0) {
+        return FS_ERR_INVALID_TAG;
+    }
+    *value = ret2;
+
+    return FS_OK;
 }
 
-long long fieldstat_hist_value_at_percentile(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, double percentile)
+long long fieldstat_hist_value_at_percentile(const struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag_list *tags, double percentile)
 {
     int ret;
     const struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id, &ret);
     if (ret != FS_OK) {
         return ret;
     }
-
     if (metric == NULL || metric_get_type(metric) != METRIC_TYPE_HISTOGRAM) {
         return FS_ERR_INVALID_METRIC_ID;
     }
 
-    return metric_histogram_value_at_percentile(metric, cell_id, percentile);
+    int cell_id = get_cell_id_by_tag_list(instance, cube_id, tags);
+    if (cell_id == -1) {
+        return FS_ERR_INVALID_TAG;
+    }
+    long long ret = metric_histogram_value_at_percentile(metric, cell_id, percentile);
+    if (ret < 0) {
+        return FS_ERR_INVALID_TAG;
+    }
+
+    return ret;
 }
 
-long long fieldstat_hist_count_le_value(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, long long value)
+long long fieldstat_hist_count_le_value(const struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag_list *tags, long long value)
 {
     int ret;
     const struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id, &ret);
@@ -1191,10 +1270,20 @@ long long fieldstat_hist_count_le_value(const struct fieldstat *instance, int cu
         return FS_ERR_INVALID_METRIC_ID;
     }
 
-    return metric_histogram_count_le_value(metric, cell_id, value);
+    int cell_id = get_cell_id_by_tag_list(instance, cube_id, tags);
+    if (cell_id == -1) {
+        return FS_ERR_INVALID_TAG;
+    }
+
+    long long ret = metric_histogram_count_le_value(metric, cell_id, value);
+    if (ret < 0) {
+        return FS_ERR_INVALID_TAG;
+    }
+
+    return ret;
 }
 
-void fieldstat_get_serialized_blob(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id, char **blob, size_t *blob_size)
+void fieldstat_get_serialized_blob(const struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag_list *tags, char **blob, size_t *blob_size)
 {
     *blob = NULL;
     *blob_size = 0;
@@ -1208,6 +1297,11 @@ void fieldstat_get_serialized_blob(const struct fieldstat *instance, int cube_id
     }
     enum metric_type type = metric_get_type(metric);
     if (!(type == METRIC_TYPE_HLL || type == METRIC_TYPE_HISTOGRAM)) {
+        return;
+    }
+
+    int cell_id = get_cell_id_by_tag_list(instance, cube_id, tags);
+    if (cell_id == -1) {
         return;
     }
 
@@ -1228,10 +1322,12 @@ void fieldstat_tag_list_arr_free(struct fieldstat_tag_list *tag_list, size_t n_c
     free(tag_list);
 }
 
-const char *fieldstat_get_metric_name(const struct fieldstat *instance, int cube_id, int metric_id)
+const char *fieldstat_get_metric_name(const struct fieldstat *instance, int metric_id)
 {
-    int ret;
-    const struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id, &ret);
+    if (metric_id < 0 || metric_id >= instance->n_metric_master) {
+        return NULL;
+    }
+    const struct metric *metric = instance->metric_masters[metric_id];
     if (metric == NULL) {
         return NULL;
     }
@@ -1239,18 +1335,20 @@ const char *fieldstat_get_metric_name(const struct fieldstat *instance, int cube
     return metric_get_name(metric);
 }
 
-enum metric_type fieldstat_get_metric_type(const struct fieldstat *instance, int cube_id, int metric_id)
+enum metric_type fieldstat_get_metric_type(const struct fieldstat *instance, int metric_id)
 {
-    int ret;
-    const struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id, &ret);
+    if (metric_id < 0 || metric_id >= instance->n_metric_master) {
+        return (enum metric_type)(-1);
+    }
+    const struct metric *metric = instance->metric_masters[metric_id];
     if (metric == NULL) {
-        return (enum metric_type)-1;
+        return (enum metric_type)(-1);
     }
 
     return metric_get_type(metric);
 }
 
-void fieldstat_get_cells_from_cube(const struct fieldstat *instance, int cube_id, int **cell_ids, struct fieldstat_tag_list **tag_list, size_t *n_cell)
+void fieldstat_get_cells_using_by_cube(const struct fieldstat *instance, int cube_id, struct fieldstat_tag_list **tag_list, size_t *n_cell)
 {
     if (cube_id < 0 || cube_id >= instance->valid_cube_arr_length) {
         return;
@@ -1263,14 +1361,12 @@ void fieldstat_get_cells_from_cube(const struct fieldstat *instance, int cube_id
     int arr_len = 0;
     const struct tag_hash_key **tags_discontinuous = cell_manager_dump(cube->cell_manager, &arr_len);
     if (arr_len == 0) {
-        *cell_ids = NULL;
         *tag_list = NULL;
         *n_cell = 0;
         return;
     }
 
     struct fieldstat_tag_list *tag_list_ret = (struct fieldstat_tag_list *)malloc(sizeof(struct fieldstat_tag_list) * arr_len);
-    int *cell_ids_ret = (int *)malloc(sizeof(int) * arr_len);
     int n_cell_ret = 0;
 
     for (int i = 0; i < arr_len; i++) {
@@ -1279,19 +1375,15 @@ void fieldstat_get_cells_from_cube(const struct fieldstat *instance, int cube_id
             continue;
         }
         tag_hash_key_convert_to_fieldstat_tag(tag_key, &(tag_list_ret[n_cell_ret].tag), &(tag_list_ret[n_cell_ret].n_tag));
-        cell_ids_ret[n_cell_ret] = i;
         n_cell_ret++;
     }
     if (n_cell_ret == 0) {
-        free(cell_ids_ret);
         free(tag_list_ret);
-        *cell_ids = NULL;
         *tag_list = NULL;
         *n_cell = 0;
         return;
     }
 
-    *cell_ids = cell_ids_ret;
     *tag_list = tag_list_ret;
     *n_cell = n_cell_ret;
 }
