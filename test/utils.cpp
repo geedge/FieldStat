@@ -293,10 +293,3 @@ double test_cal_topk_accuracy(vector<struct Fieldstat_tag_list_wrapper *> &test_
     double accuracy = (double)correct / test_result.size();
     return accuracy;
 }
-
-long long my_fieldstat_counter_get(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id)
-{
-    long long value;
-    fieldstat_counter_get(instance, cube_id, metric_id, cell_id, &value);
-    return value;
-}

@@ -146,14 +146,17 @@ void cell_manager_id_tag_array_add(struct cell_manager *pthis, int cell_id, stru
     pthis->current_cell_num++;
 }
 
-int cell_manager_get_count_by_tag(const struct cell_manager *pthis, const struct tag_hash_key *tag)
+long long cell_manager_get_count_by_tag(const struct cell_manager *pthis, const struct tag_hash_key *tag)
 {
     if (pthis->sampling_mode == SAMPLING_MODE_COMPREHENSIVE) {
         return -1;
     }
 
     unsigned int count = 0;
-    heavy_keeper_query_one(pthis->topk_tag_id_map, tag, &count, NULL);
+    int ret = heavy_keeper_query_one(pthis->topk_tag_id_map, tag, &count, NULL);
+    if (ret == -1) {
+        return -1;
+    }
 
     return count;
 }

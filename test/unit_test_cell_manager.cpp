@@ -688,7 +688,8 @@ TEST(unit_test_cell_manager, reset_once_and_query_topk)
         keys.push_back(key);
     }
     for (int i = 0; i < TEST_ROUND; i++) {
-        int cell_id = cell_manager_add_cell(cm, keys[i]);
+        int dummy;
+        int cell_id = cell_manager_add_cell_topk(cm, keys[i], 1, &dummy);
         EXPECT_EQ(cell_id, i);
     }
 
@@ -696,7 +697,7 @@ TEST(unit_test_cell_manager, reset_once_and_query_topk)
     for (int i = 0; i < TEST_ROUND; i++) {
         EXPECT_EQ(cell_manager_find(cm, keys[i]), -1);
         EXPECT_TRUE(cell_manager_get_tag_by_cell_id(cm, i) == NULL);
-        EXPECT_TRUE(cell_manager_get_count_by_tag(cm, keys[i]) == -1);
+        EXPECT_EQ(cell_manager_get_count_by_tag(cm, keys[i]), -1);
     }
     int array_len = 0;
     cell_manager_dump(cm, &array_len);
@@ -707,9 +708,6 @@ TEST(unit_test_cell_manager, reset_once_and_query_topk)
         tag_hash_key_free(keys[i]);
     }
 }
-
-
-// reset 然后query
 
 // 速度测试
 

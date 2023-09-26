@@ -72,11 +72,11 @@ struct cell_iter {
     struct fieldstat_tag_list *shared_tag;
 
     struct fieldstat_tag_list *tag_list;
-    int *cell_ids;
     size_t n_cell;
     size_t curr_cell_idx;
 
-    int max_metric_id;
+    int *metric_ids;
+    size_t n_metric;
 
     const struct fieldstat *instance;
 };
@@ -409,8 +409,6 @@ void cell_iter_free_cell_records(struct cell_iter *iter) {
     fieldstat_tag_list_arr_free(iter->tag_list, iter->n_cell);
     iter->tag_list = NULL;
     iter->n_cell = 0;
-    free(iter->cell_ids);
-    iter->cell_ids = NULL;
     iter->curr_cell_idx = 0;
 }
 
@@ -430,17 +428,17 @@ int cell_iter_next_cube(struct cell_iter *iter) {
     while (iter->curr_cube_idx < iter->n_cube - 1) {
         int cube_id_next = iter->cube_ids[++iter->curr_cube_idx];
 
-        int metric_id_max_next = fieldstat_get_max_metric_id(instance, cube_id_next);
-        if (metric_id_max_next == -1) {
+        fieldstat_get_metrics_using_by_cube(instance, cube_id_next, &iter->metric_ids, &iter->n_metric);
+        if (iter->n_metric == 0) {
             continue;
         }
 
         // get cell info 
-        fieldstat_get_cells_from_cube(instance, cube_id_next, &iter->cell_ids, &iter->tag_list, &iter->n_cell);
+        fieldstat_get_cells_using_by_cube(instance, cube_id_next, &iter->tag_list, &iter->n_cell);
         if (iter->n_cell == 0) {
             continue;
         }
-        iter->max_metric_id = metric_id_max_next;
+
         iter->shared_tag = fieldstat_get_shared_tags(iter->instance, iter->cube_ids[iter->curr_cube_idx]);
         iter->curr_cell_idx = 0;
         return 1;
@@ -483,16 +481,16 @@ int cell_iter_next(struct cell_iter *iter) {
 /* -------------------------------------------------------------------------- */
 
 struct export_kv_pair *cell_query_with_iter(const struct cell_iter *iter, int metric_id) {
-    enum metric_type type = fieldstat_get_metric_type(iter->instance, iter->cube_ids[iter->curr_cube_idx], metric_id);
+    enum metric_type type = fieldstat_get_metric_type(iter->instance, metric_id);
     struct export_kv_pair *ret = NULL;
     if (type == METRIC_TYPE_COUNTER) {
         long long value;
-        int tmp_ret = fieldstat_counter_get(iter->instance, iter->cube_ids[iter->curr_cube_idx], metric_id, iter->cell_ids[iter->curr_cell_idx], &value);
+        int tmp_ret = fieldstat_counter_get(iter->instance, iter->cube_ids[iter->curr_cube_idx], metric_id, &iter->tag_list[iter->curr_cell_idx], &value);
         if (tmp_ret == -1) {
             return NULL;
         }
         ret = malloc(sizeof(struct export_kv_pair));
-        ret->key = strdup(fieldstat_get_metric_name(iter->instance, iter->cube_ids[iter->curr_cube_idx], metric_id));
+        ret->key = strdup(fieldstat_get_metric_name(iter->instance, metric_id));
         ret->type = TAG_INTEGER;
         ret->value_longlong = value;
         return ret;
@@ -500,12 +498,12 @@ struct export_kv_pair *cell_query_with_iter(const struct cell_iter *iter, int me
     if (type == METRIC_TYPE_HLL || type == METRIC_TYPE_HISTOGRAM) {
         char *value;
         size_t len;
-        fieldstat_get_serialized_blob(iter->instance, iter->cube_ids[iter->curr_cube_idx], metric_id, iter->cell_ids[iter->curr_cell_idx], &value, &len);
+        fieldstat_get_serialized_blob(iter->instance, iter->cube_ids[iter->curr_cube_idx], metric_id, &iter->tag_list[iter->curr_cell_idx], &value, &len);
         if (value == NULL) {
             return NULL;
         }
         ret = malloc(sizeof(struct export_kv_pair));
-        ret->key = strdup(fieldstat_get_metric_name(iter->instance, iter->cube_ids[iter->curr_cube_idx], metric_id));
+        ret->key = strdup(fieldstat_get_metric_name(iter->instance, metric_id));
         ret->type = TAG_CSTRING;
         ret->value_str = value;
         return ret;
@@ -598,8 +596,8 @@ int cjson_map_add(struct cellwise_rec_for_export *tag_field_pair, const struct c
 {
     struct json_writer *writer = NULL;
     
-    for (int i = 0; i <= iter->max_metric_id; i++) {
-        struct export_kv_pair *field = cell_query_with_iter(iter, i);
+    for (int i = 0; i < iter->n_metric; i++) {
+        struct export_kv_pair *field = cell_query_with_iter(iter, iter->metric_ids[i]);
         if (field == NULL) {
             continue;
         }
@@ -610,7 +608,7 @@ int cjson_map_add(struct cellwise_rec_for_export *tag_field_pair, const struct c
         kv_pair_free(field);
     }
 
-    if (writer == NULL) {
+    if (writer == NULL) { // all fields are null
         return 0;
     }
     tag_field_pair->cjson_fields = writer;
@@ -618,7 +616,6 @@ int cjson_map_add(struct cellwise_rec_for_export *tag_field_pair, const struct c
     struct export_kv_pair *tag_list;
     size_t tag_list_len;
     cell_iter_read_tag_list(iter, &tag_list, &tag_list_len);
-
     struct json_writer *writer_tag = json_writer_init();
     for (int i = 0; i < tag_list_len; i++) {
         kv_pair_write_to_json(&tag_list[i], writer_tag);
@@ -631,22 +628,23 @@ int cjson_map_add(struct cellwise_rec_for_export *tag_field_pair, const struct c
 
 void cjson_map_record_metrics(struct cellwise_rec_for_export *tag_field_pair, const struct cell_iter *iter)
 {
-    tag_field_pair->metric_name = malloc(sizeof(char *) * (iter->max_metric_id + 1));
-    tag_field_pair->metric_value = malloc(sizeof(long long) * (iter->max_metric_id + 1));
+    tag_field_pair->metric_name = malloc(sizeof(char *) * iter->n_metric);
+    tag_field_pair->metric_value = malloc(sizeof(long long) * iter->n_metric);
 
     int n_counter_metric = 0;
-    for (int metric_id = 0; metric_id <= iter->max_metric_id; metric_id++) {
+    for (int i = 0; i <= iter->n_metric; i++) {
+        int metric_id = iter->metric_ids[i];
         int cube_id = iter->cube_ids[iter->curr_cube_idx];
-        if (fieldstat_get_metric_type(iter->instance, cube_id, metric_id) != METRIC_TYPE_COUNTER) {
+        if (fieldstat_get_metric_type(iter->instance, metric_id) != METRIC_TYPE_COUNTER) {
             continue;
         }
         long long value;
-        int ret = fieldstat_counter_get(iter->instance, cube_id, metric_id, iter->cell_ids[iter->curr_cell_idx], &value);
+        int ret = fieldstat_counter_get(iter->instance, cube_id, metric_id, &iter->tag_list[iter->curr_cell_idx], &value);
         if (ret == -1) { // no value, happens when the two cells in one cube has different metrics
             continue;
         }
 
-        tag_field_pair->metric_name[n_counter_metric] = strdup(fieldstat_get_metric_name(iter->instance, cube_id, metric_id));
+        tag_field_pair->metric_name[n_counter_metric] = strdup(fieldstat_get_metric_name(iter->instance, metric_id));
         tag_field_pair->metric_value[n_counter_metric] = value;
 
         n_counter_metric++;
