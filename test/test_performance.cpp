@@ -27,7 +27,7 @@ TEST(test_performance, merge_performance_when_comprehensive_sampling_multi_insta
     struct fieldstat *instances[INSTANCE_NUM];
     for (int i = 0; i < INSTANCE_NUM; i++) {
         struct fieldstat *tmp_i = fieldstat_new();
-        int cube_id = fieldstat_register_cube(tmp_i, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, MAX_CELL_NUM);
+        int cube_id = fieldstat_create_cube(tmp_i, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, MAX_CELL_NUM);
         int metric_id = fieldstat_register_counter(tmp_i, cube_id, "metric name", COUNTER_MERGE_BY_SUM);
         for (int j = 0; j < MAX_CELL_NUM; j++) {
             int cell_id = fieldstat_cube_add(tmp_i, cube_id, tags[rand() % DIMENSION_TOTAL]->get_tag(), 1, 1);
@@ -74,7 +74,7 @@ clock_t perform_merge_test(std::function<void (struct fieldstat*, int, int, int)
         tags[i] = new Fieldstat_tag_list_wrapper("my key", i);
     }
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, mode, MAX_CELL_NUM);
+    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, mode, MAX_CELL_NUM);
     int metric_id = metric_register_func(instance, cube_id);
     for (int j = 0; j < MAX_CELL_NUM; j++) {
         int cell_id = fieldstat_cube_add(instance, cube_id, tags[j]->get_tag(), 1, 1);
@@ -238,7 +238,7 @@ TEST(test_performance, performance_test_add_cells_comprehensive)
     }
     // getchar();
     struct fieldstat *instance = fieldstat_new();
-    fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, cell_count);
+    fieldstat_create_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, cell_count);
     fieldstat_register_counter(instance, 0, "test", COUNTER_MERGE_BY_SUM);
 
     clock_t start = clock();
@@ -265,7 +265,7 @@ TEST(test_performance, performance_test_add_cells_topk)
             tags[i].value_longlong = rand() % 1000;
     }
     struct fieldstat *instance = fieldstat_new();
-    fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_TOPK, 1000);
+    fieldstat_create_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_TOPK, 1000);
     fieldstat_register_counter(instance, 0, "test", COUNTER_MERGE_BY_SUM);
 
     // getchar();
@@ -286,7 +286,7 @@ TEST(test_performance, performance_test_add_cells_topk)
 TEST(test_performance, performance_test_add_cells_histogram_record)
 {
     struct fieldstat *instance = fieldstat_new();
-    fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    fieldstat_create_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
     fieldstat_register_hist(instance, 0, "test", 1, 1000000, 3);
     int cell_id = fieldstat_cube_add(instance, 0, &TEST_TAG_DOUBLE, 1, 1);
     size_t test_num = 100000;
@@ -309,7 +309,7 @@ TEST(test_performance, performance_test_add_cells_histogram_record)
 TEST(test_performance, performance_test_add_cells_hll_add)
 {
     struct fieldstat *instance = fieldstat_new();
-    fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    fieldstat_create_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
     fieldstat_register_hll(instance, 0, "test", 6);
     int cell_id = fieldstat_cube_add(instance, 0, &TEST_TAG_DOUBLE, 1, 1);
     size_t test_num = 100000;
@@ -350,7 +350,7 @@ TEST(test_performance, export_many_cells)
     int cell_id[MAX_CELL_NUM];
     for (int i = 0; i < CUBE_NUM; i++) {
         Fieldstat_tag_list_wrapper cube_tag("shared key", i);
-        int cube_id = fieldstat_register_cube(instance, cube_tag.get_tag(), cube_tag.get_tag_count(), SAMPLING_MODE_COMPREHENSIVE, MAX_CELL_NUM);
+        int cube_id = fieldstat_create_cube(instance, cube_tag.get_tag(), cube_tag.get_tag_count(), SAMPLING_MODE_COMPREHENSIVE, MAX_CELL_NUM);
         for (int k = 0; k < MAX_CELL_NUM; k++) {
             cell_id[k] = fieldstat_cube_add(instance, cube_id, tags[rand() % TAG_NUM]->get_tag(), 1, 1);
         }
@@ -395,7 +395,7 @@ clock_t perform_serialize_test(std::function<void (struct fieldstat*, int, int, 
         tags[i] = new Fieldstat_tag_list_wrapper("my key", i);
     }
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, mode, MAX_CELL_NUM);
+    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, mode, MAX_CELL_NUM);
     int metric_id = metric_register_func(instance, cube_id);
     for (int j = 0; j < MAX_CELL_NUM; j++) {
         int cell_id = fieldstat_cube_add(instance, cube_id, tags[j]->get_tag(), 1, 1);

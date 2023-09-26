@@ -75,13 +75,13 @@ int fieldstat_calibrate(const struct fieldstat *master, struct fieldstat *replic
     * @return cube id, if success; otherwise, return FS_ERR_NULL_HANDLER, or FS_ERR_INVALID_PARAM when (max_n_cell == 0 && mode == TOPK). return FS_ERR_INVALID_KEY when the shared_tags is not unique.
 */
 // todo: 命名为 create cube
-int fieldstat_register_cube(struct fieldstat *instance, const struct fieldstat_tag *shared_tags, size_t n_tag, enum sampling_mode mode, size_t max_n_cell);
+int fieldstat_create_cube(struct fieldstat *instance, const struct fieldstat_tag *shared_tags, size_t n_tag, enum sampling_mode mode, size_t max_n_cell);
 int fieldstat_cube_set_primary_metric(struct fieldstat *instance, int cube_id, int metric_id);
 /*
     * @brief Delete the cube of cube_id. All the cells and metrics are deleted. The cube_id may be reused by other new cubes. Increase the corresponding cube_version by 1.
     * @return FS_OK, FS_ERR_NULL_HANDLER or FS_ERR_INVALID_CUBE_ID
 */
-int fieldstat_unregister_cube(struct fieldstat *instance, int cube_id);
+int fieldstat_destroy_cube(struct fieldstat *instance, int cube_id);
 
 /*
     * @brief get the cube_version of the cube of cube_id.
@@ -125,14 +125,12 @@ int fieldstat_cube_remove(struct fieldstat *instance, int cube_id, const struct 
 
 /*
     * @brief let the value of counter metric of cell_id increase by increment.
-    * @param cube_id: cube id, previously returned by fieldstat_register_cube.
+    * @param cube_id: cube id, previously returned by fieldstat_create_cube.
     * @param metric_id: metric id, previously returned by fieldstat_register_counter.
-    * @param cell_id: cell id, previously returned by fieldstat_cube_add.
     * @param increment: increment of the counter metric. Can be negative.
     * @return FS_OK if success. FS_ERR_NULL_HANDLER, FS_ERR_INVALID_CUBE_ID, FS_ERR_INVALID_METRIC_ID if fail.
 */
-// todo: 现在没cell id 了
-int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long increment);
+int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long increment);
 
 /*
     * @brief let the value of counter metric equal to value. Other annotations refer to fieldstat_counter_incrby.
@@ -228,7 +226,7 @@ void fieldstat_get_cells(const struct fieldstat *instance, int cube_id, int metr
     int **cell_ids, struct fieldstat_tag_list **tag_list, size_t *n_cell);
 
 /*
-    get the shared tag of fieldstat_register_cube. User free them by calling fieldstat_tag_list_arr_free(struct fieldstat_tag_list *, 1)
+    get the shared tag of fieldstat_create_cube. User free them by calling fieldstat_tag_list_arr_free(struct fieldstat_tag_list *, 1)
     return NULL when ID is invalid.
 */
 struct fieldstat_tag_list *fieldstat_get_shared_tags(const struct fieldstat *instance, int cube_id);
@@ -239,7 +237,7 @@ struct fieldstat_tag_list *fieldstat_get_shared_tags(const struct fieldstat *ins
 int fieldstat_find_cube(const struct fieldstat *instance, const struct fieldstat_tag *shared_tags, size_t n_shared_tags);
 
 /* 
-    get the parameter max_n_cell of fieldstat_register_cube. -1 is a valid value, meaning cube has no metric. 
+    get the parameter max_n_cell of fieldstat_create_cube. -1 is a valid value, meaning cube has no metric. 
 */
 int fieldstat_get_max_cell_id(const struct fieldstat *instance, int cube_id);
 
@@ -258,15 +256,13 @@ int fieldstat_counter_get(const struct fieldstat *instance, int cube_id, int met
     @return >= 0 if success. FS_ERR_INVALID_PARAM if precision is invalid.
 */
 int fieldstat_hll_get(const struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag_list *tags, double *value);
-long long fieldstat_hist_value_at_percentile(const struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag_list *tags, double percentile)=;
+long long fieldstat_hist_value_at_percentile(const struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag_list *tags, double percentile);
 long long fieldstat_hist_count_le_value(const struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag_list *tags, long long value);
 
 // get the base 64 encoded string of the serialized blob of a cell
 void fieldstat_get_serialized_blob(const struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag_list *tags, char **blob, size_t *blob_size);
 
 void fieldstat_tag_list_arr_free(struct fieldstat_tag_list *tag_list, size_t n_cell);
-
-
 
 
 #ifdef __cplusplus

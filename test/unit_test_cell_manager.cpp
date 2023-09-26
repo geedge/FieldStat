@@ -678,10 +678,36 @@ TEST(unit_test_cell_manager, add_after_reset_and_ensure_performance_improvement)
 
 TEST(unit_test_cell_manager, reset_once_and_query_topk)
 {
-    // todo
+    const int TEST_ROUND = 10;
+    struct cell_manager *cm = cell_manager_new(SAMPLING_MODE_TOPK, TEST_ROUND);
+
+    vector<struct tag_hash_key *> keys;
+    for (int i = 0; i < TEST_ROUND; i++)
+    {
+        struct tag_hash_key *key = test_gen_tag_key("key", i);
+        keys.push_back(key);
+    }
+    for (int i = 0; i < TEST_ROUND; i++) {
+        int cell_id = cell_manager_add_cell(cm, keys[i]);
+        EXPECT_EQ(cell_id, i);
+    }
+
+    cell_manager_reset(cm);
+    for (int i = 0; i < TEST_ROUND; i++) {
+        EXPECT_EQ(cell_manager_find(cm, keys[i]), -1);
+        EXPECT_TRUE(cell_manager_get_tag_by_cell_id(cm, i) == NULL);
+        EXPECT_TRUE(cell_manager_get_count_by_tag(cm, keys[i]) == -1);
+    }
+    int array_len = 0;
+    cell_manager_dump(cm, &array_len);
+    EXPECT_EQ(array_len, 0);
+
+    cell_manager_free(cm);
+    for (int i = 0; i < TEST_ROUND; i++) {
+        tag_hash_key_free(keys[i]);
+    }
 }
 
-// 加0
 
 // reset 然后query
 

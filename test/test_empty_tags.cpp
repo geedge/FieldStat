@@ -9,7 +9,7 @@
 TEST(test_empty_tag, serialize)
 {
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_register_cube(instance, NULL, 0, SAMPLING_MODE_COMPREHENSIVE, 10);
+    int cube_id = fieldstat_create_cube(instance, NULL, 0, SAMPLING_MODE_COMPREHENSIVE, 10);
     fieldstat_cube_add(instance, cube_id, NULL, 0, 1);
 
     char *blob;
@@ -46,7 +46,7 @@ TEST(test_empty_tag, serialize)
 TEST(test_empty_tag, add_many_times) // test hash find ok
 {
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_register_cube(instance, NULL, 0, SAMPLING_MODE_COMPREHENSIVE, 1);
+    int cube_id = fieldstat_create_cube(instance, NULL, 0, SAMPLING_MODE_COMPREHENSIVE, 1);
     int cell_id = fieldstat_cube_add(instance, cube_id, NULL, 0, 1);
     EXPECT_EQ(cell_id, 0);
     cell_id = fieldstat_cube_add(instance, cube_id, NULL, 0, 1);
@@ -64,7 +64,7 @@ TEST(test_empty_tag, add_many_times) // test hash find ok
 struct fieldstat *test_empty_my_init(enum sampling_mode mode = SAMPLING_MODE_COMPREHENSIVE)
 {
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_register_cube(instance, NULL, 0, mode, 1);
+    int cube_id = fieldstat_create_cube(instance, NULL, 0, mode, 1);
     int cell_id = fieldstat_cube_add(instance, cube_id, NULL, 0, 1);
     int metric_id = fieldstat_register_counter(instance, cube_id, "metric", COUNTER_MERGE_BY_SUM);
     fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id, 1);

@@ -122,7 +122,7 @@ unsigned long fieldstat_get_cell_version(const struct fieldstat *instance)
     return instance->cell_version;
 }
 
-int fieldstat_unregister_cube(struct fieldstat *instance, int cube_id)
+int fieldstat_destroy_cube(struct fieldstat *instance, int cube_id)
 {
     if (instance == NULL) {
         return FS_ERR_NULL_HANDLER;
@@ -285,7 +285,7 @@ struct fs_cube *fieldstat_cube_new(const struct fieldstat_tag *shared_tags, size
     return cube;
 }
 
-int fieldstat_register_cube(struct fieldstat *instance, const struct fieldstat_tag *shared_tags, size_t n_tag, enum sampling_mode mode, size_t max_n_cell)
+int fieldstat_create_cube(struct fieldstat *instance, const struct fieldstat_tag *shared_tags, size_t n_tag, enum sampling_mode mode, size_t max_n_cell)
 {
     if (instance == NULL) {
         return  FS_ERR_NULL_HANDLER;
@@ -456,18 +456,6 @@ struct metric *find_or_add_metric(struct fieldstat *instance, int cube_id, int m
     struct metric *metric = metric_fork(instance->metric_masters[metric_id]);
     add_metric_to_cube(cube, metric, metric_id);
     return metric;
-}
-
-int find_or_add_tag(struct fs_cube *cube, struct fieldstat_tag *tags, size_t n_tag)
-{
-    struct tag_hash_key *tag_key = tag_hash_key_construct_with_fieldstat_tag(tags, n_tag);
-    if (cube->sampling_mode == SAMPLING_MODE_TOPK) {
-        cell_manager_add_cell_topk(cube->cell_manager, tag_key, 0, NULL, NULL);
-    }
-
-    int cell_id = cell_manager_add_cell(cube->cell_manager, tag_key);
-    tag_hash_key_free(tag_key);
-    return cell_id;
 }
 
 static int append_metric_to_instance(struct fieldstat *instance, struct metric *metric)

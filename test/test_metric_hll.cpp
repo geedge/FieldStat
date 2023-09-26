@@ -6,7 +6,7 @@
 struct fieldstat *test_init_standard_instance_one_cube_one_metric_one_cell_hll(bool is_gauge = false)
 {
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_register_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
     EXPECT_EQ(cube_id, 0);
 
     int metric_id = fieldstat_register_hll(instance, cube_id, "czz_test hll metric", 10);
@@ -194,7 +194,7 @@ TEST(metric_test_hll, serialize_with_b64_and_query_with_python_api)
 TEST(metric_test_hll, add_or_set_with_wrong_cell_id_expecting_fail)
 {
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    int cube_id = fieldstat_create_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
     int metric_id = fieldstat_register_hll(instance, cube_id, "czz_test hll metric", 10);
 
     int ret = fieldstat_hll_add(instance, cube_id, metric_id, 1, "hello", 5);
@@ -208,7 +208,7 @@ TEST(metric_test_hll, add_or_set_with_wrong_cell_id_expecting_fail)
 TEST(metric_test_hll, add_with_wrong_cube_id_expecting_fail)
 {
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    int cube_id = fieldstat_create_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
 
     int ret = fieldstat_hll_add(instance, cube_id + 1, 0, 0, "hello", 5);
     EXPECT_EQ(ret, FS_ERR_INVALID_CUBE_ID);
@@ -221,7 +221,7 @@ TEST(metric_test_hll, add_with_wrong_cube_id_expecting_fail)
 TEST(metric_test_hll, add_with_wrong_metric_id_expecting_fail)
 {
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    int cube_id = fieldstat_create_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
     int metric_id = fieldstat_register_hll(instance, cube_id, "czz_test hll metric", 10);
 
     int ret = fieldstat_hll_add(instance, cube_id, metric_id + 1, 0, "hello", 5);

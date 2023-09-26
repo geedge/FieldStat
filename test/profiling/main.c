@@ -80,7 +80,7 @@ void performance_cube_add_comprehensive()
     getchar();
     clock_t start, end;
     struct fieldstat *instance = fieldstat_new();
-    fieldstat_register_cube(instance, &TEST_TAG_INT, 1, SAMPLING_MODE_COMPREHENSIVE, 64000);
+    fieldstat_create_cube(instance, &TEST_TAG_INT, 1, SAMPLING_MODE_COMPREHENSIVE, 64000);
     fieldstat_register_counter(instance, 0, "test", COUNTER_MERGE_BY_SUM);
     start = clock();
     for (int i = 0; i < 64000; i++) {
@@ -118,7 +118,7 @@ void topk_K_100_tag_2()
     printf("topk_K_100_tag_2\n");
     getchar();
     struct fieldstat *instance = fieldstat_new();
-    fieldstat_register_cube(instance, &TEST_TAG_INT, 1, SAMPLING_MODE_TOPK, 1000);
+    fieldstat_create_cube(instance, &TEST_TAG_INT, 1, SAMPLING_MODE_TOPK, 1000);
     fieldstat_register_counter(instance, 0, "test", COUNTER_MERGE_BY_SUM);
     struct fieldstat_tag server_ip_tag = {"server_ip", TAG_CSTRING, {.value_str = "192.168.0.1"}};
     char client_ip[] = "123.123.123.123.1234";
@@ -150,7 +150,7 @@ int my_cmp_int(const void *a, const void *b)
 int topk_and_find_max_cell_id(int K, int *tag_vals, int n_tags)
 {
     struct fieldstat *instance = fieldstat_new();
-    fieldstat_register_cube(instance, &TEST_TAG_INT, 1, SAMPLING_MODE_TOPK, K);
+    fieldstat_create_cube(instance, &TEST_TAG_INT, 1, SAMPLING_MODE_TOPK, K);
     fieldstat_register_counter(instance, 0, "test", COUNTER_MERGE_BY_SUM);
     struct fieldstat_tag total = TEST_TAG_INT;
     for (int i = 0; i < n_tags; i++) {
