@@ -167,18 +167,14 @@ void topk_init(struct fieldstat *instance, unsigned int test_expected_big_count)
 {
     const char *metric_name[TEST_METRIC_NUM] = {"topk1", "topk2"};
     int cube_id = fieldstat_create_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_TOPK, TEST_TOPK_STANDARD_K);
-    int m1 = fieldstat_register_counter(instance, cube_id, metric_name[0]);
-    int m2 = fieldstat_register_counter(instance, cube_id, metric_name[1]);
+    int m1 = fieldstat_register_counter(instance, metric_name[0]);
+    int m2 = fieldstat_register_counter(instance, metric_name[1]);
 
-    std::function<void(Fieldstat_tag_list_wrapper *, unsigned int *)> topk_add = [instance, cube_id, m1, m2](
-            const Fieldstat_tag_list_wrapper *my_tags, unsigned int counts[TEST_METRIC_NUM]) {
-                int cell_id = fieldstat_cube_add(instance, cube_id, my_tags->get_tag(), my_tags->get_tag_count(), counts[0]);
-                if (cell_id >= 0) {
-                    fieldstat_counter_incrby(instance, cube_id, m1, cell_id, counts[0]);
-                    fieldstat_counter_incrby(instance, cube_id, m2, cell_id, counts[1]);
-                    return;
-            }
-    };
+    std::function<void(Fieldstat_tag_list_wrapper *, unsigned int *)> topk_add = 
+        [instance, cube_id, m1, m2](const Fieldstat_tag_list_wrapper *my_tags, unsigned int counts[TEST_METRIC_NUM]) {
+                fieldstat_counter_incrby(instance, cube_id, m1, my_tags->get_tag(), my_tags->get_tag_count(), counts[0]);
+                fieldstat_counter_incrby(instance, cube_id, m2, my_tags->get_tag(), my_tags->get_tag_count(), counts[1]);
+        };
 
     topk_standard_oper(topk_add, TEST_METRIC_NUM, test_expected_big_count);
 }
@@ -190,9 +186,9 @@ TEST(export_test, cjson_export_with_fixed_tag_and_many_metrics_on_one_cube_of_co
     // new instance
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_create_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, tag_list_num);
-    int id_counter = fieldstat_register_counter(instance, cube_id, "counter");
-    int id_gauge = fieldstat_register_hll(instance, cube_id, "gauge", g_hll_standard->cfg.precision);
-    int id_histogram = fieldstat_register_hist(instance, cube_id, "histogram",
+    int id_counter = fieldstat_register_counter(instance, "counter");
+    int id_gauge = fieldstat_register_hll(instance, "gauge", g_hll_standard->cfg.precision);
+    int id_histogram = fieldstat_register_hist(instance, "histogram",
         g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
 
     Fieldstat_tag_list_wrapper *tags[tag_list_num];
@@ -201,12 +197,11 @@ TEST(export_test, cjson_export_with_fixed_tag_and_many_metrics_on_one_cube_of_co
     for (int j = 0; j < tag_list_num; j++) {
         const struct fieldstat_tag *tag_tmp = tags[j]->get_tag();
         size_t tag_count = tags[j]->get_tag_count();
-        int cell_id = fieldstat_cube_add(instance, cube_id, tag_tmp, tag_count, 1);
 
-        fieldstat_counter_incrby(instance, cube_id, id_counter, cell_id, 1);
+        fieldstat_counter_incrby(instance, cube_id, id_counter, tag_tmp, tag_count, 1);
         for (size_t i = 0; i < OPER_NUM; i++){
-            fieldstat_hll_add(instance, cube_id, id_gauge, cell_id, g_hll_standard_oper[i].c_str(), g_hll_standard_oper[i].length());
-            fieldstat_hist_record(instance, cube_id, id_histogram, cell_id, g_histogram_standard_oper[i]);
+            fieldstat_hll_add(instance, cube_id, id_gauge, tag_tmp, tag_count, g_hll_standard_oper[i].c_str(), g_hll_standard_oper[i].length());
+            fieldstat_hist_record(instance, cube_id, id_histogram, tag_tmp, tag_count, g_histogram_standard_oper[i]);
         }
     }
 
@@ -290,10 +285,10 @@ TEST(export_test, only_registered_but_not_added_export_null_with_global_tag)
 {
     struct fieldstat *instance = fieldstat_new();
 
-    int cube_id = fieldstat_create_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
-    fieldstat_register_counter(instance, cube_id, "counter");
-    fieldstat_register_hll(instance, cube_id, "gauge", g_hll_standard->cfg.precision);
-    fieldstat_register_hist(instance, cube_id, "histogram",
+    fieldstat_create_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
+    fieldstat_register_counter(instance, "counter");
+    fieldstat_register_hll(instance, "gauge", g_hll_standard->cfg.precision);
+    fieldstat_register_hist(instance, "histogram",
         g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
 
     // add global tag
@@ -306,21 +301,20 @@ TEST(export_test, only_registered_but_not_added_export_null_with_global_tag)
 TEST(export_test, skip_two_empty_cube_and_export_last_one_with_global_tag)
 {
     struct fieldstat *instance = fieldstat_new();
-    int cube_id_1 = fieldstat_create_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
-    (void)fieldstat_register_hll(instance, cube_id_1, "gauge", g_hll_standard->cfg.precision);
-    int cube_id_2 = fieldstat_create_cube(instance, TEST_TAG_SHARED2, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
-    (void)fieldstat_register_counter(instance, cube_id_2, "counter");
+    (void)fieldstat_create_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
+    (void)fieldstat_create_cube(instance, TEST_TAG_SHARED2, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
     int cube_id_3 = fieldstat_create_cube(instance, TEST_TAG_SHARED3, 1, SAMPLING_MODE_COMPREHENSIVE, 3);
-    int id_histogram = fieldstat_register_hist(instance, cube_id_3, "histogram",
+    (void)fieldstat_register_counter(instance, "counter");
+    (void)fieldstat_register_hll(instance, "gauge", g_hll_standard->cfg.precision);
+    int id_histogram = fieldstat_register_hist(instance, "histogram",
         g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
 
     const int tag_num = 1;
     Fieldstat_tag_list_wrapper *tags[tag_num];
     fill_random_tag(tags, tag_num);
     const Fieldstat_tag_list_wrapper *the_tag = tags[0];
-    int cell_id = fieldstat_cube_add(instance, cube_id_3, the_tag->get_tag(), the_tag->get_tag_count(), 1);
     for (size_t i = 0; i < OPER_NUM; i++){
-        fieldstat_hist_record(instance, cube_id_3, id_histogram, cell_id, g_histogram_standard_oper[i]);
+        fieldstat_hist_record(instance, cube_id_3, id_histogram, the_tag->get_tag(), the_tag->get_tag_count(), g_histogram_standard_oper[i]);
     }
 
     // export test
@@ -358,18 +352,17 @@ TEST(export_test, skip_empty_metrics_given_cube_deleted) {
     int cube_id_del = fieldstat_create_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
     int cube_id = fieldstat_create_cube(instance, TEST_TAG_SHARED2, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
     fieldstat_destroy_cube(instance, cube_id_del);
-    (void)fieldstat_register_counter(instance, cube_id, "counter");
-    (void)fieldstat_register_counter(instance, cube_id, "counter2");
-    int metric_id = fieldstat_register_counter(instance, cube_id, "counter3");
-    (void)fieldstat_register_counter(instance, cube_id, "counter4");
+    (void)fieldstat_register_counter(instance, "counter");
+    (void)fieldstat_register_counter(instance, "counter2");
+    int metric_id = fieldstat_register_counter(instance, "counter3");
+    (void)fieldstat_register_counter(instance, "counter4");
 
     const int tag_num = 1;
     Fieldstat_tag_list_wrapper *tags[tag_num];
     fill_random_tag(tags, tag_num);
     const Fieldstat_tag_list_wrapper *the_tag = tags[0];
-    int cell_id = fieldstat_cube_add(instance, cube_id, the_tag->get_tag(), the_tag->get_tag_count(), 1);
 
-    fieldstat_counter_incrby(instance, cube_id, metric_id, cell_id, 1234);
+    fieldstat_counter_incrby(instance, cube_id, metric_id, the_tag->get_tag(), the_tag->get_tag_count(), 1234);
 
     cJSON *root_arr = test_exporter_extract_results_with_standard_global(instance);
     int arr_num = cJSON_GetArraySize(root_arr);
@@ -406,9 +399,8 @@ TEST(export_test, enable_delta_and_export_twice_without_new_metric)
 {
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_create_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 10);
-    int id_counter = fieldstat_register_counter(instance, cube_id, "counter");
-    int cell_id = fieldstat_cube_add(instance, cube_id, &TEST_TAG_INT, 1, 1);
-    fieldstat_counter_incrby(instance, cube_id, id_counter, cell_id, 1);
+    int id_counter = fieldstat_register_counter(instance, "counter");
+    fieldstat_counter_incrby(instance, cube_id, id_counter, &TEST_TAG_INT, 1, 1);
 
     // export test
     struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new(instance);
@@ -474,12 +466,11 @@ TEST(export_test, enable_delta_and_export_twice_with_new_metric_and_omit_histogr
 {
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_create_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 10);
-    int id_counter = fieldstat_register_counter(instance, cube_id, "counter");
-    int id_histogram = fieldstat_register_hist(instance, cube_id, "histogram",
+    int id_counter = fieldstat_register_counter(instance, "counter");
+    int id_histogram = fieldstat_register_hist(instance, "histogram",
         g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
-    int cell_id = fieldstat_cube_add(instance, cube_id, &TEST_TAG_INT, 1, 1);
-    fieldstat_counter_incrby(instance, cube_id, id_counter, cell_id, 1);
-    fieldstat_hist_record(instance, cube_id, id_histogram, cell_id, 123);
+    fieldstat_counter_incrby(instance, cube_id, id_counter, &TEST_TAG_INT, 1, 1);
+    fieldstat_hist_record(instance, cube_id, id_histogram, &TEST_TAG_INT, 1, 123);
 
     // export test
     struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new(instance);
@@ -513,9 +504,9 @@ TEST(export_test, enable_delta_and_export_twice_with_new_metric_and_omit_histogr
 
     struct timeval new_ts = TEST_TIMEVAL;
     new_ts.tv_sec += 1;
-    int id_counter2 = fieldstat_register_counter(instance, cube_id, "counter2");
-    fieldstat_counter_incrby(instance, cube_id, id_counter2, cell_id, 1);
-    fieldstat_counter_incrby(instance, cube_id, id_counter, cell_id, 10);
+    int id_counter2 = fieldstat_register_counter(instance, "counter2");
+    fieldstat_counter_incrby(instance, cube_id, id_counter2, &TEST_TAG_INT, 1, 1);
+    fieldstat_counter_incrby(instance, cube_id, id_counter, &TEST_TAG_INT, 1, 10);
 
     json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, &new_ts);
     root_arr = cJSON_Parse(json_string);
@@ -555,18 +546,17 @@ TEST(export_test, enable_delta_and_export_three_times_skipping_cube_with_no_coun
 {
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_create_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 10);
-    int id_counter = fieldstat_register_counter(instance, cube_id, "counter");
-    int id_histogram = fieldstat_register_hist(instance, cube_id, "histogram",
+    int id_counter = fieldstat_register_counter(instance, "counter");
+    int id_histogram = fieldstat_register_hist(instance, "histogram",
         g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
-    int cell_with_counter = fieldstat_cube_add(instance, cube_id, &TEST_TAG_INT, 1, 1);
-    int cell_with_hdr = fieldstat_cube_add(instance, cube_id, &TEST_TAG_STRING, 1, 1);
-    fieldstat_counter_incrby(instance, cube_id, id_counter, cell_with_counter, 1);
-    fieldstat_hist_record(instance, cube_id, id_histogram, cell_with_hdr, 123);
+    fieldstat_counter_incrby(instance, cube_id, id_counter, &TEST_TAG_INT, 1, 1);
+    fieldstat_hist_record(instance, cube_id, id_histogram, &TEST_TAG_STRING, 1, 123);
 
     /* -------------------------- export test, 1st time ------------------------- */
     struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new(instance);
     fieldstat_json_exporter_enable_delta(fieldstat_json_exporter);
     char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, &TEST_TIMEVAL);
+    printf("%s\n", json_string);
     cJSON *root_arr = cJSON_Parse(json_string);
     free(json_string);
 
@@ -612,8 +602,8 @@ TEST(export_test, enable_delta_and_export_three_times_skipping_cube_with_no_coun
 
     /* -------------------------------- 3rd time -------------------------------- */
     // add some new recs
-    fieldstat_counter_incrby(instance, cube_id, id_counter, cell_with_counter, 10);
-    fieldstat_hist_record(instance, cube_id, id_histogram, cell_with_hdr, 1234);
+    fieldstat_counter_incrby(instance, cube_id, id_counter, &TEST_TAG_INT, 1, 10);
+    fieldstat_hist_record(instance, cube_id, id_histogram, &TEST_TAG_STRING, 1, 1234);
     json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, &TEST_TIMEVAL);
     root_arr = cJSON_Parse(json_string);
     free(json_string);
@@ -659,18 +649,13 @@ TEST(export_test, enable_delta_and_export_instance_with_many_cells_with_global_t
 {
     struct fieldstat *instance = fieldstat_new();
     int cube_id1 = fieldstat_create_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 10);
-    int id_counter1 = fieldstat_register_counter(instance, cube_id1, "counter");
-    int cell_id1_1 = fieldstat_cube_add(instance, cube_id1, &TEST_TAG_INT, 1, 1);
-    fieldstat_counter_incrby(instance, cube_id1, id_counter1, cell_id1_1, 11);
-    int cell_id1_2 = fieldstat_cube_add(instance, cube_id1, &TEST_TAG_STRING, 1, 1);
-    fieldstat_counter_incrby(instance, cube_id1, id_counter1, cell_id1_2, 12);
+    int id_counter1 = fieldstat_register_counter(instance, "counter");
+    fieldstat_counter_incrby(instance, cube_id1, id_counter1, &TEST_TAG_INT, 1, 11);
+    fieldstat_counter_incrby(instance, cube_id1, id_counter1, &TEST_TAG_STRING, 1, 12);
 
     int cube_id2 = fieldstat_create_cube(instance, TEST_TAG_SHARED3, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
-    int id_counter2 = fieldstat_register_counter(instance, cube_id2, "counter");
-    int cell_id2_1 = fieldstat_cube_add(instance, cube_id2, &TEST_TAG_INT, 1, 1);
-    fieldstat_counter_incrby(instance, cube_id2, id_counter2, cell_id2_1, 21);
-    int cell_id2_2 = fieldstat_cube_add(instance, cube_id2, &TEST_TAG_DOUBLE, 1, 1);
-    fieldstat_counter_incrby(instance, cube_id2, id_counter2, cell_id2_2, 22);
+    fieldstat_counter_incrby(instance, cube_id2, id_counter1, &TEST_TAG_INT, 1, 21);
+    fieldstat_counter_incrby(instance, cube_id2, id_counter1, &TEST_TAG_DOUBLE, 1, 22);
 
     // export test
     struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new(instance);
@@ -704,10 +689,10 @@ TEST(export_test, enable_delta_and_export_instance_with_many_cells_with_global_t
     test_check_delta_for_one_json(&tmp_tag_cell, &tmp_tag_shared, 22, 22, root);
 
     // new turn 
-    fieldstat_counter_incrby(instance, cube_id1, id_counter1, cell_id1_1, 100);
-    fieldstat_counter_incrby(instance, cube_id1, id_counter1, cell_id1_2, 200);
-    fieldstat_counter_incrby(instance, cube_id2, id_counter2, cell_id2_1, 300);
-    fieldstat_counter_incrby(instance, cube_id2, id_counter2, cell_id2_2, 400);
+    fieldstat_counter_incrby(instance, cube_id1, id_counter1, &TEST_TAG_INT, 1, 100);
+    fieldstat_counter_incrby(instance, cube_id1, id_counter1, &TEST_TAG_STRING, 1, 200);
+    fieldstat_counter_incrby(instance, cube_id2, id_counter1, &TEST_TAG_INT, 1, 300);
+    fieldstat_counter_incrby(instance, cube_id2, id_counter1, &TEST_TAG_DOUBLE, 1, 400);
 
     cJSON_Delete(root_arr);
 
@@ -749,9 +734,8 @@ void test_reset_one_round(std::function<void(struct fieldstat *, struct fieldsta
 {
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 1);
-    int id_counter = fieldstat_register_counter(instance, cube_id, "counter");
-    int cell_id = fieldstat_cube_add(instance, cube_id, &TEST_TAG_INT, 1, 1);
-    fieldstat_counter_incrby(instance, cube_id, id_counter, cell_id, 11);
+    int id_counter = fieldstat_register_counter(instance, "counter");
+    fieldstat_counter_incrby(instance, cube_id, id_counter, &TEST_TAG_INT, 1, 11);
 
     // export test
     struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new(instance);
@@ -772,8 +756,7 @@ void test_reset_one_round(std::function<void(struct fieldstat *, struct fieldsta
 
     trigger_reset(instance, fieldstat_json_exporter);
 
-    cell_id = fieldstat_cube_add(instance, cube_id, &TEST_TAG_INT, 1, 1);
-    fieldstat_counter_set(instance, cube_id, id_counter, cell_id, 123);
+    fieldstat_counter_set(instance, cube_id, id_counter, &TEST_TAG_INT, 1, 123);
 
     json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, &TEST_TIMEVAL);
     root_arr = cJSON_Parse(json_string);
@@ -821,8 +804,6 @@ TEST(export_test, enable_delta_and_reset_on_delete_cube) {
     auto trigger = [](struct fieldstat *instance, struct fieldstat_json_exporter *fieldstat_json_exporter) {
         fieldstat_destroy_cube(instance, 0);
         fieldstat_create_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
-        fieldstat_register_counter(instance, 0, "counter");
-        fieldstat_cube_add(instance, 0, &TEST_TAG_INT, 1, 1);
     };
 
     test_reset_one_round(trigger);

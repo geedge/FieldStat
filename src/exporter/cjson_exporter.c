@@ -419,6 +419,7 @@ void cell_iter_free(struct cell_iter *iter) {
         fieldstat_tag_list_arr_free(iter->shared_tag, 1);
     }
     free(iter->cube_ids);
+    free(iter->metric_ids);
 
     free(iter);
 }
@@ -436,6 +437,7 @@ int cell_iter_next_cube(struct cell_iter *iter) {
         // get cell info 
         fieldstat_get_cells_used_by_cube(instance, cube_id_next, &iter->tag_list, &iter->n_cell);
         if (iter->n_cell == 0) {
+            free(iter->metric_ids);
             continue;
         }
 
@@ -470,6 +472,8 @@ int cell_iter_next(struct cell_iter *iter) {
     cell_iter_free_cell_records(iter);
     fieldstat_tag_list_arr_free(iter->shared_tag, 1);
     iter->shared_tag = NULL;
+    free(iter->metric_ids);
+    iter->metric_ids = NULL;
     if (cell_iter_next_cube(iter)) {
         return 1;
     }
@@ -486,7 +490,7 @@ struct export_kv_pair *cell_query_with_iter(const struct cell_iter *iter, int me
     if (type == METRIC_TYPE_COUNTER) {
         long long value;
         int tmp_ret = fieldstat_counter_get(iter->instance, iter->cube_ids[iter->curr_cube_idx], metric_id, &iter->tag_list[iter->curr_cell_idx], &value);
-        if (tmp_ret == -1) {
+        if (tmp_ret < 0) {
             return NULL;
         }
         ret = malloc(sizeof(struct export_kv_pair));
@@ -632,7 +636,7 @@ void cjson_map_record_metrics(struct cellwise_rec_for_export *tag_field_pair, co
     tag_field_pair->metric_value = malloc(sizeof(long long) * iter->n_metric);
 
     int n_counter_metric = 0;
-    for (int i = 0; i <= iter->n_metric; i++) {
+    for (int i = 0; i < iter->n_metric; i++) {
         int metric_id = iter->metric_ids[i];
         int cube_id = iter->cube_ids[iter->curr_cube_idx];
         if (fieldstat_get_metric_type(iter->instance, metric_id) != METRIC_TYPE_COUNTER) {
@@ -640,7 +644,7 @@ void cjson_map_record_metrics(struct cellwise_rec_for_export *tag_field_pair, co
         }
         long long value;
         int ret = fieldstat_counter_get(iter->instance, cube_id, metric_id, &iter->tag_list[iter->curr_cell_idx], &value);
-        if (ret == -1) { // no value, happens when the two cells in one cube has different metrics
+        if (ret < 0) { // no value, happens when the two cells in one cube has different metrics
             continue;
         }
 

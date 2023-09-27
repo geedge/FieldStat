@@ -212,6 +212,8 @@ TEST(metric_test_counter, add_with_wrong_metric_id_expecting_fail)
     fieldstat_free(instance);
 }
 
+//todo: set + topk
+
 int main(int argc, char *argv[]) 
 {
 	testing::InitGoogleTest(&argc, argv);
