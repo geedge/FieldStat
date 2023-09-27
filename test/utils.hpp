@@ -4,6 +4,7 @@
 #include "fieldstat.h"
 
 const struct fieldstat_tag TEST_TAG_STRING = {"STRING KEY_", TAG_CSTRING, {.value_str = "100.1"}};
+const struct fieldstat_tag_list TEST_TAG_LIST_STRING = {(struct fieldstat_tag *)&TEST_TAG_STRING, 1};
 const struct fieldstat_tag TEST_TAG_STRING_collided = {"collided", TAG_CSTRING, {.value_str = "2"}};
 const struct fieldstat_tag TEST_TAG_INT = {"INT key_", TAG_INTEGER, {.value_longlong = 100}};
 const struct fieldstat_tag_list TEST_TAG_LIST_INT = {(struct fieldstat_tag *)&TEST_TAG_INT, 1};
