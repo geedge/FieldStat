@@ -839,10 +839,13 @@ int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
                 ret = FS_ERR_INVALID_PARAM;
                 continue;
             }
-            if (strcmp(
-                    metric_get_name(cube_dst->metrics[cube_dst->primary_metric_id]), 
-                    metric_get_name(cube_src->metrics[cube_src->primary_metric_id])
+            if (cube_dst->sampling_mode == SAMPLING_MODE_TOPK && strcmp(
+                    metric_get_name(instance->metric_masters[cube_dst->primary_metric_id]), 
+                    metric_get_name(src->metric_masters[cube_src->primary_metric_id])
                 ) != 0) {
+                printf("primary metric name not match, name instance: %s, name src: %s\n", 
+                    metric_get_name(instance->metric_masters[cube_dst->primary_metric_id]), 
+                    metric_get_name(src->metric_masters[cube_src->primary_metric_id]));
                 ret = FS_ERR_INVALID_PARAM;
                 continue;
             }
