@@ -60,14 +60,23 @@ struct fieldstat *fieldstat_fork(const struct fieldstat *instance);
 int fieldstat_calibrate(const struct fieldstat *master, struct fieldstat *replica);
 /*
     * @brief add an cube to this instance. Cube represents an template with a user-defined set of cells and metrics.
-    * @param shared_tags: tags that are shared by all cubes in this instance. This is the key of the cube. Cannot be NULL. Must be unique. shared_tags are ordered.which means that {"TAG_KEY": "123", "TAG_KEY2": "456"} and {"TAG_KEY2": "456", "TAG_KEY": "123"} are map to different cube.
+    * @param shared_tags: tags that are shared by all cells in this cube. This is the key of the cube. Can be NULL. Must be unique. Shared_tags are ordered, which means that {"TAG_KEY": "123", "TAG_KEY2": "456"} and {"TAG_KEY2": "456", "TAG_KEY": "123"} are map to different cube.
     * @param n_tag: number of shared tags.
     * @param mode: sampling mode. Refer to enum sampling_mode.
-    * @param max_n_cell: max number of cells in each cube. When mode is TOPK, max_n_cell > 0, while in COMPREHENSIVE mode, max_n_cell can be 0, meaning that there is no limit.
+    * @param max_n_cell: max number of samplings(cells) in each cube. When mode is TOPK, max_n_cell > 0, while in COMPREHENSIVE mode, max_n_cell can be 0, meaning that there is no limit.
     * @return cube id, if success; otherwise, return FS_ERR_NULL_HANDLER, or FS_ERR_INVALID_PARAM when (max_n_cell == 0 && mode == TOPK). return FS_ERR_INVALID_KEY when the shared_tags is not unique.
 */
 int fieldstat_create_cube(struct fieldstat *instance, const struct fieldstat_tag *shared_tags, size_t n_tag, enum sampling_mode mode, size_t max_n_cell);
+/*
+    @brief Change the topk cube primary metric id. When fieldstat_counter_add or fieldstat_counter_set are called on the primary metric, the topk record of such cell will be updated.
+            the default primary metric id is 0.
+    @return FS_OK, FS_ERR_NULL_HANDLER or FS_ERR_INVALID_CUBE_ID.
+            FS_ERR_INVALID_METRIC_ID when the metric is not registered to instance.
+            FS_ERR_INVALID_PARAM when the cube is not a topk sampling cube, or the metric is not a counter. 
+
+*/
 int fieldstat_cube_set_primary_metric(struct fieldstat *instance, int cube_id, int metric_id);
+
 /*
     * @brief Delete the cube of cube_id. All the cells and metrics are deleted. The cube_id may be reused by other new cubes. Increase the corresponding cube_version by 1.
     * @return FS_OK, FS_ERR_NULL_HANDLER or FS_ERR_INVALID_CUBE_ID
@@ -80,40 +89,45 @@ int fieldstat_destroy_cube(struct fieldstat *instance, int cube_id);
 */
 long long fieldstat_get_cube_version(const struct fieldstat *instance, int cube_id);
 /*
-    * @brief add a metric to the cube of cube_id. One metric may have multiple sub-metric that are associated with different cells.
-    * @param metric_name: name of the metric. Cannot be NULL. Must be unique in this cube.
-    * @return metric id if success. If failed, return FS_ERR_NULL_HANDLER, FS_ERR_INVALID_KEY(when metric_name is not unique in this cube)
+    * @brief add a metric to the cube of cube_id. One metric may be associated with different cells.
+    * @param metric_name: name of the metric. Cannot be NULL. Must be unique.
+    * @return metric id>=0 if success. If failed, return FS_ERR_NULL_HANDLER, FS_ERR_INVALID_KEY(when metric_name is not unique in this cube)
 */
 int fieldstat_register_counter(struct fieldstat *instance, const char *metric_name);
 
 /*
-    * @brief add a metric to the cube of cube_id. One metric may have multiple sub-metric that are associated with different cells. other parameters are the same as fieldstat_register_counter.
+    * @brief refer to fieldstat_register_counter.
     * @param precision: the bigger, the larger memory consumption, while accuracy improved. Must be in [4, 18].
-    * @return metric id if success. If failed, return FS_ERR_NULL_HANDLER, FS_ERR_INVALID_KEY(when metric_name is not unique in this cube), or FS_ERR_INVALID_PARAM.
+    * @return metric id if success. If failed, return FS_ERR_NULL_HANDLER, FS_ERR_INVALID_KEY(when metric_name is not unique in this cube), or FS_ERR_INVALID_PARAM(if precision not in range)
 */
 int fieldstat_register_hll(struct fieldstat *instance, const char *metric_name, unsigned char precision);
 
 /*
-    * @brief add a metric to the cube of cube_id. One metric may have multiple sub-metric that are associated with different cells. other parameters are the same as fieldstat_register_counter.
+    * @brief refer to fieldstat_register_counter.
     * @param lowest_trackable_value: the lowest value that can be tracked (distinguishable from 0) by the histogram. Must be >= 1.
     * @param highest_trackable_value: the highest value to be tracked by the histogram. Must be >= 2 * lowest_trackable_value.
     * @param significant_figures: the precision of the histogram. Must be in [1, 5].
-        * @return metric id if success. If failed, return FS_ERR_NULL_HANDLER, FS_ERR_INVALID_KEY(when metric_name is not unique in this cube), or FS_ERR_INVALID_PARAM.
+        * @return metric id if success. If failed, return FS_ERR_NULL_HANDLER, FS_ERR_INVALID_KEY(when metric_name is not unique in this cube), or FS_ERR_INVALID_PARAM(if any of the 3 params are out of range)
 */
 int fieldstat_register_hist(struct fieldstat *instance, const char *metric_name, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures);
 
 /*
-    * @brief let the value of counter metric of cell_id increase by increment.
+    * @brief let the value of counter metric of cell_id increase by `increment`.
     * @param cube_id: cube id, previously returned by fieldstat_create_cube.
     * @param metric_id: metric id, previously returned by fieldstat_register_counter.
     * @param increment: increment of the counter metric. Can be negative.
     * @return FS_OK if success. FS_ERR_NULL_HANDLER, FS_ERR_INVALID_CUBE_ID, FS_ERR_INVALID_METRIC_ID if fail.
+    *         FS_ERR_INVALID_PARAM when cube is topk, metric is primary metric, and increment is negative.
+    *         FS_ERR_TOO_MANY_CELLS when the cube is full.
+    *           In comprehensive mode, a full cube cannot be added any more cells.
+    *           In topk mode, every increment matters, so even the cube is full, the cell can also replace the least frequent cell.
 */
 int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long increment);
 
 /*
     * @brief let the value of counter metric equal to value. Other annotations refer to fieldstat_counter_incrby.
-    * @return FS_OK if success. FS_ERR_NULL_HANDLER, FS_ERR_INVALID_CUBE_ID, FS_ERR_INVALID_METRIC_ID if fail.
+    * @return Refer to fieldstat_counter_incrby. What's more, be cautious to call this function if the metric is a primary metric of a topk cube,
+    *   in such case, FS_ERR_INVALID_PARAM will be the output when the value is set to a smaller one(increment is negative).
 */
 int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long value);
 
@@ -121,7 +135,8 @@ int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id
     * @brief add a key to the hll metric of cell_id. HLL approximates the number of distinct elements in a set of `key`s.
     * @param key: key of the hll metric. Cannot be NULL.
     * @param key_len: strlen(key).
-    * @return FS_OK if success. FS_ERR_NULL_HANDLER, FS_ERR_INVALID_CUBE_ID, FS_ERR_INVALID_METRIC_ID if fail.
+    * @return FS_OK if success. FS_ERR_NULL_HANDLER, FS_ERR_INVALID_CUBE_ID, FS_ERR_INVALID_METRIC_ID if fail. 
+    *         Since topk only support counter, FS_ERR_INVALID_PARAM is returned when the cube is topk.
 */
 int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, const char *key, size_t key_len);
 
@@ -130,13 +145,13 @@ int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, co
              The value bigger than highest_trackable_value will be set to highest_trackable_value. The value less than lowest_trackable_value will be tried to record, and, if succeed, remains in the record as -inf(most of the time) or 0(if value == 0)
     * @param value: value of the histogram metric.
     * @return FS_OK if success. FS_ERR_NULL_HANDLER, FS_ERR_INVALID_CUBE_ID, FS_ERR_INVALID_METRIC_ID if fail.
-    *         FS_ERR_INVALID_PARAM when value is less than 0.
+    *         FS_ERR_INVALID_PARAM when value is less than 0, or the cube is topk.
 */
 int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long value);
 
 /*
     * @brief Delete all the cells, also the content of every metrics. The cube and metrics are not deleted. Increase cell_version by 1.
-             Note that the cell record won't be deleted at once, they just seem to be deleted. The cell record will be deleted when they are not used ever since the last reset and until the next reset.
+             Note that the cell record won't be deleted at once, they just seem to be deleted. The cell record will be deleted when they are not used since the last reset and until the next reset.
 */
 void fieldstat_reset(struct fieldstat *instance);
 /*
@@ -146,7 +161,7 @@ unsigned long fieldstat_get_version(const struct fieldstat *instance);
 
 /*
  @brief Merge the instance. The registered cubes and metrics are merged even if there are no cells added.
- @return 0 if success. return FS_ERR_INVALID_PARAM when the registered cubes or metrics between dest and src of the same keys has different types or configurations.
+ @return 0 if success. return FS_ERR_INVALID_PARAM when the registered cubes or metrics between dest and src of the same keys has different types or configurations(like different primary metric).
 */
 int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src);
 
@@ -173,19 +188,27 @@ void fieldstat_get_cubes(const struct fieldstat *instance, int **cube_ids, int *
 */
 int fieldstat_get_metrics_used_by_cube(const struct fieldstat *instance, int cube_id, int **metric_id_out, size_t *n_metric);
 
+/*
+    * @brief Get all the registered metrics by fieldstat_register_counter, fieldstat_register_hll, fieldstat_register_hist.
+*/
 void fieldstat_get_metrics(const struct fieldstat *instance, int **metric_id_out, size_t *n_metric);
 
-// query the name of the metric, return NULL if cube_id or metric_id is invalid.
+// query the name of the metric, return NULL if metric_id is invalid.
 const char *fieldstat_get_metric_name(const struct fieldstat *instance, int metric_id);
 
-// query the type of the metric. return -1 if cube_id or metric_id is invalid.
+// query the type of the metric. return (enum metric_type)-1 if metric_id is invalid.
 enum metric_type fieldstat_get_metric_type(const struct fieldstat *instance, int metric_id);
 
+/*
+    get the tags added to metric when calling fieldstat_counter_incrby, fieldstat_counter_set, fieldstat_hll_add, fieldstat_hist_record.
+*/
 void fieldstat_get_cells_used_by_metric(const struct fieldstat *instance, int cube_id, int metric_id,
     struct fieldstat_tag_list **tag_list, size_t *n_cell);
 
+/*
+    get the tags added to cube when calling fieldstat_counter_incrby, fieldstat_counter_set, fieldstat_hll_add, fieldstat_hist_record.
+*/
 void fieldstat_get_cells_used_by_cube(const struct fieldstat *instance, int cube_id, struct fieldstat_tag_list **tag_list, size_t *n_cell);
-
 
 /*
     get the shared tag of fieldstat_create_cube. User free them by calling fieldstat_tag_list_arr_free(struct fieldstat_tag_list *, 1)
@@ -199,7 +222,7 @@ struct fieldstat_tag_list *fieldstat_get_shared_tags(const struct fieldstat *ins
 int fieldstat_find_cube(const struct fieldstat *instance, const struct fieldstat_tag *shared_tags, size_t n_shared_tags);
 
 /* 
-    get the parameter max_n_cell of fieldstat_create_cube. -1 is a valid value, meaning cube has no metric. 
+    get the parameter max_n_cell of fieldstat_create_cube. -1 is a valid value, meaning cube has no metric. Return FS_ERR_INVALID_CUBE_ID if cube_id is invalid.
 */
 int fieldstat_get_max_cell_id(const struct fieldstat *instance, int cube_id);
 
@@ -207,7 +230,7 @@ int fieldstat_get_max_cell_id(const struct fieldstat *instance, int cube_id);
     * @brief Get the value of a metric of a cell.
     * @param cube_id: cube id, previously returned by fieldstat_get_cubes.
     * @param metric_id: metric id, previously returned by fieldstat_get_max_metric_id.
-    * @param cell_id: cell id, previously returned by fieldstat_get_cells_used_by_metric.
+    * @param tags: previously returned by fieldstat_get_cells_used_by_metric.
     * @param value_out: the value of the metric. If the cell is not found, *value_out is set to 0.
     * @return FS_OK if success. FS_ERR_NULL_HANDLER, FS_ERR_INVALID_CUBE_ID, FS_ERR_INVALID_METRIC_ID if fail.
 */

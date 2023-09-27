@@ -618,6 +618,7 @@ int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id
     int cell_id = -1;
 
     // get the occurrence
+    // todo: 干脆查个值然后直接调用incrby
     long long occurrence = 0;
     if (cube->sampling_mode == SAMPLING_MODE_TOPK && cube->primary_metric_id == metric_id) {
         struct tag_hash_key *tag_key = tag_hash_key_construct_with_fieldstat_tag(tags, n_tag);
