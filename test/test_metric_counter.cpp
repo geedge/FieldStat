@@ -143,8 +143,6 @@ TEST(metric_test_counter, topk_add_and_test_accuracy)
 
         EXPECT_STREQ(key.c_str(), "elephant ");
 
-        printf("topk_add_and_test_accuracy %s %s, count: %lld\n", key.c_str(), value.c_str(), my_fieldstat_counter_get(instance, 0, 0, &tag_list[i]));
-
         error += abs(my_fieldstat_counter_get(instance, 0, 0, &tag_list[i]) - flow_cnt[key + value]);
     }
     printf("topk_add_and_test_accuracy Mean ratio e: %lld\n", error);
@@ -212,7 +210,97 @@ TEST(metric_test_counter, add_with_wrong_metric_id_expecting_fail)
     fieldstat_free(instance);
 }
 
-//todo: set + topk
+TEST(metric_test_counter, add_and_query_on_dummy_cell_of_topk)
+{
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 10);
+    fieldstat_register_counter(instance, "primary"); // also the dummy one
+    int metric_id = fieldstat_register_counter(instance, "using");
+
+    fieldstat_counter_incrby(instance, cube_id, metric_id, &TEST_TAG_INT, 1, 1);
+
+    // add success
+    long long measure = my_fieldstat_counter_get(instance, cube_id, metric_id);
+    EXPECT_EQ(measure, 1);
+    // cannot query dummy
+    int *metric_ids = NULL;
+    size_t n_metric = 0;
+    fieldstat_get_metrics_used_by_cube(instance, cube_id, &metric_ids, &n_metric);
+    EXPECT_EQ(n_metric, 1);
+    EXPECT_EQ(metric_ids[0], 1);
+    free(metric_ids);
+
+    struct fieldstat_tag_list *tag_list = NULL;
+    size_t n_cell;
+    fieldstat_get_cells_used_by_metric(instance, cube_id, 0, &tag_list, &n_cell);
+    EXPECT_EQ(n_cell, 0);
+
+    fieldstat_free(instance);
+}
+
+TEST(metric_test_counter, set_on_primary_metric_going_smaller)
+{
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 10);
+    int metric_id = fieldstat_register_counter(instance, "primary");
+
+    int ret = fieldstat_counter_set(instance, cube_id, metric_id, &TEST_TAG_INT, 1, 10);
+    EXPECT_EQ(ret, FS_OK);
+    ret = fieldstat_counter_set(instance, cube_id, metric_id, &TEST_TAG_INT, 1, 2);
+    EXPECT_EQ(ret, FS_ERR_INVALID_PARAM);
+
+    fieldstat_free(instance);
+}
+
+TEST(metric_test_counter, set_on_primary_metric_going_bigger)
+{
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 10);
+    int metric_id = fieldstat_register_counter(instance, "primary");
+
+    int ret = fieldstat_counter_set(instance, cube_id, metric_id, &TEST_TAG_INT, 1, 10);
+    EXPECT_EQ(ret, FS_OK);
+    ret = fieldstat_counter_set(instance, cube_id, metric_id, &TEST_TAG_INT, 1, 20);
+    EXPECT_EQ(ret, FS_OK);
+
+    EXPECT_EQ(my_fieldstat_counter_get(instance, cube_id, metric_id), 20);
+
+    fieldstat_free(instance);
+}
+
+TEST(metric_test_counter, topk_set_and_test_accuracy)
+{
+    struct fieldstat *instance = fieldstat_new();
+    fieldstat_create_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_TOPK, 6);
+    fieldstat_register_counter(instance, "test");
+
+    struct fieldstat_tag tag = TEST_TAG_INT;
+    // tag : [0, 1, 2, 3, 4 ,5]
+    // value: [0, 1, 2, 3, 4 ,5]
+    for (int i = 0; i < 6; i++) {
+        tag.value_longlong = i;
+        EXPECT_EQ(fieldstat_counter_set(instance, 0, 0, &tag, 1, i), FS_OK);
+    }
+    // tag : [0, 1, 2, 3,  4 ,5, 6, 7, 8]
+    // value: [0, 1, 2, 100, 100, 100, 100, 100, 100]
+    for (int i = 0; i < 6; i++) {
+        tag.value_longlong = i + 3;
+        EXPECT_EQ(fieldstat_counter_set(instance, 0, 0, &tag, 1, 100), FS_OK);
+    }
+
+    struct fieldstat_tag_list *tag_list = NULL;
+    size_t n_cell = 0;
+    fieldstat_get_cells_used_by_metric(instance, 0, 0, &tag_list, &n_cell);
+    EXPECT_EQ(n_cell, 6);
+    for (size_t i = 0; i < n_cell; i++) {
+        EXPECT_EQ(tag_list[i].tag[0].value_longlong, i + 3);
+        EXPECT_EQ(my_fieldstat_counter_get(instance, 0, 0, &tag_list[i]), 100);
+    }
+
+    fieldstat_tag_list_arr_free(tag_list, n_cell);
+    fieldstat_free(instance);
+}
+
 
 int main(int argc, char *argv[]) 
 {

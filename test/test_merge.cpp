@@ -480,8 +480,67 @@ TEST(unit_test_merge, merge_accuracy_test_gen_dest_full_some_inserted_and_some_m
     }
 }
 
-// todo: primary key 不同的情况
-// todo: primary key 上一个操作都没有
+TEST(unit_test_merge, primary_metric_has_no_value)
+{
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 2);
+    int metric_primary = fieldstat_register_counter(instance, "primary");
+    int metric_operated = fieldstat_register_counter(instance, "operated");
+    fieldstat_counter_incrby(instance, cube_id, metric_operated, &TEST_TAG_STRING, 1, 1);
+    struct fieldstat *instance_dest = fieldstat_new();
+    fieldstat_merge(instance_dest, instance);
+    fieldstat_merge(instance_dest, instance);
+
+    struct fieldstat_tag_list *tag_list = NULL;
+    size_t n_cell = 0;
+    fieldstat_get_cells_used_by_metric(instance_dest, 0, metric_primary, &tag_list, &n_cell);
+    EXPECT_EQ(n_cell, 0);
+
+    fieldstat_get_cells_used_by_metric(instance_dest, 0, metric_operated, &tag_list, &n_cell);
+    EXPECT_EQ(n_cell, 1);
+    EXPECT_EQ(merge_test_fieldstat_counter_get(instance_dest, 0, metric_operated, &tag_list[0]), 2);
+    fieldstat_tag_list_arr_free(tag_list, n_cell);
+
+    fieldstat_free(instance);
+    fieldstat_free(instance_dest);
+}
+
+TEST(unit_test_merge, primary_metric_id_different)
+{
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 2);
+    int metric_primary = fieldstat_register_counter(instance, "primary");
+    int metric_2 = fieldstat_register_counter(instance, "2");
+    fieldstat_counter_incrby(instance, cube_id, metric_primary, &TEST_TAG_STRING, 1, 100);
+    fieldstat_counter_incrby(instance, cube_id, metric_2, &TEST_TAG_STRING, 1, 1);
+
+    struct fieldstat *instance_dst = fieldstat_new();
+    int cube_id_dst = fieldstat_create_cube(instance_dst, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 2);
+    fieldstat_register_counter(instance_dst, "2");
+    int metric_primary_dst = fieldstat_register_counter(instance_dst, "primary");
+    fieldstat_cube_set_primary_metric(instance_dst, cube_id_dst, metric_primary_dst);
+
+    fieldstat_merge(instance_dst, instance);
+
+    struct fieldstat_tag_list *tag_list = NULL;
+    size_t n_cell = 0;
+    fieldstat_get_cells_used_by_metric(instance_dst, 0, metric_primary, &tag_list, &n_cell);
+    EXPECT_EQ(n_cell, 1);
+    int *metric_ids;
+    size_t n_metrics;
+    fieldstat_get_metrics(instance_dst, &metric_ids, &n_metrics);
+    EXPECT_EQ(n_metrics, 2);
+    EXPECT_STREQ(fieldstat_get_metric_name(instance_dst, metric_ids[0]), "2");
+    EXPECT_STREQ(fieldstat_get_metric_name(instance_dst, metric_ids[1]), "primary");
+
+    EXPECT_EQ(merge_test_fieldstat_counter_get(instance_dst, 0, metric_ids[1], &tag_list[0]), 100);
+    EXPECT_EQ(merge_test_fieldstat_counter_get(instance_dst, 0, metric_ids[0], &tag_list[0]), 1);
+    fieldstat_tag_list_arr_free(tag_list, n_cell);
+    free(metric_ids);
+    fieldstat_free(instance);
+    fieldstat_free(instance_dst);
+}
+
 
 int main(int argc, char *argv[]) 
 {

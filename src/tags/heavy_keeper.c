@@ -242,20 +242,20 @@ static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_
 int heavy_keeper_add(struct heavy_keeper *hk, const struct tag_hash_key *tag, unsigned int count, int cell_id, int *popped_id_out)
 {
     *popped_id_out = -1;
-    int ret = heavy_keeper_add_by_recording_popped_data(hk, tag, count, cell_id, popped_id_out);
+    heavy_keeper_add_by_recording_popped_data(hk, tag, count, cell_id, popped_id_out);
 
-    int cell_id_tmp = sorted_set_get_cell_id(hk->top_K_heap, tag); // todo: 之后删掉
+    int cell_id_tmp = sorted_set_get_cell_id(hk->top_K_heap, tag);
     if (cell_id_tmp >= 0) {
-        if (cell_id_tmp == cell_id) {
-            assert(ret == 0 || ret == 2);
+        if (cell_id_tmp == cell_id) { // insert success
+            return 0;
         } else {
-            assert(ret == 1);
+            return 1; // insert success, but use the different cell_id
         }
     } else {
-        assert(ret == -1);
+        return -1;
     }
 
-    return ret;
+    return -1; // should not reach here
 }
 
 struct tag_hash_key *heavy_keeper_get_true_pst_tag(const struct heavy_keeper *hk, const struct tag_hash_key *tag)

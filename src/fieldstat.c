@@ -618,7 +618,6 @@ int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id
     int cell_id = -1;
 
     // get the occurrence
-    // todo: 干脆查个值然后直接调用incrby
     long long occurrence = 0;
     if (cube->sampling_mode == SAMPLING_MODE_TOPK && cube->primary_metric_id == metric_id) {
         struct tag_hash_key *tag_key = tag_hash_key_construct_with_fieldstat_tag(tags, n_tag);
@@ -631,6 +630,8 @@ int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id
             } else {
                 occurrence = value;
             }
+        } else {
+            occurrence = value;
         }
         tag_hash_key_free(tag_key);
         if (occurrence < 0) {
@@ -1078,6 +1079,8 @@ void fieldstat_get_metrics(const struct fieldstat *instance, int **metric_id_out
 void fieldstat_get_cells_used_by_metric(const struct fieldstat *instance, int cube_id, int metric_id,
     struct fieldstat_tag_list **tag_list, size_t *n_cell)
 {
+    *tag_list = NULL;
+    *n_cell = 0;
     int ret = FS_OK;
     const struct metric *metric = fieldstat_find_metric(instance, cube_id, metric_id, &ret);
     if (metric == NULL) {
@@ -1087,11 +1090,10 @@ void fieldstat_get_cells_used_by_metric(const struct fieldstat *instance, int cu
     size_t n_cell_ret = 0;
     int *cell_ids = NULL;
     metric_get_cell_ids(metric, &cell_ids, &n_cell_ret);
-    *n_cell = n_cell_ret;
     if (n_cell_ret == 0) {
-        *tag_list = NULL;
         return;
     }
+    *n_cell = n_cell_ret;
 
     struct fieldstat_tag_list *tag_list_ret = (struct fieldstat_tag_list *)malloc(sizeof(struct fieldstat_tag_list) * n_cell_ret);
     *tag_list = tag_list_ret;
