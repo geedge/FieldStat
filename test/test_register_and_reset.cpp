@@ -381,7 +381,8 @@ TEST(calibrate, target_more_cube)
     struct fieldstat_tag_list *tag_list = fieldstat_get_shared_tags(target, cube_id);
     EXPECT_STREQ(tag_list->tag[0].key, TEST_SHARED_TAG.key);
 
-    // todo: query by shared tag,保证cube manager 更新
+    EXPECT_EQ(fieldstat_find_cube(target, &TEST_SHARED_TAG, 1), 0);
+    EXPECT_EQ(fieldstat_find_cube(target, &TEST_TAG_STRING, 1), FS_ERR_INVALID_KEY);
 
     fieldstat_free(master);
     fieldstat_free(target);
