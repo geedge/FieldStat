@@ -244,7 +244,7 @@ int heavy_keeper_add(struct heavy_keeper *hk, const struct tag_hash_key *tag, un
     *popped_id_out = -1;
     int ret = heavy_keeper_add_by_recording_popped_data(hk, tag, count, cell_id, popped_id_out);
 
-    int cell_id_tmp = sorted_set_get_cell_id(hk->top_K_heap, tag);
+    int cell_id_tmp = sorted_set_get_cell_id(hk->top_K_heap, tag); // todo: 之后删掉
     if (cell_id_tmp >= 0) {
         if (cell_id_tmp == cell_id) {
             assert(ret == 0 || ret == 2);

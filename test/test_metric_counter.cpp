@@ -22,7 +22,7 @@ struct fieldstat *test_init_standard_instance()
 long long my_fieldstat_counter_get(const struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag_list *tag_list = &TEST_TAG_LIST_INT)
 {
     long long ret = 0;
-    fieldstat_counter_get(instance, cube_id, metric_id, &TEST_TAG_LIST_INT, &ret);
+    fieldstat_counter_get(instance, cube_id, metric_id, tag_list, &ret);
     return ret;
 }
 
