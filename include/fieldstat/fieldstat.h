@@ -8,8 +8,6 @@ extern "C"
 #include <stddef.h>
 #include <stdbool.h>
 
-#define EXPORT_VER 1 // increase by 1 when the serialization format is changed.
-
 #define FS_OK 0
 #define FS_ERR_TOO_MANY_CELLS -1
 #define FS_ERR_NULL_HANDLER -2
