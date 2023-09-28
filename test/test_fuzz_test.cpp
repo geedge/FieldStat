@@ -56,7 +56,6 @@ double fuzz_fieldstat_hll_get(const struct fieldstat *instance, int cube_id, int
     return value;
 }
 
-// cpp-check-suppress moduloofone
 TEST(Fuzz_test, many_instance_random_flow_unregister_calibrate_reset_fork_merge_comprehensive)
 {
     const int METRIC_NUM = 2;
@@ -203,7 +202,6 @@ TEST(Fuzz_test, many_instance_random_flow_unregister_calibrate_reset_fork_merge_
     }
 }
 
-// cpp-check-suppress moduloofone
 TEST(Fuzz_test, many_instance_random_flow_unregister_calibrate_reset_fork_merge_topk)
 {
     const int CUBE_NUM = 5;

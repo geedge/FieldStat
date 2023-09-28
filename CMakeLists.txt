@@ -64,7 +64,6 @@ if (CMAKE_CXX_CPPCHECK)
             "--inline-suppr"
             "--suppress=*:${PROJECT_SOURCE_DIR}/vendors/*"
             "--suppress=*:${PROJECT_SOURCE_DIR}/test/utils.hpp"
-            "--suppress=*:${PROJECT_SOURCE_DIR}/test/test_fuzz_test.cpp"
             "--suppress=*:${PROJECT_SOURCE_DIR}/test/unit_test_serialize.cpp"
             "--suppress=*:${PROJECT_SOURCE_DIR}/src/logger/log_handle.c"
     )
