@@ -416,7 +416,7 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
         sorted_set_insert(new_rec, tag_arr[i], maxv, cell_id_arr_dst[i]);
     }
 
-    qsort(cell_id_arr_dst, size_dest, sizeof(int), cmp_int);
+    qsort(cell_id_arr_dst, size_dest, sizeof(int), cmp_int); // use in find_next_unused_cell_id to find the minimum unused cell_id
 
     /* ------------------------------ merge source ------------------------------ */
     int *cell_id_arr_src = (int *)malloc(size_src * sizeof(int));
@@ -430,20 +430,20 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
         int cell_id_dest = sorted_set_get_cell_id(ss_dest, tag_src);
         int cell_id_src = cell_id_arr_src[i];
     
-        if (cell_id_dest != -1) {  // the tag is in both dest and src, so has been processed in the previous loop. Just record some info
+        if (cell_id_dest != -1) {  // the tag is in both dest and src, so has been processed in the previous loop. The reason why no need to sum up result is that merging sketch already gets its summed up count
             cell_id_in_src_before_merge[cell_id_in_src_before_merge_len] = cell_id_src;
             cell_id_in_dest_corresponding[cell_id_in_src_before_merge_len] = cell_id_dest;
             cell_id_in_src_before_merge_len++;
 
             continue;
         }
-        // the dest heavy keeper has been merged, so the maxv is the maxv in the merged sketch, instead of the dest sketch
-        unsigned maxv = find_maxv_in_sketch(dest, tag_src);
+
+        unsigned maxv = find_maxv_in_sketch(dest, tag_src); // the dest heavy keeper has been merged, so the maxv is the maxv in the merged sketch, instead of the dest sketch
         int popped_id = -1;
         int now_idx = next_idx;
         int find_id = find_next_unused_cell_id(cell_id_arr_dst, size_dest, last_find_id, &now_idx);
         int tmp_ret = sorted_set_insert_and_record_popped_back(new_rec, tag_src, maxv, find_id, &popped_id);
-        if (tmp_ret == 2) { // insert success and popped one. the previous tag_final is already freed by sorted_set
+        if (tmp_ret == 2) { // insert success and popped one.
             cell_id_popped_from_dest_when_merge_src[cell_id_popped_from_dest_when_merge_src_len++] = popped_id;
         } 
         if (tmp_ret != 0) { // insert success
@@ -472,7 +472,6 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
         memcpy(*cell_id_popped_from_dest_when_merge_src_out, cell_id_popped_from_dest_when_merge_src, cell_id_popped_from_dest_when_merge_src_len * sizeof(int));
         *cell_id_popped_from_dest_when_merge_src_len_out = cell_id_popped_from_dest_when_merge_src_len;
     }
-
     if (cell_id_in_src_before_merge_len == 0) {
         *cell_id_in_src_before_merge_out = NULL;
         *cell_id_in_src_before_merge_len_out = 0;
@@ -485,7 +484,6 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
         memcpy(*cell_id_in_dest_corresponding_out, cell_id_in_dest_corresponding, cell_id_in_src_before_merge_len * sizeof(int));
     }
 }
-
 
 int heavy_keeper_merge_recording_id_details(struct heavy_keeper *dest, const struct heavy_keeper *src,
     int **cell_id_popped_from_dest_when_merge_src_out, int *cell_id_popped_from_dest_when_merge_src_len_out,

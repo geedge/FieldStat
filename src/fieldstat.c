@@ -201,12 +201,16 @@ long long fieldstat_get_cube_version(const struct fieldstat *instance, int cube_
 /*                                    cube                                    */
 /* -------------------------------------------------------------------------- */
 
-void fieldstat_clear_one_tag(const struct fieldstat_tag *tag)
+void fieldstat_free_tag_array(struct fieldstat_tag *tags, size_t n_tags)
 {
-    free((char *)tag->key);
-    if (tag->type == TAG_CSTRING && tag->value_str != NULL) {
-        free((char *)tag->value_str);
+    for (size_t i = 0; i < n_tags; i++) {
+        struct fieldstat_tag *tag = &tags[i];
+        free((char *)tag->key);
+        if (tag->type == TAG_CSTRING) {
+            free((char *)tag->value_str);
+        }
     }
+    free(tags);
 }
 
 void add_cube_to_position(struct fieldstat *instance, struct fs_cube *cube, int cube_id)
@@ -365,10 +369,7 @@ void fieldstat_cube_free(struct fieldstat *instance, int cube_id)
     cube_manager_delete(instance->shared_tag_cube_manager, cube->key_tag);
 
     cell_manager_free(cube->cell_manager);
-    for (size_t i = 0; i < cube->n_shared_tags; i++) {
-        fieldstat_clear_one_tag(&cube->shared_tags[i]);
-    }
-    free(cube->shared_tags);
+    fieldstat_free_tag_array(cube->shared_tags, cube->n_shared_tags);
     tag_hash_key_free(cube->key_tag);
 
     for (size_t i = 0; i < cube->valid_metric_arr_len; i++) {
@@ -771,15 +772,10 @@ void fieldstat_cube_merge_topk(struct fs_cube *dest, const struct fs_cube *src, 
             metric_delete_cell(dest->metrics[j], id);
         }
     }
-    if (cell_id_popped != NULL) {
-        free(cell_id_popped);
-    }
-    if (cell_id_added != NULL) {
-        free(cell_id_added);
-    }
-    if (cell_id_old != NULL) {
-        free(cell_id_old);
-    }
+
+    free(cell_id_popped);
+    free(cell_id_added);
+    free(cell_id_old);
 }
 
 void fieldstat_cube_merge(struct fs_cube *dest, const struct fs_cube *src, const int *metric_id_src_dest_map)
@@ -1288,10 +1284,7 @@ void fieldstat_tag_list_arr_free(struct fieldstat_tag_list *tag_list, size_t n_c
         return;
     }
     for (int i = 0; i < n_cell; i++) {
-        for (int j = 0; j < tag_list[i].n_tag; j++) {
-            fieldstat_clear_one_tag(&(tag_list[i].tag[j]));
-        }
-        free(tag_list[i].tag);
+        fieldstat_free_tag_array(tag_list[i].tag, tag_list[i].n_tag);
     }
     free(tag_list);
 }
