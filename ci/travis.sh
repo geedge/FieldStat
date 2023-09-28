@@ -56,6 +56,9 @@ make
 
 
 if [ -n "${UNIT_TEST}" ]; then
+    current_path=$(pwd)
+    echo $current_path  > /etc/ld.so.conf.d/test_case.conf
+    ldconfig
 	ctest --verbose
 fi
 

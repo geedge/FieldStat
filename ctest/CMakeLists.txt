@@ -15,6 +15,8 @@ add_test(NAME COPY_GTEST_METRIC_HLL_BINARY COMMAND sh -c "cp ${CMAKE_BINARY_DIR}
 add_test(NAME COPY_GTEST_REGISTER_AND_RESET_BINARY COMMAND sh -c "cp ${CMAKE_BINARY_DIR}/test/test_register_and_reset ${CMAKE_BINARY_DIR}/testing/")
 add_test(NAME COPY_GTEST_SERIALIZE_BINARY COMMAND sh -c "cp ${CMAKE_BINARY_DIR}/test/test_serialize ${CMAKE_BINARY_DIR}/testing/")
 add_test(NAME COPY_GTEST_UNIT_TEST_CELL_MANAGER_BINARY COMMAND sh -c "cp ${CMAKE_BINARY_DIR}/test/unit_test_cell_manager ${CMAKE_BINARY_DIR}/testing/")
+add_test(NAME COPY_GTEST_WRITE_JSON_FILE_BINARY COMMAND sh -c "cp ${CMAKE_BINARY_DIR}/test/test_write_json_file ${CMAKE_BINARY_DIR}/testing/")
+add_test(NAME CHMOD_UNITTEST COMMAND sh -c "chmod 0755 ${CMAKE_SOURCE_DIR}/test/test_fieldstat_exporter.py; cp ${CMAKE_SOURCE_DIR}/test/test_fieldstat_exporter.py ${CMAKE_BINARY_DIR}/testing/test_fieldstat_exporter")
 
 set(GTEST_RUN_DIR ${CMAKE_BINARY_DIR}/testing)
 add_test(NAME GTEST_EMPTY_TAGS COMMAND test_empty_tags WORKING_DIRECTORY ${GTEST_RUN_DIR})
@@ -27,3 +29,5 @@ add_test(NAME GTEST_METRIC_HLL COMMAND test_metric_hll WORKING_DIRECTORY ${GTEST
 add_test(NAME GTEST_REGISTER_AND_RESET COMMAND test_register_and_reset WORKING_DIRECTORY ${GTEST_RUN_DIR})
 add_test(NAME GTEST_SERIALIZE COMMAND test_serialize WORKING_DIRECTORY ${GTEST_RUN_DIR})
 add_test(NAME GTEST_UNIT_TEST_CELL_MANAGER COMMAND unit_test_cell_manager WORKING_DIRECTORY ${GTEST_RUN_DIR})
+add_test(NAME GTEST_WRITE_JSON_FILE COMMAND test_write_json_file WORKING_DIRECTORY ${GTEST_RUN_DIR})
+add_test(NAME GTEST_PYTHON_EXPORTER COMMAND test_fieldstat_exporter WORKING_DIRECTORY ${GTEST_RUN_DIR})

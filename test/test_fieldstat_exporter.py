@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 import unittest
 import sys
 import urllib
@@ -13,8 +15,8 @@ from contextlib import redirect_stdout
 from prettytable import PrettyTable,NONE,HEADER
 
 import os
-current_path = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(current_path + '../src/exporter')
+current_path  = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(current_path + '/../../src/exporter')
 
 from fieldstat_exporter import FieldstatAPI
 

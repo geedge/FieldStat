@@ -193,3 +193,135 @@ Merging Heavy Keeper is slower the coping it, it is why the execution time is un
 
 #### export a cell
 I add a instance with 100 cubes, on each of which I register 10 metrics. The max cell number of each cube is 1000, and call the metric operation on every added cell. So there are 100 * 10 * 1000 cells in total. After exporting the instance, calculate the average time spent on each cells.
+
+## Fieldstat exporter
+Fieldstat exporter provides exporter functions for fieldstat4, including prometheus exporter and local exporter. 
+
+### prometheus exporter
+The prometheus exporter reads the fieldstat4 json file and enables the prometheus endpoint. The default port is 8080.
+
+### local exporter
+The local exporter reads the fieldstat4 json file and outputs it to the screen.
+
+### Installation and Usage
+Download fieldstat4 rpm from https://repo.geedge.net/pulp/content/ and  install rpm package.
+
+
+#### List of rpm files
+    ...
+    |-- bin
+        |-- fieldstat_exporter
+    |-- lib
+        |-- ibfieldstat4.a
+        |-- libfieldstat4.so
+#### Service configuration
+The following is the prometheus exporter systemd service example file.
+```systemd
+[Unit]
+Description=fieldstat4 prometheus service.
+After=target.service      #Replace target service with the actual service used.
+Requires=target.service   #Replace target service with the actual service used.
+
+[Service]
+Type=simple
+ExecStart=/opt/tsg/framework/bin/fieldstat_exporter prometheus
+RestartSec=10s
+Restart=always
+PrivateTmp=True
+
+[Install]
+WantedBy=multi-user.target
+```
+### Command Line
+Fieldstat exporter includes prometheus including prometheus and local subcommands.
+```txt
+[root@localhost bin]# ./fieldstat_exporter --help
+usage: fieldstat_exporter [-h] {prometheus,local} ...
+
+Fieldstat exporter
+
+positional arguments:
+  {prometheus,local}
+    prometheus        Set prometheus exporter
+    local             Set local exporter
+
+optional arguments:
+  -h, --help          show this help message and exit
+```
+The following is prometheus exporter command line example.
+```bash
+./fieldstat_exporter prometheus -b 0.1,0.2,0.3,0.4,0.5 -f summary -j /tmp/fieldstat.json -p 8080 -u /metrics
+```
+The following is fieldstat prometheus exporter help info.
+```txt
+[root@localhost bin]# ./fieldstat_exporter prometheus --help
+usage: fieldstat_exporter prometheus [-h] [-b HIST_BINS] [-f HIST_FORMAT]
+                                     [-j JSON_PATH] [-p LISTEN_PORT]
+                                     [-u URI_PATH]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -b HIST_BINS, --hist-bins HIST_BINS
+                        The metrics of histogram type output bins.
+  -f HIST_FORMAT, --hist-format HIST_FORMAT
+                        The metrics of histogram type output format.
+  -j JSON_PATH, --json-path JSON_PATH
+                        The input fieldstat metrics json file path.
+  -p LISTEN_PORT, --listen-port LISTEN_PORT
+                        Specify the prometheus endpoint port to listen. i.e.,
+                        80,8080
+  -u URI_PATH, --uri-path URI_PATH
+                        Specify the prometheus endpoint uri path
+```
+The prometheus exporter optional arguments default values.
+args|default value
+--- | ---
+-b, --hist-bins|[0.1,0.5,0.8,0.9,0.95,0.99]
+-f, --hist-format|summary
+-j, --json-path|./fieldstat.json
+-p, --listen-port|8080
+-u, --uri-path|/metrics
+The following is local exporter command line example.
+```bash
+./fieldstat_exporter local -b 0.1,0.2,0.3,0.4,0.5 -f summary -j /tmp/fieldstat.json -i 1 -l --clear-screen -m policy_id:1,device_name:xxg
+```
+The following is fieldstat local exporter help info.
+```txt
+[root@localhost bin]# ./fieldstat_exporter local --help
+usage: fieldstat_exporter local [-h] [-b HIST_BINS] [-f HIST_FORMAT]
+                                [-j JSON_PATH] [-i INTERVAL] [-l]
+                                [--clear-screen] [--display-hll]
+                                [--display-hist] [--display-counter]
+                                [-m MATCH_TAGS]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -b HIST_BINS, --hist-bins HIST_BINS
+                        The metrics of histogram type output bins.
+  -f HIST_FORMAT, --hist-format HIST_FORMAT
+                        The metrics of histogram type output format.
+  -j JSON_PATH, --json-path JSON_PATH
+                        The input fieldstat metrics json file path.
+  -i INTERVAL, --interval INTERVAL
+                        interval, seconds to wait between print.
+  -l, --loop            print loop, exit when recv a signal.
+  --clear-screen        clear screen at start of loop
+  --display-hll         Display hyperloglog type metrics
+  --display-hist        Display histogram type metrics
+  --display-counter     Display counter type metrics
+  -m MATCH_TAGS, --match-tags MATCH_TAGS
+                        Display the tags match metrics
+```
+The local exporter optional arguments default values.
+args|default value
+--- | ---
+-b, --hist-bins|[0.1,0.5,0.8,0.9,0.95,0.99]
+-f, --hist-format|summary
+-j, --json-path|./fieldstat.json
+-i, --interval|1(s)
+-l, --loop|False
+--clear-screen|False
+--display-hll|False
+--display-hist|False
+--display-counter|False
+-m, --match-tags|""

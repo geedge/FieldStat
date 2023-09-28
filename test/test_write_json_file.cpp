@@ -135,6 +135,19 @@ static struct fieldstat *get_table_fieldstat()
     return instance;
 }
 
+static int write_json_to_file(const char *filename, char *json_str) 
+{
+    FILE *fp = fopen(filename, "w");
+    if (fp == NULL) 
+    {
+        return -1;
+    }
+    fprintf(fp, json_str);
+    fclose(fp);
+
+    return 0;
+}
+
 TEST(ExporterLocal, TableBuild)
 {
     struct timeval current   = {100, 10000};
@@ -149,7 +162,9 @@ TEST(ExporterLocal, TableBuild)
     struct fieldstat_json_exporter *exporter = fieldstat_json_exporter_new(merger);
     fieldstat_json_exporter_enable_delta(exporter);
     char *str_json = fieldstat_json_exporter_export(exporter, &current);
-    printf(str_json);
+    
+    int ret = write_json_to_file("/tmp/fieldstat.json",str_json);
+    EXPECT_EQ(0, ret);
 }
 
 
