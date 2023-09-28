@@ -14,7 +14,7 @@
 struct tag_id_map {
     struct tag_hash_key *tag;
     int cell_id;
-    bool discarded;
+    bool dying;
     UT_hash_handle hh;
 };
 
@@ -94,8 +94,8 @@ void cell_manager_reset(struct cell_manager *pthis)
     struct tag_id_map *node = NULL;
     struct tag_id_map *tmp = NULL;
     HASH_ITER(hh, pthis->comprehensive_tag_id_map, node, tmp) {
-        if (!node->discarded) {
-            node->discarded = true;
+        if (!node->dying) {
+            node->dying = true;
             continue;
         }
         HASH_DEL(pthis->comprehensive_tag_id_map, node);
@@ -165,7 +165,7 @@ int cell_manager_add_cell(struct cell_manager *pthis, const struct tag_hash_key 
 {
     struct tag_id_map *node = NULL;
     HASH_FIND_TAG(pthis->comprehensive_tag_id_map, tag, node);
-    if (node != NULL && !node->discarded) {
+    if (node != NULL && !node->dying) {
         return node->cell_id;
     }
 
@@ -174,7 +174,7 @@ int cell_manager_add_cell(struct cell_manager *pthis, const struct tag_hash_key 
     }
 
     if (node != NULL) {
-        node->discarded = false;
+        node->dying = false;
         node->cell_id = pthis->next_cell_id;
         cell_manager_id_tag_array_add(pthis, pthis->next_cell_id, node->tag);
         return pthis->next_cell_id++;
@@ -184,7 +184,7 @@ int cell_manager_add_cell(struct cell_manager *pthis, const struct tag_hash_key 
     node = (struct tag_id_map *)malloc(sizeof(struct tag_id_map));
     node->tag = tag_copy;
     node->cell_id = pthis->next_cell_id;
-    node->discarded = false;
+    node->dying = false;
     HASH_ADD_TAG(pthis->comprehensive_tag_id_map, tag, node);
 
     cell_manager_id_tag_array_add(pthis, pthis->next_cell_id, tag_copy);
@@ -340,7 +340,7 @@ struct cell_manager *cell_manager_deserialize(const char *blob, size_t blob_size
             struct tag_id_map *node = (struct tag_id_map *)malloc(sizeof(struct tag_id_map));
             node->tag = tag;
             node->cell_id = cell_id;
-            node->discarded = false;
+            node->dying = false;
             HASH_ADD_TAG(pthis->comprehensive_tag_id_map, tag, node);
    
             cell_manager_id_tag_array_add(pthis, cell_id, tag);
@@ -385,7 +385,7 @@ struct cell_manager *cell_manager_copy(const struct cell_manager *src)
             struct tag_id_map *tmp_node = (struct tag_id_map *)malloc(sizeof(struct tag_id_map));
             tmp_node->tag = tag_copy;
             tmp_node->cell_id = i;
-            tmp_node->discarded = false;
+            tmp_node->dying = false;
             HASH_ADD_TAG(pthis->comprehensive_tag_id_map, tag, tmp_node);
 
             cell_manager_id_tag_array_add(pthis, i, tag_copy);
@@ -410,7 +410,7 @@ int cell_manager_find(const struct cell_manager *pthis, const struct tag_hash_ke
         if (node == NULL) {
             return -1;
         } else {
-            return node->discarded ? -1 : node->cell_id;
+            return node->dying ? -1 : node->cell_id;
         }
     } else {
         int cell_id = -1;
@@ -451,7 +451,7 @@ void cube_manager_add(struct cube_manager *pthis, const struct tag_hash_key *tag
     struct tag_id_map *node = (struct tag_id_map *)malloc(sizeof(struct tag_id_map));
     node->tag = tag_hash_key_copy(tag);
     node->cell_id = id;
-    node->discarded = false; // this is not used in cube manager, just give it a value
+    node->dying = false; // this is not used in cube manager, just give it a value
     HASH_ADD_TAG(pthis->head, tag, node);
 }
 
