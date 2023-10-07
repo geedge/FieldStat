@@ -138,10 +138,10 @@ It is hard to calculate memory usage of CJSON. By experiment, RSS to different c
 
 | operation                                     | time(us)  | corresponding api                                                                |
 | --------------------------------------------- | --------- | -------------------------------------------------------------------------------- |
-| add a cell(topk)                              | 0.457940  | fieldstat_cube_add                                                               |
-| add a cell(comprehensive)                     | 0.816540  | fieldstat_cube_add                                                               |
-| histogram record                              | 0.017060  | fieldstat_histogram_record                                                       |
-| HLL add                                       | 0.018250  | fieldstat_hll_add                                                                |
+| add a cell(topk)                              | 0.836     | fieldstat_counter_incyby(new sampling)                                           |
+| add a cell(comprehensive)                     | 1.191     | fieldstat_counter_incyby(new sampling)                                           |
+| histogram record                              | 0.2946    | fieldstat_histogram_record                                                       |
+| HLL add                                       | 0.3306    | fieldstat_hll_add                                                                |
 | copy 1 cell of a 1 counter metric             | 0.7814    | fieldstat_merge(empty destination instance)                                      |
 | copy 1 cell of a HLL metric                   | 1.96      | fieldstat_merge(empty destination instance)                                      |
 | copy 1 cell of a histogram metric             | 0.844     | fieldstat_merge(empty destination instance)                                      |
@@ -150,16 +150,13 @@ It is hard to calculate memory usage of CJSON. By experiment, RSS to different c
 | merge 1 cell of a HLL metric                  | 1.70      | fieldstat_merge(destination also has registered cube, metric and cells)          |
 | merge 1 cell of a histogram metric            | 0.659     | fieldstat_merge(destination instance also has registered cube, metric and cells) |
 | merge 1 cell of a counter metric on topk cube | 0.659     | fieldstat_merge(destination instance also has registered cube, metric and cells) |
-| export a cell (with 10 counter)               | 0.078      | fieldstat_json_exporter_export                                                   |
-| serialize 1 cell of a counter metric          | 0.776  | fieldstat_serialize                                                              |
-| serialize 1 cell of a HLL metric              | 0.624 | fieldstat_serialize                                                              |
-| serialize 1 cell of a histogram metric        | 5.54  | fieldstat_serialize                                                              |
+| export a cell (with 10 counter)               | 0.118     | fieldstat_json_exporter_export                                                   |
 
 ### Explanation
 #### add a cell(topk)
-Generate 100000 random tags, call fieldstat_cube_add for each tag. Calculate the mean time spent for one tag. The max cell number of cube(K) is 1000.
+Generate 100000 random tags, call fieldstat_counter_incyby for each tag. Calculate the mean time spent for one tag. The max cell number of cube(K) is 1000.
 #### add a cell(comprehensive)
-Generate 100000 random tags, call fieldstat_cube_add for each tag. Calculate the mean time spent for one tag. Every adding operation is success (The max cell number of cube is 100000).
+Generate 100000 random tags, call fieldstat_counter_incyby for each tag. Calculate the mean time spent for one tag. Every adding operation is success (The max cell number of cube is 100000).
 
 The time is larger than topk mode, because every tags are added to hash table, while topk only select some.
 #### histogram record 

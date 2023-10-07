@@ -455,7 +455,7 @@ void add_metric_to_instance(struct fieldstat *instance, const struct metric *met
 
 struct metric *find_or_add_metric(struct fieldstat *instance, int cube_id, int metric_id) {
     struct fs_cube *cube = instance->cube[cube_id];
-    if (cube->metrics[metric_id] != NULL) {
+    if (metric_id < cube->valid_metric_arr_len && cube->metrics[metric_id] != NULL) {
         return cube->metrics[metric_id];
     }
     struct metric *metric = metric_fork(instance->metric_masters[metric_id]);
@@ -1357,6 +1357,9 @@ void fieldstat_get_cells_used_by_cube(const struct fieldstat *instance, int cube
 
 int fieldstat_get_used_sampling(const struct fieldstat *instance, int cube_id)
 {
+    if (cube_id < 0 || cube_id >= instance->valid_cube_arr_length) {
+        return -1;
+    }
     const struct fs_cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
         return FS_ERR_INVALID_CUBE_ID;
