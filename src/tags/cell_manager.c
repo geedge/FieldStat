@@ -433,6 +433,15 @@ void cell_manager_merge_topk(struct cell_manager *dest, const struct cell_manage
     heavy_keeper_result_free(result);
 }
 
+int cell_manager_get_cardinality(const struct cell_manager *pthis)
+{
+    if (pthis->sampling_mode == SAMPLING_MODE_COMPREHENSIVE) {
+        return pthis->current_cell_num;
+    } else {
+        return heavy_keeper_get_cardinality(pthis->topk_tag_id_map);
+    }
+}
+
 void cube_manager_free(struct cube_manager *pthis)
 {
     tag_id_map_free(pthis->head);

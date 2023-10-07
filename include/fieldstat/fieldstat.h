@@ -222,9 +222,9 @@ struct fieldstat_tag_list *fieldstat_get_shared_tags(const struct fieldstat *ins
 int fieldstat_find_cube(const struct fieldstat *instance, const struct fieldstat_tag *shared_tags, size_t n_shared_tags);
 
 /* 
-    get the parameter max_n_cell of fieldstat_create_cube. -1 is a valid value, meaning cube has no metric. Return FS_ERR_INVALID_CUBE_ID if cube_id is invalid.
+    get the cell numbers in a cube. Return FS_ERR_INVALID_CUBE_ID if cube_id is invalid.
 */
-int fieldstat_get_max_cell_id(const struct fieldstat *instance, int cube_id);
+int fieldstat_get_used_sampling(const struct fieldstat *instance, int cube_id);
 
 /*
     * @brief Get the value of a metric of a cell.

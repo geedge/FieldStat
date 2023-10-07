@@ -1032,7 +1032,7 @@ int fieldstat_get_metrics_used_by_cube(const struct fieldstat *instance, int cub
 
     int all_available_metric_count = 0;
     if (cube->valid_metric_arr_len == 0) {
-        return 0;
+        return FS_OK;
     }
     int *tmp_ids = (int *)malloc(sizeof(int) * cube->valid_metric_arr_len);
     for (int i = 0; i < cube->valid_metric_arr_len; i++) {
@@ -1045,7 +1045,7 @@ int fieldstat_get_metrics_used_by_cube(const struct fieldstat *instance, int cub
     }
     if (all_available_metric_count == 0) {
         free(tmp_ids);
-        return 0;
+        return FS_OK;
     }
 
     *metric_id_out = tmp_ids;
@@ -1355,16 +1355,14 @@ void fieldstat_get_cells_used_by_cube(const struct fieldstat *instance, int cube
     *n_cell = n_cell_ret;
 }
 
-int fieldstat_get_max_cell_id(const struct fieldstat *instance, int cube_id)
+int fieldstat_get_used_sampling(const struct fieldstat *instance, int cube_id)
 {
     const struct fs_cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
         return FS_ERR_INVALID_CUBE_ID;
     }
 
-    int max_id;
-    (void)cell_manager_dump(cube->cell_manager, &max_id);
-    return max_id;
+    return cell_manager_get_cardinality(cube->cell_manager);
 }
 
 int fieldstat_find_cube(const struct fieldstat *instance, const struct fieldstat_tag *shared_tags, size_t n_shared_tags)

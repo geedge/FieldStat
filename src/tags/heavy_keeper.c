@@ -276,6 +276,10 @@ struct heavy_keeper_result *heavy_keeper_query(const struct heavy_keeper *hk) {
     return stats;
 }
 
+size_t heavy_keeper_get_cardinality(const struct heavy_keeper *hk) {
+    return sorted_set_cardinality(hk->top_K_heap);
+}
+
 int heavy_keeper_query_one(const struct heavy_keeper *hk, const struct tag_hash_key *tag, unsigned int *count_out, int *cell_id_out)
 {
     if (count_out != NULL) {

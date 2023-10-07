@@ -63,6 +63,7 @@ struct heavy_keeper_result *heavy_keeper_query(const struct heavy_keeper *hk);
 
 int heavy_keeper_query_one(const struct heavy_keeper *hk, const struct tag_hash_key *tag, unsigned int *count_out, int *cube_id_out);
 
+size_t heavy_keeper_get_cardinality(const struct heavy_keeper *hk);
 /**
  * @brief   free a heavy keeper query result.
  * @param   stats_hd     the pointer to the heavy keeper query result.

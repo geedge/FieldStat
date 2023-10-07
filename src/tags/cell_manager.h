@@ -17,6 +17,7 @@ const struct tag_hash_key *cell_manager_get_tag_by_cell_id(const struct cell_man
 long long cell_manager_get_count_by_tag(const struct cell_manager *pthis, const struct tag_hash_key *tag);
 const struct tag_hash_key **cell_manager_dump(const struct cell_manager *pthis, int *array_len);
 int cell_manager_find(const struct cell_manager *pthis, const struct tag_hash_key *tag);
+int cell_manager_get_cardinality(const struct cell_manager *pthis);
 
 int cell_manager_add_cell(struct cell_manager *pthis, const struct tag_hash_key *tag);
 int cell_manager_add_cell_topk(struct cell_manager *pthis, const struct tag_hash_key *tag, unsigned int count, int *popped_cell_id);

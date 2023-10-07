@@ -668,7 +668,7 @@ struct cellwise_rec_for_export *read_tag_and_field(const struct fieldstat *insta
 
     size_t n_cell_total = 0;
     for (int i = 0; i < cube_id_len; i++) {
-        n_cell_total += fieldstat_get_max_cell_id(instance, cube_id[i]);
+        n_cell_total += fieldstat_get_used_sampling(instance, cube_id[i]);
     }
     free(cube_id);
     if (n_cell_total == 0) {
