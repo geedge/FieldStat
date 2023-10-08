@@ -59,7 +59,6 @@ struct export_kv_pair {
 };
 
 struct fieldstat_json_exporter {
-    const struct fieldstat *instance;
     char *name;
     struct fieldstat_tag_list *global_tag_list;
     struct counter_history *history;
@@ -280,44 +279,48 @@ struct fieldstat_tag_list *my_copy_fs_tag_list(const struct fieldstat_tag_list *
     return dest;
 }
 
-bool counter_history_check_if_need_to_update(const struct fieldstat_json_exporter *exporter)
+bool counter_history_check_if_need_to_update(const struct fieldstat_json_exporter *exporter, const struct fieldstat *instance)
 {
-    if (exporter->history == NULL) {
+    struct counter_history *history = exporter->history;
+    if (history == NULL) {
         return false; // delta export disabled
     }
+    if (history->cube_version == NULL) { // first time
+        return true;
+    }
 
-    unsigned long cur_cell_version = fieldstat_get_version(exporter->instance);
+    unsigned long cur_cell_version = fieldstat_get_version(instance);
     const char *cur_exporter_name = exporter->name ? exporter->name : DEFAULT_EXPORTER_NAME;
     const struct fieldstat_tag_list *cur_global_tag_list = exporter->global_tag_list;
 
-    if (exporter->history->cell_version != cur_cell_version) {
+    if (history->cell_version != cur_cell_version) {
         return true;
     }
 
-    if (strcmp(exporter->history->exporter_name, cur_exporter_name) != 0) {
+    if (strcmp(history->exporter_name, cur_exporter_name) != 0) {
         return true;
     }
 
-    if (exporter->history->global_tag_list == NULL && cur_global_tag_list != NULL) {
+    if (history->global_tag_list == NULL && cur_global_tag_list != NULL) {
         return true;
     }
-    if (exporter->history->global_tag_list == NULL && cur_global_tag_list == NULL) {
+    if (history->global_tag_list == NULL && cur_global_tag_list == NULL) {
         return false;
     }
-    // global tag cant be deleted, so no need to check if cur_global_tag_list == NULL && exporter->history->global_tag_list != NULL
-    if (fieldstat_tag_list_cmp(cur_global_tag_list, exporter->history->global_tag_list) == false) {
+    // global tag cant be deleted, so no need to check if cur_global_tag_list == NULL && history->global_tag_list != NULL
+    if (fieldstat_tag_list_cmp(cur_global_tag_list, history->global_tag_list) == false) {
         return true;
     }
 
     int *cube_ids = NULL;
     int n_cube = 0;
-    fieldstat_get_cubes(exporter->instance, &cube_ids, &n_cube);
-    if (n_cube != exporter->history->n_cube) {
+    fieldstat_get_cubes(instance, &cube_ids, &n_cube);
+    if (n_cube != history->n_cube) {
         return true;
     }
     for (int i = 0; i < n_cube; i++) {
-        unsigned long cube_version = fieldstat_get_cube_version(exporter->instance, cube_ids[i]);
-        if (cube_version != exporter->history->cube_version[i]) {
+        unsigned long cube_version = fieldstat_get_cube_version(instance, cube_ids[i]);
+        if (cube_version != history->cube_version[i]) {
             return true;
         }
     }
@@ -326,9 +329,9 @@ bool counter_history_check_if_need_to_update(const struct fieldstat_json_exporte
     return false;
 }
 
-void counter_history_fill_version_info(struct counter_history *history, struct fieldstat_json_exporter *exporter)
+void counter_history_fill_version_info(struct counter_history *history, struct fieldstat_json_exporter *exporter, const struct fieldstat *instance)
 {
-    unsigned long cur_cell_version = fieldstat_get_version(exporter->instance);
+    unsigned long cur_cell_version = fieldstat_get_version(instance);
     const char *cur_exporter_name = exporter->name ? exporter->name : DEFAULT_EXPORTER_NAME;
     const struct fieldstat_tag_list *cur_global_tag_list = exporter->global_tag_list;
 
@@ -342,25 +345,25 @@ void counter_history_fill_version_info(struct counter_history *history, struct f
 
     int *cube_ids = NULL;
     int n_cube = 0;
-    fieldstat_get_cubes(exporter->instance, &cube_ids, &n_cube);
+    fieldstat_get_cubes(instance, &cube_ids, &n_cube);
     history->n_cube = n_cube;
     history->cube_version = malloc(sizeof(unsigned long) * n_cube);
     for (int i = 0; i < n_cube; i++) {
-        history->cube_version[i] = fieldstat_get_cube_version(exporter->instance, cube_ids[i]);
+        history->cube_version[i] = fieldstat_get_cube_version(instance, cube_ids[i]);
     }
     free(cube_ids);
 }
 
-void fieldstat_json_exporter_update_history(struct fieldstat_json_exporter *exporter)
+void fieldstat_json_exporter_update_history(struct fieldstat_json_exporter *exporter, const struct fieldstat *instance)
 {
-    if (counter_history_check_if_need_to_update(exporter) == false) {
+    if (counter_history_check_if_need_to_update(exporter, instance) == false) {
         return;
     }
 
     counter_history_free(exporter->history);
     exporter->history = counter_history_new();
 
-    counter_history_fill_version_info(exporter->history, exporter);
+    counter_history_fill_version_info(exporter->history, exporter, instance);
 }
 
 void fieldstat_json_exporter_write_delta(struct fieldstat_json_exporter *exporter, struct cellwise_rec_for_export *tag_field_pair_arr, size_t arr_len)
@@ -770,14 +773,12 @@ int add_object_to_json_array(char **buf, int *buf_len, int start, const char *st
 /*
     Output the fieldstat instance to json string array. User must free the output string.
 */
-void fieldstat_json_exporter_export_array(const struct fieldstat_json_exporter *exporter, const struct timeval *timestamp, char ***output, size_t *output_size)
+void fieldstat_json_exporter_export_array(const struct fieldstat_json_exporter *exporter, const struct fieldstat *instance, const struct timeval *timestamp, char ***output, size_t *output_size)
 {
     long long timestamp_ms = cal_ms_time(timestamp);
     if (exporter->history != NULL) {
-        fieldstat_json_exporter_update_history((struct fieldstat_json_exporter *)exporter);
+        fieldstat_json_exporter_update_history((struct fieldstat_json_exporter *)exporter, instance);
     }
-
-    const struct fieldstat *instance = exporter->instance;
 
     size_t n_pair;
     struct cellwise_rec_for_export *tag_field_pair = read_tag_and_field(instance, &n_pair, exporter->history != NULL);
@@ -834,11 +835,11 @@ void fieldstat_json_exporter_export_array(const struct fieldstat_json_exporter *
     free(tag_field_pair);
 }
 
-char *fieldstat_json_exporter_export(const struct fieldstat_json_exporter *exporter, const struct timeval *timestamp)
+char *fieldstat_json_exporter_export(const struct fieldstat_json_exporter *exporter, const struct fieldstat *instance, const struct timeval *timestamp)
 {
     char **str_arr = NULL;
     size_t n_pair = 0;
-    fieldstat_json_exporter_export_array(exporter, timestamp, &str_arr, &n_pair);
+    fieldstat_json_exporter_export_array(exporter, instance, timestamp, &str_arr, &n_pair);
     if (str_arr == NULL || n_pair == 0) {
         return NULL;
     }
@@ -860,10 +861,9 @@ char *fieldstat_json_exporter_export(const struct fieldstat_json_exporter *expor
     return cjson_str_arr;
 }
 
-struct fieldstat_json_exporter *fieldstat_json_exporter_new(const struct fieldstat *instance)
+struct fieldstat_json_exporter *fieldstat_json_exporter_new()
 {
     struct fieldstat_json_exporter *exporter = (struct fieldstat_json_exporter *)malloc(sizeof(struct fieldstat_json_exporter));
-    exporter->instance = instance;
     exporter->name = NULL;
     exporter->global_tag_list = NULL;
     exporter->history = NULL;
@@ -932,5 +932,4 @@ void fieldstat_json_exporter_enable_delta(struct fieldstat_json_exporter *export
         return;
     }
     exporter->history = counter_history_new();
-    counter_history_fill_version_info(exporter->history, exporter);
 }

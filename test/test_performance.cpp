@@ -293,10 +293,10 @@ TEST(test_performance, export_many_cells)
         }
     }
 
-    struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new(instance);
+    struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new();
     // getchar();
     clock_t start = clock();
-    char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, &TEST_TIMEVAL);
+    char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, instance, &TEST_TIMEVAL);
     clock_t end = clock();
     // exit(0);
     free(json_string);

@@ -118,10 +118,10 @@ void fill_random_tag(Fieldstat_tag_list_wrapper *tags[], int tag_list_num)
 
 cJSON *test_exporter_extract_results_with_standard_global(const struct fieldstat *instance)
 {
-    struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new(instance);
+    struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new();
     fieldstat_json_exporter_set_global_tag(fieldstat_json_exporter, TEST_TAG_GLOBAL, 3);
 
-    char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, &TEST_TIMEVAL);
+    char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, instance, &TEST_TIMEVAL);
     cJSON *root_arr = cJSON_Parse(json_string);
     free(json_string);
     fieldstat_json_exporter_free(fieldstat_json_exporter);
@@ -131,10 +131,10 @@ cJSON *test_exporter_extract_results_with_standard_global(const struct fieldstat
 
 cJSON *test_exporter_extract_results(const struct fieldstat *instance)
 {
-    struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new(instance);
+    struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new();
 
     // getchar();
-    char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, &TEST_TIMEVAL);
+    char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, instance, &TEST_TIMEVAL);
     // exit(0);
     cJSON *root_arr = cJSON_Parse(json_string);
     free(json_string);
@@ -403,9 +403,9 @@ TEST(export_test, enable_delta_and_export_twice_without_new_metric)
     fieldstat_counter_incrby(instance, cube_id, id_counter, &TEST_TAG_INT, 1, 1);
 
     // export test
-    struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new(instance);
+    struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new();
     fieldstat_json_exporter_enable_delta(fieldstat_json_exporter);
-    char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, &TEST_TIMEVAL);
+    char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, instance, &TEST_TIMEVAL);
     cJSON *root_arr = cJSON_Parse(json_string);
     free(json_string);
 
@@ -432,7 +432,7 @@ TEST(export_test, enable_delta_and_export_twice_without_new_metric)
 
     struct timeval new_ts = TEST_TIMEVAL;
     new_ts.tv_sec += 1;
-    json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, &new_ts);
+    json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, instance, &new_ts);
     root_arr = cJSON_Parse(json_string);
     free(json_string);
 
@@ -473,9 +473,9 @@ TEST(export_test, enable_delta_and_export_twice_with_new_metric_and_omit_histogr
     fieldstat_hist_record(instance, cube_id, id_histogram, &TEST_TAG_INT, 1, 123);
 
     // export test
-    struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new(instance);
+    struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new();
     fieldstat_json_exporter_enable_delta(fieldstat_json_exporter);
-    char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, &TEST_TIMEVAL);
+    char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, instance, &TEST_TIMEVAL);
     cJSON *root_arr = cJSON_Parse(json_string);
     free(json_string);
 
@@ -508,7 +508,7 @@ TEST(export_test, enable_delta_and_export_twice_with_new_metric_and_omit_histogr
     fieldstat_counter_incrby(instance, cube_id, id_counter2, &TEST_TAG_INT, 1, 1);
     fieldstat_counter_incrby(instance, cube_id, id_counter, &TEST_TAG_INT, 1, 10);
 
-    json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, &new_ts);
+    json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, instance, &new_ts);
     root_arr = cJSON_Parse(json_string);
     free(json_string);
 
@@ -553,9 +553,9 @@ TEST(export_test, enable_delta_and_export_three_times_skipping_cube_with_no_coun
     fieldstat_hist_record(instance, cube_id, id_histogram, &TEST_TAG_STRING, 1, 123);
 
     /* -------------------------- export test, 1st time ------------------------- */
-    struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new(instance);
+    struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new();
     fieldstat_json_exporter_enable_delta(fieldstat_json_exporter);
-    char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, &TEST_TIMEVAL);
+    char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, instance, &TEST_TIMEVAL);
     printf("%s\n", json_string);
     cJSON *root_arr = cJSON_Parse(json_string);
     free(json_string);
@@ -581,7 +581,7 @@ TEST(export_test, enable_delta_and_export_three_times_skipping_cube_with_no_coun
     cJSON_Delete(root_arr);
 
     /* -------------------------------- 2nd time -------------------------------- */
-    json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, &TEST_TIMEVAL);
+    json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, instance, &TEST_TIMEVAL);
     root_arr = cJSON_Parse(json_string);
     free(json_string);
     root = cJSON_GetArrayItem(root_arr, 0);
@@ -604,7 +604,7 @@ TEST(export_test, enable_delta_and_export_three_times_skipping_cube_with_no_coun
     // add some new recs
     fieldstat_counter_incrby(instance, cube_id, id_counter, &TEST_TAG_INT, 1, 10);
     fieldstat_hist_record(instance, cube_id, id_histogram, &TEST_TAG_STRING, 1, 1234);
-    json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, &TEST_TIMEVAL);
+    json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, instance, &TEST_TIMEVAL);
     root_arr = cJSON_Parse(json_string);
     free(json_string);
     root = cJSON_GetArrayItem(root_arr, 0);
@@ -658,11 +658,11 @@ TEST(export_test, enable_delta_and_export_instance_with_many_cells_with_global_t
     fieldstat_counter_incrby(instance, cube_id2, id_counter1, &TEST_TAG_DOUBLE, 1, 22);
 
     // export test
-    struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new(instance);
+    struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new();
     fieldstat_json_exporter_set_global_tag(fieldstat_json_exporter, TEST_TAG_GLOBAL, 3);
     fieldstat_json_exporter_set_name(fieldstat_json_exporter, "test_instance");
     fieldstat_json_exporter_enable_delta(fieldstat_json_exporter);
-    char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, &TEST_TIMEVAL);
+    char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, instance, &TEST_TIMEVAL);
     cJSON *root_arr = cJSON_Parse(json_string);
     free(json_string);
 
@@ -698,7 +698,7 @@ TEST(export_test, enable_delta_and_export_instance_with_many_cells_with_global_t
 
     struct timeval new_ts = TEST_TIMEVAL;
     new_ts.tv_sec += 1;
-    json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, &new_ts);
+    json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, instance, &new_ts);
     root_arr = cJSON_Parse(json_string);
     free(json_string);
 
@@ -738,9 +738,9 @@ void test_reset_one_round(std::function<void(struct fieldstat *, struct fieldsta
     fieldstat_counter_incrby(instance, cube_id, id_counter, &TEST_TAG_INT, 1, 11);
 
     // export test
-    struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new(instance);
+    struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new();
     fieldstat_json_exporter_enable_delta(fieldstat_json_exporter);
-    char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, &TEST_TIMEVAL);
+    char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, instance, &TEST_TIMEVAL);
     cJSON *root_arr = cJSON_Parse(json_string);
     free(json_string);
 
@@ -758,7 +758,7 @@ void test_reset_one_round(std::function<void(struct fieldstat *, struct fieldsta
 
     fieldstat_counter_set(instance, cube_id, id_counter, &TEST_TAG_INT, 1, 123);
 
-    json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, &TEST_TIMEVAL);
+    json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, instance, &TEST_TIMEVAL);
     root_arr = cJSON_Parse(json_string);
     free(json_string);
 
