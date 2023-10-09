@@ -51,8 +51,6 @@ fieldstat_free(instance);
 
 ### Merge
 ```
-fieldstat_serialize(instance, &blob, &blob_size);
-struct fieldstat *instance_deserialized = fieldstat_deserialize(blob, blob_size);
 fieldstat_merge(instance_dest, instance_deserialized);
 free(blob);
 fieldstat_free(instance_deserialized);

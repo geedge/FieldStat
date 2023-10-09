@@ -23,8 +23,6 @@ int cell_manager_add_cell(struct cell_manager *pthis, const struct tag_hash_key 
 int cell_manager_add_cell_topk(struct cell_manager *pthis, const struct tag_hash_key *tag, unsigned int count, int *popped_cell_id);
 int cell_manager_delete_cell(struct cell_manager *pthis, const struct tag_hash_key *tag);
 
-int cell_manager_serialize(const struct cell_manager *pthis, char **blob, size_t *blob_size);
-struct cell_manager *cell_manager_deserialize(const char *blob, size_t blob_size);
 void cell_manager_merge_topk(struct cell_manager *dest, const struct cell_manager *src, 
     int **cell_id_popped, int *n_cell_id_popped, int **cell_id_old, int **cell_id_added, int *n_cell_id_added);
 
