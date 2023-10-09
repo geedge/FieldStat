@@ -50,7 +50,7 @@ class FieldstatAPI:
     libfieldstat.fieldstat_histogram_value_sum.restype            =  ctypes.c_longlong
 
     libfieldstat.fieldstat_is_hll.argtypes                        = [ctypes.c_char_p]
-    libfieldstat.fieldstat_is_hll.restype                         =  ctypes.c_longlong
+    libfieldstat.fieldstat_is_hll.restype                         =  ctypes.c_bool
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(message)s')
 
