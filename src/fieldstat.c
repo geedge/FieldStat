@@ -988,12 +988,12 @@ int fieldstat_calibrate(const struct fieldstat *master, struct fieldstat *replic
 /* -------------------------------------------------------------------------- */
 void fieldstat_get_cubes(const struct fieldstat *instance, int **cube_ids, int *n_cube)
 {
-    int all_available_cube_count = 0;
-    if (instance->valid_cube_arr_length == 0) {
+    if (instance == NULL || instance->valid_cube_arr_length == 0) {
         *cube_ids = NULL;
         *n_cube = 0;
         return;
     }
+    int all_available_cube_count = 0;
 
     int *tmp_ids = (int *)malloc(sizeof(int) * instance->valid_cube_arr_length);
     for (int i = 0; i < instance->valid_cube_arr_length; i++) {
@@ -1022,6 +1022,9 @@ int fieldstat_get_metrics_used_by_cube(const struct fieldstat *instance, int cub
 {
     *metric_id_out = NULL;
     *n_metric = 0;
+    if (instance == NULL) {
+        return FS_ERR_NULL_HANDLER;
+    }
     if (cube_id >= instance->valid_cube_arr_length || cube_id < 0) {
         return FS_ERR_INVALID_CUBE_ID;
     }
@@ -1056,7 +1059,7 @@ int fieldstat_get_metrics_used_by_cube(const struct fieldstat *instance, int cub
 
 void fieldstat_get_metrics(const struct fieldstat *instance, int **metric_id_out, size_t *n_metric)
 {
-    if (instance->n_metric_master == 0) {
+    if (instance == NULL || instance->n_metric_master == 0) {
         *metric_id_out = NULL;
         *n_metric = 0;
         return;
@@ -1106,7 +1109,7 @@ void fieldstat_get_cells_used_by_metric(const struct fieldstat *instance, int cu
 
 struct fieldstat_tag_list *fieldstat_get_shared_tags(const struct fieldstat *instance, int cube_id)
 {
-    if (cube_id >= instance->valid_cube_arr_length || cube_id < 0) {
+    if (instance == NULL || cube_id >= instance->valid_cube_arr_length || cube_id < 0) {
         return NULL;
     }
     struct fs_cube *cube = instance->cube[cube_id];
@@ -1304,7 +1307,7 @@ const char *fieldstat_get_metric_name(const struct fieldstat *instance, int metr
 
 enum metric_type fieldstat_get_metric_type(const struct fieldstat *instance, int metric_id)
 {
-    if (metric_id < 0 || metric_id >= instance->n_metric_master) {
+    if (instance == NULL || metric_id < 0 || metric_id >= instance->n_metric_master) {
         return (enum metric_type)(-1);
     }
     const struct metric *metric = instance->metric_masters[metric_id];
@@ -1317,7 +1320,7 @@ enum metric_type fieldstat_get_metric_type(const struct fieldstat *instance, int
 
 void fieldstat_get_cells_used_by_cube(const struct fieldstat *instance, int cube_id, struct fieldstat_tag_list **tag_list, size_t *n_cell)
 {
-    if (cube_id < 0 || cube_id >= instance->valid_cube_arr_length) {
+    if (instance == NULL || cube_id < 0 || cube_id >= instance->valid_cube_arr_length) {
         return;
     }
     const struct fs_cube *cube = instance->cube[cube_id];
@@ -1357,8 +1360,11 @@ void fieldstat_get_cells_used_by_cube(const struct fieldstat *instance, int cube
 
 int fieldstat_get_used_sampling(const struct fieldstat *instance, int cube_id)
 {
+    if (instance == NULL) {
+        return FS_ERR_NULL_HANDLER;
+    }
     if (cube_id < 0 || cube_id >= instance->valid_cube_arr_length) {
-        return -1;
+        return FS_ERR_INVALID_CUBE_ID;
     }
     const struct fs_cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
@@ -1370,6 +1376,9 @@ int fieldstat_get_used_sampling(const struct fieldstat *instance, int cube_id)
 
 int fieldstat_find_cube(const struct fieldstat *instance, const struct fieldstat_tag *shared_tags, size_t n_shared_tags)
 {
+    if (instance == NULL) {
+        return FS_ERR_NULL_HANDLER;
+    }
     const struct cube_manager *tag_cube_id_map = instance->shared_tag_cube_manager;
     struct tag_hash_key *shared_tag_key = tag_hash_key_construct_with_fieldstat_tag(shared_tags, n_shared_tags);
     int cube_id = cube_manager_find(tag_cube_id_map, shared_tag_key);

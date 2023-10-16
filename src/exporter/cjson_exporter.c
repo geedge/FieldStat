@@ -775,6 +775,11 @@ int add_object_to_json_array(char **buf, int *buf_len, int start, const char *st
 */
 void fieldstat_json_exporter_export_array(const struct fieldstat_json_exporter *exporter, const struct fieldstat *instance, const struct timeval *timestamp, char ***output, size_t *output_size)
 {
+    if (instance == NULL) {
+        *output = NULL;
+        *output_size = 0;
+        return;
+    }
     long long timestamp_ms = cal_ms_time(timestamp);
     if (exporter->history != NULL) {
         fieldstat_json_exporter_update_history((struct fieldstat_json_exporter *)exporter, instance);
