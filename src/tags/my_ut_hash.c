@@ -24,10 +24,11 @@ void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_tags, ch
 	int used_len = 0;
 	struct fieldstat_tag *tag = NULL;
 
-    char one_time_key[1024] = {0};
-    size_t tmp_key_size = sizeof(one_time_key);
-    size_t remain_key_size = tmp_key_size;
-    size_t total_key_size = tmp_key_size;
+    const size_t init_key_size = 1024;
+    size_t one_time_key_size = init_key_size;
+    char *one_time_key = (char *)malloc(init_key_size);
+    size_t remain_key_size = init_key_size;
+    size_t total_key_size = init_key_size;
     char *dynamic_mem = (char *)malloc(remain_key_size);
     size_t key_len;
     size_t val_len;
@@ -41,6 +42,10 @@ void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_tags, ch
                 key_len = strlen(tag->key);
                 val_len = sizeof(long long);
                 used_len = key_len + val_len;
+                while (used_len >= one_time_key_size) {
+                    one_time_key_size += init_key_size;
+                    one_time_key = (char *)realloc(one_time_key, one_time_key_size);
+                }
                 memcpy(one_time_key, tag->key, key_len);
                 memcpy(one_time_key + key_len, &tag->value_longlong, val_len);
 				break;
@@ -48,6 +53,10 @@ void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_tags, ch
                 key_len = strlen(tag->key);
                 val_len = sizeof(double);
                 used_len = key_len + val_len;
+                while (used_len >= one_time_key_size) {
+                    one_time_key_size += init_key_size;
+                    one_time_key = (char *)realloc(one_time_key, one_time_key_size);
+                }
                 memcpy(one_time_key, tag->key, key_len);
                 memcpy(one_time_key + key_len, &tag->value_double, val_len);
 				break;
@@ -55,6 +64,10 @@ void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_tags, ch
                 key_len = strlen(tag->key);
                 val_len = strlen(tag->value_str);
                 used_len = key_len + val_len;
+                while (used_len >= one_time_key_size) {
+                    one_time_key_size += init_key_size;
+                    one_time_key = (char *)realloc(one_time_key, one_time_key_size);
+                }
                 memcpy(one_time_key, tag->key, key_len);
                 memcpy(one_time_key + key_len, tag->value_str, val_len);
 				break;
@@ -63,10 +76,10 @@ void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_tags, ch
 				break;
 		}
         
-        if (used_len >= remain_key_size) {
-            total_key_size += tmp_key_size;
+        while (used_len >= remain_key_size) {
+            total_key_size += init_key_size;
             dynamic_mem = (char *)realloc(dynamic_mem, total_key_size);
-            remain_key_size += tmp_key_size;
+            remain_key_size += init_key_size;
         }
 
         memcpy(dynamic_mem + total_key_size - remain_key_size, one_time_key, used_len);
@@ -79,6 +92,7 @@ void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_tags, ch
     *out_key_size = total_key_size - remain_key_size; // not include '\0'
 
     free(dynamic_mem);
+    free(one_time_key);
 }
 
 struct tag_hash_key {

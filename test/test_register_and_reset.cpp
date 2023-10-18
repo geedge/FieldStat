@@ -122,13 +122,13 @@ TEST(test_register, register_many_cubes)
     fieldstat_free(instance);
 }
 
-TEST(test_register, add_long_tagged_cells)
+TEST(test_register, add_many_tagged_cells)
 {
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
     struct fieldstat_tag test_tag_long[100];
     for (int i = 0; i < 100; i++) {
-        test_tag_long[i] = TEST_TAG_INT;
+        test_tag_long[i] = TEST_TAG_INT; // will trigger realloc 
     }
 
     int metric_id = fieldstat_register_counter(instance, "counter");
@@ -140,6 +140,28 @@ TEST(test_register, add_long_tagged_cells)
     EXPECT_EQ(result, 10086);
 
     fieldstat_free(instance);
+}
+
+TEST(test_register, add_long_tagged_cells)
+{
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    struct fieldstat_tag test_tag_long = TEST_TAG_STRING;
+    char *long_string = (char *)malloc(5001);
+    memset(long_string, 'a', 5001);
+    long_string[5000] = '\0';
+    test_tag_long.value_str = long_string;
+
+    int metric_id = fieldstat_register_counter(instance, "counter");
+    fieldstat_counter_incrby(instance, cube_id, metric_id, &test_tag_long, 1, 10086);
+
+    long long result;
+    struct fieldstat_tag_list tag_list = {&test_tag_long, 1};
+    fieldstat_counter_get(instance, cube_id, metric_id, &tag_list, &result);
+    EXPECT_EQ(result, 10086);
+
+    fieldstat_free(instance);
+    free(long_string);
 }
 
 TEST(test_register, register_too_many_metrics)
@@ -475,7 +497,6 @@ TEST(calibrate, master_many_cube)
     fieldstat_free(master);
     fieldstat_free(target);
 }
-
 
 int main(int argc, char *argv[]) 
 {

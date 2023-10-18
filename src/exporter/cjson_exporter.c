@@ -441,6 +441,7 @@ int cell_iter_next_cube(struct cell_iter *iter) {
         fieldstat_get_cells_used_by_cube(instance, cube_id_next, &iter->tag_list, &iter->n_cell);
         if (iter->n_cell == 0) {
             free(iter->metric_ids);
+            iter->metric_ids = NULL;
             continue;
         }
 
