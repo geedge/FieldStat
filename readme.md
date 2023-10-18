@@ -305,10 +305,11 @@ optional arguments:
   -i INTERVAL, --interval INTERVAL
                         interval, seconds to wait between print.
   -l, --loop            print loop, exit when recv a signal.
-  --clear-screen        clear screen at start of loop
-  --display-hll         Display hyperloglog type metrics
-  --display-hist        Display histogram type metrics
-  --display-counter     Display counter type metrics
+  --clear-screen        clear screen at start of loop.
+  --display-hll         Display hyperloglog type metrics.
+  --display-hist        Display histogram type metrics.
+  --display-counter     Display counter type metrics.
+  --disable-table       disable display table format.
   -m MATCH_TAGS, --match-tags MATCH_TAGS
                         Display the tags match metrics
 ```

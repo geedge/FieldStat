@@ -62,6 +62,7 @@ class FieldstatExporterVars:
     local_display_hist    = False
     local_display_hll     = False
     local_match_tags      = {}
+    local_disable_table   = True
 
     prom_uri_path         = ""
 
@@ -228,33 +229,43 @@ class CounterTable:
         self.field_names = []  
         self.rows        = []
 
-    def add_field_names(self, fields):
-        if len(self.field_names) == 0:
-            sorted_keys = sorted(fields.keys())
-            self.field_names.append("")
-            self.field_names.extend(sorted_keys)
 
-    def append_field_rows(self,  tags, match_tags, fields):
-        row      = []
-        new_tags = {}
+    def create_row_table(self, fields):
+        field_names = []
+        sorted_keys = sorted(fields.keys())
+        field_names.append("")
+        field_names.extend(sorted_keys)
 
-        #table only one tags
-        if len(tags) - len(match_tags) != 1:
+        table = PrettyTable()
+        table.vrules = NONE
+        table.hrules = NONE
+        table.field_names = field_names
+
+        for item in field_names:
+            table.align[item] = "r"
+        table.align[""] = "l"
+
+        self.tables.append(table)
+
+        return table
+
+
+    def add_row_table_row(self, table, tags, fields):
+        row = []
+
+        if table is None:
             return
 
-        for key in tags:
-            if key not in match_tags:
-                new_tags[key] = tags[key]
-                break
-
-        for key, value in new_tags.items():
+        #exporter table row name.
+        for key, value in tags.items():
             row.append("%s_%s" % (key, str(value)))
 
+        #exporter table row value.
         sorted_keys = sorted(fields.keys())
         for key in sorted_keys:
             row.append(fields[key])
 
-        self.rows.append(row)
+        table.add_row(row)
 
 
     def add_table_column(self, tags, head, value, speed_s):
@@ -299,23 +310,6 @@ class CounterTable:
                 table  = self.__build_one_table(self.columns[l_edge:r_edge])
             
             self.tables.append(table)
-        
-    def __build_rows_tables(self):
-        if len(self.field_names) == 0 or len(self.rows) == 0:
-            return
-        table = PrettyTable()
-        table.vrules = NONE
-        table.hrules = NONE
-        table.field_names = self.field_names
-        
-        for item in self.field_names:
-            table.align[item] = "r"
-        table.align[""] = "l"
-
-        for row in self.rows:
-            table.add_row(row)
-
-        self.tables.append(table)
 
     def read_columns_num(self):
         return len(self.columns)
@@ -328,7 +322,6 @@ class CounterTable:
 
     def print_tables(self):
         self.__build_columns_tables()
-        self.__build_rows_tables()
         for item in self.tables:
             print(item)
 
@@ -399,7 +392,7 @@ class LocalExporter:
         self.display_hist      = FieldstatExporterVars.local_display_hist
         self.display_hll       = FieldstatExporterVars.local_display_hll
         self.match_tags        = FieldstatExporterVars.local_match_tags
-        self.is_counter_table  = False
+        self.disable_table     = FieldstatExporterVars.local_disable_table
         self.__set_default_display()
 
     def __set_default_display(self):
@@ -452,82 +445,109 @@ class LocalExporter:
             
         return True
 
-    #table: one same tags + same fields keys 
-    def __is_counter_table(self, json_list):
-        is_first_elem = True
-        prev_tags     = {}
-        prev_fields   = {}
 
-        #only one counter type json object, counter type print normal mode
-        if len(json_list) <= 1:
-            return False
+    def __generate_table_bundle(self, json_objects):
+        table_bundle = {}
+        table_bundle["not_table_field"] = []
 
-        for json_object in json_list:
-            tags = copy.deepcopy(json_object["tags"])
+        for item in json_objects:
+            #set display table option off
+            if self.disable_table:
+                table_bundle["not_table_field"].append(item)
+                continue
+            # table: only one tag and same tag key + same field keys + name key
+            not_append_table = False
+            if len(item["tags"]) != 1:
+                table_bundle["not_table_field"].append(item)
+                continue
 
+            for _, value in item["fields"].items():                
+                if isinstance(value, str):
+                    not_append_table = True
+                    break
+
+            if not_append_table == True:
+                table_bundle["not_table_field"].append(item)
+                continue
+
+            key_list  = list(item["tags"].keys()) + sorted(list(item["fields"].keys()))
+            key = ''.join(key_list) + item["name"]
+            
+            if key in table_bundle:
+                val = table_bundle[key]
+                val.append(item)
+            else:
+                table_bundle[key] = [item]
+
+        return table_bundle
+
+
+    def __read_match_tags_objects(self, json_objects):
+        match_objects = []
+
+        for item in json_objects:
+            tags = item["tags"]
+            #not match tags object. not read.
             if not self.__match_tags(tags):
                 continue
+            #match tags object. delete matching tags.
+            for key,value in self.match_tags.items():
+                if key in tags and value == tags[key]:
+                    tags.pop(key, None)
 
-            for _, value in json_object["fields"].items():
-                if isinstance(value, str):
-                    return False
+            match_objects.append(item)
 
-            for key in self.match_tags:
-                tags.pop(key, None)
+        return match_objects
 
-            #fields no one tags. print normal mode.
-            if len(tags) != 1:
-                return False
+    def __parse_table_json_object(self, json_objects):
+        table = None
+        for item in json_objects:
+            tags   = item["tags"]
+            fields = item["fields"]
+            if table == None:
+                table = self.ctable.create_row_table(fields)
+            self.ctable.add_row_table_row(table, tags, fields)
 
-            if is_first_elem:
-                prev_tags     = tags
-                prev_fields   = json_object["fields"]
-                is_first_elem = False
-                continue
-            else:
-                if prev_tags.keys()   == tags.keys() and \
-                   prev_fields.keys() == json_object["fields"].keys():
-                   continue
-                else:
-                    return False
-        
-        return True
-
-
-    def __parse_json_object(self, json_object):
+    def __parse_single_json_object(self, json_object):
         tags   = self.__parse_json_tags(json_object)
         fields = json_object["fields"]
 
-        if not self.__match_tags(json_object["tags"]):
-            return
-
         for key,value in fields.items():
             if not isinstance(value, str):
+                #counter type 
                 if key.endswith("_delta"):
                     continue
                 speed_s = self.__get_counter_speed_value(key, fields, json_object)
-                if self.is_counter_table:
-                    self.ctable.add_field_names(fields)
-                    self.ctable.append_field_rows(json_object["tags"], self.match_tags, fields)
-                    continue
-                else:
-                    self.__dealwith_counter(tags, key, value, speed_s)
+                self.__dealwith_counter(tags, key, value, speed_s)
             else:
+                # histogram and hll type
                 is_hll = FieldstatAPI.libfieldstat.fieldstat_is_hll(value.encode('utf-8'))
                 if is_hll:
                     self.__dealwith_hll(tags, key, value)
                 else:
                     self.__dealwith_histogram(tags, key, value)
 
+
     def parse_data(self):
+        #check source json file is exist.
         if not os.path.exists(self.json_path):
             logging.error("Path: {%s} does not exist", self.json_path)
             return
+
         with open(self.json_path) as file:
-            data = json.load(file)
-            self.is_counter_table = self.__is_counter_table(data)
-            for json_object in data:
-                self.__parse_json_object(json_object)
+            json_objects  = json.load(file)
+            #read match tags objects.
+            match_objects = self.__read_match_tags_objects(json_objects)
+            #generate tables dict.
+            table_bundle  = self.__generate_table_bundle(match_objects)
+
+            for tkey,tval in table_bundle.items():
+                if tkey == "not_table_field": # exporter single metrics.
+                    for item in tval:
+                        self.__parse_single_json_object(item)
+                else:                         # exporter table-format metrics.
+                    self.__parse_table_json_object(tval)
+
 
     def __print_top_edge(self):
         timestamp = datetime.datetime.now().timestamp()
@@ -615,6 +635,8 @@ class FieldstatExporter:
                             help = 'Display histogram type metrics')
         parser.add_argument('--display-counter', action = 'store_true', default = False,
                             help = 'Display counter type metrics')
+        parser.add_argument('--disable-table',   action = 'store_true', default = False,
+                            help = 'disable display table format')
         parser.add_argument("-m", "--match-tags", type = str,           default = "",
                             help = "Display the tags match metrics")
 
@@ -660,6 +682,7 @@ class FieldstatExporter:
             FieldstatExporterVars.local_display_hll     = args.display_hll
             FieldstatExporterVars.local_display_hist    = args.display_hist
             FieldstatExporterVars.local_match_tags      = self.__parse_tags_str(args.match_tags)
+            FieldstatExporterVars.local_disable_table   = args.disable_table
             self.exporter_mode       = 'local'
             self.local_interval_s    = args.interval
             self.local_enable_loop   = args.loop
