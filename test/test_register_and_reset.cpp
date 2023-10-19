@@ -457,6 +457,7 @@ TEST(calibrate, master_change_cube)
     EXPECT_STREQ(tag_list->tag[0].key, TEST_TAG_STRING.key);
 
     EXPECT_EQ(fieldstat_find_cube(target, &TEST_TAG_STRING, 1), 0);
+    EXPECT_EQ(fieldstat_get_cube_version(target, cube_id), 1);
 
     fieldstat_free(master);
     fieldstat_free(target);

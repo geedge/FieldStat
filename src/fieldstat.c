@@ -883,6 +883,7 @@ struct fieldstat *fieldstat_fork(const struct fieldstat *instance)
         }
     }
     new_instance->cube_version = calloc(new_instance->max_n_cube, sizeof(unsigned long));
+    memcpy(new_instance->cube_version, instance->cube_version, sizeof(unsigned long) * new_instance->max_n_cube);
 
     new_instance->metric_masters = calloc(instance->max_n_metric_master, sizeof(struct metric *));
     new_instance->max_n_metric_master = instance->max_n_metric_master;
