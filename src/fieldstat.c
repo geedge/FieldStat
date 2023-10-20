@@ -659,6 +659,9 @@ int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, co
         return FS_ERR_INVALID_PARAM;
     }
     int cell_id = fieldstat_cube_add(instance, cube_id, tags, n_tag, 0);
+    if (cell_id < 0) {
+        return FS_ERR_TOO_MANY_CELLS;
+    }
     struct metric *metric = find_or_add_metric(instance, cube_id, metric_id);
 
     metric_hll_add(metric, cell_id, key, key_len);
@@ -676,6 +679,9 @@ int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id
     }
 
     int cell_id = fieldstat_cube_add(instance, cube_id, tags, n_tag, 0);
+    if (cell_id < 0) {
+        return FS_ERR_TOO_MANY_CELLS;
+    }
     struct metric *metric = find_or_add_metric(instance, cube_id, metric_id);
 
     ret = metric_histogram_record(metric, cell_id, value);
