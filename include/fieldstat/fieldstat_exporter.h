@@ -36,6 +36,14 @@ void fieldstat_json_exporter_export_array(const struct fieldstat_json_exporter *
     Outputting delta value is time-consuming.
 */
 void fieldstat_json_exporter_enable_delta(struct fieldstat_json_exporter *exporter);
+/*
+    let json exporter output delta value by the side of the original value(accumulated). Instead of let exporter record the delta value, user can provide the delta value by this function.
+    All the delta metrics are provided through argument `instance_delta`.
+    `instance` and `instance_delta` must has exactly the same configurations, including the metrics and cubes. 
+    since this function is only used by fieldstat_easy, users are not expected to use this function directly. As a result, the configuration check is not implemented.    
+    return NULL when instance has no cell records.
+*/
+char *fieldstat_json_exporter_export_with_delta(struct fieldstat_json_exporter *exporter, const struct fieldstat *instance, const struct fieldstat *instance_delta, const struct timeval *timestamp);
 
 #ifdef __cplusplus
 }
