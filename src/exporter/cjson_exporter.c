@@ -59,10 +59,10 @@ struct export_kv_pair {
 };
 
 struct fieldstat_json_exporter {
-    const struct fieldstat *instance;
     char *name;
     struct fieldstat_tag_list *global_tag_list;
     struct counter_history *history;
+    long long last_ts;
 };
 
 struct cell_iter {
@@ -81,6 +81,8 @@ struct cell_iter {
     const struct fieldstat *instance;
 };
 
+// todo: 这个结构体太突兀了，就简简单单带上全量metric id，不带cjson_fields。
+// 之后是要拼fields呢，还是只用counter数据写入到history里呢，是之后的事
 struct cellwise_rec_for_export {
     struct json_writer *cjson_tags;
     struct export_kv_pair **metric_pairs;
@@ -452,7 +454,7 @@ void couple_export_table_free(struct couple_export_table *tbl)
 
 void extend_metric_delta(struct cellwise_rec_for_export *acc, size_t n_acc, struct cellwise_rec_for_export *delta, size_t n_delta)
 {
-    struct couple_export_table *map = couple_export_table_new();
+    struct couple_export_table *map = couple_export_table_new(); // todo: 这个map更新放到exporter里，不要每次都new
     for (int i = 0; i < n_acc; i++) {
         const char *tag_json = json_writer_unwrap(acc[i].cjson_tags);
         couple_export_table_add(map, tag_json, i);
@@ -746,7 +748,6 @@ struct cellwise_rec_for_export *read_tag_and_field(const struct fieldstat *insta
         if (cjson_map_add(&tag_field_pair[i], iter) == 0) {
             continue;
         }
-
         i++;
     }
 
@@ -852,9 +853,6 @@ void fieldstat_json_exporter_export_array(const struct fieldstat_json_exporter *
     }
 
     fieldstat_json_exporter_write_global_tags(exporter, tag_field_pair, n_pair);
-    if (exporter->history != NULL) { // not null when fieldstat_json_exporter_enable_delta is called
-        fieldstat_json_exporter_write_delta((struct fieldstat_json_exporter *)exporter, tag_field_pair, n_pair);
-    }
 
     char **cjson_str_arr = (char **)malloc(sizeof(char *) * n_pair);
     
@@ -904,11 +902,11 @@ void fieldstat_json_exporter_export_array(const struct fieldstat_json_exporter *
     free(tag_field_pair);
 }
 
-char *fieldstat_json_exporter_export(const struct fieldstat_json_exporter *exporter)
+char *fieldstat_json_exporter_export(const struct fieldstat_json_exporter *exporter, const struct fieldstat *instance, const struct timeval *timestamp)
 {
     char **str_arr = NULL;
     size_t n_pair = 0;
-    fieldstat_json_exporter_export_array(exporter, &str_arr, &n_pair);
+    fieldstat_json_exporter_export_array(exporter, instance, timestamp, &str_arr, &n_pair);
     if (str_arr == NULL || n_pair == 0) {
         return NULL;
     }
@@ -1002,6 +1000,8 @@ struct fieldstat_json_exporter *fieldstat_json_exporter_new()
     struct fieldstat_json_exporter *exporter = (struct fieldstat_json_exporter *)malloc(sizeof(struct fieldstat_json_exporter));
     exporter->name = NULL;
     exporter->global_tag_list = NULL;
+    exporter->history = NULL;
+    exporter->last_ts = 0;
     return exporter;
 }
 
