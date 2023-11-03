@@ -176,58 +176,6 @@ TEST(metric_test_histogram, can_add_0value) // histogram only allow min_val > 0,
     fieldstat_free(instance);
 }
 
-TEST(metric_test_histogram, can_add_0value) // histogram only allow min_val > 0, but it can accept value == 0
-{
-    struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_register_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
-    int metric_id = fieldstat_register_hist(instance, cube_id, "czz_test", 1, 600000, 3);
-    int cell_id = fieldstat_cube_add(instance, cube_id, &TEST_TAG_INT_collided, 1, 1);
-
-    int ret = fieldstat_hist_record(instance, cube_id, metric_id, cell_id, 0);
-    EXPECT_EQ(ret, 0);
-    ret = fieldstat_hist_record(instance, cube_id, metric_id, cell_id, 0);
-    EXPECT_EQ(ret, 0);
-    ret = fieldstat_hist_record(instance, cube_id, metric_id, cell_id, 500);
-
-    EXPECT_EQ(fieldstat_hist_value_at_percentile(instance, cube_id, metric_id, cell_id, 60.0), 0);
-
-    fieldstat_free(instance);
-}
-
-extern "C" {
-    bool fieldstat_is_hll(char *buf);
-}
-
-TEST(metric_test_histogram, encode_decode_b64)
-{
-    struct hdr_histogram *h = NULL;
-    hdr_init(1, 10000, 5, &h);
-    hdr_record_value(h, 1234);
-    hdr_record_value(h, 1234);
-    hdr_record_value(h, 4312);
-
-    char *b64 = NULL;
-    size_t b64_len = 0;
-    histogram_encode_into_b64(h, &b64, &b64_len);
-
-    EXPECT_FALSE(fieldstat_is_hll(b64));
-    
-    struct hdr_histogram *h2 = histogram_decode_from_b64(b64, b64_len);
-
-    EXPECT_TRUE(h2 != NULL);
-    EXPECT_EQ(h->lowest_discernible_value, h2->lowest_discernible_value);
-    EXPECT_EQ(h->highest_trackable_value, h2->highest_trackable_value);
-    EXPECT_EQ(h->significant_figures, h2->significant_figures);
-    EXPECT_EQ(h->counts_len, h2->counts_len);
-    for (int i = 0; i < h2->counts_len; i++)
-    {
-        EXPECT_EQ(h->counts[i], h2->counts[i]);
-    }
-
-    free(b64);
-    hdr_close(h);
-    hdr_close(h2);
-}
 
 int main(int argc, char *argv[]) 
 {
