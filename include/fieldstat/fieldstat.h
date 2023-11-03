@@ -122,7 +122,7 @@ int fieldstat_register_hist(struct fieldstat *instance, const char *metric_name,
     *           In comprehensive mode, a full cube cannot be added any more cells.
     *           In topk mode, every increment matters, so even the cube is full, the cell can also replace the least frequent cell.
 */
-int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long increment);
+int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long increment);
 
 /*
     * @brief let the value of counter metric equal to value. Other annotations refer to fieldstat_counter_incrby.
