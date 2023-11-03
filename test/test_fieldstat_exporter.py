@@ -259,30 +259,30 @@ class TestCounterTable(unittest.TestCase):
     def setUp(self):
         self.c_table = CounterTable()
 
-
-    def test_add_field_names(self):
-        self.c_table.field_names = []
-
+    def test_create_row_table(self):
         fields_names_0 = {"column0": 0, "column1": 1}
-        self.c_table.add_field_names(fields_names_0)
-        self.assertEqual(self.c_table.field_names, ["", "column0", "column1"])
+        table = self.c_table.create_row_table(fields_names_0)
+        self.assertEqual(table.field_names, ["", "column0", "column1"])
 
         fields_names_1 = {"column2": 2, "column3": 3}
-        self.c_table.add_field_names(fields_names_1)
-        self.assertEqual(self.c_table.field_names, ["", "column0", "column1"])
+        table = self.c_table.create_row_table(fields_names_1)
+        self.assertEqual(table.field_names, ["", "column2", "column3"])
 
-
-    def test_append_field_rows(self):
+    def test_add_row_table_row(self):
         self.c_table.field_names = []
 
-        fields_names_0 = {"column0": 0, "column1": 1}
-        self.c_table.append_field_rows({"name": "0"}, {}, fields_names_0)
-        self.assertEqual(self.c_table.rows[0], ["name_0", 0, 1])
+        table = self.c_table.create_row_table({"column0": 0, "column1": 1})
+        tags  = {"row": "0"}
+        field = {"column0": 0, "column1":1}
+        self.c_table.add_row_table_row(None,  tags, field)
 
-        fields_names_1 = {"column2": 2, "column3": 3}
-        self.c_table.append_field_rows({"name": "1"}, {}, fields_names_1)
-        self.assertEqual(self.c_table.rows[1],  ["name_1", 2, 3])
-
+        table_str = table.get_string()
+        row_count = len(table_str.split("\n")) - 1
+        self.assertEqual(row_count, 0)
+        
+        self.c_table.add_row_table_row(table, tags, field)
+        row_count = len(table_str.split("\n")) - 1
+        self.assertEqual(row_count, 0)
 
     def test_add_table_column(self):
         head    = "policy_hit"
@@ -323,16 +323,6 @@ class TestCounterTable(unittest.TestCase):
 
             self.assertEqual(len(self.c_table.tables),       math.ceil(100/table_size))
             self.assertEqual(self.c_table.read_tables_num(), math.ceil(100/table_size))
-
-
-    def test__build_rows_tables(self):
-        self.c_table.field_names = ["", "column0", "column1"]
-        self.c_table.rows = [["row0", 1, 1], ["row1", 2, 2]]
-        
-        n_tables_before = self.c_table.read_tables_num()
-        self.c_table._CounterTable__build_rows_tables()
-        n_table_after   = self.c_table.read_tables_num()
-        self.assertEqual(n_table_after - n_tables_before, 1)
 
 
     def test_print_tables(self):
@@ -572,7 +562,7 @@ class TestLocalExporter(unittest.TestCase):
         ret = self.local._LocalExporter__match_tags(tags)
         self.assertEqual(ret, True)
 
-    def test__is_counter_table(self):
+    def test__generate_table_bundle(self):
         json_data_0 = [{ "name": "-",
                         "tags": {
                             "send_log": "sum"
@@ -584,8 +574,9 @@ class TestLocalExporter(unittest.TestCase):
                         "timestamp_ms": 1000,
                         "timestamp_ms_delta": 0
                         }]
-        ret = self.local._LocalExporter__is_counter_table(json_data_0)
-        self.assertEqual(ret, False)
+        table_bundle_0 = self.local._LocalExporter__generate_table_bundle(json_data_0)
+        self.assertEqual(table_bundle_0["not_table_field"], [])
+        self.assertEqual(len(table_bundle_0["send_logT_fail_logT_fail_log_delta-"]), 1)
 
         json_data_1 = [{ "name": "-",
                         "tags": {
@@ -609,14 +600,9 @@ class TestLocalExporter(unittest.TestCase):
                         "timestamp_ms": 1000,
                         "timestamp_ms_delta": 0
                         }]
-        
-        self.local.match_tags = {"policy": 1} 
-        ret = self.local._LocalExporter__is_counter_table(json_data_1)
-        self.assertEqual(ret, True)
-        
-        self.local.match_tags = {"send_log": "sum"} 
-        ret = self.local._LocalExporter__is_counter_table(json_data_1)
-        self.assertEqual(ret, False)
+        table_bundle_1 = self.local._LocalExporter__generate_table_bundle(json_data_1)
+        self.assertEqual(table_bundle_1["not_table_field"], [])
+        self.assertEqual(len(table_bundle_1["send_logT_fail_logT_fail_log_delta-"]), 2)
 
         json_data_2 = [{ "name": "-",
                         "tags": {
@@ -640,9 +626,10 @@ class TestLocalExporter(unittest.TestCase):
                         "timestamp_ms": 1000,
                         "timestamp_ms_delta": 0
                         }]
-        self.local.match_tags = {} 
-        ret = self.local._LocalExporter__is_counter_table(json_data_2)
-        self.assertEqual(ret, False)
+        table_bundle_2 = self.local._LocalExporter__generate_table_bundle(json_data_2)
+        self.assertEqual(table_bundle_2["not_table_field"], [])
+        self.assertEqual(len(table_bundle_2["send_logT_fail_logT_fail_log_delta-"]), 1)
+        self.assertEqual(len(table_bundle_2["send_log_0T_fail_logT_fail_log_delta-"]), 1)
 
         json_data_3 = [{ "name": "-",
                         "tags": {
@@ -666,26 +653,72 @@ class TestLocalExporter(unittest.TestCase):
                         "timestamp_ms": 1000,
                         "timestamp_ms_delta": 0
                         }]
-        self.local.match_tags = {} 
-        ret = self.local._LocalExporter__is_counter_table(json_data_3)
-        self.assertEqual(ret, True)
+        table_bundle_3 = self.local._LocalExporter__generate_table_bundle(json_data_3)
+        self.assertEqual(table_bundle_3["not_table_field"], [])
+        self.assertEqual(len(table_bundle_3["send_logT_fail_logT_fail_log_delta-"]), 2)
 
-    def test__parse_json_object(self):
-        #counter json object
-        peradd  = len(self.local.ctable.columns)
-        self.local._LocalExporter__parse_json_object(self.counter_json_object)
-        postadd = len(self.local.ctable.columns) 
-        self.assertEqual(postadd - peradd, 1)
-         #histogram json object
-        peradd  = len(self.local.htable.tables)
-        self.local._LocalExporter__parse_json_object(self.hist_json_object)
-        postadd = len(self.local.htable.tables) 
-        self.assertEqual(postadd - peradd, 1)
-        #hll json object
-        peradd  = len(self.local.hlltable.columns)
-        self.local._LocalExporter__parse_json_object(self.hll_json_object)
-        postadd = len(self.local.hlltable.columns) 
-        self.assertEqual(postadd - peradd, 1)
+        json_data_4 = [{ "name": "-",
+                        "tags": {
+                            "send_log": "sum"
+                        },
+                        "fields": {
+                            "T_fail_log": 2,
+                            "T_fail_log_delta": 2
+                        },
+                        "timestamp_ms": 1000,
+                        "timestamp_ms_delta": 0
+                        },
+                        { "name": "-",
+                        "tags": {
+                            "send_log": "firewall"
+                        },
+                        "fields": {
+                            "T_fail_log": 2,
+                            "T_fail_log_delta": 2
+                        },
+                        "timestamp_ms": 1000,
+                        "timestamp_ms_delta": 0
+                        }]
+        self.local.disable_table = True
+        table_bundle_4 = self.local._LocalExporter__generate_table_bundle(json_data_4)
+        self.assertEqual(len(table_bundle_4["not_table_field"]), 2)
+
+    def test__read_match_tags_objects(self):
+        json_objects = [{ "name": "-",
+                        "tags": {
+                            "send_log": "sum"
+                        },
+                        "fields": {
+                            "T_fail_log": 2,
+                            "T_fail_log_delta": 2
+                        },
+                        "timestamp_ms": 1000,
+                        "timestamp_ms_delta": 0
+                        },
+                        { "name": "-",
+                        "tags": {
+                            "send_log": "firewall"
+                        },
+                        "fields": {
+                            "T_fail_log": 2,
+                            "T_fail_log_delta": 2
+                        },
+                        "timestamp_ms": 1000,
+                        "timestamp_ms_delta": 0
+                        }]
+
+        self.local.match_tags = {}
+        match_object = self.local._LocalExporter__read_match_tags_objects(json_objects)
+        self.assertEqual(len(match_object), 2)
+    
+        self.local.match_tags = {"test": 1}
+        match_object = self.local._LocalExporter__read_match_tags_objects(json_objects)
+        self.assertEqual(len(match_object), 0)
+
+        self.local.match_tags = {"send_log": "firewall"}
+        match_object = self.local._LocalExporter__read_match_tags_objects(json_objects)
+        self.assertEqual(len(match_object), 1)
+
 
     def test_parse_data(self):
         self.local.hlltable = CounterTable()
@@ -750,13 +783,14 @@ class TestFieldstatExporter(unittest.TestCase):
         self.assertEqual(args.loop,         False)
         self.assertEqual(args.clear_screen, False)
 
-        args = parser.parse_args(["local", "--loop", "--clear-screen", "-i", "1000", "--display-hist", "--display-hll", "--display-counter", "--match-tags", "policy:1,rule:1"])
+        args = parser.parse_args(["local", "--loop", "--clear-screen", "-i", "1000", "--display-hist", "--display-hll", "--display-counter", "--disable-table", "--match-tags", "policy:1,rule:1"])
         self.assertEqual(args.interval,        1000)
         self.assertEqual(args.loop,            True)
         self.assertEqual(args.clear_screen,    True)
         self.assertEqual(args.display_counter, True)
         self.assertEqual(args.display_hist,    True)
         self.assertEqual(args.display_hll,     True)
+        self.assertEqual(args.disable_table,   True)
         self.assertEqual(args.match_tags,      "policy:1,rule:1")
 
   
