@@ -18,20 +18,19 @@ static struct fieldstat *get_hll_fieldsstat()
 
     struct fieldstat *instance = fieldstat_new();
     EXPECT_NE(nullptr, instance);
-    int cube_id = fieldstat_register_cube(instance, shared_tags, 1, 
+    int cube_id = fieldstat_create_cube(instance, shared_tags, 1, 
                                           SAMPLING_MODE_COMPREHENSIVE, 100);
 
     for(unsigned int i = 0; i < sizeof(hll_name) / sizeof(hll_name[0]); i++)
     {
-        int hll_id  = fieldstat_register_hll(instance, cube_id, hll_name[i], 5);
-        int cell_id = fieldstat_cube_add(instance, cube_id, NULL, 0, 1000);
+        int hll_id  = fieldstat_register_hll(instance, hll_name[i], 5);
 
         for(int j = 0; j < 100; j++)
         {
             char ip_str[64] = {0};
             memset(ip_str, 0, sizeof(ip_str));
             snprintf(ip_str, sizeof(ip_str), "192.168.%u.%d", i, j);
-            int ret = fieldstat_hll_add(instance, cube_id, hll_id, cell_id, ip_str, strlen(ip_str));
+            int ret = fieldstat_hll_add(instance, cube_id, hll_id, NULL, 0, ip_str, strlen(ip_str));
             EXPECT_EQ(0, ret);
         }
 
@@ -67,18 +66,17 @@ static struct fieldstat *get_hist_fieldstat()
 
     struct fieldstat *instance = fieldstat_new();
     EXPECT_NE(nullptr, instance);
-    int cube_id = fieldstat_register_cube(instance, shared_tags, 2, 
+    int cube_id = fieldstat_create_cube(instance, shared_tags, 2, 
                                           SAMPLING_MODE_COMPREHENSIVE, 100);
     EXPECT_EQ(0, cube_id);
 
     for(unsigned int i = 0; i < sizeof(hist_names)/sizeof(hist_names[0]); i++)
     {
-        int hist_id = fieldstat_register_hist(instance, cube_id, hist_names[i], 1, 600000, 3);
+        int hist_id = fieldstat_register_hist(instance, hist_names[i], 1, 600000, 3);
 
-        int cell_id = fieldstat_cube_add(instance, cube_id, cell_tags, 2, 1000);
         for(int j = 0; j < 100; j++)
         {
-            fieldstat_hist_record(instance, cube_id, hist_id, cell_id, i*100 + j);
+            fieldstat_hist_record(instance, cube_id, hist_id, cell_tags, 2, i*100 + j);
         }
     }
 
@@ -111,25 +109,20 @@ static struct fieldstat *get_table_fieldstat()
     struct fieldstat *instance = fieldstat_new();
     EXPECT_NE(nullptr, instance);
 
-    int cube_id = fieldstat_register_cube(instance, shared_tags, 2, 
+    int cube_id = fieldstat_create_cube(instance, shared_tags, 2, 
                                           SAMPLING_MODE_COMPREHENSIVE, 100);
     EXPECT_EQ(0, cube_id);
 
-    int counter_id_0 = fieldstat_register_counter(instance, cube_id, 
-                                                  "T_success_log",
-                                                  COUNTER_MERGE_BY_SUM);
+    int counter_id_0 = fieldstat_register_counter(instance, "T_success_log");
 
-    int counter_id_1 = fieldstat_register_counter(instance, cube_id, 
-                                                  "T_fail_log",
-                                                  COUNTER_MERGE_BY_SUM);
+    int counter_id_1 = fieldstat_register_counter(instance, "T_fail_log");
 
     for(unsigned int i = 0; i < sizeof(cell_tag_value)/sizeof(cell_tag_value[0]); i++)
     {
         cell_tags.value_str = cell_tag_value[i];
-        int cell_id_0 = fieldstat_cube_add(instance, cube_id, &cell_tags, 1, 1);
-        fieldstat_counter_incrby(instance, cube_id, counter_id_0, cell_id_0, 1);
+        fieldstat_counter_incrby(instance, cube_id, counter_id_0, &cell_tags, 1, 1);
         if(i < 5)
-            fieldstat_counter_incrby(instance, cube_id, counter_id_1, cell_id_0, 2);
+            fieldstat_counter_incrby(instance, cube_id, counter_id_1, &cell_tags, 1, 2);
     }
 
     return instance;
@@ -159,9 +152,9 @@ TEST(ExporterLocal, TableBuild)
     fieldstat_merge(merger, hll);
     fieldstat_merge(merger, hist);
     fieldstat_merge(merger, table);
-    struct fieldstat_json_exporter *exporter = fieldstat_json_exporter_new(merger);
+    struct fieldstat_json_exporter *exporter = fieldstat_json_exporter_new();
     fieldstat_json_exporter_enable_delta(exporter);
-    char *str_json = fieldstat_json_exporter_export(exporter, &current);
+    char *str_json = fieldstat_json_exporter_export(exporter, merger, &current);
     
     int ret = write_json_to_file("/tmp/fieldstat.json",str_json);
     EXPECT_EQ(0, ret);
