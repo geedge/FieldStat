@@ -582,7 +582,7 @@ int check_before_add(const struct fieldstat *instance, int cube_id, int metric_i
     return FS_OK;
 }
 
-int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long increment)
+int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long increment)
 {
     int ret = check_before_add(instance, cube_id, metric_id, METRIC_TYPE_COUNTER);
     if (ret != FS_OK) {
