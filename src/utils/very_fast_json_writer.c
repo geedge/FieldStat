@@ -61,11 +61,14 @@ void json_writer_array_start(struct json_writer *writer) {
 
 void json_writer_array_end(struct json_writer *writer) {
     if (writer->buffer[writer->cursor - 1] == '[') { // empty array
-        json_writer_check_and_realloc(writer, 1);
+        json_writer_check_and_realloc(writer, 2);
         writer->buffer[writer->cursor++] = ']';
+        writer->buffer[writer->cursor++] = ',';
         return;
     }
     writer->buffer[writer->cursor - 1] = ']'; // replace last comma with ]
+    json_writer_check_and_realloc(writer, 1);
+    writer->buffer[writer->cursor++] = ',';
 }
 
 void json_writer_str_item(struct json_writer *writer, const char *value, size_t str_len) {

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include <stub/stub.h>
 #include <fstream>
+#include <thread>
 
 #include "utils.hpp"
 #include "cjson/cJSON.h"
@@ -9,152 +10,168 @@
 
 #define FILENAME "./test_easy_fieldstat.json"
 
-// TEST(test_easy_fieldstat, new_and_free)
-// {
-//     struct fieldstat_easy *fse = fieldstat_easy_new(10, &TEST_TAG_STRING, 1);
-//     fieldstat_easy_free(fse);
-// }
+TEST(test_easy_fieldstat, new_and_free)
+{
+    struct fieldstat_easy *fse = fieldstat_easy_new(10, &TEST_TAG_STRING, 1);
+    fieldstat_easy_free(fse);
+}
 
-// TEST(test_easy_fieldstat, output_to_buff)
-// {
-//     struct fieldstat_easy *fse = fieldstat_easy_new(10, &TEST_TAG_STRING, 1);
-//     fieldstat_easy_register_counter(fse, "metric counter");
-//     fieldstat_easy_counter_incrby(fse, 0, 0, &TEST_TAG_INT, 1, 1);
-//     // read file, should be empty
-//     char *buff = NULL;
-//     size_t buff_len = 0;
-//     fieldstat_easy_output(fse, &buff, &buff_len);
-//     cJSON *root = cJSON_Parse(buff);
-//     cJSON *cell = cJSON_GetArrayItem(root, 0);
-//     cJSON *metric = cJSON_GetObjectItem(cell, "fields");
-//     long long value = cJSON_GetObjectItem(metric, "metric counter")->valueint;
-//     EXPECT_EQ(value, 1);
-//     cJSON *tags = cJSON_GetObjectItem(cell, "tags");
-//     EXPECT_EQ(cJSON_GetObjectItem(tags, TEST_TAG_INT.key)->valueint, TEST_TAG_INT.value_longlong);
-//     EXPECT_STREQ(cJSON_GetObjectItem(tags, TEST_TAG_STRING.key)->valuestring, TEST_TAG_STRING.value_str);
+TEST(test_easy_fieldstat, output_to_buff)
+{
+    struct fieldstat_easy *fse = fieldstat_easy_new(10, &TEST_TAG_STRING, 1);
+    fieldstat_easy_register_counter(fse, "metric counter");
+    fieldstat_easy_counter_incrby(fse, 0, 0, &TEST_TAG_INT, 1, 1);
+    // read file, should be empty
+    char *buff = NULL;
+    size_t buff_len = 0;
+    fieldstat_easy_output(fse, &buff, &buff_len);
+    cJSON *root = cJSON_Parse(buff);
+    cJSON *cell = cJSON_GetArrayItem(root, 0);
+    cJSON *metric = cJSON_GetObjectItem(cell, "fields");
+    long long value = cJSON_GetObjectItem(metric, "metric counter")->valueint;
+    EXPECT_EQ(value, 1);
+    cJSON *tags = cJSON_GetObjectItem(cell, "tags");
+    EXPECT_EQ(cJSON_GetObjectItem(tags, TEST_TAG_INT.key)->valueint, TEST_TAG_INT.value_longlong);
+    EXPECT_STREQ(cJSON_GetObjectItem(tags, TEST_TAG_STRING.key)->valuestring, TEST_TAG_STRING.value_str);
 
-//     cJSON_Delete(root);
-//     free(buff);
-//     fieldstat_easy_free(fse);
-// }
+    cJSON_Delete(root);
+    free(buff);
+    fieldstat_easy_free(fse);
+}
 
-// cJSON *read_file()
-// {
-//     std::ifstream ifs(FILENAME);
-//     if (!ifs.is_open()) {
-//         return NULL;
-//     }
-//     std::string content((std::istreambuf_iterator<char>(ifs)), (std::istreambuf_iterator<char>()));
-//     printf("content: %s\n", content.c_str());
-//     cJSON *root = cJSON_Parse(content.c_str());
-//     ifs.close();
-//     return root;
-// }
+cJSON *read_file()
+{
+    std::ifstream ifs(FILENAME);
+    if (!ifs.is_open()) {
+        return NULL;
+    }
+    std::string content((std::istreambuf_iterator<char>(ifs)), (std::istreambuf_iterator<char>()));
+    printf("content: %s\n", content.c_str());
+    cJSON *root = cJSON_Parse(content.c_str());
+    ifs.close();
+    return root;
+}
 
-// TEST(test_easy_fieldstat, output_to_file)
-// {
-//     struct fieldstat_easy *fse = fieldstat_easy_new(10, NULL, 0);
-//     int counter_id = fieldstat_easy_register_counter(fse, "metric counter");
-//     // fieldstat_easy_register_histogram(fse, "metric histogram", 1, 10000, 1);
-//     fieldstat_easy_enable_auto_output(fse, FILENAME, 1);
-//     sleep(2); // long enough to output
-//     // 1st interval: read file, should be empty
-//     printf("1st interval\n");
-//     cJSON *root = read_file();
-//     EXPECT_EQ(cJSON_GetArraySize(root), 0); // is empty and valid
-//     cJSON_Delete(root);
-
-//     fieldstat_easy_counter_incrby(fse, 0, counter_id, &TEST_TAG_INT, 1, 1);
-//     fieldstat_easy_counter_incrby(fse, 1, counter_id, &TEST_TAG_INT, 1, 10);
-//     fieldstat_easy_counter_incrby(fse, 2, counter_id, &TEST_TAG_INT, 1, 100);
-//     sleep(2);
-
-//     // 2nd interval: merge 3 thread's data, and output
-
-//     printf("2nd interval\n");
-//     root = read_file();
-//     EXPECT_EQ(cJSON_GetArraySize(root), 1);
-
-//     cJSON *tagged_by_int = cJSON_GetArrayItem(root, 0);
-//     cJSON *metric = cJSON_GetObjectItem(tagged_by_int, "fields");
-//     EXPECT_TRUE(metric != NULL);
-
-//     long long value = cJSON_GetObjectItem(metric, "metric counter")->valueint;
-//     EXPECT_EQ(value, 111);
-//     cJSON_Delete(root);
-
-//     // 3nd interval: no new data, just output again
-//     sleep(1);
-//     printf("3rd interval\n");
-//     root = read_file();
-//     EXPECT_EQ(cJSON_GetArraySize(root), 1);
-//     tagged_by_int = cJSON_GetArrayItem(root, 0);
-//     metric = cJSON_GetObjectItem(tagged_by_int, "fields");
-//     value = cJSON_GetObjectItem(metric, "metric counter")->valueint;
-//     EXPECT_EQ(value, 111); // should not change
-//     cJSON_Delete(root);
-
-//     // 4th interval: new data, output again
-//     fieldstat_easy_counter_incrby(fse, 0, counter_id, &TEST_TAG_DOUBLE, 1, 10086);
-//     sleep(2);
-//     printf("4th interval\n");
-//     root = read_file();
-//     cJSON *tagged_by_double = cJSON_GetArrayItem(root, 1);
-//     metric = cJSON_GetObjectItem(tagged_by_double, "fields");
-//     value = cJSON_GetObjectItem(metric, "metric counter")->valueint;
-//     EXPECT_EQ(value, 10086);
-//     cJSON_Delete(root);
-
-//     fieldstat_easy_free(fse);
-//     remove(FILENAME);
-// }
-
-
-// extern "C" {
-//     extern char *output_work(struct fieldstat_easy *fs, struct timeval *timestamp);
-// }
-
-// int g_output_count = 0;
-// char *output_work_stub(struct fieldstat_easy *fs, struct timeval *timestamp)
-// {
-//     g_output_count++;
-//     return NULL;
-// }
-
-// TEST(test_easy_fieldstat, output_interval_ok)
-// {
-//     Stub stub;
-//     stub.set(output_work, output_work_stub);
-
-//     struct fieldstat_easy *fse = fieldstat_easy_new(10, NULL, 0);
-//     fieldstat_easy_enable_auto_output(fse, FILENAME, 1);
-
-//     sleep(20); // output 20s/1s = 20 times
-//     fieldstat_easy_free(fse);
-
-//     EXPECT_EQ(g_output_count, 20);
-// }
-
-TEST(test_easy_fieldstat, ensure_data_racing_of_two_output_and_of_incyby)
+TEST(test_easy_fieldstat, output_to_file)
 {
     struct fieldstat_easy *fse = fieldstat_easy_new(10, NULL, 0);
     int counter_id = fieldstat_easy_register_counter(fse, "metric counter");
-    int hdr_id = fieldstat_easy_register_histogram(fse, "metric histogram", 1, 10000, 1);
     fieldstat_easy_enable_auto_output(fse, FILENAME, 1);
+    sleep(3); // long enough to output
+    // 1st interval: read file, should be empty
+    printf("1st interval\n");
+    cJSON *root = read_file();
+    EXPECT_EQ(cJSON_GetArraySize(root), 0); // is empty and valid
+    cJSON_Delete(root);
 
-    char *out;
-    size_t out_len;
-    for (size_t i = 0; i < 1000000ULL; i++) { // loop million times to ensure no core dump
-        fieldstat_easy_output(fse, &out, &out_len);
-        fieldstat_easy_counter_incrby(fse, 0, counter_id, &TEST_TAG_INT, 1, 1);
-        fieldstat_easy_histogram_record(fse, 0, hdr_id, &TEST_TAG_INT, 1, rand() % 10000);
-        cJSON *root = cJSON_Parse(out);
-        EXPECT_TRUE(root != NULL);
-        cJSON_Delete(root);
-        free(out);
-    }
+    fieldstat_easy_counter_incrby(fse, 0, counter_id, &TEST_TAG_INT, 1, 1);
+    fieldstat_easy_counter_incrby(fse, 1, counter_id, &TEST_TAG_INT, 1, 10);
+    fieldstat_easy_counter_incrby(fse, 2, counter_id, &TEST_TAG_INT, 1, 100);
+    sleep(2);
+
+    // 2nd interval: merge 3 thread's data, and output
+
+    printf("2nd interval\n");
+    root = read_file();
+    EXPECT_EQ(cJSON_GetArraySize(root), 1);
+
+    cJSON *tagged_by_int = cJSON_GetArrayItem(root, 0);
+    cJSON *metric = cJSON_GetObjectItem(tagged_by_int, "fields");
+    EXPECT_TRUE(metric != NULL);
+
+    long long value = cJSON_GetObjectItem(metric, "metric counter")->valueint;
+    EXPECT_EQ(value, 111);
+    cJSON_Delete(root);
+
+    // 3nd interval: no new data, just output again
+    sleep(1);
+    printf("3rd interval\n");
+    root = read_file();
+    EXPECT_EQ(cJSON_GetArraySize(root), 1);
+    tagged_by_int = cJSON_GetArrayItem(root, 0);
+    metric = cJSON_GetObjectItem(tagged_by_int, "fields");
+    value = cJSON_GetObjectItem(metric, "metric counter")->valueint;
+    EXPECT_EQ(value, 111); // should not change
+    cJSON_Delete(root);
+
+    // 4th interval: new data, output again
+    fieldstat_easy_counter_incrby(fse, 0, counter_id, &TEST_TAG_DOUBLE, 1, 10086);
+    sleep(2);
+    printf("4th interval\n");
+    root = read_file();
+    cJSON *tagged_by_double = cJSON_GetArrayItem(root, 1);
+    metric = cJSON_GetObjectItem(tagged_by_double, "fields");
+    value = cJSON_GetObjectItem(metric, "metric counter")->valueint;
+    EXPECT_EQ(value, 10086);
+    cJSON_Delete(root);
 
     fieldstat_easy_free(fse);
+    remove(FILENAME);
+}
+
+
+extern "C" {
+    extern char *output_work(struct fieldstat_easy *fs, struct timeval *timestamp);
+}
+
+int g_output_count = 0;
+char *output_work_stub(struct fieldstat_easy *fs, struct timeval *timestamp)
+{
+    g_output_count++;
+    return NULL;
+}
+
+TEST(test_easy_fieldstat, output_interval_ok)
+{
+    Stub stub;
+    stub.set(output_work, output_work_stub);
+
+    struct fieldstat_easy *fse = fieldstat_easy_new(10, NULL, 0);
+    fieldstat_easy_enable_auto_output(fse, FILENAME, 1);
+
+    sleep(30); // output 30s/1s = 20 times
+    fieldstat_easy_free(fse);
+
+    EXPECT_TRUE(g_output_count == 30 || g_output_count == 29); // 29 when the last output is not triggered
+}
+
+TEST(test_easy_fieldstat, ensure_data_racing_of_two_output_and_of_incyby)
+{
+    const int N_THREADS = 3;
+    struct fieldstat_tag global_tags[1];
+    struct fieldstat_tag tmptag;
+    tmptag.key = "app id";
+    tmptag.type = TAG_INTEGER;
+    tmptag.value_longlong = 1;
+    global_tags[0] = tmptag;
+    
+    struct fieldstat_easy *fse = fieldstat_easy_new(N_THREADS, global_tags, 1);
+    int counter_id = fieldstat_easy_register_counter(fse, "incoming bytes");
+    int hdr_id = fieldstat_easy_register_histogram(fse, "delay", 1, 10000, 1);
+    fieldstat_easy_enable_auto_output(fse, FILENAME, 1);
+
+    std::thread threads[N_THREADS];
+    for (int thread_id = 0; thread_id < N_THREADS; thread_id++) {
+        threads[thread_id] = std::thread([fse, counter_id, hdr_id, thread_id]() {
+            for (int i = 0; i < 1000000; i++) { // loop million times to ensure no core dump
+                fieldstat_easy_counter_incrby(fse, thread_id, counter_id, &TEST_TAG_INT, 1, 1);
+                fieldstat_easy_histogram_record(fse, thread_id, hdr_id, &TEST_TAG_INT, 1, rand() % 10000);
+                char *out;
+                size_t out_len;
+                fieldstat_easy_output(fse, &out, &out_len);
+                cJSON *root = cJSON_Parse(out);
+                EXPECT_TRUE(root != NULL);
+                cJSON_Delete(root);
+                free(out);
+            }
+        });
+    }
+    for (int i = 0; i < N_THREADS; i++) {
+        threads[i].join();
+    }
+    fieldstat_easy_free(fse);
+
+    remove(FILENAME);
 }
 
 int main(int argc, char **argv)

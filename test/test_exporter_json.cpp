@@ -809,6 +809,130 @@ TEST(export_test, enable_delta_and_reset_on_delete_cube) {
     test_reset_one_round(trigger);
 }
 
+TEST(export_test, delta_with_two_instance_same_config)
+{
+    struct fieldstat *instance = fieldstat_new();
+    fieldstat_create_cube(instance, NULL, 0, SAMPLING_MODE_COMPREHENSIVE, 0);
+    int id_counter = fieldstat_register_counter(instance, "counter");
+    fieldstat_counter_incrby(instance, 0, id_counter, &TEST_TAG_INT, 1, 123);
+    int id_hist = fieldstat_register_hist(instance, "histogram", 1, 1000, 3);
+    fieldstat_hist_record(instance, 0, id_hist, &TEST_TAG_INT, 1, 5);
+    
+    struct fieldstat *acc = fieldstat_new();
+    fieldstat_merge(acc, instance);
+    fieldstat_counter_incrby(acc, 0, id_counter, &TEST_TAG_INT, 1, 1000);
+
+    // export test
+    struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new();
+    char *json = fieldstat_json_exporter_export_with_delta(fieldstat_json_exporter, acc, instance, &TEST_TIMEVAL, &TEST_TIMEVAL);
+    cJSON *root_arr = cJSON_Parse(json);
+    free(json);
+
+    cJSON *root = cJSON_GetArrayItem(root_arr, 0);
+    cJSON *metrics = cJSON_GetObjectItem(root, "fields");
+    cJSON *counter = cJSON_GetObjectItem(metrics, "counter");
+    EXPECT_EQ(counter->valueint, 1123);
+    cJSON *counter_delta = cJSON_GetObjectItem(metrics, "counter_delta");
+    EXPECT_EQ(counter_delta->valueint, 123);
+    const cJSON *histogram = cJSON_GetObjectItem(metrics, "histogram");
+    const cJSON *histogram_delta = cJSON_GetObjectItem(metrics, "histogram_delta");
+    EXPECT_STREQ(histogram->valuestring, histogram_delta->valuestring);
+    cJSON *timestamp = cJSON_GetObjectItem(root, "timestamp_ms");
+    EXPECT_EQ(timestamp->valueint, TEST_TIMEVAL_LONG);
+    cJSON *timestamp_delta = cJSON_GetObjectItem(root, "timestamp_ms_delta");
+    EXPECT_EQ(timestamp_delta->valueint, TEST_TIMEVAL_LONG);
+
+    cJSON_Delete(root_arr);
+    fieldstat_json_exporter_free(fieldstat_json_exporter);
+    fieldstat_free(instance);
+    fieldstat_free(acc);
+}
+
+TEST(export_test, delta_with_two_instance_one_empty)
+{
+    struct fieldstat *instance = fieldstat_new();
+    fieldstat_create_cube(instance, NULL, 0, SAMPLING_MODE_COMPREHENSIVE, 0);
+    int id_counter = fieldstat_register_counter(instance, "counter");
+    fieldstat_counter_incrby(instance, 0, id_counter, &TEST_TAG_INT, 1, 123);
+    int id_hist = fieldstat_register_hist(instance, "histogram", 1, 1000, 3);
+    fieldstat_hist_record(instance, 0, id_hist, &TEST_TAG_INT, 1, 5);
+    
+    struct fieldstat *delta = fieldstat_fork(instance);
+
+    // export test
+    struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new();
+    char *json = fieldstat_json_exporter_export_with_delta(fieldstat_json_exporter, instance, delta, &TEST_TIMEVAL, &TEST_TIMEVAL);
+    printf("delta_with_two_instance_one_empty :\n%s\n", json);
+    cJSON *root_arr = cJSON_Parse(json);
+    free(json);
+
+    cJSON *root = cJSON_GetArrayItem(root_arr, 0);
+    cJSON *metrics = cJSON_GetObjectItem(root, "fields");
+    cJSON *counter = cJSON_GetObjectItem(metrics, "counter");
+    EXPECT_EQ(counter->valueint, 123);
+    const cJSON *counter_delta = cJSON_GetObjectItem(metrics, "counter_delta");
+    EXPECT_TRUE(counter_delta == NULL);
+    const cJSON *histogram = cJSON_GetObjectItem(metrics, "histogram");
+    EXPECT_TRUE(histogram != NULL);
+    const cJSON *histogram_delta = cJSON_GetObjectItem(metrics, "histogram_delta");
+    EXPECT_TRUE(histogram_delta == NULL);
+    cJSON *timestamp = cJSON_GetObjectItem(root, "timestamp_ms");
+    EXPECT_EQ(timestamp->valueint, TEST_TIMEVAL_LONG);
+    cJSON *timestamp_delta = cJSON_GetObjectItem(root, "timestamp_ms_delta");
+    EXPECT_EQ(timestamp_delta->valueint, TEST_TIMEVAL_LONG);
+
+    cJSON_Delete(root_arr);
+    fieldstat_json_exporter_free(fieldstat_json_exporter);
+    fieldstat_free(instance);
+    fieldstat_free(delta);
+}
+
+TEST(export_test, delta_with_two_instance_different_cell)
+{
+    struct fieldstat *instance = fieldstat_new();
+    fieldstat_create_cube(instance, NULL, 0, SAMPLING_MODE_COMPREHENSIVE, 0);
+    int id_counter = fieldstat_register_counter(instance, "counter");
+    fieldstat_counter_incrby(instance, 0, id_counter, &TEST_TAG_INT, 1, 123);
+
+    struct fieldstat *delta = fieldstat_fork(instance);
+    fieldstat_counter_incrby(delta, 0, id_counter, &TEST_TAG_DOUBLE, 1, 1);
+    fieldstat_merge(instance, delta);
+
+    // export test
+    struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new();
+    char *json = fieldstat_json_exporter_export_with_delta(fieldstat_json_exporter, instance, delta, &TEST_TIMEVAL, &TEST_TIMEVAL);
+    printf("delta_with_two_instance_different_cell :\n%s\n", json);
+    cJSON *root_arr = cJSON_Parse(json);
+    free(json);
+
+    cJSON *root = cJSON_GetArrayItem(root_arr, 0);
+    cJSON *metrics = cJSON_GetObjectItem(root, "fields");
+    cJSON *counter = cJSON_GetObjectItem(metrics, "counter");
+    EXPECT_EQ(counter->valueint, 123);
+    cJSON *counter_delta = cJSON_GetObjectItem(metrics, "counter_delta");
+    EXPECT_TRUE(counter_delta == NULL);
+    cJSON *timestamp = cJSON_GetObjectItem(root, "timestamp_ms");
+    EXPECT_EQ(timestamp->valueint, TEST_TIMEVAL_LONG);
+    cJSON *timestamp_delta = cJSON_GetObjectItem(root, "timestamp_ms_delta");
+    EXPECT_EQ(timestamp_delta->valueint, TEST_TIMEVAL_LONG);
+
+    root = cJSON_GetArrayItem(root_arr, 1);
+    metrics = cJSON_GetObjectItem(root, "fields");
+    counter = cJSON_GetObjectItem(metrics, "counter");
+    EXPECT_EQ(counter->valueint, 1);
+    counter_delta = cJSON_GetObjectItem(metrics, "counter_delta");
+    EXPECT_EQ(counter_delta->valueint, 1);
+    timestamp = cJSON_GetObjectItem(root, "timestamp_ms");
+    EXPECT_EQ(timestamp->valueint, TEST_TIMEVAL_LONG);
+    timestamp_delta = cJSON_GetObjectItem(root, "timestamp_ms_delta");
+    EXPECT_EQ(timestamp_delta->valueint, TEST_TIMEVAL_LONG);
+
+    cJSON_Delete(root_arr);
+    fieldstat_json_exporter_free(fieldstat_json_exporter);
+    fieldstat_free(instance);
+    fieldstat_free(delta);
+}
+
 
 extern "C" {
 extern int add_object_to_json_array_start(char *buf, int buf_len);

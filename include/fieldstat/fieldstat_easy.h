@@ -9,16 +9,60 @@ extern "C"
 
 struct fieldstat_easy;
 
+/* 
+ * new a fieldstat_easy instance.
+    * @param max_thread_num: max thread number of this instance.
+    * @param tags: tags of this instance. Will appear in output json.
+*/
 struct fieldstat_easy *fieldstat_easy_new(int max_thread_num, const struct fieldstat_tag *tags, size_t n_tag);
+/*
+    * free a fieldstat_easy instance.
+*/
 void fieldstat_easy_free(struct fieldstat_easy *fse);
-// both data of accumulated and delta will be output.
+/*
+    * enable auto output. both data of accumulated and delta will be output.
+    * @param output_path: output file path. Should be identical to the one in python config.
+    * @param interval_second: output interval in second.
+    * @return: 0 if success, -1 if failed to open file. -2 if the output is already enabled.
+*/
 int fieldstat_easy_enable_auto_output(struct fieldstat_easy *pthis, const char *output_path, int interval_second);
+/*
+    * @brief add a metric to the cube of cube_id. One metric may be associated with different cells.
+    * @param metric_name: name of the metric. Cannot be NULL. Must be unique.
+    * @return metric id>=0 if success. If failed, return FS_ERR_NULL_HANDLER, FS_ERR_INVALID_KEY(when metric_name is not unique in this cube).
+    * For the error code, see fieldstat.h
+*/
 int fieldstat_easy_register_counter(struct fieldstat_easy *fse, const char *name);
+/*
+    * @brief refer to fieldstat_easy_register_counter.
+    * @param lowest_trackable_value: the lowest value that can be tracked (distinguishable from 0) by the histogram. Must be >= 1.
+    * @param highest_trackable_value: the highest value to be tracked by the histogram. Must be >= 2 * lowest_trackable_value.
+    * @param significant_figures: the precision of the histogram. Must be in [1, 5].
+    * @return metric id if success. If failed, return FS_ERR_NULL_HANDLER, FS_ERR_INVALID_KEY(when metric_name is not unique in this cube), or FS_ERR_INVALID_PARAM(if any of the 3 params are out of range)
+    * For the error code, see fieldstat.h
+*/
 int fieldstat_easy_register_histogram(struct fieldstat_easy *fse, const char *name, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures);
-// buff is a json string of accumulated data. 
-void fieldstat_easy_output(const struct fieldstat_easy *fse, char **buff, size_t *buff_len);
-
+/*
+    * Output the accumulated data to a json string.
+    * @param buff: output buffer. User should free it after use.
+*/
+void fieldstat_easy_output(struct fieldstat_easy *fse, char **buff, size_t *buff_len);
+/*
+    * @brief let the value of counter metric of cell_id increase by `increment`.
+    * @param thread_id: thread id. Must be in [0, max_thread_num).
+    * @param metric_id: metric id, previously returned by fieldstat_register_counter.
+    * @param increment: increment of the counter metric. Can be negative.
+    * @return FS_OK if success. FS_ERR_NULL_HANDLER, FS_ERR_INVALID_CUBE_ID, FS_ERR_INVALID_METRIC_ID if fail.
+    * return -1 also when the thread_id is out of range.
+*/
 int fieldstat_easy_counter_incrby(struct fieldstat_easy *fse, int thread_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long increment);
+/* 
+    * @brief Add a value to the histogram metric of cell_id. Histogram will record the distribution of the values.
+             The value bigger than highest_trackable_value will be set to highest_trackable_value. The value less than lowest_trackable_value will be tried to record, and, if succeed, remains in the record as -inf(most of the time) or 0(if value == 0)
+    * @param value: value of the histogram metric.
+    * @return FS_OK if success. FS_ERR_NULL_HANDLER, FS_ERR_INVALID_CUBE_ID, FS_ERR_INVALID_METRIC_ID if fail.
+    * return -1 also when the thread_id is out of range.
+*/
 int fieldstat_easy_histogram_record(struct fieldstat_easy *fse, int thread_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long value);
 
 #ifdef __cplusplus

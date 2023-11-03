@@ -10,10 +10,10 @@
 
 #include "fieldstat.h"
 #include "fieldstat_exporter.h"
-
+#include "fieldstat_easy.h"
 
 struct fs_unit {
-    struct fieldstat *write_only;
+    struct fieldstat *active;
     struct fieldstat *read_only;
     pthread_spinlock_t lock;
 };
@@ -23,7 +23,6 @@ static volatile int g_output_thread_running = 0;
 
 void close_output_thread()
 {
-    // atomic
     (void)__sync_lock_test_and_set(&g_output_thread_running, 0);
 }
 
@@ -38,20 +37,20 @@ struct fieldstat_easy
     struct fieldstat_json_exporter *exporter;
     FILE *output_fp;
     int output_interval_second;
-    pthread_spinlock_t outputting_lock;
+    pthread_spinlock_t outputting_lock; // lock the resource: fieldstat_easy::accumulate
 };
 
 void fs_unit_switch_role(struct fs_unit *fsu) {
     fieldstat_reset(fsu->read_only);
 
     pthread_spin_lock(&fsu->lock);
-    struct fieldstat *tmp = fsu->write_only;
-    fsu->write_only = fsu->read_only;
+    struct fieldstat *tmp = fsu->active;
+    fsu->active = fsu->read_only;
     fsu->read_only = tmp;
     pthread_spin_unlock(&fsu->lock);
 }
 
-char *output_work(struct fieldstat_easy *fs, const struct timeval *timestamp)
+char *output_work(struct fieldstat_easy *fs, const struct timeval *timestamp, const struct timeval *timestamp_delta)
 {
     fieldstat_reset(fs->delta);
 
@@ -59,17 +58,22 @@ char *output_work(struct fieldstat_easy *fs, const struct timeval *timestamp)
         fs_unit_switch_role(fs->fsu + i);
         fieldstat_merge(fs->delta, fs->fsu[i].read_only);
     }
+    pthread_spin_lock(&fs->outputting_lock);
     fieldstat_merge(fs->accumulate, fs->delta);
-    // char *ret = fieldstat_json_exporter_export_with_delta(fs->exporter, fs->accumulate, fs->delta, timestamp);
-    char *ret = fieldstat_json_exporter_export(fs->exporter, fs->accumulate, timestamp);
+    char *ret = fieldstat_json_exporter_export_with_delta(fs->exporter, fs->accumulate, fs->delta, timestamp, timestamp_delta);
+    pthread_spin_unlock(&fs->outputting_lock);
 
     return ret;
 }
 
 void *output_main(void *arg) // return void * for pthread_create check only
 {
-    long long last_run_time = 0;
+    struct timespec entry_time;
+    clock_gettime(CLOCK_MONOTONIC, &entry_time);
+    long long last_run_time = entry_time.tv_sec * 1000 + entry_time.tv_nsec / 1000000;
+    // long long last_run_time = 0;
     struct timeval timestamp;
+    struct timeval timestamp_delta;
     struct timespec this_output_time;
     struct fieldstat_easy *fs = (struct fieldstat_easy *)arg;
     long long output_interval = fs->output_interval_second * 1000;
@@ -81,19 +85,17 @@ void *output_main(void *arg) // return void * for pthread_create check only
             usleep(50000); // 50ms
             continue;
         }
-        last_run_time = now;
 
-        printf("output_main: outputting\n");
         timestamp.tv_sec = this_output_time.tv_sec;
         timestamp.tv_usec = this_output_time.tv_nsec / 1000;
-        pthread_spin_lock(&fs->outputting_lock);
-        char *ret = output_work(fs, &timestamp);
-        pthread_spin_unlock(&fs->outputting_lock);
+        timestamp_delta.tv_sec = timestamp.tv_sec - last_run_time / 1000; // divide 1000 to convert ms to sec
+        timestamp_delta.tv_usec = timestamp.tv_usec - (last_run_time % 1000) * 1000; // %1000 to get the ms part, then *1000 to convert ms to us
+        last_run_time = now;
+
+        char *ret = output_work(fs, &timestamp, &timestamp_delta);
         if (ret == NULL) {
             ret = strdup("[]");
         }
-        printf("output_main: outputting done, ret: %s\n", ret);
-
         struct flock lock;
         lock.l_type = F_WRLCK;
         lock.l_start = 0;
@@ -117,7 +119,7 @@ void *output_main(void *arg) // return void * for pthread_create check only
 
         free(ret);
     }
-    return NULL;
+    return NULL; // return void * for pthread_create check only
 }
 
 struct fieldstat_easy *fieldstat_easy_new(int max_thread_num, const struct fieldstat_tag *tags, size_t n_tag) {
@@ -133,7 +135,7 @@ struct fieldstat_easy *fieldstat_easy_new(int max_thread_num, const struct field
     pthread_spin_init(&fse->outputting_lock, PTHREAD_PROCESS_PRIVATE);
 
     for (int i = 0; i < max_thread_num; i++) {
-        fse->fsu[i].write_only = fieldstat_fork(fse->delta);
+        fse->fsu[i].active = fieldstat_fork(fse->delta);
         fse->fsu[i].read_only = fieldstat_fork(fse->delta);
         pthread_spin_init(&fse->fsu[i].lock, PTHREAD_PROCESS_PRIVATE);
     }
@@ -155,7 +157,7 @@ void fieldstat_easy_free(struct fieldstat_easy *fse) {
 
     for (int i = 0; i < fse->max_thread_num; i++) {
         pthread_spin_lock(&fse->fsu[i].lock);
-        fieldstat_free(fse->fsu[i].write_only);
+        fieldstat_free(fse->fsu[i].active);
         fieldstat_free(fse->fsu[i].read_only);
         pthread_spin_unlock(&fse->fsu[i].lock);
         pthread_spin_destroy(&fse->fsu[i].lock);
@@ -189,7 +191,7 @@ int fieldstat_easy_register_counter(struct fieldstat_easy *fse, const char *name
         pthread_spin_lock(&fse->fsu[i].lock);
     }
 
-    int ret = fieldstat_register_counter(fse->fsu[0].write_only, name); // try to register
+    int ret = fieldstat_register_counter(fse->fsu[0].active, name); // try to register
     if (ret < 0) {
         for (int i = 0; i < fse->max_thread_num; i++) {
             pthread_spin_unlock(&fse->fsu[i].lock);
@@ -198,7 +200,7 @@ int fieldstat_easy_register_counter(struct fieldstat_easy *fse, const char *name
     }
     fieldstat_register_counter(fse->fsu[0].read_only, name);
     for (int i = 1; i < fse->max_thread_num; i++) {
-        fieldstat_register_counter(fse->fsu[i].write_only, name);
+        fieldstat_register_counter(fse->fsu[i].active, name);
         fieldstat_register_counter(fse->fsu[i].read_only, name);
     }
 
@@ -215,7 +217,7 @@ int fieldstat_easy_register_histogram(struct fieldstat_easy *fse, const char *na
         pthread_spin_lock(&fse->fsu[i].lock);
     }
 
-    int ret = fieldstat_register_hist(fse->fsu[0].write_only, name, lowest_trackable_value, highest_trackable_value, significant_figures); // try to register
+    int ret = fieldstat_register_hist(fse->fsu[0].active, name, lowest_trackable_value, highest_trackable_value, significant_figures); // try to register
     if (ret < 0) {
         for (int i = 0; i < fse->max_thread_num; i++) {
             pthread_spin_unlock(&fse->fsu[i].lock);
@@ -224,7 +226,7 @@ int fieldstat_easy_register_histogram(struct fieldstat_easy *fse, const char *na
     }
     fieldstat_register_hist(fse->fsu[0].read_only, name, lowest_trackable_value, highest_trackable_value, significant_figures);
     for (int i = 1; i < fse->max_thread_num; i++) {
-        fieldstat_register_hist(fse->fsu[i].write_only, name, lowest_trackable_value, highest_trackable_value, significant_figures);
+        fieldstat_register_hist(fse->fsu[i].active, name, lowest_trackable_value, highest_trackable_value, significant_figures);
         fieldstat_register_hist(fse->fsu[i].read_only, name, lowest_trackable_value, highest_trackable_value, significant_figures);
     }
 
@@ -244,10 +246,10 @@ void fieldstat_easy_output(struct fieldstat_easy *fse, char **buff, size_t *buff
     timestamp.tv_sec = this_output_time.tv_sec;
     timestamp.tv_usec = this_output_time.tv_nsec / 1000;
     struct fieldstat *dst = fieldstat_new();
-    // collect all the data delta recorded since last passive output, if it happened. If fieldstat_easy_enable_auto_output is not called, its the data since the program started.
+    // collect all the data recorded since last passive output, if passive output happened. Otherwise, its the data since the program started.
     for (int i = 0; i < fse->max_thread_num; i++) {
         pthread_spin_lock(&fse->fsu[i].lock);
-        fieldstat_merge(dst, fse->fsu[i].write_only);
+        fieldstat_merge(dst, fse->fsu[i].active);
         pthread_spin_unlock(&fse->fsu[i].lock);
     }
 
@@ -274,7 +276,7 @@ int fieldstat_easy_counter_incrby(struct fieldstat_easy *fse, int thread_id, int
     }
 
     pthread_spin_lock(&fse->fsu[thread_id].lock);
-    int ret = fieldstat_counter_incrby(fse->fsu[thread_id].write_only, 0, metric_id, tags, n_tag, increment);
+    int ret = fieldstat_counter_incrby(fse->fsu[thread_id].active, 0, metric_id, tags, n_tag, increment);
     pthread_spin_unlock(&fse->fsu[thread_id].lock);
 
     return ret;
@@ -290,7 +292,7 @@ int fieldstat_easy_histogram_record(struct fieldstat_easy *fse, int thread_id, i
     }
 
     pthread_spin_lock(&fse->fsu[thread_id].lock);
-    int ret = fieldstat_hist_record(fse->fsu[thread_id].write_only, 0, metric_id, tags, n_tag, value);
+    int ret = fieldstat_hist_record(fse->fsu[thread_id].active, 0, metric_id, tags, n_tag, value);
     pthread_spin_unlock(&fse->fsu[thread_id].lock);
 
     return ret;
