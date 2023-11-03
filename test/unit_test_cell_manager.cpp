@@ -101,9 +101,9 @@ TEST(unit_test_cell_manager, topk_simple_add)
     }
 
     int pop_dummy;
-    int exist_dummy;
+    
     for (int i = 0; i < TEST_ROUND; i++) {
-        cell_manager_add_cell_topk(cm, keys[i], 1, &pop_dummy, &exist_dummy);
+        cell_manager_add_cell_topk(cm, keys[i], 1, &pop_dummy);
     }
 
     vector<tag_hash_key *> test_result = test_query_cell_manager_content(cm);
@@ -130,11 +130,10 @@ TEST(unit_test_cell_manager, topk_add_pop)
     }
 
     int pop_dummy;
-    int exist_dummy;
     for (int i = 0; i < TEST_ROUND - 1; i++) {
-        cell_manager_add_cell_topk(cm, keys[i], 1, &pop_dummy, &exist_dummy);
+        cell_manager_add_cell_topk(cm, keys[i], 1, &pop_dummy);
     }
-    cell_manager_add_cell_topk(cm, keys[TEST_ROUND - 1], 100, &pop_dummy, &exist_dummy);
+    cell_manager_add_cell_topk(cm, keys[TEST_ROUND - 1], 100, &pop_dummy);
 
     vector<tag_hash_key *> test_result = test_query_cell_manager_content(cm);
     EXPECT_EQ(test_result.size(), 10);
@@ -162,11 +161,10 @@ TEST(unit_test_cell_manager, topk_add_twice)
     }
 
     int pop_dummy;
-    int exist_dummy;
     for (int i = 0; i < TEST_ROUND; i++) {
-        cell_manager_add_cell_topk(cm, keys[i], 1, &pop_dummy, &exist_dummy);
+        cell_manager_add_cell_topk(cm, keys[i], 1, &pop_dummy);
     }
-    cell_manager_add_cell_topk(cm, keys[TEST_ROUND - 1], 100, &pop_dummy, &exist_dummy);
+    cell_manager_add_cell_topk(cm, keys[TEST_ROUND - 1], 100, &pop_dummy);
 
     vector<tag_hash_key *> test_result = test_query_cell_manager_content(cm);
     EXPECT_EQ(test_result.size(), 10);
@@ -197,9 +195,8 @@ TEST(unit_test_cell_manager, topk_add_and_query_accuracy)
     }
 
     int pop_dummy;
-    int exist_dummy;
     for (int i = 0; i < TEST_ROUND; i++) {
-        cell_manager_add_cell_topk(cm, keys[i], 1, &pop_dummy, &exist_dummy);
+        cell_manager_add_cell_topk(cm, keys[i], 1, &pop_dummy);
     }
 
     vector<tag_hash_key *> test_result = test_query_cell_manager_content(cm);
@@ -226,15 +223,14 @@ TEST(unit_test_cell_manager, merge_topk_given_K_large_enough)
     keys.push_back(test_gen_tag_key("key_2", 1));
 
     int pop_dummy;
-    int exist_dummy;
     int cell_id_1[3];
     int cell_id_2[2];
 
     for (size_t i = 0; i < 3; i++) {
-        cell_id_1[i] = cell_manager_add_cell_topk(cm1, keys[i], 1, &pop_dummy, &exist_dummy);
+        cell_id_1[i] = cell_manager_add_cell_topk(cm1, keys[i], 1, &pop_dummy);
     }
     for (size_t i = 3; i < 5; i++) {
-        cell_id_2[i - 3] = cell_manager_add_cell_topk(cm2, keys[i], 1, &pop_dummy, &exist_dummy);
+        cell_id_2[i - 3] = cell_manager_add_cell_topk(cm2, keys[i], 1, &pop_dummy);
     }
     int *cell_id_popped;
     int n_cell_id_popped;
@@ -278,11 +274,10 @@ TEST(unit_test_cell_manager, merge_topk_to_empty)
     keys.push_back(test_gen_tag_key("key_1", 2));
 
     int pop_dummy;
-    int exist_dummy;
     int cell_id_1[3];
 
     for (size_t i = 0; i < 3; i++) {
-        cell_id_1[i] = cell_manager_add_cell_topk(cm1, keys[i], 1, &pop_dummy, &exist_dummy);
+        cell_id_1[i] = cell_manager_add_cell_topk(cm1, keys[i], 1, &pop_dummy);
         printf("cell id: %d\n", cell_id_1[i]);
     }
     
@@ -335,15 +330,14 @@ TEST(unit_test_cell_manager, merge_topk_to_full_one)
     keys2.push_back(test_gen_tag_key("key_shared", 1));
 
     int pop_dummy;
-    int exist_dummy;
     int cell_id_1[3];
     int cell_id_2[10];
     for (size_t i = 0; i < 3; i++) {
-        cell_id_1[i] = cell_manager_add_cell_topk(cm1, keys1[i], 10, &pop_dummy, &exist_dummy);
+        cell_id_1[i] = cell_manager_add_cell_topk(cm1, keys1[i], 10, &pop_dummy);
     }
     for (size_t i = 0; i < 10; i++) {
         unsigned int count = i < 2 ? i : 5; // the first 2 keys have count 1 and 2(less), the rest have count 5
-        cell_id_2[i] = cell_manager_add_cell_topk(cm2, keys2[i], count, &pop_dummy, &exist_dummy);
+        cell_id_2[i] = cell_manager_add_cell_topk(cm2, keys2[i], count, &pop_dummy);
     }
 
     int *cell_id_popped;
@@ -384,8 +378,7 @@ TEST(unit_test_cell_manager, merge_topk_to_full_one)
 void add_key_and_assert_find_result(struct cell_manager *cm, const struct tag_hash_key *key)
 {
     int pop_dummy;
-    int exist_dummy;
-    int cell_id = cell_manager_add_cell_topk(cm, key, 1234, &pop_dummy, &exist_dummy);
+    int cell_id = cell_manager_add_cell_topk(cm, key, 1234, &pop_dummy);
     EXPECT_EQ(cell_id, 0);
     EXPECT_EQ(cell_manager_get_count_by_tag(cm, key), 1234);
     const struct tag_hash_key *key_get = cell_manager_get_tag_by_cell_id(cm, cell_id);
@@ -592,6 +585,131 @@ TEST(unit_test_cell_manager, find_next_id_given_empty_arr)
 
     free(arr);
 }
+
+TEST(unit_test_cell_manager, reset_once_and_query)
+{
+    const int TEST_ROUND = 10;
+    struct cell_manager *cm = cell_manager_new(SAMPLING_MODE_COMPREHENSIVE, TEST_ROUND);
+
+    vector<struct tag_hash_key *> keys;
+    for (int i = 0; i < TEST_ROUND; i++)
+    {
+        struct tag_hash_key *key = test_gen_tag_key("key", i);
+        keys.push_back(key);
+    }
+    for (int i = 0; i < TEST_ROUND; i++) {
+        int cell_id = cell_manager_add_cell(cm, keys[i]);
+        EXPECT_EQ(cell_id, i);
+    }
+
+    cell_manager_reset(cm);
+    for (int i = 0; i < TEST_ROUND; i++) {
+        EXPECT_EQ(cell_manager_find(cm, keys[i]), -1);
+        EXPECT_TRUE(cell_manager_get_tag_by_cell_id(cm, i) == NULL);
+    }
+    int array_len = 0;
+    cell_manager_dump(cm, &array_len);
+    EXPECT_EQ(array_len, 0);
+
+    // do it again, to see the effect of reset on a recovered cell_manager(instead of which just newed)
+    for (int i = 0; i < TEST_ROUND; i++) {
+        int cell_id = cell_manager_add_cell(cm, keys[i]);
+        EXPECT_EQ(cell_id, i);
+    }
+    cell_manager_reset(cm);
+    for (int i = 0; i < TEST_ROUND; i++) {
+        EXPECT_EQ(cell_manager_find(cm, keys[i]), -1);
+        EXPECT_TRUE(cell_manager_get_tag_by_cell_id(cm, i) == NULL);
+    }
+    cell_manager_dump(cm, &array_len);
+    EXPECT_EQ(array_len, 0);
+
+    cell_manager_free(cm);
+    for (int i = 0; i < TEST_ROUND; i++) {
+        tag_hash_key_free(keys[i]);
+    }
+}
+
+// reset once will not delete the cells, just let them be discared, so in such case, cube_add will just add to the same cell.
+TEST(unit_test_cell_manager, add_after_reset_and_ensure_performance_improvement) {
+    clock_t start, end;
+    const int TEST_ROUND = 100000;
+    struct cell_manager *cm = cell_manager_new(SAMPLING_MODE_COMPREHENSIVE, TEST_ROUND);
+    vector<struct tag_hash_key *> keys;
+    for (int i = 0; i < TEST_ROUND; i++)
+    {
+        struct tag_hash_key *key = test_gen_tag_key("key", i);
+        keys.push_back(key);
+    }
+    for (int i = 0; i < TEST_ROUND; i++) {
+        int cell_id = cell_manager_add_cell(cm, keys[i]);
+        EXPECT_EQ(cell_id, i);
+    }
+
+    cell_manager_reset(cm);
+    start = clock();
+    for (int i = 0; i < TEST_ROUND; i++)
+    {
+        int cell_id = cell_manager_add_cell(cm, keys[i]);
+        EXPECT_EQ(cell_id, i);
+    }
+    end = clock();
+    clock_t time_reset_once = end - start;
+
+
+    cell_manager_reset(cm);
+    cell_manager_reset(cm);
+    start = clock();
+    for (int i = 0; i < TEST_ROUND; i++)
+    {
+        int cell_id = cell_manager_add_cell(cm, keys[i]);
+        EXPECT_EQ(cell_id, i); // completely new cell
+    }
+    end = clock();
+    clock_t time_reset_twice = end - start;
+
+    EXPECT_GT((double)time_reset_twice, (double)time_reset_once * 1.5); // * 1.5: just indicate much greater than, not exactly
+
+    cell_manager_free(cm);
+    for (int i = 0; i < TEST_ROUND; i++) {
+        tag_hash_key_free(keys[i]);
+    }
+}
+
+TEST(unit_test_cell_manager, reset_once_and_query_topk)
+{
+    const int TEST_ROUND = 10;
+    struct cell_manager *cm = cell_manager_new(SAMPLING_MODE_TOPK, TEST_ROUND);
+
+    vector<struct tag_hash_key *> keys;
+    for (int i = 0; i < TEST_ROUND; i++)
+    {
+        struct tag_hash_key *key = test_gen_tag_key("key", i);
+        keys.push_back(key);
+    }
+    for (int i = 0; i < TEST_ROUND; i++) {
+        int dummy;
+        int cell_id = cell_manager_add_cell_topk(cm, keys[i], 1, &dummy);
+        EXPECT_EQ(cell_id, i);
+    }
+
+    cell_manager_reset(cm);
+    for (int i = 0; i < TEST_ROUND; i++) {
+        EXPECT_EQ(cell_manager_find(cm, keys[i]), -1);
+        EXPECT_TRUE(cell_manager_get_tag_by_cell_id(cm, i) == NULL);
+        EXPECT_EQ(cell_manager_get_count_by_tag(cm, keys[i]), -1);
+    }
+    int array_len = 0;
+    cell_manager_dump(cm, &array_len);
+    EXPECT_EQ(array_len, 0);
+
+    cell_manager_free(cm);
+    for (int i = 0; i < TEST_ROUND; i++) {
+        tag_hash_key_free(keys[i]);
+    }
+}
+
+// 速度测试
 
 int main(int argc, char *argv[]) 
 {

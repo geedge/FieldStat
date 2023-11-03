@@ -18,12 +18,7 @@
 #define MAX_N_DATA_ARRAY_ITEM_INIT 1024
 
 struct metric_counter_or_gauge {
-    enum counter_mode mode;
     long long value;
-};
-
-struct para_counter {
-    enum counter_mode mode;
 };
 
 struct para_hdr{
@@ -38,7 +33,6 @@ struct para_hll {
 
 struct metric_parameter {
     union {
-        struct para_counter counter;
         struct para_hdr hdr;
         struct para_hll hll;
     };
@@ -116,13 +110,12 @@ void metric_add_one_cell(struct metric *pthis, int id, struct metric_measure_dat
 
 /* --------------------------------- counter -------------------------------- */
 
-struct metric_measure_data *metric_scheme_counter_new(const struct metric_parameter *para)
+struct metric_measure_data *metric_scheme_counter_new(const struct metric_parameter *_para)
 {
     struct metric_measure_data *data = (struct metric_measure_data *)malloc(sizeof(struct metric_measure_data));
     struct metric_counter_or_gauge *counter = (struct metric_counter_or_gauge *)malloc(sizeof(struct metric_counter_or_gauge));
     data->counter = counter;
     counter->value = 0;
-    counter->mode = para->counter.mode;
     return data;
 }
 
@@ -145,7 +138,6 @@ static void metric_scheme_counter_serialize(const struct metric_measure_data *da
     struct fs_reader *reader = fs_reader_new();
 
     fs_reader_read_longlong(reader, counter->value);
-    fs_reader_read_uint(reader, counter->mode);
 
     fs_reader_finalize(reader, blob, blob_size);
 }
@@ -153,26 +145,9 @@ static void metric_scheme_counter_serialize(const struct metric_measure_data *da
 static int metric_scheme_counter_merge(struct metric_measure_data *pthis, const struct metric_measure_data *from)
 {
     struct metric_counter_or_gauge *counter = pthis->counter;
-    struct metric_counter_or_gauge *from_counter = from->counter;
+    const struct metric_counter_or_gauge *from_counter = from->counter;
+    counter->value += from_counter->value;
     
-    if (counter->mode != from_counter->mode) {
-        return -1;
-    }
-    switch (counter->mode) {
-        case COUNTER_MERGE_BY_SUM:
-            counter->value += from_counter->value;
-            break;
-        case COUNTER_MERGE_BY_MAX:
-            counter->value = counter->value > from_counter->value ? counter->value : from_counter->value;
-            break;
-        case COUNTER_MERGE_BY_MIN:
-            counter->value = counter->value < from_counter->value ? counter->value : from_counter->value;
-            break;
-        default:
-            assert(0);
-            return -1;
-    }
-
     return 0;
 }
 
@@ -181,7 +156,6 @@ static int metric_scheme_counter_copy(struct metric_measure_data *pthis, const s
     struct metric_counter_or_gauge *counter = pthis->counter;
     const struct metric_counter_or_gauge *from_counter = from->counter;
     counter->value = from_counter->value;
-    counter->mode = from_counter->mode;
     return 0;
 }
 
@@ -193,7 +167,6 @@ struct metric_measure_data *metric_scheme_counter_deserialize(const char *blob, 
     ret->counter = counter;
 
     fs_writer_write_longlong(writer, &counter->value);
-    fs_writer_write_uint(writer, (uint32_t *)&counter->mode);
 
     fs_writer_free(writer);
     return ret;
@@ -324,7 +297,6 @@ struct metric_parameter *construct_parameters(enum metric_type type, ...)
     va_start(ap, type);
     switch (type) {
         case METRIC_TYPE_COUNTER:
-            paras->counter.mode = (enum counter_mode)va_arg(ap, int);
             break;
         case METRIC_TYPE_HLL:
             paras->hll.precision = (char)va_arg(ap, int);
@@ -371,6 +343,9 @@ struct metric *metric_new(const char *name, enum metric_type type, struct metric
 
 void metric_free(struct metric *pthis)
 {
+    if (pthis == NULL) {
+        return;
+    }
     metric_info_free(pthis->info);
 
     for (size_t i = 0; i < pthis->n_array_item; i++) {
@@ -397,13 +372,18 @@ void metric_reset(struct metric *pthis) {
 void metric_info_copy(struct metric_info *dst, const struct metric_info *src)
 {
     dst->name = strdup(src->name);
-    dst->paras = (struct metric_parameter *)malloc(sizeof(struct metric_parameter));
-    memcpy(dst->paras, src->paras, sizeof(struct metric_parameter));
+    if (src->paras == NULL) {
+        dst->paras = NULL;
+    } else {
+        dst->paras = (struct metric_parameter *)malloc(sizeof(struct metric_parameter));
+        memcpy(dst->paras, src->paras, sizeof(struct metric_parameter));
+    }
+
     dst->type = src->type;
     dst->id = src->id;
 }
 
-struct metric *metric_copy_structure(const struct metric *src)
+struct metric *metric_fork(const struct metric *src)
 {
     struct metric *dst = (struct metric *)malloc(sizeof(struct metric));
     dst->info = (struct metric_info *)malloc(sizeof(struct metric_info));
@@ -419,7 +399,7 @@ struct metric *metric_copy_structure(const struct metric *src)
 
 struct metric *metric_copy(const struct metric *src)
 {
-    struct metric *dst = metric_copy_structure(src);
+    struct metric *dst = metric_fork(src);
     dst->n_array_item = src->n_array_item;
 
     for (int i = 0; i < src->n_array_item; i++) {
@@ -467,7 +447,7 @@ void metric_serialize_parameters(const struct metric *metric, char **blob, size_
     switch (metric->info->type)
     {
     case METRIC_TYPE_COUNTER:
-        fs_reader_read_uint(reader, para->counter.mode);
+        break;
     case METRIC_TYPE_HLL:
         fs_reader_read_uint(reader, para->hll.precision);
         break;
@@ -492,11 +472,8 @@ struct metric_parameter *deserialize_parameters(const char *blob, size_t blob_si
 
     struct metric_parameter *field_para = NULL;
     switch (type) {
-        case METRIC_TYPE_COUNTER:{
-            int counter_type;
-            fs_writer_write_uint(writer, (uint32_t *)&counter_type);
-            field_para = construct_parameters(type, counter_type);
-        }
+        case METRIC_TYPE_COUNTER:
+        
         break;
         case METRIC_TYPE_HLL: {
             int precision;
@@ -555,7 +532,7 @@ void blob_unpack_basic_info(const char *blob, size_t blob_size, char **new_blob,
 /*
 metric blob:
     {
-        "name":<field_name>
+        "name":<metric_name>
         "type":<field_type>
         "id":<field_id>
         "para":[may be null, one number, or a double array]
@@ -726,9 +703,9 @@ struct metric_measure_data *metric_find_or_new_cell(struct metric *pthis, int ce
     return data;
 }
 
-struct metric *metric_counter_new(const char *name, enum counter_mode mode)
+struct metric *metric_counter_new(const char *name)
 {
-    struct metric_parameter *metric_para = construct_parameters(METRIC_TYPE_COUNTER, mode);
+    struct metric_parameter *metric_para = NULL;
     struct metric *pthis = metric_new(name, METRIC_TYPE_COUNTER, metric_para);
 
     return pthis;
@@ -751,14 +728,16 @@ int metric_counter_set(struct metric *pthis, int cell_id, long long value)
     return 0;
 }
 
-long long metric_counter_get(const struct metric *pthis, int cell_id)
+int metric_counter_get(const struct metric *pthis, int cell_id, long long *value_out)
 {
     const struct metric_measure_data *data = metric_find_one_cell(pthis, cell_id);
     if (data == NULL) {
+        *value_out = 0;
         return -1;
     }
     const struct metric_counter_or_gauge *counter = data->counter;
-    return counter->value;
+    *value_out = counter->value;
+    return 0;
 }
 
 struct metric *metric_hll_new(const char *name, unsigned char precision)
@@ -799,9 +778,7 @@ int metric_histogram_record(struct metric *pthis, int cell_id, long long value)
     if (value > data->hdr->highest_trackable_value) {
         value = data->hdr->highest_trackable_value;
     }
-    // if (value < data->hdr->lowest_discernible_value) {
-    //     value = data->hdr->lowest_discernible_value;
-    // }
+
     bool ret = hdr_record_value(data->hdr, value);
     if (!ret) {
         return -1;

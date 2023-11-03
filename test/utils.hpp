@@ -4,8 +4,10 @@
 #include "fieldstat.h"
 
 const struct fieldstat_tag TEST_TAG_STRING = {"STRING KEY_", TAG_CSTRING, {.value_str = "100.1"}};
+const struct fieldstat_tag_list TEST_TAG_LIST_STRING = {(struct fieldstat_tag *)&TEST_TAG_STRING, 1};
 const struct fieldstat_tag TEST_TAG_STRING_collided = {"collided", TAG_CSTRING, {.value_str = "2"}};
 const struct fieldstat_tag TEST_TAG_INT = {"INT key_", TAG_INTEGER, {.value_longlong = 100}};
+const struct fieldstat_tag_list TEST_TAG_LIST_INT = {(struct fieldstat_tag *)&TEST_TAG_INT, 1};
 const struct fieldstat_tag TEST_TAG_INT_collided = {"collided", TAG_INTEGER, {.value_longlong = 2}};
 const struct fieldstat_tag TEST_TAG_DOUBLE = {"DOUBLE key_", TAG_DOUBLE, {.value_double = 100.1}};
 const struct fieldstat_tag TEST_TAG_DOUBLE_collided = {"collided", TAG_DOUBLE, {.value_double = 2.0}};
@@ -39,3 +41,6 @@ private:
 
 
 double test_cal_topk_accuracy(std::vector<struct Fieldstat_tag_list_wrapper *> &test_result, std::unordered_map<std::string, int> &expected_count);
+
+// after we change fieldstat_counter_get return a error code in, all the tests should change correspondingly, so just use a adapter aliasing the old function
+long long my_fieldstat_counter_get(const struct fieldstat *instance, int cube_id, int metric_id, int cell_id);
