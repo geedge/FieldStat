@@ -111,11 +111,11 @@ TEST(test_easy_fieldstat, output_to_file)
 
 
 extern "C" {
-    extern char *output_work(struct fieldstat_easy *fs, struct timeval *timestamp);
+    extern char *fs_easy_output_to_json(struct fieldstat_easy *fs, struct timeval *timestamp);
 }
 
 int g_output_count = 0;
-char *output_work_stub(struct fieldstat_easy *fs, struct timeval *timestamp)
+char *fs_easy_output_to_json_stub(struct fieldstat_easy *fs, struct timeval *timestamp)
 {
     g_output_count++;
     return NULL;
@@ -124,7 +124,7 @@ char *output_work_stub(struct fieldstat_easy *fs, struct timeval *timestamp)
 TEST(test_easy_fieldstat, output_interval_ok)
 {
     Stub stub;
-    stub.set(output_work, output_work_stub);
+    stub.set(fs_easy_output_to_json, fs_easy_output_to_json_stub);
 
     struct fieldstat_easy *fse = fieldstat_easy_new(10, NULL, 0);
     fieldstat_easy_enable_auto_output(fse, FILENAME, 1);

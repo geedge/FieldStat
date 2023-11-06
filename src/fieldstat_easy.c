@@ -5,6 +5,7 @@
 #include <time.h>
 #include <sys/time.h>
 #include <sys/file.h>
+#include <sys/prctl.h>
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -12,23 +13,16 @@
 #include "fieldstat_exporter.h"
 #include "fieldstat_easy.h"
 
-struct fs_unit {
+struct fs_easy_thread {
     struct fieldstat *active;
     struct fieldstat *read_only;
     pthread_spinlock_t lock;
+    char padding[40]; // to avoid false sharing. 40 = 64 - 8 - 8 - 8
 };
-
-static volatile int g_output_thread_running = 0;
-
-
-void close_output_thread()
-{
-    (void)__sync_lock_test_and_set(&g_output_thread_running, 0);
-}
 
 struct fieldstat_easy
 {
-    struct fs_unit *fsu;
+    struct fs_easy_thread *fsu;
     int max_thread_num;
 
     struct fieldstat *delta;
@@ -38,9 +32,10 @@ struct fieldstat_easy
     FILE *output_fp;
     int output_interval_second;
     pthread_spinlock_t outputting_lock; // lock the resource: fieldstat_easy::accumulate
+    volatile int output_thread_running;
 };
 
-void fs_unit_switch_role(struct fs_unit *fsu) {
+void rcu_reclaim_handler(struct fs_easy_thread *fsu) {
     fieldstat_reset(fsu->read_only);
 
     pthread_spin_lock(&fsu->lock);
@@ -50,12 +45,12 @@ void fs_unit_switch_role(struct fs_unit *fsu) {
     pthread_spin_unlock(&fsu->lock);
 }
 
-char *output_work(struct fieldstat_easy *fs, const struct timeval *timestamp, const struct timeval *timestamp_delta)
+char *fs_easy_output_to_json(struct fieldstat_easy *fs, const struct timeval *timestamp, const struct timeval *timestamp_delta)
 {
     fieldstat_reset(fs->delta);
 
     for (int i = 0; i < fs->max_thread_num; i++) {
-        fs_unit_switch_role(fs->fsu + i);
+        rcu_reclaim_handler(fs->fsu + i);
         fieldstat_merge(fs->delta, fs->fsu[i].read_only);
     }
     pthread_spin_lock(&fs->outputting_lock);
@@ -66,7 +61,7 @@ char *output_work(struct fieldstat_easy *fs, const struct timeval *timestamp, co
     return ret;
 }
 
-void *output_main(void *arg) // return void * for pthread_create check only
+void *fs_easy_output_thread(void *arg) // return void * for pthread_create check only
 {
     struct timespec entry_time;
     clock_gettime(CLOCK_MONOTONIC, &entry_time);
@@ -78,7 +73,9 @@ void *output_main(void *arg) // return void * for pthread_create check only
     struct fieldstat_easy *fs = (struct fieldstat_easy *)arg;
     long long output_interval = fs->output_interval_second * 1000;
 
-    while (g_output_thread_running) {
+    prctl(PR_SET_NAME, "fieldstat_easy_output_thread");
+
+    while (fs->output_thread_running) {
         clock_gettime(CLOCK_MONOTONIC, &this_output_time);
         long long now = this_output_time.tv_sec * 1000 + this_output_time.tv_nsec / 1000000;
         if (now - last_run_time < output_interval) {
@@ -92,7 +89,7 @@ void *output_main(void *arg) // return void * for pthread_create check only
         timestamp_delta.tv_usec = timestamp.tv_usec - (last_run_time % 1000) * 1000; // %1000 to get the ms part, then *1000 to convert ms to us
         last_run_time = now;
 
-        char *ret = output_work(fs, &timestamp, &timestamp_delta);
+        char *ret = fs_easy_output_to_json(fs, &timestamp, &timestamp_delta);
         if (ret == NULL) {
             ret = strdup("[]");
         }
@@ -102,7 +99,7 @@ void *output_main(void *arg) // return void * for pthread_create check only
         lock.l_whence = SEEK_SET;
         lock.l_len = 0;
         if (fcntl(fileno(fs->output_fp), F_SETLKW, &lock) < 0) {
-            fprintf(stderr, "output_main: fcntl failed to lock\n");
+            fprintf(stderr, "fs_easy_output_thread: fcntl failed to lock\n");
             free(ret);
             continue;
         }
@@ -114,7 +111,7 @@ void *output_main(void *arg) // return void * for pthread_create check only
 
         lock.l_type = F_UNLCK;
         if (fcntl(fileno(fs->output_fp), F_SETLK, &lock) < 0) {
-            fprintf(stderr, "output_main: fcntl failed to release\n");
+            fprintf(stderr, "fs_easy_output_thread: fcntl failed to release\n");
         }
 
         free(ret);
@@ -124,7 +121,7 @@ void *output_main(void *arg) // return void * for pthread_create check only
 
 struct fieldstat_easy *fieldstat_easy_new(int max_thread_num, const struct fieldstat_tag *tags, size_t n_tag) {
     struct fieldstat_easy *fse = calloc(1, sizeof(struct fieldstat_easy));
-    fse->fsu = malloc(sizeof(struct fs_unit) * max_thread_num);
+    fse->fsu = malloc(sizeof(struct fs_easy_thread) * max_thread_num);
     fse->max_thread_num = max_thread_num;
     fse->delta = fieldstat_new();
     fieldstat_create_cube(fse->delta, NULL, 0, SAMPLING_MODE_COMPREHENSIVE, 0);
@@ -144,8 +141,8 @@ struct fieldstat_easy *fieldstat_easy_new(int max_thread_num, const struct field
 }
 
 void fieldstat_easy_free(struct fieldstat_easy *fse) {
-    if (g_output_thread_running) {
-        close_output_thread();
+    if (fse->output_thread_running) {
+        (void)__sync_lock_test_and_set(&fse->output_thread_running, 0);
         pthread_join(fse->output_thread, NULL);
         fclose(fse->output_fp);
     }
@@ -168,8 +165,8 @@ void fieldstat_easy_free(struct fieldstat_easy *fse) {
 }
 
 
-int fieldstat_easy_enable_auto_output(struct fieldstat_easy *pthis, const char *output_path, int interval_second) {
-    if (g_output_thread_running) {
+int fieldstat_easy_enable_auto_output(struct fieldstat_easy *fse, const char *output_path, int interval_second) {
+    if (fse->output_thread_running) {
         return -2;
     }
 
@@ -178,10 +175,10 @@ int fieldstat_easy_enable_auto_output(struct fieldstat_easy *pthis, const char *
         return -1;
     }
 
-    pthis->output_fp = fp;
-    g_output_thread_running = 1;
-    pthis->output_interval_second = interval_second;
-    pthread_create(&pthis->output_thread, NULL, output_main, pthis);
+    fse->output_fp = fp;
+    fse->output_thread_running = 1;
+    fse->output_interval_second = interval_second;
+    pthread_create(&fse->output_thread, NULL, fs_easy_output_thread, fse);
 
     return 0;
 }
@@ -242,7 +239,7 @@ void fieldstat_easy_output(struct fieldstat_easy *fse, char **buff, size_t *buff
 {
     struct timeval timestamp;
     struct timespec this_output_time;
-    clock_gettime(CLOCK_MONOTONIC, &this_output_time); // use the same method as output_main
+    clock_gettime(CLOCK_MONOTONIC, &this_output_time); // use the same method as fs_easy_output_thread
     timestamp.tv_sec = this_output_time.tv_sec;
     timestamp.tv_usec = this_output_time.tv_nsec / 1000;
     struct fieldstat *dst = fieldstat_new();
