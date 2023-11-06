@@ -204,6 +204,7 @@ The prometheus exporter reads the fieldstat4 json file and enables the prometheu
 The local exporter reads the fieldstat4 json file and outputs it to the screen.
 
 
+
 ### List of rpm files
     ...
     |-- bin
