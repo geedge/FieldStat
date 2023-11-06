@@ -109,6 +109,30 @@ TEST(test_easy_fieldstat, output_to_file)
     remove(FILENAME);
 }
 
+TEST(test_easy_fieldstat, empty_tag)
+{
+    struct fieldstat_easy *fse = fieldstat_easy_new(10, NULL, 0);
+    int counter_id = fieldstat_easy_register_counter(fse, "metric counter");
+    fieldstat_easy_counter_incrby(fse, 0, counter_id, NULL, 0, 1);
+    fieldstat_easy_enable_auto_output(fse, FILENAME, 2);
+    sleep(3); // long enough to output, but only once
+    fieldstat_easy_free(fse);
+
+    cJSON *root = read_file();
+    EXPECT_EQ(cJSON_GetArraySize(root), 1);
+
+    cJSON *tagged_by_int = cJSON_GetArrayItem(root, 0);
+    cJSON *metric = cJSON_GetObjectItem(tagged_by_int, "fields");
+    EXPECT_TRUE(metric != NULL);
+
+    long long value = cJSON_GetObjectItem(metric, "metric counter")->valueint;
+    EXPECT_EQ(value, 1);
+    long long value_delta = cJSON_GetObjectItem(metric, "metric counter_delta")->valueint;
+    EXPECT_EQ(value_delta, 1);
+
+    cJSON_Delete(root);
+    remove(FILENAME);
+}
 
 extern "C" {
     extern char *fs_easy_output_to_json(struct fieldstat_easy *fs, struct timeval *timestamp);
@@ -127,12 +151,17 @@ TEST(test_easy_fieldstat, output_interval_ok)
     stub.set(fs_easy_output_to_json, fs_easy_output_to_json_stub);
 
     struct fieldstat_easy *fse = fieldstat_easy_new(10, NULL, 0);
+    fieldstat_easy_register_histogram(fse, "metric histogram", 1, 1000000, 5); // a pretty time consuming metric
+    fieldstat_easy_histogram_record(fse, 0, 0, &TEST_TAG_INT, 1, 1);
+    fieldstat_easy_histogram_record(fse, 0, 0, &TEST_TAG_DOUBLE, 1, 10);
+    fieldstat_easy_histogram_record(fse, 0, 0, &TEST_TAG_STRING, 1, 110);
+
     fieldstat_easy_enable_auto_output(fse, FILENAME, 1);
 
     sleep(30); // output 30s/1s = 20 times
     fieldstat_easy_free(fse);
 
-    EXPECT_TRUE(g_output_count == 30 || g_output_count == 29); // 29 when the last output is not triggered
+    EXPECT_TRUE(g_output_count == 30 || g_output_count == 29); // missing only one is ok and expected
 }
 
 TEST(test_easy_fieldstat, ensure_data_racing_of_two_output_and_of_incyby)

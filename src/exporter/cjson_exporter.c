@@ -457,11 +457,18 @@ void extend_metric_delta(struct cellwise_rec_for_export *acc, size_t n_acc, stru
     struct couple_export_table *map = couple_export_table_new(); // todo: 这个map更新放到exporter里，不要每次都new
     for (int i = 0; i < n_acc; i++) {
         const char *tag_json = json_writer_unwrap(acc[i].cjson_tags);
+        if (tag_json == NULL) { // tag might be empty, give it a dummy name which will only be used by me
+            tag_json = "\anil";
+        }
         couple_export_table_add(map, tag_json, i);
     }
 
     for (int i = 0; i < n_delta; i++) {
         const char *tag_json = json_writer_unwrap(delta[i].cjson_tags);
+        if (tag_json == NULL) { // tag might be empty, give it a dummy name which will only be used by me
+            tag_json = "\anil";
+        }
+
         int id_acc = couple_export_table_find(map, tag_json);
         assert(id_acc < n_acc);
 
