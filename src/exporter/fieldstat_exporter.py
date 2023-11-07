@@ -10,8 +10,10 @@ import shutil
 import datetime
 import time
 import copy
+import fcntl
 from prettytable import PrettyTable,NONE,HEADER
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from jinja2 import Environment, FileSystemLoader
 
 import ctypes
 
@@ -62,7 +64,7 @@ class FieldstatExporterVars:
     local_display_hist    = False
     local_display_hll     = False
     local_match_tags      = {}
-    local_disable_table   = True
+    local_template        = ""
 
     prom_uri_path         = ""
 
@@ -158,8 +160,6 @@ class PrometheusExporter:
         for key,value in json_dict["fields"].items():
             escaped_name = self.__escape_metric_name(key)
             if isinstance(value, int):
-                if key.endswith("_delta"):
-                    continue
                 metrics += self.__build_type_counter(escaped_name, escaped_tags, value)
             else:
                 is_hll = FieldstatAPI.libfieldstat.fieldstat_is_hll(value.encode('utf-8'))
@@ -177,7 +177,9 @@ class PrometheusExporter:
             return payload
 
         with open(self.json_path) as file:
+            fcntl.flock(file, fcntl.LOCK_EX)
             json_data = json.load(file)
+            fcntl.flock(file, fcntl.LOCK_UN)
             for item in json_data:
                 payload += self.__build_metrics(item)
 
@@ -225,47 +227,7 @@ class CounterTable:
         self.min_width   = self.INFO_COLUMN_WIDTH
         self.tables      = []
         self.columns     = []
-        self.rows        = []
         self.field_names = []  
-        self.rows        = []
-
-
-    def create_row_table(self, fields):
-        field_names = []
-        sorted_keys = sorted(fields.keys())
-        field_names.append("")
-        field_names.extend(sorted_keys)
-
-        table = PrettyTable()
-        table.vrules = NONE
-        table.hrules = NONE
-        table.field_names = field_names
-
-        for item in field_names:
-            table.align[item] = "r"
-        table.align[""] = "l"
-
-        self.tables.append(table)
-
-        return table
-
-
-    def add_row_table_row(self, table, tags, fields):
-        row = []
-
-        if table is None:
-            return
-
-        #exporter table row name.
-        for key, value in tags.items():
-            row.append("%s_%s" % (key, str(value)))
-
-        #exporter table row value.
-        sorted_keys = sorted(fields.keys())
-        for key in sorted_keys:
-            row.append(fields[key])
-
-        table.add_row(row)
 
 
     def add_table_column(self, tags, head, value, speed_s):
@@ -287,7 +249,7 @@ class CounterTable:
 
         return table
     
-    def __build_columns_tables(self):
+    def build_columns_tables(self):
         # One table print in screen size
         # One table per screen size
         n_columns  = len(self.columns)
@@ -297,7 +259,6 @@ class CounterTable:
         table_size = self.column_size // (self.min_width + self.COLUMM_PADDING)
         if 0 == table_size:
             table_size = 1
-        
 
         for i in range(0, n_columns, table_size):
             table  = None
@@ -321,7 +282,55 @@ class CounterTable:
         return len(self.tables)
 
     def print_tables(self):
-        self.__build_columns_tables()
+        self.build_columns_tables()
+        for item in self.tables:
+            print(item)
+
+
+class TableFormatTable:
+    def __init__(self):
+        self.tables = []
+        self.rows   = []
+
+    def create_table(self, fields):
+        field_names = []
+        sorted_keys = sorted(fields.keys())
+        field_names.append("")
+        field_names.extend(sorted_keys)
+
+        table = PrettyTable()
+        table.vrules = NONE
+        table.hrules = NONE
+        table.field_names = field_names
+
+        for item in field_names:
+            table.align[item] = "r"
+        table.align[""] = "l"
+
+        self.tables.append(table)
+
+        return table
+
+
+    def add_table_row(self, table, tags, fields):
+        row = []
+
+        if table is None:
+            return
+
+        #exporter table row name.
+        for key, value in tags.items():
+            row.append("%s_%s" % (key, str(value)))
+
+        #exporter table row value.
+        sorted_keys = sorted(fields.keys())
+        for key in sorted_keys:
+            row.append(fields[key])
+
+        table.add_row(row)
+
+
+    def print_tables(self):
         for item in self.tables:
             print(item)
 
@@ -332,45 +341,75 @@ class HistogramTable:
         self.bins   = FieldstatExporterVars.hist_bins
         self.tables = []
 
-    def __build_summary_format(self, c_hist, table):
-        for i in self.bins:
-            head = "{:.2f}%".format(i * 100)
-            row  =  FieldstatAPI.libfieldstat.fieldstat_histogram_value_at_percentile(c_hist, float(i * 100))
-            table.add_column(head, [row])
-
-    def __build_histogram_format(self, c_hist, table):
-        for i in self.bins:
-            head = "le={:d}".format(int(i))
-            row  =  FieldstatAPI.libfieldstat.fieldstat_histogram_value_at_percentile(c_hist, int(i))
-            table.add_column(head, [row])
-
-
-    def build_table(self, tags, key, value):
-        table  = PrettyTable()
-        c_hist = FieldstatAPI.libfieldstat.fieldstat_histogram_base64_decode(value.encode('utf-8'))
-        if self.format == "summary":
-            self.__build_summary_format(c_hist, table)
-        if self.format == "histogram":
-            self.__build_histogram_format(c_hist, table)
+    def __get_row_shared_values(self, c_hist):
+        shared_values = []
 
         max_value = FieldstatAPI.libfieldstat.fieldstat_histogram_value_max(c_hist)
-        table.add_column("MAX", [max_value])
-        
+        shared_values.append(str(max_value))
+
         min_value = FieldstatAPI.libfieldstat.fieldstat_histogram_value_min(c_hist)
-        table.add_column("MIN", [min_value])
-        
+        shared_values.append(str(min_value))
+
         avg_value = FieldstatAPI.libfieldstat.fieldstat_histogram_value_mean(c_hist)
-        table.add_column("AVG", ["{:.2f}".format(avg_value)])
-        
+        shared_values.append("{:.2f}".format(avg_value))
+
         dev_value = FieldstatAPI.libfieldstat.fieldstat_histogram_value_stddev(c_hist)
-        table.add_column("STDDEV", ["{:.2f}".format(dev_value)])
+        shared_values.append("{:.2f}".format(dev_value))
         
         cnt_value = FieldstatAPI.libfieldstat.fieldstat_histogram_value_total_count(c_hist)
-        table.add_column("CNT", [cnt_value])
+        shared_values.append(str(cnt_value))
+        
+        return shared_values
 
+    def  __get_row_values(self, c_hist):
+        row_values = []
+        for i in self.bins:
+            if self.format == "summary":
+                value = FieldstatAPI.libfieldstat.fieldstat_histogram_value_at_percentile(c_hist, float(i * 100))
+                row_values.append(str(value))
+            if self.format == "histogram":
+                value = FieldstatAPI.libfieldstat.fieldstat_histogram_count_le_value(c_hist, int(i))
+                row_values.append(str(value))
+        shared_values = self.__get_row_shared_values(c_hist)
+        row_values   += shared_values
+        return row_values
+
+    def  __add_table_field_names(self, table):
+        field_names = []
+        field_names.append("")
+        for i in self.bins:
+            if self.format == "summary":
+                field_names.append("{:.2f}%".format(i * 100))
+            if self.format == "histogram":
+                field_names.append("le={:d}".format(int(i)))
+        field_names += ["MAX", "MIN", "AVG", "STDDEV", "CNT"]
+        table.field_names = field_names
+        for item in field_names:
+            table.min_width[item] = 10
+            if item == "":
+                table.align[item] = "l"
+            else:
+                table.align[item] = "r"
+
+    def __add_table_row(self, table, hist_value, row_name):
+        if hist_value is None:
+            return
+        c_hist = FieldstatAPI.libfieldstat.fieldstat_histogram_base64_decode(hist_value.encode('utf-8'))
+        row    = [row_name] + self.__get_row_values(c_hist)
         FieldstatAPI.libfieldstat.fieldstat_histogram_free(c_hist)
+        table.add_row(row)
 
-        table.title = key + " " + tags
+    def build_table(self, tags, key, hist_value, hist_value_delta, interval_ms):
+        table = PrettyTable()
+        table.vrules = NONE
+        # table.hrules = NONE
+        table.title = key + " " + tags + " "
+        if interval_ms > 0:
+            table.title += "interval: {:d}ms".format(int(interval_ms))
+        self.__add_table_field_names(table)
+        self.__add_table_row(table, hist_value, "acc")
+        self.__add_table_row(table, hist_value_delta, "delta")
+
         self.tables.append(table)
 
     def read_tables_num(self):
@@ -388,46 +427,44 @@ class LocalExporter:
         self.ctable            = CounterTable()
         self.htable            = HistogramTable()
         self.hlltable          = CounterTable()
+        self.tftable           = TableFormatTable()
         self.display_counter   = FieldstatExporterVars.local_display_counter
         self.display_hist      = FieldstatExporterVars.local_display_hist
         self.display_hll       = FieldstatExporterVars.local_display_hll
         self.match_tags        = FieldstatExporterVars.local_match_tags
-        self.disable_table     = FieldstatExporterVars.local_disable_table
+        self.template          = FieldstatExporterVars.local_template
         self.__set_default_display()
+        self.objects_matched   = []
+        self.template_ja2      = None 
+
 
     def __set_default_display(self):
-        #default print all type metrics
         if not (self.display_counter or self.display_hist or self.display_hll):
             self.display_counter = True
             self.display_hist    = True
             self.display_hll     = True
 
-    def __dealwith_counter(self, tags, key, value, speed_s):
+
+    def __build_counter_type_exporter(self, tags, key, value, value_delta, timestamp_ms_delta):
+        speed_s = 0.0
+        if value_delta is not None:
+            speed_s = value_delta * 1000 / timestamp_ms_delta
         self.ctable.add_table_column(tags, key, value, speed_s)
 
-    def __dealwith_histogram(self, tags, key, value):
-        self.htable.build_table(tags, key, value)
+    def __build_histogram_type_exporter(self, tags, key, value, value_delta, timestamp_ms_delta):
+        self.htable.build_table(tags, key, value, value_delta, timestamp_ms_delta)
 
-    def __dealwith_hll(self, tags, key, value):
+    def __build_hll_type_exporter(self, tags, key, value):
         hll_value = FieldstatAPI.libfieldstat.fieldstat_hll_base64_to_count(value.encode('utf-8'))
         self.hlltable.add_table_column(tags, key, "{:.2f}".format(hll_value), 0)
 
-    def __parse_json_tags(self, json_object):
+    def __append_app_name_to_tags(self, json_object):
         tags_dict = copy.deepcopy(json_object["tags"])
         tags_dict.update({"app_name": json_object["name"]})
         return json.dumps(tags_dict)
 
-    def __get_counter_speed_value(self, key, fields, json_object):
-        delta_key = key + "_delta"
-        if delta_key in fields:
-            delta_val = fields[delta_key]
-            delta_ms  = json_object["timestamp_ms"] - json_object["timestamp_ms_delta"]
-            speed_s   = delta_val * 1000 / delta_ms
-            return speed_s
-        return 0
 
-
-    def __match_tags(self, tags):
+    def __is_tags_matched(self, tags):
         if len(self.match_tags) == 0:
             return True
 
@@ -442,146 +479,250 @@ class LocalExporter:
                 return False
             if value != tags[key]:
                 return False
-            
+
         return True
 
 
-    def __generate_table_bundle(self, json_objects):
-        table_bundle = {}
-        table_bundle["not_table_field"] = []
-
-        for item in json_objects:
-            #set display table option off
-            if self.disable_table:
-                table_bundle["not_table_field"].append(item)
-                continue
-            # table: only one tag and same tag key + same field keys + name key
-            not_append_table = False
-            if len(item["tags"]) != 1:
-                table_bundle["not_table_field"].append(item)
-                continue
-
-            for _, value in item["fields"].items():                
-                if isinstance(value, str):
-                    not_append_table = True
-                    break
-
-            if not_append_table == True:
-                table_bundle["not_table_field"].append(item)
-                continue
-
-            key_list  = list(item["tags"].keys()) + sorted(list(item["fields"].keys()))
-            key = ''.join(key_list) + item["name"]
-            
-            if key in table_bundle:
-                val = table_bundle[key]
-                val.append(item)
-            else:
-                table_bundle[key] = [item]
-
-        return table_bundle
+    def read_json_objects_from_file(self):
+        #check source json file is exist.
+        objects = []
+        if not os.path.exists(self.json_path):
+            logging.error("Path: {%s} does not exist", self.json_path)
+            return objects
+        with open(self.json_path) as fd:
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            objects = json.load(fd)
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        return objects
 
 
-    def __read_match_tags_objects(self, json_objects):
-        match_objects = []
+    def read_match_tags_json_objects(self, json_objects):
+        matched_objects = []
 
         for item in json_objects:
             tags = item["tags"]
             #not match tags object. not read.
-            if not self.__match_tags(tags):
+            if not self.__is_tags_matched(tags):
                 continue
             #match tags object. delete matching tags.
             for key,value in self.match_tags.items():
                 if key in tags and value == tags[key]:
                     tags.pop(key, None)
 
-            match_objects.append(item)
+            matched_objects.append(item)
 
-        return match_objects
+        self.objects_matched = matched_objects
 
-    def __parse_table_json_object(self, json_objects):
+        return matched_objects
+
+    # def build_table_format_htable(self, json_objects):
+    #     table_bundle = {}
+    #     table_bundle["not_table_format"] = []
+
+    #     for item in json_objects:
+    #         #set display table option off
+    #         if self.disable_table:
+    #             table_bundle["not_table_format"].append(item)
+    #             continue
+    #         # table: only one tag and same tag key + same field keys + name key
+    #         not_append_table = False
+    #         if len(item["tags"]) != 1:
+    #             table_bundle["not_table_format"].append(item)
+    #             continue
+
+    #         for _, value in item["fields"].items():                
+    #             if isinstance(value, str):
+    #                 not_append_table = True
+    #                 break
+
+    #         if not_append_table == True:
+    #             table_bundle["not_table_format"].append(item)
+    #             continue
+
+    #         key_list  = list(item["tags"].keys()) + sorted(list(item["fields"].keys()))
+    #         key = ''.join(key_list) + item["name"]
+            
+    #         if key in table_bundle:
+    #             val = table_bundle[key]
+    #             val.append(item)
+    #         else:
+    #             table_bundle[key] = [item]
+
+    #     return table_bundle
+
+
+    def build_not_table_format_exporter(self, json_objects):
+        for item in json_objects:
+            timestamp_ms_delta = item["timestamp_ms_delta"]
+            fields_delta       = item["fields_delta"]
+            tags_new           = self.__append_app_name_to_tags(item)
+
+            for key,value in item["fields"].items():
+                value_delta = None
+                if key in fields_delta:
+                    value_delta = fields_delta[key]
+                if not isinstance(value, str):
+                    self.__build_counter_type_exporter(tags_new, key, value, value_delta, timestamp_ms_delta)
+                else:
+                    # histogram and hll type
+                    is_hll = FieldstatAPI.libfieldstat.fieldstat_is_hll(value.encode('utf-8'))
+                    if is_hll:
+                        self.__build_hll_type_exporter(tags_new, key, value)
+                    else:
+                        self.__build_histogram_type_exporter(tags_new, key, value, value_delta, timestamp_ms_delta)
+
+
+    def build_table_format_exporter(self, json_objects):
         table = None
         for item in json_objects:
             tags   = item["tags"]
             fields = item["fields"]
             if table == None:
-                table = self.ctable.create_row_table(fields)
-            self.ctable.add_row_table_row(table, tags, fields)
+                table = self.tftable.create_table(fields)
+            self.tftable.add_table_row(table, tags, fields)
+        return table
 
-    def __parse_single_json_object(self, json_object):
-        tags   = self.__parse_json_tags(json_object)
-        fields = json_object["fields"]
 
-        for key,value in fields.items():
-            if not isinstance(value, str):
-                #counter type 
-                if key.endswith("_delta"):
+    def export_templates(self):
+        env = Environment(loader=FileSystemLoader('templates'))
+        env.globals.update(print_tables    =self.print_table_format)
+        env.globals.update(print_counters  =self.print_counter_type)
+        env.globals.update(print_histograms=self.print_histogram_type)
+        env.globals.update(print_hlls      =self.print_hll_type)
+        template = env.from_string(self.template)
+        self.template_ja2 = template
+
+    def build_local_exporter(self):
+        objects = self.read_json_objects_from_file()
+        self.objects_matched = self.read_match_tags_json_objects(objects)
+
+        if len(self.template) > 0:
+            self.export_templates()
+        else:
+            self.build_not_table_format_exporter(self.objects_matched)
+
+
+    def print_table_format(self, groupby, columns):
+        table_fields=[]
+        for item in self.objects_matched:
+            is_print_table = True
+            tags   = item["tags"]
+            fields = item["fields"]
+            
+            if groupby not in tags:
+                continue
+            for column in columns:
+                if column not in fields:
+                    is_print_table = False
+                    break
+                if isinstance(fields[column], str):
+                    is_print_table = False
                     continue
-                speed_s = self.__get_counter_speed_value(key, fields, json_object)
-                self.__dealwith_counter(tags, key, value, speed_s)
-            else:
-                # histogram and hll type
-                is_hll = FieldstatAPI.libfieldstat.fieldstat_is_hll(value.encode('utf-8'))
-                if is_hll:
-                    self.__dealwith_hll(tags, key, value)
-                else:
-                    self.__dealwith_histogram(tags, key, value)
+            if is_print_table == False:
+                continue
+
+            new_fields = copy.deepcopy(item)
+            
+            for key in fields:
+                if key not in columns:
+                    new_fields["fields"].pop(key)
+
+            for key in tags:
+                if groupby != key:
+                    new_fields["tags"].pop(key)
+
+            table_fields.append(new_fields)
+        return self.build_table_format_exporter(table_fields)
+    
+#   def print_counter(self, [tags], [fields])
+    def print_counter_type(self, field_keys):
+        counter_fields = []
+        for item in self.objects_matched:
+            fields = item["fields"]
+
+            new_fields = copy.deepcopy(item)
+                    
+            for key in fields:
+                if (key not in field_keys) or (isinstance(fields[key], str)):
+                    new_fields["fields"].pop(key)
+            counter_fields.append(new_fields)
+        self.build_not_table_format_exporter(counter_fields)
+        self.ctable.build_columns_tables()
+        str_tables = []
+        for item in self.ctable.tables:
+            str_tables.append(item.get_string())        
+        return "".join(str_tables)
+
+    def print_histogram_type(self, field_keys):
+        hist_fields = []
+        for item in self.objects_matched:
+            fields = item["fields"]
+            new_fields = copy.deepcopy(item) 
+            for key in fields:
+                if (key not in field_keys) \
+                    or (not isinstance(fields[key], str)) \
+                    or (True == FieldstatAPI.libfieldstat.fieldstat_is_hll(fields[key].encode('utf-8'))):
+                    new_fields["fields"].pop(key)
+            hist_fields.append(new_fields)
+        self.build_not_table_format_exporter(hist_fields)
+        str_tables = []
+        for item in self.htable.tables:
+            str_tables.append(item.get_string())   
+        return "".join(str_tables)
+
+    def print_hll_type(self, field_keys):
+        hll_fields = []
+        for item in self.objects_matched:
+            fields = item["fields"]
+            new_fields = copy.deepcopy(item) 
+            for key in fields:
+                if (key not in field_keys) \
+                    or (not isinstance(fields[key], str)) \
+                    or (False == FieldstatAPI.libfieldstat.fieldstat_is_hll(fields[key].encode('utf-8'))):
+                    new_fields["fields"].pop(key)
+                    
+            hll_fields.append(new_fields)
+        self.build_not_table_format_exporter(hll_fields)
+        self.hlltable.build_columns_tables()
+        str_tables = []
+        for item in self.hlltable.tables:
+            str_tables.append(item.get_string())        
+        return "".join(str_tables)
 
 
-    def parse_data(self):
-        #check source json file is exist.
-        if not os.path.exists(self.json_path):
-            logging.error("Path: {%s} does not exist", self.json_path)
-            return
-
-        with open(self.json_path) as file:
-            json_objects  = json.load(file)
-            #read match tags objects.
-            match_objects = self.__read_match_tags_objects(json_objects)
-            #generate tables dict.
-            table_bundle  = self.__generate_table_bundle(match_objects)
-
-            for tkey,tval in table_bundle.items():
-                if tkey == "not_table_field": # exporter single metrics.
-                    for item in tval:
-                        self.__parse_single_json_object(item)
-                else:                         # exporter table-format metrics.
-                    self.__parse_table_json_object(tval)
-
-
-    def __print_top_edge(self):
-        timestamp = datetime.datetime.now().timestamp()
+    def print_local_exporter(self):
+        #The top edge
+        timestamp      = datetime.datetime.now().timestamp()
         formatted_time = datetime.datetime.fromtimestamp(timestamp).strftime('%a %b %d %H:%M:%S %Y')
-        
-        num_of_equals = (self.terminal_size - len(formatted_time)) // 2
-        
-        result = '=' * num_of_equals + formatted_time + '=' * num_of_equals
-        print(result)
+        num_of_equals  = (self.terminal_size - len(formatted_time)) // 2
+        print('=' * num_of_equals + formatted_time + '=' * num_of_equals)
 
-    def __print_bottom_edge(self):
+        if len(self.template) > 0:
+            print(self.template_ja2.render())
+        else:
+            if self.display_counter:
+                self.ctable.print_tables()
+                print("=" * self.terminal_size)
+                self.tftable.print_tables()
+                print("=" * self.terminal_size)
+
+            if self.display_hist:
+                self.htable.print_tables()
+                print("=" * self.terminal_size)
+
+            if self.display_hll:
+                self.hlltable.print_tables()
+                print("=" * self.terminal_size)
+
+        #The bottom edge
         print('-' * self.terminal_size)
-
-    def print_data(self):
-        self.__print_top_edge()
-
-        if self.display_counter:
-            self.ctable.print_tables()
-
-        if self.display_hist:
-            self.htable.print_tables()
-
-        if self.display_hll:
-            self.hlltable.print_tables()
-
-        self.__print_bottom_edge()
 
 
     @classmethod
     def run_local_exporter(cls):
-        praser = cls()
-        praser.parse_data()
-        praser.print_data()
-
+        exporter = cls()
+        exporter.build_local_exporter()
+        exporter.print_local_exporter()
 
 
 ################################################################################
@@ -635,10 +776,10 @@ class FieldstatExporter:
                             help = 'Display histogram type metrics')
         parser.add_argument('--display-counter', action = 'store_true', default = False,
                             help = 'Display counter type metrics')
-        parser.add_argument('--disable-table',   action = 'store_true', default = False,
-                            help = 'disable display table format')
         parser.add_argument("-m", "--match-tags", type = str,           default = "",
                             help = "Display the tags match metrics")
+        parser.add_argument("-t", "--template",   type = str,           default = "",
+                            help = "Specify the print template with jinja2.")
 
 
     def __parse_bins_str(self, bins_str):
@@ -682,7 +823,7 @@ class FieldstatExporter:
             FieldstatExporterVars.local_display_hll     = args.display_hll
             FieldstatExporterVars.local_display_hist    = args.display_hist
             FieldstatExporterVars.local_match_tags      = self.__parse_tags_str(args.match_tags)
-            FieldstatExporterVars.local_disable_table   = args.disable_table
+            FieldstatExporterVars.local_template        = args.template
             self.exporter_mode       = 'local'
             self.local_interval_s    = args.interval
             self.local_enable_loop   = args.loop

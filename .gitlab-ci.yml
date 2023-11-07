@@ -19,7 +19,7 @@ stages:
   - yum install -y elfutils-libelf-devel
   - yum install -y libuuid libuuid-devel
   - yum install -y zlib
-  - python3 -m pip install prettytable
+  - python3 -m pip install prettytable jinja2
 
 
 .build_by_travis_for_centos7:
