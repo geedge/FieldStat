@@ -417,9 +417,10 @@ TEST(export_test, enable_delta_and_export_twice_without_new_metric)
 
         // check metrics
         cJSON *metrics = cJSON_GetObjectItem(root, "fields");
+        cJSON *metrics_delta = cJSON_GetObjectItem(root, "fields_delta");
         cJSON *counter = cJSON_GetObjectItem(metrics, "counter");
         EXPECT_EQ(counter->valueint, 1);
-        cJSON *counter_delta = cJSON_GetObjectItem(metrics, "counter_delta");
+        cJSON *counter_delta = cJSON_GetObjectItem(metrics_delta, "counter");
         EXPECT_EQ(counter_delta->valueint, 1);
 
         // timestamp
@@ -444,9 +445,10 @@ TEST(export_test, enable_delta_and_export_twice_without_new_metric)
 
         // check metrics
         cJSON *metrics = cJSON_GetObjectItem(root, "fields");
+        cJSON *metrics_delta = cJSON_GetObjectItem(root, "fields_delta");
         cJSON *counter = cJSON_GetObjectItem(metrics, "counter");
         EXPECT_EQ(counter->valueint, 1);
-        cJSON *counter_delta = cJSON_GetObjectItem(metrics, "counter_delta");
+        cJSON *counter_delta = cJSON_GetObjectItem(metrics_delta, "counter");
         EXPECT_EQ(counter_delta->valueint, 0);
 
         // timestamp
@@ -487,12 +489,13 @@ TEST(export_test, enable_delta_and_export_twice_with_new_metric_and_omit_histogr
 
         // check metrics
         cJSON *metrics = cJSON_GetObjectItem(root, "fields");
+        cJSON *metrics_delta = cJSON_GetObjectItem(root, "fields_delta");
         cJSON *counter = cJSON_GetObjectItem(metrics, "counter");
         EXPECT_EQ(counter->valueint, 1);
-        cJSON *counter_delta = cJSON_GetObjectItem(metrics, "counter_delta");
+        cJSON *counter_delta = cJSON_GetObjectItem(metrics_delta, "counter");
         EXPECT_EQ(counter_delta->valueint, 1);
         EXPECT_TRUE(cJSON_GetObjectItem(metrics, "histogram") != nullptr);
-        EXPECT_TRUE(cJSON_GetObjectItem(metrics, "histogram_delta") == NULL);
+        EXPECT_TRUE(cJSON_GetObjectItem(metrics_delta, "histogram") == NULL);
 
         // timestamp
         cJSON *timestamp = cJSON_GetObjectItem(root, "timestamp_ms");
@@ -520,15 +523,16 @@ TEST(export_test, enable_delta_and_export_twice_with_new_metric_and_omit_histogr
 
         // check metrics
         cJSON *metrics = cJSON_GetObjectItem(root, "fields");
+        cJSON *metrics_delta = cJSON_GetObjectItem(root, "fields_delta");
         cJSON *counter = cJSON_GetObjectItem(metrics, "counter");
         EXPECT_EQ(counter->valueint, 11);
-        cJSON *counter_delta = cJSON_GetObjectItem(metrics, "counter_delta");
+        cJSON *counter_delta = cJSON_GetObjectItem(metrics_delta, "counter");
         EXPECT_EQ(counter_delta->valueint, 10);
         EXPECT_TRUE(cJSON_GetObjectItem(metrics, "histogram") != nullptr);
-        EXPECT_TRUE(cJSON_GetObjectItem(metrics, "histogram_delta") == NULL);
+        EXPECT_TRUE(cJSON_GetObjectItem(metrics_delta, "histogram") == NULL);
         cJSON *counter2 = cJSON_GetObjectItem(metrics, "counter2");
         EXPECT_EQ(counter2->valueint, 1);
-        cJSON *counter2_delta = cJSON_GetObjectItem(metrics, "counter2_delta");
+        cJSON *counter2_delta = cJSON_GetObjectItem(metrics_delta, "counter2");
         EXPECT_EQ(counter2_delta->valueint, 1);
 
         // timestamp
@@ -556,7 +560,6 @@ TEST(export_test, enable_delta_and_export_three_times_skipping_cube_with_no_coun
     struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new();
     fieldstat_json_exporter_enable_delta(fieldstat_json_exporter);
     char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, instance, &TEST_TIMEVAL);
-    printf("%s\n", json_string);
     cJSON *root_arr = cJSON_Parse(json_string);
     free(json_string);
 
@@ -565,18 +568,20 @@ TEST(export_test, enable_delta_and_export_three_times_skipping_cube_with_no_coun
 
     cJSON *root = cJSON_GetArrayItem(root_arr, 0);
     cJSON *metrics = cJSON_GetObjectItem(root, "fields");
+    cJSON *metrics_delta = cJSON_GetObjectItem(root, "fields_delta");
     cJSON *counter = cJSON_GetObjectItem(metrics, "counter");
     EXPECT_EQ(counter->valueint, 1);
-    cJSON *counter_delta = cJSON_GetObjectItem(metrics, "counter_delta");
+    cJSON *counter_delta = cJSON_GetObjectItem(metrics_delta, "counter");
     EXPECT_EQ(counter_delta->valueint, 1);
     EXPECT_TRUE(cJSON_GetObjectItem(metrics, "histogram") == NULL);
-    EXPECT_TRUE(cJSON_GetObjectItem(metrics, "histogram_delta") == NULL);
+    EXPECT_TRUE(cJSON_GetObjectItem(metrics_delta, "histogram") == NULL);
 
     root = cJSON_GetArrayItem(root_arr, 1);
     metrics = cJSON_GetObjectItem(root, "fields");
+    metrics_delta = cJSON_GetObjectItem(root, "fields_delta");
     EXPECT_TRUE(cJSON_GetObjectItem(metrics, "counter") == NULL);
-    EXPECT_TRUE(cJSON_GetObjectItem(metrics, "counter_delta") == NULL);
-    EXPECT_TRUE(cJSON_GetObjectItem(metrics, "histogram_delta") == NULL);
+    EXPECT_TRUE(cJSON_GetObjectItem(metrics_delta, "counter") == NULL);
+    EXPECT_TRUE(cJSON_GetObjectItem(metrics_delta, "histogram") == NULL);
     EXPECT_TRUE(cJSON_GetObjectItem(metrics, "histogram") != NULL);
     cJSON_Delete(root_arr);
 
@@ -586,17 +591,19 @@ TEST(export_test, enable_delta_and_export_three_times_skipping_cube_with_no_coun
     free(json_string);
     root = cJSON_GetArrayItem(root_arr, 0);
     metrics = cJSON_GetObjectItem(root, "fields");
+    metrics_delta = cJSON_GetObjectItem(root, "fields_delta");
     counter = cJSON_GetObjectItem(metrics, "counter");
     EXPECT_EQ(counter->valueint, 1);
-    counter_delta = cJSON_GetObjectItem(metrics, "counter_delta");
+    counter_delta = cJSON_GetObjectItem(metrics_delta, "counter");
     EXPECT_EQ(counter_delta->valueint, 0);
     EXPECT_TRUE(cJSON_GetObjectItem(metrics, "histogram") == NULL);
-    EXPECT_TRUE(cJSON_GetObjectItem(metrics, "histogram_delta") == NULL);
+    EXPECT_TRUE(cJSON_GetObjectItem(metrics_delta, "histogram") == NULL);
     root = cJSON_GetArrayItem(root_arr, 1);
     metrics = cJSON_GetObjectItem(root, "fields");
+    metrics_delta = cJSON_GetObjectItem(root, "fields_delta");
     EXPECT_TRUE(cJSON_GetObjectItem(metrics, "counter") == NULL);
-    EXPECT_TRUE(cJSON_GetObjectItem(metrics, "counter_delta") == NULL);
-    EXPECT_TRUE(cJSON_GetObjectItem(metrics, "histogram_delta") == NULL);
+    EXPECT_TRUE(cJSON_GetObjectItem(metrics_delta, "counter_delta") == NULL);
+    EXPECT_TRUE(cJSON_GetObjectItem(metrics_delta, "histogram_delta") == NULL);
     EXPECT_TRUE(cJSON_GetObjectItem(metrics, "histogram") != NULL);
     cJSON_Delete(root_arr);
 
@@ -609,17 +616,19 @@ TEST(export_test, enable_delta_and_export_three_times_skipping_cube_with_no_coun
     free(json_string);
     root = cJSON_GetArrayItem(root_arr, 0);
     metrics = cJSON_GetObjectItem(root, "fields");
+    metrics_delta = cJSON_GetObjectItem(root, "fields_delta");
     counter = cJSON_GetObjectItem(metrics, "counter");
     EXPECT_EQ(counter->valueint, 11);
-    counter_delta = cJSON_GetObjectItem(metrics, "counter_delta");
+    counter_delta = cJSON_GetObjectItem(metrics_delta, "counter");
     EXPECT_EQ(counter_delta->valueint, 10);
     EXPECT_TRUE(cJSON_GetObjectItem(metrics, "histogram") == NULL);
-    EXPECT_TRUE(cJSON_GetObjectItem(metrics, "histogram_delta") == NULL);
+    EXPECT_TRUE(cJSON_GetObjectItem(metrics_delta, "histogram") == NULL);
     root = cJSON_GetArrayItem(root_arr, 1);
     metrics = cJSON_GetObjectItem(root, "fields");
+    metrics_delta = cJSON_GetObjectItem(root, "fields_delta");
     EXPECT_TRUE(cJSON_GetObjectItem(metrics, "counter") == NULL);
-    EXPECT_TRUE(cJSON_GetObjectItem(metrics, "counter_delta") == NULL);
-    EXPECT_TRUE(cJSON_GetObjectItem(metrics, "histogram_delta") == NULL);
+    EXPECT_TRUE(cJSON_GetObjectItem(metrics_delta, "counter") == NULL);
+    EXPECT_TRUE(cJSON_GetObjectItem(metrics_delta, "histogram") == NULL);
     EXPECT_TRUE(cJSON_GetObjectItem(metrics, "histogram") != NULL);
 
     cJSON_Delete(root_arr);
@@ -639,9 +648,10 @@ void test_check_delta_for_one_json(const struct fieldstat_tag_list *expect_cell_
 
     // check metrics
     cJSON *metrics = cJSON_GetObjectItem(root, "fields");
+    cJSON *metrics_delta = cJSON_GetObjectItem(root, "fields_delta");
     cJSON *counter = cJSON_GetObjectItem(metrics, "counter");
     EXPECT_EQ(counter->valueint, expect_value);
-    cJSON *counter_delta = cJSON_GetObjectItem(metrics, "counter_delta");
+    cJSON *counter_delta = cJSON_GetObjectItem(metrics_delta, "counter");
     EXPECT_EQ(counter_delta->valueint, expect_delta);
 }
 
@@ -748,9 +758,10 @@ void test_reset_one_round(std::function<void(struct fieldstat *, struct fieldsta
     EXPECT_EQ(arr_num, 1);
     cJSON *root = cJSON_GetArrayItem(root_arr, 0);
     cJSON *metrics = cJSON_GetObjectItem(root, "fields");
+    cJSON *metrics_delta = cJSON_GetObjectItem(root, "fields_delta");
     cJSON *counter = cJSON_GetObjectItem(metrics, "counter");
     EXPECT_EQ(counter->valueint, 11);
-    cJSON *counter_delta = cJSON_GetObjectItem(metrics, "counter_delta");
+    cJSON *counter_delta = cJSON_GetObjectItem(metrics_delta, "counter");
     EXPECT_EQ(counter_delta->valueint, 11);
     cJSON_Delete(root_arr);
 
@@ -766,9 +777,10 @@ void test_reset_one_round(std::function<void(struct fieldstat *, struct fieldsta
     EXPECT_EQ(arr_num, 1);
     root = cJSON_GetArrayItem(root_arr, 0);
     metrics = cJSON_GetObjectItem(root, "fields");
+    metrics_delta = cJSON_GetObjectItem(root, "fields_delta");
     counter = cJSON_GetObjectItem(metrics, "counter");
     EXPECT_EQ(counter->valueint, 123);
-    counter_delta = cJSON_GetObjectItem(metrics, "counter_delta");
+    counter_delta = cJSON_GetObjectItem(metrics_delta, "counter");
     EXPECT_EQ(counter_delta->valueint, 123);
     cJSON_Delete(root_arr);
 
@@ -830,12 +842,13 @@ TEST(export_test, delta_with_two_instance_same_config)
 
     cJSON *root = cJSON_GetArrayItem(root_arr, 0);
     cJSON *metrics = cJSON_GetObjectItem(root, "fields");
+    cJSON *metrics_delta = cJSON_GetObjectItem(root, "fields_delta");
     cJSON *counter = cJSON_GetObjectItem(metrics, "counter");
     EXPECT_EQ(counter->valueint, 1123);
-    cJSON *counter_delta = cJSON_GetObjectItem(metrics, "counter_delta");
+    cJSON *counter_delta = cJSON_GetObjectItem(metrics_delta, "counter");
     EXPECT_EQ(counter_delta->valueint, 123);
     const cJSON *histogram = cJSON_GetObjectItem(metrics, "histogram");
-    const cJSON *histogram_delta = cJSON_GetObjectItem(metrics, "histogram_delta");
+    const cJSON *histogram_delta = cJSON_GetObjectItem(metrics_delta, "histogram");
     EXPECT_STREQ(histogram->valuestring, histogram_delta->valuestring);
     cJSON *timestamp = cJSON_GetObjectItem(root, "timestamp_ms");
     EXPECT_EQ(timestamp->valueint, TEST_TIMEVAL_LONG);
@@ -868,14 +881,15 @@ TEST(export_test, delta_with_two_instance_one_empty)
 
     cJSON *root = cJSON_GetArrayItem(root_arr, 0);
     cJSON *metrics = cJSON_GetObjectItem(root, "fields");
+    cJSON *metrics_delta = cJSON_GetObjectItem(root, "fields_delta");
+    // metrics_delta is empty
+    const cJSON *counter_delta = cJSON_GetObjectItem(metrics_delta, "counter");
+    EXPECT_TRUE(counter_delta == NULL);
+
     cJSON *counter = cJSON_GetObjectItem(metrics, "counter");
     EXPECT_EQ(counter->valueint, 123);
-    const cJSON *counter_delta = cJSON_GetObjectItem(metrics, "counter_delta");
-    EXPECT_TRUE(counter_delta == NULL);
     const cJSON *histogram = cJSON_GetObjectItem(metrics, "histogram");
     EXPECT_TRUE(histogram != NULL);
-    const cJSON *histogram_delta = cJSON_GetObjectItem(metrics, "histogram_delta");
-    EXPECT_TRUE(histogram_delta == NULL);
     cJSON *timestamp = cJSON_GetObjectItem(root, "timestamp_ms");
     EXPECT_EQ(timestamp->valueint, TEST_TIMEVAL_LONG);
     cJSON *timestamp_delta = cJSON_GetObjectItem(root, "timestamp_ms_delta");
@@ -907,9 +921,10 @@ TEST(export_test, delta_with_two_instance_different_cell)
 
     cJSON *root = cJSON_GetArrayItem(root_arr, 0);
     cJSON *metrics = cJSON_GetObjectItem(root, "fields");
+    cJSON *metrics_delta = cJSON_GetObjectItem(root, "fields_delta");
     cJSON *counter = cJSON_GetObjectItem(metrics, "counter");
     EXPECT_EQ(counter->valueint, 123);
-    cJSON *counter_delta = cJSON_GetObjectItem(metrics, "counter_delta");
+    cJSON *counter_delta = cJSON_GetObjectItem(metrics_delta, "counter");
     EXPECT_TRUE(counter_delta == NULL);
     cJSON *timestamp = cJSON_GetObjectItem(root, "timestamp_ms");
     EXPECT_EQ(timestamp->valueint, TEST_TIMEVAL_LONG);
@@ -918,9 +933,10 @@ TEST(export_test, delta_with_two_instance_different_cell)
 
     root = cJSON_GetArrayItem(root_arr, 1);
     metrics = cJSON_GetObjectItem(root, "fields");
+    metrics_delta = cJSON_GetObjectItem(root, "fields_delta");
     counter = cJSON_GetObjectItem(metrics, "counter");
     EXPECT_EQ(counter->valueint, 1);
-    counter_delta = cJSON_GetObjectItem(metrics, "counter_delta");
+    counter_delta = cJSON_GetObjectItem(metrics_delta, "counter");
     EXPECT_EQ(counter_delta->valueint, 1);
     timestamp = cJSON_GetObjectItem(root, "timestamp_ms");
     EXPECT_EQ(timestamp->valueint, TEST_TIMEVAL_LONG);

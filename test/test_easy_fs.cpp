@@ -124,10 +124,12 @@ TEST(test_easy_fieldstat, empty_tag)
     cJSON *tagged_by_int = cJSON_GetArrayItem(root, 0);
     cJSON *metric = cJSON_GetObjectItem(tagged_by_int, "fields");
     EXPECT_TRUE(metric != NULL);
+    cJSON *metric_delta = cJSON_GetObjectItem(tagged_by_int, "fields_delta");
+    EXPECT_TRUE(metric_delta != NULL);
 
     long long value = cJSON_GetObjectItem(metric, "metric counter")->valueint;
     EXPECT_EQ(value, 1);
-    long long value_delta = cJSON_GetObjectItem(metric, "metric counter_delta")->valueint;
+    long long value_delta = cJSON_GetObjectItem(metric_delta, "metric counter")->valueint;
     EXPECT_EQ(value_delta, 1);
 
     cJSON_Delete(root);

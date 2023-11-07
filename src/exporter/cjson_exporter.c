@@ -399,12 +399,7 @@ void write_delta_to_json(struct fieldstat_json_exporter *exporter, struct cellwi
         }
         // cell will never delete. If delete cube / cell happen, the exporter history will be reset.
 
-        size_t delta_metric_name_len = strlen(metric_name) + 6; // 6 for "_delta"
-        char *delta_metric_name = malloc(delta_metric_name_len + 1);
-        snprintf(delta_metric_name, delta_metric_name_len + 1, "%s_delta", metric_name);
-        delta_metric_name[delta_metric_name_len] = '\0';
-        json_writer_longlong_field(field_json, delta_metric_name, delta);
-        free(delta_metric_name);
+        json_writer_longlong_field(field_json, metric_name, delta);
     }
 }
 
@@ -452,39 +447,33 @@ void couple_export_table_free(struct couple_export_table *tbl)
     free(tbl);
 }
 
-void extend_metric_delta(struct cellwise_rec_for_export *acc, size_t n_acc, struct cellwise_rec_for_export *delta, size_t n_delta)
+// align delta fields to acc fields by matching tag json string, return an array with length n_acc, each of whose element match the corresponding acc element by both tag and index
+const struct cellwise_rec_for_export **rearrange_metric_delta(const struct cellwise_rec_for_export *acc, size_t n_acc, const struct cellwise_rec_for_export *delta, size_t n_delta)
 {
     struct couple_export_table *map = couple_export_table_new(); // todo: 这个map更新放到exporter里，不要每次都new
     for (int i = 0; i < n_acc; i++) {
         const char *tag_json = json_writer_unwrap(acc[i].cjson_tags);
-        if (tag_json == NULL) { // tag might be empty, give it a dummy name which will only be used by me
+        if (tag_json == NULL) { // tag might be empty, give it a dummy name
             tag_json = "\anil";
         }
         couple_export_table_add(map, tag_json, i);
     }
 
+    const struct cellwise_rec_for_export **ret = calloc(n_acc, sizeof(struct cellwise_rec_for_export *));
+
     for (int i = 0; i < n_delta; i++) {
         const char *tag_json = json_writer_unwrap(delta[i].cjson_tags);
-        if (tag_json == NULL) { // tag might be empty, give it a dummy name which will only be used by me
+        if (tag_json == NULL) { // tag might be empty, give it a dummy name
             tag_json = "\anil";
         }
 
         int id_acc = couple_export_table_find(map, tag_json);
-        assert(id_acc < n_acc);
-
-        acc[id_acc].metric_pairs = realloc(acc[id_acc].metric_pairs, sizeof(struct export_kv_pair *) * (acc[id_acc].n_metric + delta[i].n_metric));
-        struct export_kv_pair **dst_expair_arr = acc[id_acc].metric_pairs;
-        struct export_kv_pair **src_expair_arr = delta[i].metric_pairs;
-        for (int j = 0; j < delta[i].n_metric; j++) {
-            src_expair_arr[j]->key = realloc(src_expair_arr[j]->key, strlen(src_expair_arr[j]->key) + 6 + 1); // 6 for "_delta", 1 for '\0'
-            strcat(src_expair_arr[j]->key, "_delta");
-            dst_expair_arr[acc[id_acc].n_metric + j] = src_expair_arr[j];
-        }
-        acc[id_acc].n_metric += delta[i].n_metric;
-        delta[i].n_metric = 0; // moved to acc, avoid free
+        assert(id_acc < n_acc); // mute cppcheck
+        ret[id_acc] = &delta[i];
     }
 
     couple_export_table_free(map);
+    return ret;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -871,8 +860,9 @@ void fieldstat_json_exporter_export_array(const struct fieldstat_json_exporter *
         for (int j = 0; j < tag_field_pair[i].n_metric; j++) {
             kv_pair_write_to_json(tag_field_pair[i].metric_pairs[j], field_json);
         }
+        struct json_writer *field_json_delta = json_writer_init();
         if (exporter->history != NULL) { // not null when fieldstat_json_exporter_enable_delta is called
-            write_delta_to_json((struct fieldstat_json_exporter *)exporter, &tag_field_pair[i], field_json);
+            write_delta_to_json((struct fieldstat_json_exporter *)exporter, &tag_field_pair[i], field_json_delta);
         }
 
         const char *tmp_name = exporter->name ? exporter->name : DEFAULT_EXPORTER_NAME;
@@ -881,6 +871,9 @@ void fieldstat_json_exporter_export_array(const struct fieldstat_json_exporter *
         json_writer_str_field(root, "name", tmp_name, strlen(tmp_name));
         json_writer_object_item(root, "tags", current->cjson_tags);
         json_writer_object_item(root, "fields", field_json);
+        if (exporter->history != NULL) {
+            json_writer_object_item(root, "fields_delta", field_json_delta);
+        }
         json_writer_longlong_field(root, "timestamp_ms", timestamp_ms);
         if (exporter->history != NULL) {
             json_writer_longlong_field(root, "timestamp_ms_delta", timestamp_ms - exporter->history->ts);
@@ -946,9 +939,7 @@ char *fieldstat_json_exporter_export_with_delta(const struct fieldstat_json_expo
     }
     size_t n_pair_delta;
     struct cellwise_rec_for_export *expair_delta = read_tag_and_field(delta, &n_pair_delta);
-    if (expair_delta != NULL && n_pair_delta != 0) {
-        extend_metric_delta(expair_acc, n_pair_acc, expair_delta, n_pair_delta);
-    }
+    const struct cellwise_rec_for_export **expair_delta_rearranged = rearrange_metric_delta(expair_acc, n_pair_acc, expair_delta, n_pair_delta);
 
     fieldstat_json_exporter_write_global_tags(exporter, expair_acc, n_pair_acc);
     
@@ -957,17 +948,25 @@ char *fieldstat_json_exporter_export_with_delta(const struct fieldstat_json_expo
     for (int i = 0; i < n_pair_acc; i++) {
         struct cellwise_rec_for_export *current = &expair_acc[i];
 
+        const char *tmp_name = exporter->name ? exporter->name : DEFAULT_EXPORTER_NAME;
+
         struct json_writer *field_json = json_writer_init();
         for (int j = 0; j < expair_acc[i].n_metric; j++) {
             kv_pair_write_to_json(expair_acc[i].metric_pairs[j], field_json);
         }
 
-        const char *tmp_name = exporter->name ? exporter->name : DEFAULT_EXPORTER_NAME;
+        struct json_writer *field_json_delta = json_writer_init();
+        if (expair_delta_rearranged[i] != NULL) {
+            for (int j = 0; j < expair_acc[i].n_metric; j++) {
+                kv_pair_write_to_json(expair_delta_rearranged[i]->metric_pairs[j], field_json_delta);
+            }
+        }
 
         json_writer_start_map(root);
         json_writer_str_field(root, "name", tmp_name, strlen(tmp_name));
         json_writer_object_item(root, "tags", current->cjson_tags);
         json_writer_object_item(root, "fields", field_json);
+        json_writer_object_item(root, "fields_delta", field_json_delta);
         json_writer_longlong_field(root, "timestamp_ms", cal_ms_time(timestamp));
         json_writer_longlong_field(root, "timestamp_ms_delta", cal_ms_time(timestamp_delta));
 
@@ -998,6 +997,8 @@ char *fieldstat_json_exporter_export_with_delta(const struct fieldstat_json_expo
         free(dummy_s);
     }
     free(expair_delta);
+
+    free(expair_delta_rearranged);
 
     return cjson_str;
 }
