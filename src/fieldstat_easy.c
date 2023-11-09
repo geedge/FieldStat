@@ -13,12 +13,12 @@
 #include "fieldstat_exporter.h"
 #include "fieldstat_easy.h"
 
+#define CACHE_LINE_SIZE 64
 struct fs_easy_thread {
     struct fieldstat *active;
     struct fieldstat *read_only;
     pthread_spinlock_t lock;
-    char padding[40]; // to avoid false sharing. 40 = 64 - 8 - 8 - 8
-};
+} __attribute__((aligned(CACHE_LINE_SIZE)));
 
 struct fieldstat_easy
 {
