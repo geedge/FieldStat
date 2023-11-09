@@ -145,6 +145,9 @@ It is hard to calculate memory usage of CJSON. By experiment, RSS to different c
 | add a cell(comprehensive)                     | 1.191     | fieldstat_counter_incyby(new sampling)                                           |
 | histogram record                              | 0.2946    | fieldstat_histogram_record                                                       |
 | HLL add                                       | 0.3306    | fieldstat_hll_add                                                                |
+| add a cell(comprehensive)  with 5 tags        | 1.8751    | fieldstat_counter_incyby(new sampling)                                           |
+| histogram record           with 5 tags        | 0.5956    | fieldstat_histogram_record                                                       |
+| HLL add                    with 5 tags        | 0.6825    | fieldstat_hll_add                                                                |
 | copy 1 cell of a 1 counter metric             | 0.7814    | fieldstat_merge(empty destination instance)                                      |
 | copy 1 cell of a HLL metric                   | 1.96      | fieldstat_merge(empty destination instance)                                      |
 | copy 1 cell of a histogram metric             | 0.844     | fieldstat_merge(empty destination instance)                                      |

@@ -261,6 +261,98 @@ TEST(test_performance, performance_test_add_cells_hll_add)
     fieldstat_free(instance);
 }
 
+TEST(test_performance, performance_test_add_cells_comprehensive_5_tags)
+{
+    size_t cell_count = 100000;
+    struct fieldstat_tag *tag_v[cell_count];
+    for (size_t i = 0; i < cell_count; i++) {
+        struct fieldstat_tag *tags = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * 5);
+
+        tags[0] = TEST_TAG_INT;
+        tags[1] = TEST_TAG_INT;
+        tags[2] = TEST_TAG_INT;
+        tags[3] = TEST_TAG_INT;
+        tags[4] = TEST_TAG_INT;
+        tags[0].value_longlong = i;
+
+        tag_v[i] = tags;
+    }
+    // getchar();
+    struct fieldstat *instance = fieldstat_new();
+    fieldstat_create_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, cell_count);
+    fieldstat_register_counter(instance, "test");
+
+    clock_t start = clock();
+    for (size_t i = 0; i < cell_count; i++) {
+        fieldstat_counter_incrby(instance, 0, 0, tag_v[i % cell_count], 5, 1);
+    }
+    clock_t end = clock();
+    double seconds = (double)(end - start) / cell_count;
+    printf("performance_test_add_cells_comprehensive time 5 tags cost: %f\n", seconds);
+    EXPECT_TRUE(seconds < 2);
+    fieldstat_free(instance);
+
+    for (size_t i = 0; i < cell_count; i++) {
+        free(tag_v[i]);
+    }
+}
+
+TEST(test_performance, performance_test_add_cells_histogram_record_5tags)
+{
+    struct fieldstat *instance = fieldstat_new();
+    fieldstat_create_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    fieldstat_register_hist(instance, "test", 1, 100000, 3);
+    size_t test_num = 100000;
+    long long vals[test_num];
+    for (size_t i = 0; i < test_num; i++) {
+        vals[i] = rand() % 100000 + 1;
+    }
+
+    struct fieldstat_tag tags[5];
+    tags[0] = TEST_TAG_INT;
+    tags[1] = TEST_TAG_STRING;
+    tags[2] = TEST_TAG_DOUBLE;
+    tags[3] = TEST_TAG_INT;
+    tags[4] = TEST_TAG_INT;
+    clock_t start = clock();
+    for (size_t i = 0; i < test_num; i++) {
+        fieldstat_hist_record(instance, 0, 0, tags, 5, vals[i]);
+    }
+    clock_t end = clock();
+    double seconds = (double)(end - start) / test_num;
+    printf("performance_test_add_cells_histogram_record time 5 tags cost: %f\n", seconds);
+    EXPECT_TRUE(seconds < 1);
+    fieldstat_free(instance);
+}
+
+TEST(test_performance, performance_test_add_cells_hll_add_5tags)
+{
+    struct fieldstat *instance = fieldstat_new();
+    fieldstat_create_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    fieldstat_register_hll(instance, "test", 6);
+    size_t test_num = 100000;
+    std::string vals[test_num];
+    for (size_t i = 0; i < test_num; i++) {
+        vals[i] = std::to_string(rand() % 1000000 + 1);
+    }
+
+    struct fieldstat_tag tags[5];
+    tags[0] = TEST_TAG_INT;
+    tags[1] = TEST_TAG_STRING;
+    tags[2] = TEST_TAG_DOUBLE;
+    tags[3] = TEST_TAG_INT;
+    tags[4] = TEST_TAG_INT;
+    clock_t start = clock();
+    for (size_t i = 0; i < test_num; i++) {
+        fieldstat_hll_add(instance, 0, 0, tags, 5, vals[i].c_str(), vals[i].length());
+    }
+    clock_t end = clock();
+    double seconds = (double)(end - start) / test_num;
+    printf("performance_test_add_cells_hll_add time 5 tags cost: %f\n", seconds);
+    EXPECT_TRUE(seconds < 1);
+    fieldstat_free(instance);
+}
+
 /* -------------------------------------------------------------------------- */
 /*                                   export                                   */
 /* -------------------------------------------------------------------------- */
