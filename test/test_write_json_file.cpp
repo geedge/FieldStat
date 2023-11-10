@@ -5,6 +5,58 @@
 
 #include "fieldstat.h"
 #include "fieldstat_exporter.h"
+#include "fieldstat_easy.h"
+
+const int N_THREAD = 2;
+
+static struct fieldstat_easy *get_hll_fieldstat_easy()
+{
+    /*
+        fieldstat easy does not support hll
+    */
+    assert(0);
+    return NULL;
+}
+
+extern "C" {
+    extern char *fs_easy_output_to_json(struct fieldstat_easy *fs, const struct timeval *timestamp, const struct timeval *timestamp_delta);
+}
+
+static struct fieldstat_easy *get_hist_fieldstat_easy()
+{
+    struct fieldstat_tag global_tags[2];
+    struct fieldstat_tag cell_tags[2];
+
+    global_tags[0].key  = "rule_id";
+    global_tags[0].type = TAG_INTEGER;
+    global_tags[0].value_longlong = 1;
+    global_tags[1].key  = "action";
+    global_tags[1].type = TAG_CSTRING;
+    global_tags[1].value_str = "deny";
+
+    cell_tags[0].key  = "thread_id";
+    cell_tags[0].type = TAG_INTEGER;
+    cell_tags[0].value_longlong = 1;
+    cell_tags[1].key  = "hit_rate";
+    cell_tags[1].type = TAG_DOUBLE;
+    cell_tags[1].value_double = 1.1;
+
+    const char *hist_names[] = {"list_num", "max_wt_ms", "ivt_nx_itv_ms", 
+                                "bye_pv_itv_ms", "sess_num/udp", "ivt/udp",
+                                "bye/udp", "oth_mtd/udp"};
+
+    struct fieldstat_easy *fse = fieldstat_easy_new(N_THREAD, global_tags, 2);
+    for(unsigned int i = 0; i < sizeof(hist_names)/sizeof(hist_names[0]); i++)
+    {
+        int hist_id = fieldstat_easy_register_histogram(fse, hist_names[i], 1, 600000, 3); // only precision 1 would be enough
+        for(int j = 0; j < 100; j++)
+        {
+            fieldstat_easy_histogram_record(fse, rand() % N_THREAD, hist_id, cell_tags, 2, i*100 + j);
+        }
+    }
+
+    return fse;
+}
 
 static struct fieldstat *get_hll_fieldsstat()
 {
@@ -83,7 +135,49 @@ static struct fieldstat *get_hist_fieldstat()
     return instance;
 }
 
+static struct fieldstat_easy *get_table_fieldstat_easy()
+{
+    struct fieldstat_tag global_tags[2];
+    struct fieldstat_tag cell_tags;
 
+    global_tags[0].key  = "policy_id";
+    global_tags[0].type = TAG_INTEGER;
+    global_tags[0].value_longlong = 1;
+    global_tags[1].key  = "quanlity";
+    global_tags[1].type = TAG_DOUBLE;
+    global_tags[1].value_double = 0.5;
+
+    const char *cell_tag_value[] = {
+        "sum", "SECURITY-EVENT", "SESSION-RECORD", "INTERNAL-RTP-RECORD",
+        "VOIP-RECORD", "INTERIM-SESSION-RECORD", "TRANSACTION-RECORD",
+        "GTPC-RECORD", "BGP-RECORD", "PROXY-EVENT", "DOS-SKETCH-RECORD",
+        "STATISTICS-RULE-METRIC", "OBJECT-STATISTICS-METRIC"};
+
+    cell_tags.key  = "send_log";
+    cell_tags.type = TAG_CSTRING;
+    cell_tags.value_str = "true";
+
+    struct fieldstat_easy *fse = fieldstat_easy_new(N_THREAD, global_tags, 2);
+    int counter_id_0 = fieldstat_easy_register_counter(fse, "T_success_log");
+    int counter_id_1 = fieldstat_easy_register_counter(fse, "T_fail_log");
+
+    for(unsigned int i = 0; i < sizeof(cell_tag_value)/sizeof(cell_tag_value[0]); i++)
+    {
+        cell_tags.value_str = cell_tag_value[i];
+        fieldstat_easy_counter_incrby(fse, rand()%N_THREAD, counter_id_0, &cell_tags, 1, 1);
+        if(i < 5)
+            fieldstat_easy_counter_incrby(fse, rand()%N_THREAD, counter_id_1, &cell_tags, 1, 2);
+    }
+
+    return fse;
+}
+
+void fieldstat_easy_to_file(struct fieldstat_easy *fse, const char *file_path)
+{
+    fieldstat_easy_enable_auto_output(fse, file_path, 1);
+    usleep(1 * 1000 * 1000 + 500 * 1000); // 1.5s
+    fieldstat_easy_free(fse); // only by free to stop exporting
+}
 
 static struct fieldstat *get_table_fieldstat()
 {
@@ -158,6 +252,38 @@ TEST(ExporterLocal, TableBuild)
     
     int ret = write_json_to_file("/tmp/fieldstat.json",str_json);
     EXPECT_EQ(0, ret);
+}
+
+#include <iostream>
+#include <fstream>
+TEST(ExporterLocal, TableBuild2)
+{
+    // fieldstat easy does not support hll
+    struct fieldstat_easy *hist = get_hist_fieldstat_easy();
+    struct fieldstat_easy *table = get_table_fieldstat_easy();
+
+    // fieldstat easy does not support merge
+    
+    fieldstat_easy_to_file(hist, "/tmp/fieldstat_hist.json");
+    fieldstat_easy_to_file(table, "/tmp/fieldstat_table.json");
+
+    // merge to one file
+    std::ifstream file("/tmp/fieldstat_hist.json");
+    std::string json_hist((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    file.close();
+    file.open("/tmp/fieldstat_table.json");
+    std::string json_table((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    file.close();
+    
+    cJSON *root_hist = cJSON_Parse(json_hist.c_str());
+    cJSON *root_table = cJSON_Parse(json_table.c_str());
+    cJSON *dst = cJSON_CreateArray();
+    cJSON *hist_o = cJSON_GetArrayItem(root_hist, 0);
+    cJSON *table_o = cJSON_GetArrayItem(root_table, 0);
+    cJSON_AddItemToArray(dst, hist_o);
+    cJSON_AddItemToArray(dst, table_o);
+    char *str_json = cJSON_Print(dst);
+    int ret = write_json_to_file("/tmp/fieldstat.json",str_json);
 }
 
 
