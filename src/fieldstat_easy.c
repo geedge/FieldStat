@@ -93,13 +93,9 @@ void *fs_easy_output_thread(void *arg) // return void * for pthread_create check
         if (ret == NULL) {
             ret = strdup("[]");
         }
-        struct flock lock;
-        lock.l_type = F_WRLCK;
-        lock.l_start = 0;
-        lock.l_whence = SEEK_SET;
-        lock.l_len = 0;
-        if (fcntl(fileno(fs->output_fp), F_SETLKW, &lock) < 0) {
-            fprintf(stderr, "fs_easy_output_thread: fcntl failed to lock\n");
+
+        if (flock(fileno(fs->output_fp), LOCK_EX) == -1) {
+            perror("fs_easy_output_thread: Error locking file");
             free(ret);
             continue;
         }
@@ -108,10 +104,9 @@ void *fs_easy_output_thread(void *arg) // return void * for pthread_create check
         ftruncate(fileno(fs->output_fp), 0);
         rewind(fs->output_fp);
         fprintf(fs->output_fp, "%s\n", ret);
-
-        lock.l_type = F_UNLCK;
-        if (fcntl(fileno(fs->output_fp), F_SETLK, &lock) < 0) {
-            fprintf(stderr, "fs_easy_output_thread: fcntl failed to release\n");
+        fflush(fs->output_fp);
+        if (flock(fileno(fs->output_fp), LOCK_UN) == -1) {
+            perror("fs_easy_output_thread: Error unlocking file");
         }
 
         free(ret);
