@@ -229,14 +229,18 @@ int fieldstat_easy_register_histogram(struct fieldstat_easy *fse, const char *na
     return ret;
 }
 
-// output an json string for accumulated data
-void fieldstat_easy_output(struct fieldstat_easy *fse, char **buff, size_t *buff_len)
+struct timeval get_current_timestamp()
 {
     struct timeval timestamp;
     struct timespec this_output_time;
     clock_gettime(CLOCK_MONOTONIC, &this_output_time); // use the same method as fs_easy_output_thread
     timestamp.tv_sec = this_output_time.tv_sec;
     timestamp.tv_usec = this_output_time.tv_nsec / 1000;
+    return timestamp;
+}
+
+struct fieldstat *merge_all_instance(struct fieldstat_easy *fse)
+{
     struct fieldstat *dst = fieldstat_new();
     // collect all the data recorded since last passive output, if passive output happened. Otherwise, its the data since the program started.
     for (int i = 0; i < fse->max_thread_num; i++) {
@@ -250,12 +254,31 @@ void fieldstat_easy_output(struct fieldstat_easy *fse, char **buff, size_t *buff
     fieldstat_merge(dst, fse->accumulate);
     pthread_spin_unlock(&fse->outputting_lock);
 
+    return dst;
+}
+
+// output an json string for accumulated data
+void fieldstat_easy_output(struct fieldstat_easy *fse, char **buff, size_t *buff_len)
+{
+    struct fieldstat *dst = merge_all_instance(fse);
+    struct timeval timestamp = get_current_timestamp();
+
     *buff = fieldstat_json_exporter_export(fse->exporter, dst, &timestamp);
     if (*buff == NULL) {
         *buff = strdup("[]");
     }
     fieldstat_free(dst);
     *buff_len = strlen(*buff);
+}
+
+// output many json string for accumulated data(many objects vs array)
+void fieldstat_easy_output_array(struct fieldstat_easy *fse, char ***json_objects, size_t *n_object)
+{
+    struct timeval timestamp = get_current_timestamp();
+    struct fieldstat *dst = merge_all_instance(fse);
+
+    fieldstat_json_exporter_export_array(fse->exporter, dst, &timestamp, json_objects, n_object);
+    fieldstat_free(dst);
 }
 
 int fieldstat_easy_counter_incrby(struct fieldstat_easy *fse, int thread_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long increment)

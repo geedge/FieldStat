@@ -47,6 +47,7 @@ int fieldstat_easy_register_histogram(struct fieldstat_easy *fse, const char *na
     * @param buff: output buffer. User should free it after use.
 */
 void fieldstat_easy_output(struct fieldstat_easy *fse, char **buff, size_t *buff_len);
+void fieldstat_easy_output_array(struct fieldstat_easy *fse, char ***json_objects, size_t *n_object);
 /*
     * @brief let the value of counter metric of cell_id increase by `increment`.
     * @param thread_id: thread id. Must be in [0, max_thread_num).
