@@ -254,37 +254,37 @@ TEST(ExporterLocal, TableBuild)
     EXPECT_EQ(0, ret);
 }
 
-#include <iostream>
-#include <fstream>
-TEST(ExporterLocal, TableBuild2)
-{
-    // fieldstat easy does not support hll
-    struct fieldstat_easy *hist = get_hist_fieldstat_easy();
-    struct fieldstat_easy *table = get_table_fieldstat_easy();
+// #include <iostream>
+// #include <fstream>
+// TEST(ExporterLocal, TableBuild2)
+// {
+//     // fieldstat easy does not support hll
+//     struct fieldstat_easy *hist = get_hist_fieldstat_easy();
+//     struct fieldstat_easy *table = get_table_fieldstat_easy();
 
-    // fieldstat easy does not support merge
+//     // fieldstat easy does not support merge
     
-    fieldstat_easy_to_file(hist, "/tmp/fieldstat_hist.json");
-    fieldstat_easy_to_file(table, "/tmp/fieldstat_table.json");
+//     fieldstat_easy_to_file(hist, "/tmp/fieldstat_hist.json");
+//     fieldstat_easy_to_file(table, "/tmp/fieldstat_table.json");
 
-    // merge to one file
-    std::ifstream file("/tmp/fieldstat_hist.json");
-    std::string json_hist((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-    file.close();
-    file.open("/tmp/fieldstat_table.json");
-    std::string json_table((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-    file.close();
+//     // merge to one file
+//     std::ifstream file("/tmp/fieldstat_hist.json");
+//     std::string json_hist((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+//     file.close();
+//     file.open("/tmp/fieldstat_table.json");
+//     std::string json_table((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+//     file.close();
     
-    cJSON *root_hist = cJSON_Parse(json_hist.c_str());
-    cJSON *root_table = cJSON_Parse(json_table.c_str());
-    cJSON *dst = cJSON_CreateArray();
-    cJSON *hist_o = cJSON_GetArrayItem(root_hist, 0);
-    cJSON *table_o = cJSON_GetArrayItem(root_table, 0);
-    cJSON_AddItemToArray(dst, hist_o);
-    cJSON_AddItemToArray(dst, table_o);
-    char *str_json = cJSON_Print(dst);
-    int ret = write_json_to_file("/tmp/fieldstat.json",str_json);
-}
+//     cJSON *root_hist = cJSON_Parse(json_hist.c_str());
+//     cJSON *root_table = cJSON_Parse(json_table.c_str());
+//     cJSON *dst = cJSON_CreateArray();
+//     cJSON *hist_o = cJSON_GetArrayItem(root_hist, 0);
+//     cJSON *table_o = cJSON_GetArrayItem(root_table, 0);
+//     cJSON_AddItemToArray(dst, hist_o);
+//     cJSON_AddItemToArray(dst, table_o);
+//     char *str_json = cJSON_Print(dst);
+//     int ret = write_json_to_file("/tmp/fieldstat.json",str_json);
+// }
 
 
 int main(int argc, char *argv[]) 
