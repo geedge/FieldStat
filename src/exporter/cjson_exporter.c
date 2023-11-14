@@ -862,7 +862,7 @@ void fieldstat_json_exporter_export_array(const struct fieldstat_json_exporter *
         }
         struct json_writer *field_json_delta = NULL;
         if (exporter->history != NULL) { // not null when fieldstat_json_exporter_enable_delta is called
-            struct json_writer *field_json_delta = json_writer_init();
+            field_json_delta = json_writer_init();
             write_delta_to_json((struct fieldstat_json_exporter *)exporter, &tag_field_pair[i], field_json_delta);
         }
 
