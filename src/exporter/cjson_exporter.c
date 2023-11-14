@@ -860,8 +860,9 @@ void fieldstat_json_exporter_export_array(const struct fieldstat_json_exporter *
         for (int j = 0; j < tag_field_pair[i].n_metric; j++) {
             kv_pair_write_to_json(tag_field_pair[i].metric_pairs[j], field_json);
         }
-        struct json_writer *field_json_delta = json_writer_init();
+        struct json_writer *field_json_delta = NULL;
         if (exporter->history != NULL) { // not null when fieldstat_json_exporter_enable_delta is called
+            struct json_writer *field_json_delta = json_writer_init();
             write_delta_to_json((struct fieldstat_json_exporter *)exporter, &tag_field_pair[i], field_json_delta);
         }
 

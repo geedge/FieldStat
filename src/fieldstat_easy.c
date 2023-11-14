@@ -114,7 +114,7 @@ void *fs_easy_output_thread(void *arg) // return void * for pthread_create check
     return NULL; // return void * for pthread_create check only
 }
 
-struct fieldstat_easy *fieldstat_easy_new(int max_thread_num, const struct fieldstat_tag *tags, size_t n_tag) {
+struct fieldstat_easy *fieldstat_easy_new(int max_thread_num, const char *name, const struct fieldstat_tag *tags, size_t n_tag) {
     struct fieldstat_easy *fse = calloc(1, sizeof(struct fieldstat_easy));
     fse->fsu = malloc(sizeof(struct fs_easy_thread) * max_thread_num);
     fse->max_thread_num = max_thread_num;
@@ -123,7 +123,13 @@ struct fieldstat_easy *fieldstat_easy_new(int max_thread_num, const struct field
 
     fse->accumulate = fieldstat_fork(fse->delta);
     fse->exporter = fieldstat_json_exporter_new();
-    fieldstat_json_exporter_set_global_tag(fse->exporter, tags, n_tag);
+    if (tags != NULL && n_tag > 0) {
+        fieldstat_json_exporter_set_global_tag(fse->exporter, tags, n_tag);
+    }
+    if (name != NULL) {
+        fieldstat_json_exporter_set_name(fse->exporter, name);
+    }
+    
     pthread_spin_init(&fse->outputting_lock, PTHREAD_PROCESS_PRIVATE);
 
     for (int i = 0; i < max_thread_num; i++) {

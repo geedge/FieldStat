@@ -45,7 +45,7 @@ static struct fieldstat_easy *get_hist_fieldstat_easy()
                                 "bye_pv_itv_ms", "sess_num/udp", "ivt/udp",
                                 "bye/udp", "oth_mtd/udp"};
 
-    struct fieldstat_easy *fse = fieldstat_easy_new(N_THREAD, global_tags, 2);
+    struct fieldstat_easy *fse = fieldstat_easy_new(N_THREAD, NULL, global_tags, 2);
     for(unsigned int i = 0; i < sizeof(hist_names)/sizeof(hist_names[0]); i++)
     {
         int hist_id = fieldstat_easy_register_histogram(fse, hist_names[i], 1, 600000, 3); // only precision 1 would be enough
@@ -157,7 +157,7 @@ static struct fieldstat_easy *get_table_fieldstat_easy()
     cell_tags.type = TAG_CSTRING;
     cell_tags.value_str = "true";
 
-    struct fieldstat_easy *fse = fieldstat_easy_new(N_THREAD, global_tags, 2);
+    struct fieldstat_easy *fse = fieldstat_easy_new(N_THREAD, NULL, global_tags, 2);
     int counter_id_0 = fieldstat_easy_register_counter(fse, "T_success_log");
     int counter_id_1 = fieldstat_easy_register_counter(fse, "T_fail_log");
 

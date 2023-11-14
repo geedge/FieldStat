@@ -155,7 +155,7 @@ global_tags[0] = tmptag;
 struct fieldstat_tag tag1 = {"direction", TAG_STRING, "incoming"};
 struct fieldstat_tag tag2 = {"direction", TAG_STRING, "outgoing"};
 
-struct fieldstat_easy *fse = fieldstat_easy_new(N_THREADS, global_tags, 1);
+struct fieldstat_easy *fse = fieldstat_easy_new(N_THREADS, NULL, global_tags, 1);
 int counter_id = fieldstat_easy_register_counter(fse, "incoming bytes");
 int hdr_id = fieldstat_easy_register_histogram(fse, 
                                                "delay", 

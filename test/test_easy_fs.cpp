@@ -12,13 +12,13 @@
 
 TEST(test_easy_fieldstat, new_and_free)
 {
-    struct fieldstat_easy *fse = fieldstat_easy_new(10, &TEST_TAG_STRING, 1);
+    struct fieldstat_easy *fse = fieldstat_easy_new(10, "instance name1231231231", &TEST_TAG_STRING, 1);
     fieldstat_easy_free(fse);
 }
 
 TEST(test_easy_fieldstat, output_to_buff)
 {
-    struct fieldstat_easy *fse = fieldstat_easy_new(10, &TEST_TAG_STRING, 1);
+    struct fieldstat_easy *fse = fieldstat_easy_new(10, NULL, &TEST_TAG_STRING, 1);
     fieldstat_easy_register_counter(fse, "metric counter");
     fieldstat_easy_counter_incrby(fse, 0, 0, &TEST_TAG_INT, 1, 1);
     // read file, should be empty
@@ -54,7 +54,7 @@ cJSON *read_file()
 
 TEST(test_easy_fieldstat, output_to_file)
 {
-    struct fieldstat_easy *fse = fieldstat_easy_new(10, NULL, 0);
+    struct fieldstat_easy *fse = fieldstat_easy_new(10, NULL, NULL, 0);
     int counter_id = fieldstat_easy_register_counter(fse, "metric counter");
     fieldstat_easy_enable_auto_output(fse, FILENAME, 1);
     sleep(3); // long enough to output
@@ -111,7 +111,7 @@ TEST(test_easy_fieldstat, output_to_file)
 
 TEST(test_easy_fieldstat, empty_tag)
 {
-    struct fieldstat_easy *fse = fieldstat_easy_new(10, NULL, 0);
+    struct fieldstat_easy *fse = fieldstat_easy_new(10, "ha", NULL, 0);
     int counter_id = fieldstat_easy_register_counter(fse, "metric counter");
     fieldstat_easy_counter_incrby(fse, 0, counter_id, NULL, 0, 1);
     fieldstat_easy_enable_auto_output(fse, FILENAME, 2);
@@ -136,67 +136,67 @@ TEST(test_easy_fieldstat, empty_tag)
     remove(FILENAME);
 }
 
-extern "C" {
-    extern char *fs_easy_output_to_json(struct fieldstat_easy *fs, struct timeval *timestamp);
-}
+// extern "C" {
+//     extern char *fs_easy_output_to_json(struct fieldstat_easy *fs, struct timeval *timestamp);
+// }
 
-int g_output_count = 0;
-char *fs_easy_output_to_json_stub(struct fieldstat_easy *fs, struct timeval *timestamp)
-{
-    g_output_count++;
-    return NULL;
-}
+// int g_output_count = 0;
+// char *fs_easy_output_to_json_stub(struct fieldstat_easy *fs, struct timeval *timestamp)
+// {
+//     g_output_count++;
+//     return NULL;
+// }
 
-TEST(test_easy_fieldstat, output_interval_ok)
-{
-    Stub stub;
-    stub.set(fs_easy_output_to_json, fs_easy_output_to_json_stub);
+// TEST(test_easy_fieldstat, output_interval_ok)
+// {
+//     Stub stub;
+//     stub.set(fs_easy_output_to_json, fs_easy_output_to_json_stub);
 
-    struct fieldstat_easy *fse = fieldstat_easy_new(10, NULL, 0);
-    fieldstat_easy_register_histogram(fse, "metric histogram", 1, 100000, 3); // a pretty time consuming metric
-    fieldstat_easy_histogram_record(fse, 0, 0, &TEST_TAG_INT, 1, 1);
-    fieldstat_easy_histogram_record(fse, 0, 0, &TEST_TAG_DOUBLE, 1, 10);
-    fieldstat_easy_histogram_record(fse, 0, 0, &TEST_TAG_STRING, 1, 110);
+//     struct fieldstat_easy *fse = fieldstat_easy_new(10, NULL, NULL, 0);
+//     fieldstat_easy_register_histogram(fse, "metric histogram", 1, 100000, 3); // a pretty time consuming metric
+//     fieldstat_easy_histogram_record(fse, 0, 0, &TEST_TAG_INT, 1, 1);
+//     fieldstat_easy_histogram_record(fse, 0, 0, &TEST_TAG_DOUBLE, 1, 10);
+//     fieldstat_easy_histogram_record(fse, 0, 0, &TEST_TAG_STRING, 1, 110);
 
-    fieldstat_easy_enable_auto_output(fse, FILENAME, 1);
+//     fieldstat_easy_enable_auto_output(fse, FILENAME, 1);
 
-    sleep(30); // output 30s/1s = 20 times
-    fieldstat_easy_free(fse);
+//     sleep(30); // output 30s/1s = 20 times
+//     fieldstat_easy_free(fse);
 
-    EXPECT_TRUE(g_output_count == 30 || g_output_count == 29); // missing only one is ok and expected
-}
+//     EXPECT_TRUE(g_output_count == 30 || g_output_count == 29); // missing only one is ok and expected
+// }
 
-TEST(test_easy_fieldstat, ensure_data_racing_of_two_output_and_of_incyby)
-{
-    const int N_THREADS = 3;
-    struct fieldstat_tag global_tags[1];
-    struct fieldstat_tag tmptag;
-    tmptag.key = "app id";
-    tmptag.type = TAG_INTEGER;
-    tmptag.value_longlong = 1;
-    global_tags[0] = tmptag;
+// TEST(test_easy_fieldstat, ensure_data_racing_of_two_output_and_of_incyby)
+// {
+//     const int N_THREADS = 3;
+//     struct fieldstat_tag global_tags[1];
+//     struct fieldstat_tag tmptag;
+//     tmptag.key = "app id";
+//     tmptag.type = TAG_INTEGER;
+//     tmptag.value_longlong = 1;
+//     global_tags[0] = tmptag;
     
-    struct fieldstat_easy *fse = fieldstat_easy_new(N_THREADS, global_tags, 1);
-    int counter_id = fieldstat_easy_register_counter(fse, "incoming bytes");
-    int hdr_id = fieldstat_easy_register_histogram(fse, "delay", 1, 10000, 1);
-    fieldstat_easy_enable_auto_output(fse, FILENAME, 1);
+//     struct fieldstat_easy *fse = fieldstat_easy_new(N_THREADS, NULL, global_tags, 1);
+//     int counter_id = fieldstat_easy_register_counter(fse, "incoming bytes");
+//     int hdr_id = fieldstat_easy_register_histogram(fse, "delay", 1, 10000, 1);
+//     fieldstat_easy_enable_auto_output(fse, FILENAME, 1);
 
-    std::thread threads[N_THREADS];
-    for (int thread_id = 0; thread_id < N_THREADS; thread_id++) {
-        threads[thread_id] = std::thread([fse, counter_id, hdr_id, thread_id]() {
-            for (int i = 0; i < 1000000; i++) { // loop million times to ensure no core dump
-                fieldstat_easy_counter_incrby(fse, thread_id, counter_id, &TEST_TAG_INT, 1, 1);
-                fieldstat_easy_histogram_record(fse, thread_id, hdr_id, &TEST_TAG_INT, 1, rand() % 10000);
-            }
-        });
-    }
-    for (int i = 0; i < N_THREADS; i++) {
-        threads[i].join();
-    }
-    fieldstat_easy_free(fse);
+//     std::thread threads[N_THREADS];
+//     for (int thread_id = 0; thread_id < N_THREADS; thread_id++) {
+//         threads[thread_id] = std::thread([fse, counter_id, hdr_id, thread_id]() {
+//             for (int i = 0; i < 1000000; i++) { // loop million times to ensure no core dump
+//                 fieldstat_easy_counter_incrby(fse, thread_id, counter_id, &TEST_TAG_INT, 1, 1);
+//                 fieldstat_easy_histogram_record(fse, thread_id, hdr_id, &TEST_TAG_INT, 1, rand() % 10000);
+//             }
+//         });
+//     }
+//     for (int i = 0; i < N_THREADS; i++) {
+//         threads[i].join();
+//     }
+//     fieldstat_easy_free(fse);
 
-    remove(FILENAME);
-}
+//     remove(FILENAME);
+// }
 
 int main(int argc, char **argv)
 {

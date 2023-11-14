@@ -12,9 +12,10 @@ struct fieldstat_easy;
 /* 
  * new a fieldstat_easy instance.
     * @param max_thread_num: max thread number of this instance.
-    * @param tags: tags of this instance. Will appear in output json.
+    * @param name: name of this instance. Will appear in output json. Can be NULL.
+    * @param tags: tags of this instance. Will appear in output json. Can be NULL.
 */
-struct fieldstat_easy *fieldstat_easy_new(int max_thread_num, const struct fieldstat_tag *tags, size_t n_tag);
+struct fieldstat_easy *fieldstat_easy_new(int max_thread_num, const char *name, const struct fieldstat_tag *tags, size_t n_tag);
 /*
     * free a fieldstat_easy instance.
 */
