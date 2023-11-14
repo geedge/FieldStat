@@ -64,7 +64,7 @@ char *fs_easy_output_to_json(struct fieldstat_easy *fs, const struct timeval *ti
 void *fs_easy_output_thread(void *arg) // return void * for pthread_create check only
 {
     struct timespec entry_time;
-    clock_gettime(CLOCK_MONOTONIC, &entry_time);
+    clock_gettime(CLOCK_REALTIME, &entry_time);
     long long last_run_time = entry_time.tv_sec * 1000 + entry_time.tv_nsec / 1000000;
     // long long last_run_time = 0;
     struct timeval timestamp;
@@ -76,7 +76,7 @@ void *fs_easy_output_thread(void *arg) // return void * for pthread_create check
     prctl(PR_SET_NAME, "fieldstat_easy_output_thread");
 
     while (fs->output_thread_running) {
-        clock_gettime(CLOCK_MONOTONIC, &this_output_time);
+        clock_gettime(CLOCK_REALTIME, &this_output_time);
         long long now = this_output_time.tv_sec * 1000 + this_output_time.tv_nsec / 1000000;
         if (now - last_run_time < output_interval) {
             usleep(50000); // 50ms
@@ -233,7 +233,7 @@ struct timeval get_current_timestamp()
 {
     struct timeval timestamp;
     struct timespec this_output_time;
-    clock_gettime(CLOCK_MONOTONIC, &this_output_time); // use the same method as fs_easy_output_thread
+    clock_gettime(CLOCK_REALTIME, &this_output_time); // use the same method as fs_easy_output_thread
     timestamp.tv_sec = this_output_time.tv_sec;
     timestamp.tv_usec = this_output_time.tv_nsec / 1000;
     return timestamp;
