@@ -124,6 +124,9 @@ int fieldstat_register_hist(struct fieldstat *instance, const char *metric_name,
 */
 int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long increment);
 
+int fieldstat_counter_incrby_batch(struct fieldstat *instance, 
+    int cube_id, int metric_ids[], const struct fieldstat_tag *tags, size_t n_tag, long long increments[], int n_metric);
+
 /*
     * @brief let the value of counter metric equal to value. Other annotations refer to fieldstat_counter_incrby.
     * @return Refer to fieldstat_counter_incrby. What's more, be cautious to call this function if the metric is a primary metric of a topk cube,

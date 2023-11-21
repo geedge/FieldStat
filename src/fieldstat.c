@@ -608,6 +608,36 @@ int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric
     return FS_OK;
 }
 
+int fieldstat_counter_incrby_batch(struct fieldstat *instance, int cube_id, int metric_ids[], const struct fieldstat_tag *tags, size_t n_tag, long long increments[], int n_metric)
+{
+    int ret = check_before_add(instance, cube_id, metric_ids[0], METRIC_TYPE_COUNTER);
+    if (ret != FS_OK) {
+        return ret;
+    }
+    const struct fs_cube *cube = instance->cube[cube_id];
+    long long occurrence = 0;
+    if (cube->sampling_mode == SAMPLING_MODE_TOPK) {
+        for (int i = 0; i < n_metric; i++) {
+            if (metric_ids[i] == cube->primary_metric_id) {
+                if (increments[i] < 0) {
+                    return FS_ERR_INVALID_PARAM;
+                }
+                occurrence += increments[i];
+            }
+        }
+    }
+    int cell_id = fieldstat_cube_add(instance, cube_id, tags, n_tag, occurrence);
+    if (cell_id < 0) {
+        return FS_ERR_TOO_MANY_CELLS;
+    }
+
+    for (int i = 0; i < n_metric; i++) {
+        struct metric *metric = find_or_add_metric(instance, cube_id, metric_ids[i]);
+        metric_counter_incrby(metric, cell_id, increments[i]);
+    }
+    return FS_OK;
+}
+
 int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long value)
 {
     int ret = check_before_add(instance, cube_id, metric_id, METRIC_TYPE_COUNTER);
