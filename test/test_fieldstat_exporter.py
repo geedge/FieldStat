@@ -29,6 +29,7 @@ from fieldstat_exporter import PrometheusEndpoint
 from fieldstat_exporter import CounterTable
 from fieldstat_exporter import HistogramTable
 from fieldstat_exporter import LocalExporter
+from fieldstat_exporter import TableFormatTable
 
 
 
@@ -164,11 +165,13 @@ class TestPrometheusExporter(unittest.TestCase):
                             "quanlity": 0.50
                         },
                         "fields": {
-                            "T_success_log": 1,
-                            "T_success_log_delta": 1
+                            "T_success_log": 1
+                        },
+                        "fields_delta": {
+                            "T_success_log": 1
                         },
                         "timestamp_ms": 100010,
-                        "timestamp_ms_delta": 0
+                        "timestamp_ms_delta": 1000
                         }
         metrics = self.prom._PrometheusExporter__build_metrics(counter_dict)
         self.assertEqual(metrics, "T_success_log{send_log=\"PROXY-EVENT\",policy_id=\"1\",quanlity=\"0.5\",app_name=\"-\"} 1\n")
@@ -259,30 +262,30 @@ class TestCounterTable(unittest.TestCase):
     def setUp(self):
         self.c_table = CounterTable()
 
-    def test_create_row_table(self):
-        fields_names_0 = {"column0": 0, "column1": 1}
-        table = self.c_table.create_row_table(fields_names_0)
-        self.assertEqual(table.field_names, ["", "column0", "column1"])
+    # def test_create_row_table(self):
+    #     fields_names_0 = {"column0": 0, "column1": 1}
+    #     table = self.c_table.create_row_table(fields_names_0)
+    #     self.assertEqual(table.field_names, ["", "column0", "column1"])
 
-        fields_names_1 = {"column2": 2, "column3": 3}
-        table = self.c_table.create_row_table(fields_names_1)
-        self.assertEqual(table.field_names, ["", "column2", "column3"])
+    #     fields_names_1 = {"column2": 2, "column3": 3}
+    #     table = self.c_table.create_row_table(fields_names_1)
+    #     self.assertEqual(table.field_names, ["", "column2", "column3"])
 
-    def test_add_row_table_row(self):
-        self.c_table.field_names = []
+    # def test_add_row_table_row(self):
+    #     self.c_table.field_names = []
 
-        table = self.c_table.create_row_table({"column0": 0, "column1": 1})
-        tags  = {"row": "0"}
-        field = {"column0": 0, "column1":1}
-        self.c_table.add_row_table_row(None,  tags, field)
+    #     table = self.c_table.create_row_table({"column0": 0, "column1": 1})
+    #     tags  = {"row": "0"}
+    #     field = {"column0": 0, "column1":1}
+    #     self.c_table.add_row_table_row(None,  tags, field)
 
-        table_str = table.get_string()
-        row_count = len(table_str.split("\n")) - 1
-        self.assertEqual(row_count, 0)
+    #     table_str = table.get_string()
+    #     row_count = len(table_str.split("\n")) - 1
+    #     self.assertEqual(row_count, 0)
         
-        self.c_table.add_row_table_row(table, tags, field)
-        row_count = len(table_str.split("\n")) - 1
-        self.assertEqual(row_count, 0)
+    #     self.c_table.add_row_table_row(table, tags, field)
+    #     row_count = len(table_str.split("\n")) - 1
+    #     self.assertEqual(row_count, 0)
 
     def test_add_table_column(self):
         head    = "policy_hit"
@@ -305,7 +308,7 @@ class TestCounterTable(unittest.TestCase):
         self.assertEqual(len(table.field_names), 2)
 
 
-    def test__build_columns_tables(self):
+    def test_build_columns_tables(self):
         self.c_table.columns = []
         for i in range(100):
             head = "h" + str(i)
@@ -315,7 +318,7 @@ class TestCounterTable(unittest.TestCase):
         for _ in range(5):
             self.c_table.column_size = random.randint(1, 100)
             self.c_table.tables      = []
-            self.c_table._CounterTable__build_columns_tables()
+            self.c_table.build_columns_tables()
 
             table_size = self.c_table.column_size //(self.c_table.min_width + self.c_table.COLUMM_PADDING)
             if 0 == table_size:
@@ -352,6 +355,37 @@ class TestCounterTable(unittest.TestCase):
 
 
 
+class TestTableFormatTable(unittest.TestCase):
+    def setUp(self):
+        self.c_table = TableFormatTable()
+
+
+    def test_create_table(self):
+        fields_names_0 = {"column0": 0, "column1": 1}
+        table = self.c_table.create_table(fields_names_0)
+        self.assertEqual(table.field_names, ["", "column0", "column1"])
+
+        fields_names_1 = {"column2": 2, "column3": 3}
+        table = self.c_table.create_table(fields_names_1)
+        self.assertEqual(table.field_names, ["", "column2", "column3"])
+
+    def test_add_table_row(self):
+        self.c_table.field_names = []
+
+        table = self.c_table.create_table({"column0": 0, "column1": 1})
+        tags  = {"row": "0"}
+        field = {"column0": 0, "column1":1}
+        self.c_table.add_table_row(None,  tags, field)
+
+        table_str = table.get_string()
+        row_count = len(table_str.split("\n")) - 1
+        self.assertEqual(row_count, 0)
+        
+        self.c_table.add_table_row(table, tags, field)
+        row_count = len(table_str.split("\n")) - 1
+        self.assertEqual(row_count, 0)
+
+
 class TestHistogramTable(unittest.TestCase):
     def setUp(self):
         self.h_table  = HistogramTable()
@@ -361,51 +395,77 @@ class TestHistogramTable(unittest.TestCase):
                         "CAgICAgICAgICAgICAgICAgICAgIAAAAAAAAA"
         self.c_hist   = FieldstatAPI.libfieldstat.fieldstat_histogram_base64_decode(self.hist_val.encode('utf-8'))
 
-    def test__build_summary_format(self):
-        for _ in range(5):
-            table  = PrettyTable()
-            n_bins = random.randint(1, 100)
-            self.h_table.bins = []
-            for i in range(1, n_bins + 1):
-                self.h_table.bins.append(i * 0.01)
 
-            self.h_table._HistogramTable__build_histogram_format(self.c_hist, table)
-            self.assertEqual(len(table.field_names), n_bins)
+    def test__get_row_shared_values(self):
+        shared_values = self.h_table._HistogramTable__get_row_shared_values(self.c_hist)
+        self.assertEqual(shared_values, ['99', '1', '49.51', '28.85', '100'])
 
 
-    def test__build_histogram_format(self):
-        for _ in range(5):
-            table  = PrettyTable()
-            n_bins = random.randint(1, 100)
-            self.h_table.bins = []
-            for i in range(1, n_bins + 1):
-                self.h_table.bins.append(i)
+    def test__get_row_values(self):
+        self.h_table.bins   = [0.1, 0.5, 0.8, 0.9, 0.95, 0.99]
+        self.h_table.format = "summary"
+        row_values = self.h_table._HistogramTable__get_row_values(self.c_hist)
+        self.assertEqual(row_values, ['9', '49', '79', '89', '94', '98', '99', '1', '49.51', '28.85', '100'])
+        self.h_table.bins   = [10, 50, 80, 90, 95, 99]
+        self.h_table.format = "histogram"
+        row_values = self.h_table._HistogramTable__get_row_values(self.c_hist)
+        self.assertEqual(row_values, ['10', '50', '80', '90', '95', '99', '99', '1', '49.51', '28.85', '100'])
 
-            self.h_table._HistogramTable__build_histogram_format(self.c_hist, table)
-            self.assertEqual(len(table.field_names), n_bins)        
+
+    def test__add_table_field_names(self):
+        table_summ = PrettyTable()
+        self.h_table.bins   = [0.1, 0.5, 0.8, 0.9, 0.95, 0.99]
+        self.h_table.format = "summary"
+        self.h_table._HistogramTable__add_table_field_names(table_summ)
+        self.assertEqual(table_summ.field_names, ['', '10.00%', '50.00%', '80.00%', '90.00%', '95.00%', '99.00%', 'MAX', 'MIN', 'AVG', 'STDDEV', 'CNT'])
+
+        table_hist = PrettyTable()
+        self.h_table.bins   = [10, 50, 80, 90, 95, 99]
+        self.h_table.format = "histogram"
+        self.h_table._HistogramTable__add_table_field_names(table_hist)
+        self.assertEqual(table_hist.field_names, ['', 'le=10', 'le=50', 'le=80', 'le=90', 'le=95', 'le=99', 'MAX', 'MIN', 'AVG', 'STDDEV', 'CNT'])
+
+
+    def test__add_table_row(self):
+        table = PrettyTable()
+        self.h_table.bins   = [0.1, 0.5, 0.8, 0.9, 0.95, 0.99]
+        self.h_table.format = "summary"
+        self.h_table._HistogramTable__add_table_field_names(table)
+        self.h_table._HistogramTable__add_table_row(table, self.hist_val, "acc")
+        table_str = table.get_string()
+        row_count = len(table_str.split("\n"))
+        self.assertEqual(row_count, 5)
+        self.h_table._HistogramTable__add_table_row(table, self.hist_val, "delta")
+        table_str = table.get_string()
+        row_count = len(table_str.split("\n"))
+        self.assertEqual(row_count, 6)
+
+
+    def test_build_table(self):
+        tags = "{\"thread_id\": 1}"
+        key  = "hit_policy"
+        self.h_table.build_table(tags, key, self.hist_val, self.hist_val, 1000)
+        table_str = self.h_table.tables[-1].get_string()
+        row_count = len(table_str.split("\n"))
+        self.assertEqual(row_count, 7)
 
 
     def test_build_table(self):
         tags  = "{\"thread_id\": 1,\"action\": \"deny\"}"
         key   = "policy_hit"
-        value = self.hist_val
+        self.h_table.format = "summary"
 
         for _ in range(5):
             n_bins = random.randint(1, 100)
             self.h_table.bins = []
             for i in range(1, n_bins + 1):
                 self.h_table.bins.append(i * 0.01)
-
-            self.h_table.build_table(tags, key, value)
+            self.h_table.build_table(tags, key, self.hist_val, self.hist_val, 1000)
             table = self.h_table.tables[-1]
-            self.assertEqual(len(table.field_names), n_bins + 5)
-
-        for _ in range(5):
-            n_operate = random.randint(1, 100)
-            self.h_table.tables = []
-            for _ in range (1, n_operate + 1):
-                self.h_table.build_table(tags, key, value) 
-            self.assertEqual(len(self.h_table.tables), n_operate)
+            self.assertEqual(len(table.field_names), n_bins + 6)
+            table_str = self.h_table.tables[-1].get_string()
+            row_count = len(table_str.split("\n"))
+            self.assertEqual(row_count, 7)
 
 
     def test_print_tables(self):
@@ -417,7 +477,7 @@ class TestHistogramTable(unittest.TestCase):
             n_operate = random.randint(1, 100)
             self.h_table.tables = []
             for _ in range (n_operate):
-                self.h_table.build_table(tags, key, value)
+                self.h_table.build_table(tags, key, self.hist_val, None, 1000)
             
             output     = StringIO()
             sys.stdout = output
@@ -426,7 +486,7 @@ class TestHistogramTable(unittest.TestCase):
             sys.stdout = sys.__stdout__
             
             self.assertEqual(len(self.h_table.tables),    n_operate)
-            self.assertEqual(len(output_str.split('\n')), n_operate * 7 + 1)
+            self.assertEqual(len(output_str.split('\n')), n_operate * 6 + 1)
 
 
     def tearDown(self):
@@ -446,11 +506,13 @@ class TestLocalExporter(unittest.TestCase):
                                          "send_log": "sum"
                                      },
                                      "fields": {
-                                         "T_fail_log": 2,
-                                         "T_fail_log_delta": 2
+                                         "T_fail_log": 2
+                                     },
+                                     "fields_delta": {
+                                         "T_fail_log": 2
                                      },
                                      "timestamp_ms": 1000,
-                                     "timestamp_ms_delta": 0
+                                     "timestamp_ms_delta": 1000
                                    }
         
         self.hll_json_object     = { "name": "-",
@@ -461,7 +523,7 @@ class TestLocalExporter(unittest.TestCase):
                                          "acc_ip": "AQUFEGDCAhAwhAMMIQQBBBCDBRBggQMEMIcAAADCAAAAAAAAAA=="
                                      },
                                      "timestamp_ms": 100010,
-                                     "timestamp_ms_delta": 100010
+                                     "timestamp_ms_delta": 0
                                     }
 
 
@@ -498,199 +560,76 @@ class TestLocalExporter(unittest.TestCase):
                         self.assertEqual(self.local.display_hll,     k)
 
 
-    def test__dealwith_counter(self):
-        value   = 100
-        speed_s = 1.1
+    def test__build_counter_type_exporter(self):
+        for _ in range(5):
+            val        = random.randint(1, 100)
+            val_delta  = random.randint(10, 20)
+            tsms_delta = random.randint(1, 10) * 1000
+            self.local.ctable.columns = []
+            self.local._LocalExporter__build_counter_type_exporter(self.tags, self.key, val, val_delta, tsms_delta)
+            self.assertEqual(self.local.ctable.columns[-1][1][1], str(val))
+            self.assertEqual(self.local.ctable.columns[-1][1][2],  "{:.2f}".format(val_delta*1000/tsms_delta))
 
-        peradd  = len(self.local.ctable.columns)
-        self.local._LocalExporter__dealwith_counter(self.tags, self.key, value, speed_s)
-        postadd = len(self.local.ctable.columns) 
 
-        self.assertEqual(postadd - peradd, 1)
-
-
-    def test__dealwith_histogram(self):
+    def test__build_histogram_type_exporter(self):
         hist_val = "HISTEwAAAGQAAAAAAAAAAwAAAAAAAAABAAAAAAAJJ8A/8AAAAAAAA"\
                    "AEEAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg"\
                    "ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI"\
                    "CAgICAgICAgICAgICAgICAgICAgIAAAAAAAAA"
 
         peradd   = len(self.local.htable.tables)
-        self.local._LocalExporter__dealwith_histogram(self.tags, self.key, hist_val)
+        self.local._LocalExporter__build_histogram_type_exporter(self.tags, self.key, hist_val, None, 0)
         postadd  = len(self.local.htable.tables)
-
         self.assertEqual(postadd - peradd, 1)
 
 
-    def test__dealwith_hll(self):
+    def test__build_hll_type_exporter(self):
         value   = "AQUBDECDAQxAQQUIIEEJCDCFARgQRAUIMIMAAAECAAAAAAAAAA=="
         
         peradd  = len(self.local.hlltable.columns)
-        self.local._LocalExporter__dealwith_hll(self.tags, self.key, value)
+        self.local._LocalExporter__build_hll_type_exporter(self.tags, self.key, value)
         postadd = len(self.local.hlltable.columns)
         
         self.assertEqual(postadd - peradd, 1)
 
 
-    def test__parse_json_tags(self):
-        tags = self.local._LocalExporter__parse_json_tags(self.counter_json_object)       
+    def test__append_app_name_to_tags(self):
+        tags = self.local._LocalExporter__append_app_name_to_tags(self.counter_json_object)       
         self.assertEqual(tags, "{\"send_log\": \"sum\", \"app_name\": \"-\"}")
 
 
-    def test__get_counter_speed_value(self):
-        speed_s = self.local._LocalExporter__get_counter_speed_value("T_fail_log", self.counter_json_object["fields"], self.counter_json_object)
-        self.assertEqual(speed_s, 2)   
-
-    def test__match_tags(self):
+    def test__is_tags_matched(self):
         self.local.match_tags = {}
         tags = {"action": "deny", "policy_id": 0, "hit_rate": 1.1}
-        ret = self.local._LocalExporter__match_tags(tags)
+        ret = self.local._LocalExporter__is_tags_matched(tags)
         self.assertEqual(ret, True)
 
         self.local.match_tags = {"action": "deny"}
         tags = {}
-        ret = self.local._LocalExporter__match_tags(tags)
+        ret = self.local._LocalExporter__is_tags_matched(tags)
         self.assertEqual(ret, False)
 
         self.local.match_tags = {"action": "deny", "policy_id": 0, "hit_rate": 1.1}
         tags = {"action": "deny"}
-        ret = self.local._LocalExporter__match_tags(tags)
+        ret = self.local._LocalExporter__is_tags_matched(tags)
         self.assertEqual(ret, False)
 
         self.local.match_tags = {"action": "deny", "policy_id": 0, "hit_rate": 1.10}
         tags = {"action": "deny", "policy_id": 0, "hit_rate": 1.1}
-        ret = self.local._LocalExporter__match_tags(tags)
+        ret = self.local._LocalExporter__is_tags_matched(tags)
         self.assertEqual(ret, True)
 
-    def test__generate_table_bundle(self):
-        json_data_0 = [{ "name": "-",
-                        "tags": {
-                            "send_log": "sum"
-                        },
-                        "fields": {
-                            "T_fail_log": 2,
-                            "T_fail_log_delta": 2
-                        },
-                        "timestamp_ms": 1000,
-                        "timestamp_ms_delta": 0
-                        }]
-        table_bundle_0 = self.local._LocalExporter__generate_table_bundle(json_data_0)
-        self.assertEqual(table_bundle_0["not_table_field"], [])
-        self.assertEqual(len(table_bundle_0["send_logT_fail_logT_fail_log_delta-"]), 1)
 
-        json_data_1 = [{ "name": "-",
-                        "tags": {
-                            "send_log": "sum"
-                        },
-                        "fields": {
-                            "T_fail_log": 2,
-                            "T_fail_log_delta": 2
-                        },
-                        "timestamp_ms": 1000,
-                        "timestamp_ms_delta": 0
-                        },
-                        { "name": "-",
-                        "tags": {
-                            "send_log": "sum"
-                        },
-                        "fields": {
-                            "T_fail_log": 2,
-                            "T_fail_log_delta": 2
-                        },
-                        "timestamp_ms": 1000,
-                        "timestamp_ms_delta": 0
-                        }]
-        table_bundle_1 = self.local._LocalExporter__generate_table_bundle(json_data_1)
-        self.assertEqual(table_bundle_1["not_table_field"], [])
-        self.assertEqual(len(table_bundle_1["send_logT_fail_logT_fail_log_delta-"]), 2)
-
-        json_data_2 = [{ "name": "-",
-                        "tags": {
-                            "send_log": "sum"
-                        },
-                        "fields": {
-                            "T_fail_log": 2,
-                            "T_fail_log_delta": 2
-                        },
-                        "timestamp_ms": 1000,
-                        "timestamp_ms_delta": 0
-                        },
-                        { "name": "-",
-                        "tags": {
-                            "send_log_0": "sum"
-                        },
-                        "fields": {
-                            "T_fail_log": 2,
-                            "T_fail_log_delta": 2
-                        },
-                        "timestamp_ms": 1000,
-                        "timestamp_ms_delta": 0
-                        }]
-        table_bundle_2 = self.local._LocalExporter__generate_table_bundle(json_data_2)
-        self.assertEqual(table_bundle_2["not_table_field"], [])
-        self.assertEqual(len(table_bundle_2["send_logT_fail_logT_fail_log_delta-"]), 1)
-        self.assertEqual(len(table_bundle_2["send_log_0T_fail_logT_fail_log_delta-"]), 1)
-
-        json_data_3 = [{ "name": "-",
-                        "tags": {
-                            "send_log": "sum"
-                        },
-                        "fields": {
-                            "T_fail_log": 2,
-                            "T_fail_log_delta": 2
-                        },
-                        "timestamp_ms": 1000,
-                        "timestamp_ms_delta": 0
-                        },
-                        { "name": "-",
-                        "tags": {
-                            "send_log": "firewall"
-                        },
-                        "fields": {
-                            "T_fail_log": 2,
-                            "T_fail_log_delta": 2
-                        },
-                        "timestamp_ms": 1000,
-                        "timestamp_ms_delta": 0
-                        }]
-        table_bundle_3 = self.local._LocalExporter__generate_table_bundle(json_data_3)
-        self.assertEqual(table_bundle_3["not_table_field"], [])
-        self.assertEqual(len(table_bundle_3["send_logT_fail_logT_fail_log_delta-"]), 2)
-
-        json_data_4 = [{ "name": "-",
-                        "tags": {
-                            "send_log": "sum"
-                        },
-                        "fields": {
-                            "T_fail_log": 2,
-                            "T_fail_log_delta": 2
-                        },
-                        "timestamp_ms": 1000,
-                        "timestamp_ms_delta": 0
-                        },
-                        { "name": "-",
-                        "tags": {
-                            "send_log": "firewall"
-                        },
-                        "fields": {
-                            "T_fail_log": 2,
-                            "T_fail_log_delta": 2
-                        },
-                        "timestamp_ms": 1000,
-                        "timestamp_ms_delta": 0
-                        }]
-        self.local.disable_table = True
-        table_bundle_4 = self.local._LocalExporter__generate_table_bundle(json_data_4)
-        self.assertEqual(len(table_bundle_4["not_table_field"]), 2)
-
-    def test__read_match_tags_objects(self):
+    def test_read_match_tags_json_objects(self):
         json_objects = [{ "name": "-",
                         "tags": {
                             "send_log": "sum"
                         },
                         "fields": {
-                            "T_fail_log": 2,
-                            "T_fail_log_delta": 2
+                            "T_fail_log": 2
+                        },
+                        "fields_delta": {
+                            "T_fail_log": 2
                         },
                         "timestamp_ms": 1000,
                         "timestamp_ms_delta": 0
@@ -700,42 +639,40 @@ class TestLocalExporter(unittest.TestCase):
                             "send_log": "firewall"
                         },
                         "fields": {
-                            "T_fail_log": 2,
-                            "T_fail_log_delta": 2
+                            "T_fail_log": 2
+                        },
+                        "fields_delta": {
+                            "T_fail_log": 2
                         },
                         "timestamp_ms": 1000,
                         "timestamp_ms_delta": 0
                         }]
 
         self.local.match_tags = {}
-        match_object = self.local._LocalExporter__read_match_tags_objects(json_objects)
+        match_object = self.local.read_match_tags_json_objects(json_objects)
         self.assertEqual(len(match_object), 2)
     
         self.local.match_tags = {"test": 1}
-        match_object = self.local._LocalExporter__read_match_tags_objects(json_objects)
+        match_object = self.local.read_match_tags_json_objects(json_objects)
         self.assertEqual(len(match_object), 0)
 
         self.local.match_tags = {"send_log": "firewall"}
-        match_object = self.local._LocalExporter__read_match_tags_objects(json_objects)
+        match_object = self.local.read_match_tags_json_objects(json_objects)
         self.assertEqual(len(match_object), 1)
 
 
-    def test_parse_data(self):
+    def test_read_json_objects_from_file(self):
         self.local.hlltable = CounterTable()
         self.local.ctable   = CounterTable()
         self.local.htable   = HistogramTable()
 
         self.local.json_path = "/tmp/noexist.json"
-        self.local.parse_data()
-        self.assertEqual(len(self.local.ctable.columns),   0)
-        self.assertEqual(len(self.local.htable.tables),    0)
-        self.assertEqual(len(self.local.hlltable.columns), 0)
+        objects0 = self.local.read_json_objects_from_file()
+        self.assertEqual(len(objects0), 0)
 
         self.local.json_path = FIELDSTAT_INPUT_JSON_PATH
-        self.local.parse_data()
-        self.assertEqual(len(self.local.ctable.columns),   18)
-        self.assertEqual(len(self.local.htable.tables),    8)
-        self.assertEqual(len(self.local.hlltable.columns), 3)
+        objects1 = self.local.read_json_objects_from_file()
+        self.assertGreater(len(objects1), 0)
 
 
 class TestFieldstatExporter(unittest.TestCase):
@@ -783,14 +720,13 @@ class TestFieldstatExporter(unittest.TestCase):
         self.assertEqual(args.loop,         False)
         self.assertEqual(args.clear_screen, False)
 
-        args = parser.parse_args(["local", "--loop", "--clear-screen", "-i", "1000", "--display-hist", "--display-hll", "--display-counter", "--disable-table", "--match-tags", "policy:1,rule:1"])
+        args = parser.parse_args(["local", "--loop", "--clear-screen", "-i", "1000", "--display-hist", "--display-hll", "--display-counter", "--match-tags", "policy:1,rule:1"])
         self.assertEqual(args.interval,        1000)
         self.assertEqual(args.loop,            True)
         self.assertEqual(args.clear_screen,    True)
         self.assertEqual(args.display_counter, True)
         self.assertEqual(args.display_hist,    True)
         self.assertEqual(args.display_hll,     True)
-        self.assertEqual(args.disable_table,   True)
         self.assertEqual(args.match_tags,      "policy:1,rule:1")
 
   

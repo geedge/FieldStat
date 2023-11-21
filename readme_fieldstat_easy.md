@@ -115,6 +115,8 @@ optional arguments:
   --disable-table       disable display table format.
   -m MATCH_TAGS, --match-tags MATCH_TAGS
                         Display the tags match metrics
+  -t TEMPLATE, --template TEMPLATE
+                        Specify the print template with jinja2.
 ```
 The local exporter optional arguments default values.
 args|default value
@@ -129,6 +131,19 @@ args|default value
 --display-hist|False
 --display-counter|False
 -m, --match-tags|""
+-t, --template| ""
+
+## Export table format with Local Exporter
+### table format
+Export the metrics of type counter in the form of a determinant.
+### Command line arguments
+We can use the template argument to exporter table format. The template argument include the follow functions:
+functions|description|jinja2 example
+---|---|---
+print_tables(groupby, columns)|Groupby specifies the tag key as the row of the table. Column specifies the field key as the column of the table.| '{{ print_tables("send_log", ["T_success_log"]) }}{{"\n"}}{{ print_tables("groupby", ["T_fail_log"]) }}'
+print_counters(field_keys)| Export counter metrics specified by the field keys.|'{{ print_counters(["T_success_log"]) }}'
+print_histograms(field_keys)| Export histogram metrics specified by the field keys.|'{{ print_histograms(["list_num"]) }}'
+print_hlls(field_keys)| Export hyperloglog metrics specified by the field keys.| '{{ print_hlls(["external_ip"]) }}'
 
 # fieldstat easy
 
