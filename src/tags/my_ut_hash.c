@@ -11,12 +11,12 @@
 #include "serializer.h"
 
 
-
 struct tag_hash_key {
    
     struct fieldstat_tag *tags; // not used for hash, just to recover the original tags.
     size_t n_my_tag;
     unsigned int hashv;
+    bool is_deep_copy;
 };
 
 unsigned int tag_hash_key_cal_hash_value(const struct tag_hash_key *my_hash_key)
@@ -34,25 +34,27 @@ int tag_hash_key_cmp(const struct tag_hash_key *a, const struct tag_hash_key *b)
         return 1;
     }
     for (size_t i = 0; i < a->n_my_tag; i++) {
-        if (strcmp(a->tags[i].key, b->tags[i].key) != 0) {
+        const struct fieldstat_tag *tag_a = &a->tags[i];
+        const struct fieldstat_tag *tag_b = &b->tags[i];
+        if (strcmp(tag_a->key, tag_b->key) != 0) {
             return 1;
         }
-        if (a->tags[i].type != b->tags[i].type) {
+        if (tag_a->type != tag_b->type) {
             return 1;
         }
-        switch (a->tags[i].type) {
+        switch (tag_a->type) {
             case TAG_INTEGER:
-                if (a->tags[i].value_longlong != b->tags[i].value_longlong) {
+                if (tag_a->value_longlong != tag_b->value_longlong) {
                     return 1;
                 }
                 break;
             case TAG_DOUBLE:
-                if (a->tags[i].value_double != b->tags[i].value_double) {
+                if (tag_a->value_double != tag_b->value_double) {
                     return 1;
                 }
                 break;
             case TAG_CSTRING:
-                if (strcmp(a->tags[i].value_str, b->tags[i].value_str) != 0) {
+                if (strcmp(tag_a->value_str, tag_b->value_str) != 0) {
                     return 1;
                 }
                 break;
@@ -220,14 +222,9 @@ struct tag_hash_key *tag_hash_key_construct_with_fieldstat_tag(const struct fiel
 {
     struct tag_hash_key *ret_hash_key = (struct tag_hash_key *)malloc(sizeof(struct tag_hash_key));
 
-    if (n_src == 0) {
-        ret_hash_key->tags = NULL;
-    } else {
-        ret_hash_key->tags = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * n_src);
-        for (int i = 0; i < n_src; i++) {
-            fieldtag_copy(&ret_hash_key->tags[i], &src[i]);
-        }
-    }
+    ret_hash_key->tags = n_src == 0 ? NULL : (struct fieldstat_tag *)src;
+    ret_hash_key->n_my_tag = n_src;
+    ret_hash_key->is_deep_copy = false;
 
     ret_hash_key->n_my_tag = n_src;
 
@@ -236,6 +233,23 @@ struct tag_hash_key *tag_hash_key_construct_with_fieldstat_tag(const struct fiel
 
     return ret_hash_key;
 }
+
+void tag_hash_key_store(struct tag_hash_key *tag_key)
+{
+    if (tag_key->is_deep_copy) {
+        return;
+    }
+    tag_key->is_deep_copy = true;
+    if (tag_key->n_my_tag == 0) {
+        return;
+    }
+    struct fieldstat_tag *new_tags = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * tag_key->n_my_tag);
+    for (int i = 0; i < tag_key->n_my_tag; i++) {
+        fieldtag_copy(&new_tags[i], &tag_key->tags[i]);
+    }
+    tag_key->tags = new_tags;
+}
+
 
 void tag_hash_key_convert_to_fieldstat_tag(const struct tag_hash_key *tag_key, struct fieldstat_tag **out, size_t *n_out)
 {
@@ -259,6 +273,7 @@ struct tag_hash_key *tag_hash_key_copy(const struct tag_hash_key *src)
     struct tag_hash_key *dst = (struct tag_hash_key *)malloc(sizeof(struct tag_hash_key));
     dst->n_my_tag = src->n_my_tag;
     dst->hashv = src->hashv;
+    dst->is_deep_copy = true;
 
     if (dst->n_my_tag == 0) {
         dst->tags = NULL;
@@ -274,7 +289,9 @@ struct tag_hash_key *tag_hash_key_copy(const struct tag_hash_key *src)
 
 void tag_hash_key_free(struct tag_hash_key *tag_key)
 {
-    fieldtag_list_free(tag_key->tags, tag_key->n_my_tag);
+    if (tag_key->is_deep_copy) {
+        fieldtag_list_free(tag_key->tags, tag_key->n_my_tag);
+    }
     free(tag_key);
 }
 

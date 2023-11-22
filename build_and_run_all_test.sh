@@ -7,8 +7,8 @@ make
 cd test
 for f in *test*; do
     echo "Running $f"
-    ./$f
-    # valgrind --tool=memcheck --leak-check=full ./$f
+    # ./$f
+    valgrind --tool=memcheck --leak-check=full ./$f
     wait
 done
 # lcov --capture --directory . --output-file AnyName.info

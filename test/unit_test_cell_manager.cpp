@@ -22,6 +22,7 @@ struct tag_hash_key *test_gen_tag_key(const char *key, int value)
     };
 
     struct tag_hash_key *tag_key = tag_hash_key_construct_with_fieldstat_tag(&tag, 1);
+    tag_hash_key_store(tag_key);
 
     free((void *)tag.value_str);
 

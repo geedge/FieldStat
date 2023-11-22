@@ -282,6 +282,7 @@ struct fs_cube *fieldstat_cube_info_init(const struct fieldstat_tag *shared_tags
     cube->n_shared_tags = n_tag;
 
     struct tag_hash_key *shared_tag_key = tag_hash_key_construct_with_fieldstat_tag(shared_tags, n_tag);
+    tag_hash_key_store(shared_tag_key);
     cube->key_tag = shared_tag_key;
 
     cube->max_n_metric = 64;
