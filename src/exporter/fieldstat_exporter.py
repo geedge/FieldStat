@@ -178,7 +178,11 @@ class PrometheusExporter:
 
         with open(self.json_path) as file:
             fcntl.flock(file, fcntl.LOCK_EX)
-            json_data = json.load(file)
+            json_data = []
+            try:
+                json_data = json.load(file)
+            except json.JSONDecodeError as e:
+                print("Invalid JSON:", e)
             fcntl.flock(file, fcntl.LOCK_UN)
             for item in json_data:
                 payload += self.__build_metrics(item)
@@ -285,18 +289,31 @@ class CounterTable:
         self.build_columns_tables()
         for item in self.tables:
             print(item)
+        if len(self.tables) > 0:
+            print("=" * self.terminal_size)
+            
 
 
 class TableFormatTable:
     def __init__(self):
+        self.terminal_size, _ = shutil.get_terminal_size((128, 64))
         self.tables = []
         self.rows   = []
 
-    def create_table(self, fields):
+    def create_table(self, fields, enable_speed):
         field_names = []
-        sorted_keys = sorted(fields.keys())
         field_names.append("")
-        field_names.extend(sorted_keys)
+
+        sorted_keys = sorted(fields.keys())
+        if enable_speed:
+            keys = []
+            for key in sorted_keys:
+                keys.append(key)
+                speed_fields = str(key) + "/s"
+                keys.append(speed_fields)
+            field_names.extend(keys)
+        else:
+            field_names.extend(sorted_keys)
 
         table = PrettyTable()
         table.vrules = NONE
@@ -312,7 +329,7 @@ class TableFormatTable:
         return table
 
 
-    def add_table_row(self, table, tags, fields):
+    def add_table_row(self, table, tags, fields, fields_delta, interval_ms, enable_speed):
         row = []
 
         if table is None:
@@ -324,8 +341,17 @@ class TableFormatTable:
 
         #exporter table row value.
         sorted_keys = sorted(fields.keys())
-        for key in sorted_keys:
-            row.append(fields[key])
+        if enable_speed:
+            for key in sorted_keys:
+                row.append(fields[key])
+                if (interval_ms > 0) and (key in fields_delta):
+                    speed_s = fields_delta[key] * 1000 / interval_ms
+                    row.append("{:.2f}".format(speed_s))
+                else:
+                    row.append("-")
+        else:
+            for key in sorted_keys:
+                row.append(fields[key])
 
         table.add_row(row)
 
@@ -333,13 +359,15 @@ class TableFormatTable:
     def print_tables(self):
         for item in self.tables:
             print(item)
-
+        if len(self.tables) > 0:
+            print("=" * self.terminal_size)
 
 class HistogramTable:
     def __init__(self):
         self.format = FieldstatExporterVars.hist_format
         self.bins   = FieldstatExporterVars.hist_bins
         self.tables = []
+        self.terminal_size, _  = shutil.get_terminal_size((128, 64))
 
     def __get_row_shared_values(self, c_hist):
         shared_values = []
@@ -418,7 +446,8 @@ class HistogramTable:
     def print_tables(self):
         for item in self.tables:
             print(item)
-
+        if len(self.tables) > 0:
+            print("=" * self.terminal_size)
 
 class LocalExporter:
     def __init__(self):
@@ -447,7 +476,7 @@ class LocalExporter:
 
     def __build_counter_type_exporter(self, tags, key, value, value_delta, timestamp_ms_delta):
         speed_s = 0.0
-        if value_delta is not None:
+        if (value_delta is not None) and (timestamp_ms_delta > 0):
             speed_s = value_delta * 1000 / timestamp_ms_delta
         self.ctable.add_table_column(tags, key, value, speed_s)
 
@@ -491,7 +520,10 @@ class LocalExporter:
             return objects
         with open(self.json_path) as fd:
             fcntl.flock(fd, fcntl.LOCK_EX)
-            objects = json.load(fd)
+            try:
+                objects = json.load(fd)
+            except json.JSONDecodeError as e:
+                print("Invalid JSON:", e)
             fcntl.flock(fd, fcntl.LOCK_UN)
         return objects
 
@@ -572,14 +604,17 @@ class LocalExporter:
                         self.__build_histogram_type_exporter(tags_new, key, value, value_delta, timestamp_ms_delta)
 
 
-    def build_table_format_exporter(self, json_objects):
+    def build_table_format_exporter(self, json_objects, enable_speed):
         table = None
         for item in json_objects:
             tags   = item["tags"]
             fields = item["fields"]
+            fields_delta = item["fields_delta"]
+            interval_ms = item["timestamp_ms_delta"]
             if table == None:
-                table = self.tftable.create_table(fields)
-            self.tftable.add_table_row(table, tags, fields)
+                table = self.tftable.create_table(fields, enable_speed)
+            
+            self.tftable.add_table_row(table, tags, fields, fields_delta, interval_ms, enable_speed)
         return table
 
 
@@ -602,7 +637,7 @@ class LocalExporter:
             self.build_not_table_format_exporter(self.objects_matched)
 
 
-    def print_table_format(self, groupby, columns):
+    def print_table_format(self, groupby, columns, enable_speed=True):
         table_fields=[]
         for item in self.objects_matched:
             is_print_table = True
@@ -631,8 +666,11 @@ class LocalExporter:
                 if groupby != key:
                     new_fields["tags"].pop(key)
 
+            # if enable_speed == False:
+            #     new_fields["fields_delta"] = {}
+
             table_fields.append(new_fields)
-        return self.build_table_format_exporter(table_fields)
+        return self.build_table_format_exporter(table_fields, enable_speed)
     
 #   def print_counter(self, [tags], [fields])
     def print_counter_type(self, field_keys):
@@ -702,17 +740,15 @@ class LocalExporter:
         else:
             if self.display_counter:
                 self.ctable.print_tables()
-                print("=" * self.terminal_size)
                 self.tftable.print_tables()
-                print("=" * self.terminal_size)
 
             if self.display_hist:
                 self.htable.print_tables()
-                print("=" * self.terminal_size)
+                #print("=" * self.terminal_size)
 
             if self.display_hll:
                 self.hlltable.print_tables()
-                print("=" * self.terminal_size)
+                #print("=" * self.terminal_size)
 
         #The bottom edge
         print('-' * self.terminal_size)
