@@ -4,7 +4,8 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
-
+#define XXH_INLINE_ALL
+#include "xxhash/xxhash.h"
 #include "my_ut_hash_inner.h"
 #include "my_ut_hash.h"
 #include "serializer.h"
@@ -32,7 +33,7 @@ int tag_hash_key_cmp(const struct tag_hash_key *a, const struct tag_hash_key *b)
     if (a->n_my_tag != b->n_my_tag) {
         return 1;
     }
-    for (int i = 0; i < (int)a->n_my_tag; i++) {
+    for (size_t i = 0; i < a->n_my_tag; i++) {
         if (strcmp(a->tags[i].key, b->tags[i].key) != 0) {
             return 1;
         }
@@ -182,9 +183,37 @@ unsigned int cal_tag_hash(struct fieldstat_tag *tags, size_t n_tag, unsigned int
     return fnv_hash_calculator_get_hashv(&calculator);
 }
 
+unsigned int cal_tag_hash_xxhash(struct fieldstat_tag *tag, size_t n_tag, unsigned int seed)
+{
+    XXH32_state_t state;
+    XXH32_reset(&state, seed);
+    
+    for (int i = 0; i < n_tag; i++)
+    {
+        XXH32_update(&state, (const xxh_u8 *)tag[i].key, strlen(tag[i].key));
+        switch (tag[i].type)
+        {
+        case TAG_INTEGER:
+            XXH32_update(&state, (const xxh_u8 *)&tag[i].value_longlong, sizeof(long long));
+            break;
+        case TAG_DOUBLE:
+            XXH32_update(&state, (const xxh_u8 *)&tag[i].value_double, sizeof(double));
+            break;
+        case TAG_CSTRING:
+            XXH32_update(&state, (const xxh_u8 *)tag[i].value_str, strlen(tag[i].value_str));
+            break;
+        default:
+            assert(0);
+            break;
+        }
+    }
+
+    return XXH32_digest(&state);
+}
+
 unsigned int my_tag_hash_func(struct fieldstat_tag *tags, size_t n_tag)
 {
-    return cal_tag_hash(tags, n_tag, 0);
+    return cal_tag_hash_xxhash(tags, n_tag, 0);
 }
 
 struct tag_hash_key *tag_hash_key_construct_with_fieldstat_tag(const struct fieldstat_tag *src, size_t n_src)
@@ -251,7 +280,8 @@ void tag_hash_key_free(struct tag_hash_key *tag_key)
 
 // FNV-1a hash (http://www.isthe.com/chongo/tech/comp/fnv/)
 unsigned tag_hash_key_cal_fnv_hash(const struct tag_hash_key *tag, unsigned seed) {
-    return cal_tag_hash(tag->tags, tag->n_my_tag, seed);
+    // return cal_tag_hash(tag->tags, tag->n_my_tag, seed);
+    return cal_tag_hash_xxhash(tag->tags, tag->n_my_tag, seed);
 }
 
 
