@@ -658,10 +658,9 @@ int output_file_format_json(struct fieldstat_instance *instance, int n_cur_metri
 			case FIELD_TYPE_SUMMARY:
 			case FILED_TYPE_HISTOGRAM:
 				struct hdr_histogram *h_out = read_hdr_unit_output(metric);
-				tmp_obj = cJSON_CreateObject();
-
 				for(int j = 0; j < metric->histogram.bins_num; j++)
 				{
+					tmp_obj = cJSON_CreateObject();
 					if(metric->field_type == FIELD_TYPE_SUMMARY)
 					{
 						value = (long long)hdr_value_at_percentile(h_out, metric->histogram.bins[j]);
