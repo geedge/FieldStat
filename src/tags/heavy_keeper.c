@@ -142,7 +142,7 @@ struct Bucket *map_flow_id_hash_to_bucket(struct heavy_keeper *hk, int array_ind
     if (array_index == FP_HASH_KEY) {
         Hsh = already_hashed_flow_id % w;
     } else {
-        Hsh = tag_hash_key_cal_fnv_hash(tag, array_index) % w;
+        Hsh = tag_hash_key_cal_hash_val(tag, array_index) % w;
     }
 
     return &(hk->sketch[array_index * w + Hsh]);
@@ -183,7 +183,7 @@ static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_
     unsigned nMin = sorted_set_get_min_count(summary);
     unsigned maxv = 0;
     
-    unsigned int FP = tag_hash_key_cal_fnv_hash(tag, FP_HASH_KEY);
+    unsigned int FP = tag_hash_key_cal_hash_val(tag, FP_HASH_KEY);
     for (int j = 0; j < heavy_keeper->params.array_num; j++) {
         struct Bucket *bucket = map_flow_id_hash_to_bucket(heavy_keeper, j, tag, FP);
 
@@ -330,11 +330,11 @@ static void heavy_keeper_merge_sketch(struct heavy_keeper *dest, const struct he
 
 unsigned find_maxv_in_sketch(struct heavy_keeper *hk, const struct tag_hash_key *tag) {
     struct Bucket *bucket;
-    unsigned fp = tag_hash_key_cal_fnv_hash(tag, FP_HASH_KEY);
+    unsigned fp = tag_hash_key_cal_hash_val(tag, FP_HASH_KEY);
 
     unsigned maxv = 0;
     for (int array_id = 0; array_id < hk->params.array_num; array_id++) {
-        bucket = map_flow_id_hash_to_bucket(hk, array_id, tag, tag_hash_key_cal_fnv_hash(tag, FP_HASH_KEY));  // hk->sketch is the merge of two. So just check one
+        bucket = map_flow_id_hash_to_bucket(hk, array_id, tag, tag_hash_key_cal_hash_val(tag, FP_HASH_KEY));  // hk->sketch is the merge of two. So just check one
 
         if (bucket->finger_print == fp) {
             maxv = my_max(maxv, bucket->count);

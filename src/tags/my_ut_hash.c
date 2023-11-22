@@ -33,35 +33,27 @@ int tag_hash_key_cmp(const struct tag_hash_key *a, const struct tag_hash_key *b)
     if (a->n_my_tag != b->n_my_tag) {
         return 1;
     }
-    for (size_t i = 0; i < a->n_my_tag; i++) {
-        const struct fieldstat_tag *tag_a = &a->tags[i];
-        const struct fieldstat_tag *tag_b = &b->tags[i];
-        if (strcmp(tag_a->key, tag_b->key) != 0) {
-            return 1;
+    size_t tmp_tag_n = a->n_my_tag;
+    const struct fieldstat_tag *tag_a = a->tags;
+    const struct fieldstat_tag *tag_b = b->tags;
+    for (size_t i = 0; i < tmp_tag_n; i++) {
+        if (tag_a->type == TAG_CSTRING) {
+            if (strcmp(tag_a->value_str, tag_b->value_str) != 0) {
+                return 1;
+            }
+        } else {
+            if (tag_a->value_longlong != tag_b->value_longlong) { // sizeof(long long) == sizeof(double)
+                return 1;
+            }
         }
-        if (tag_a->type != tag_b->type) {
-            return 1;
-        }
-        switch (tag_a->type) {
-            case TAG_INTEGER:
-                if (tag_a->value_longlong != tag_b->value_longlong) {
-                    return 1;
-                }
-                break;
-            case TAG_DOUBLE:
-                if (tag_a->value_double != tag_b->value_double) {
-                    return 1;
-                }
-                break;
-            case TAG_CSTRING:
-                if (strcmp(tag_a->value_str, tag_b->value_str) != 0) {
-                    return 1;
-                }
-                break;
-            default:
-                assert(0);
-                break;
-        }
+
+        // its hardly possible that the key is different while the value is the same. What's more, the tags are in the same hash bucket. So it's not necessary to compare the key.
+        // if (strcmp(tag_a->key, tag_b->key) != 0) {
+        //     return 1;
+        // }
+        
+        tag_a++;
+        tag_b++;
     }
     return 0;
 }
@@ -157,35 +149,7 @@ unsigned int fnv_hash_calculator_get_hashv(const struct fnv_hash_calculator *cal
     return calculator->hashv;
 }
 
-unsigned int cal_tag_hash(struct fieldstat_tag *tags, size_t n_tag, unsigned int seed)
-{
-    struct fnv_hash_calculator calculator;
-    fnv_hash_calculator_init(&calculator, seed);
-
-    for (int i = 0; i < n_tag; i++)
-    {
-        fnv_hash_calculator_update(&calculator, tags[i].key, strlen(tags[i].key));
-        switch (tags[i].type)
-        {
-        case TAG_INTEGER:
-            fnv_hash_calculator_update(&calculator, (char *)&tags[i].value_longlong, sizeof(long long));
-            break;
-        case TAG_DOUBLE:
-            fnv_hash_calculator_update(&calculator, (char *)&tags[i].value_double, sizeof(double));
-            break;
-        case TAG_CSTRING:
-            fnv_hash_calculator_update(&calculator, tags[i].value_str, strlen(tags[i].value_str));
-            break;
-        default:
-            assert(0);
-            break;
-        }
-    }
-
-    return fnv_hash_calculator_get_hashv(&calculator);
-}
-
-unsigned int cal_tag_hash_xxhash(struct fieldstat_tag *tag, size_t n_tag, unsigned int seed)
+unsigned int cal_tag_hash_xxhash(const struct fieldstat_tag *tag, size_t n_tag, unsigned int seed)
 {
     XXH32_state_t state;
     XXH32_reset(&state, seed);
@@ -193,20 +157,11 @@ unsigned int cal_tag_hash_xxhash(struct fieldstat_tag *tag, size_t n_tag, unsign
     for (int i = 0; i < n_tag; i++)
     {
         XXH32_update(&state, (const xxh_u8 *)tag[i].key, strlen(tag[i].key));
-        switch (tag[i].type)
-        {
-        case TAG_INTEGER:
+
+        if (tag[i].type != TAG_CSTRING) { // sizeof(long long) == sizeof(double)
             XXH32_update(&state, (const xxh_u8 *)&tag[i].value_longlong, sizeof(long long));
-            break;
-        case TAG_DOUBLE:
-            XXH32_update(&state, (const xxh_u8 *)&tag[i].value_double, sizeof(double));
-            break;
-        case TAG_CSTRING:
+        } else {
             XXH32_update(&state, (const xxh_u8 *)tag[i].value_str, strlen(tag[i].value_str));
-            break;
-        default:
-            assert(0);
-            break;
         }
     }
 
@@ -249,7 +204,6 @@ void tag_hash_key_store(struct tag_hash_key *tag_key)
     }
     tag_key->tags = new_tags;
 }
-
 
 void tag_hash_key_convert_to_fieldstat_tag(const struct tag_hash_key *tag_key, struct fieldstat_tag **out, size_t *n_out)
 {
@@ -296,7 +250,7 @@ void tag_hash_key_free(struct tag_hash_key *tag_key)
 }
 
 // FNV-1a hash (http://www.isthe.com/chongo/tech/comp/fnv/)
-unsigned tag_hash_key_cal_fnv_hash(const struct tag_hash_key *tag, unsigned seed) {
+unsigned tag_hash_key_cal_hash_val(const struct tag_hash_key *tag, unsigned seed) {
     // return cal_tag_hash(tag->tags, tag->n_my_tag, seed);
     return cal_tag_hash_xxhash(tag->tags, tag->n_my_tag, seed);
 }

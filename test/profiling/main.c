@@ -8,6 +8,7 @@
 #include "tags/my_ut_hash_inner.h"
 
 #define ADD_OPER_NUM 5000000
+// #define ADD_OPER_NUM 1
 #define MAX_STRING_KEY_LEN 10
 
 const struct fieldstat_tag TEST_TAG_INT = {"INT key_", TAG_INTEGER, {.value_longlong = 100}};
