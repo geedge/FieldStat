@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8.8)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -g -fPIC -Wall -lm -lz")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -g -fPIC -Wall -lm -lz -lpthread")
 
 set(PROJECT_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../..)
 #print 

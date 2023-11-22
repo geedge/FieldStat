@@ -281,11 +281,6 @@ TEST(unit_test_cell_manager, merge_topk_to_empty)
         printf("cell id: %d\n", cell_id_1[i]);
     }
     
-    auto test_result_1 = test_query_cell_manager_content(cm1);
-    for (size_t i = 0; i < test_result_1.size(); i++) {
-        printf("cm1 content: %s\n", tag_hash_key_get_compound_key(test_result_1[i]));
-    }
-
     int *cell_id_popped;
     int n_cell_id_popped;
     int *cell_id_old;
@@ -375,6 +370,15 @@ TEST(unit_test_cell_manager, merge_topk_to_full_one)
     // all keys are moved to cm1, so no need to free keys2
 }
 
+bool test_is_tag_equal(const struct tag_hash_key* a, const struct tag_hash_key* b) {
+    char *key1 = tag_hash_key_get_compound_key(a);
+    char *key2 = tag_hash_key_get_compound_key(b);
+    bool ret = strcmp(key1, key2) == 0;
+    free(key1);
+    free(key2);
+    return ret;
+}
+
 void add_key_and_assert_find_result(struct cell_manager *cm, const struct tag_hash_key *key)
 {
     int pop_dummy;
@@ -382,7 +386,7 @@ void add_key_and_assert_find_result(struct cell_manager *cm, const struct tag_ha
     EXPECT_EQ(cell_id, 0);
     EXPECT_EQ(cell_manager_get_count_by_tag(cm, key), 1234);
     const struct tag_hash_key *key_get = cell_manager_get_tag_by_cell_id(cm, cell_id);
-    EXPECT_STREQ(tag_hash_key_get_compound_key(key_get), tag_hash_key_get_compound_key(key));
+    EXPECT_TRUE(test_is_tag_equal(key_get, key));
 }
 
 void add_key_and_assert_find_result_comprehensive(struct cell_manager *cm, const struct tag_hash_key *key)
@@ -390,7 +394,7 @@ void add_key_and_assert_find_result_comprehensive(struct cell_manager *cm, const
     int cell_id = cell_manager_add_cell(cm, key);
     EXPECT_EQ(cell_id, 0);
     const struct tag_hash_key *key_get = cell_manager_get_tag_by_cell_id(cm, cell_id);
-    EXPECT_STREQ(tag_hash_key_get_compound_key(key_get), tag_hash_key_get_compound_key(key));
+    EXPECT_TRUE(test_is_tag_equal(key_get, key));
 }
 
 TEST(unit_test_cell_manager, add_with_key_length_is_1_int_type_topk)

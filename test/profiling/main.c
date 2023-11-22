@@ -4,197 +4,38 @@
 #include <string.h>
 
 #include "fieldstat.h"
+#include "tags/my_ut_hash.h"
+#include "tags/my_ut_hash_inner.h"
 
-#define ADD_OPER_NUM 1000000
+#define ADD_OPER_NUM 5000000
 #define MAX_STRING_KEY_LEN 10
 
 const struct fieldstat_tag TEST_TAG_INT = {"INT key_", TAG_INTEGER, {.value_longlong = 100}};
 
 
-static char *rand_string(char *str, size_t size)
-{
-    const char charset[] = "abcdefghijklmnopqrstuvwxyz.";
-    if (size) {
-        --size;
-        for (size_t n = 0; n < size; n++) {
-            int key = rand() % (int) (sizeof charset - 1);
-            str[n] = charset[key];
-        }
-        str[size] = '\0';
-    }
-    return str;
-}
-
-void get_rand_elephant(char buffer[MAX_STRING_KEY_LEN], int flow_nums)
-{
-    memset(buffer, 0, MAX_STRING_KEY_LEN);
-    sprintf(buffer, "elephant%d", rand() % flow_nums);
-}
-
-void flow_id_generate(char buffer[MAX_STRING_KEY_LEN], float elephant_flow_radio, int elephant_flow_number)
-{
-  memset(buffer, 0, MAX_STRING_KEY_LEN);
-    if ((double)rand() / (double)RAND_MAX < elephant_flow_radio) {
-      get_rand_elephant(buffer, elephant_flow_number);
-    } else {
-      rand_string(buffer, rand() % (MAX_STRING_KEY_LEN - 1) + 2);
-    }
-}
-
-void bin_print_struct(void *obj, size_t sizeof_obj)
-{
-    unsigned char *p = (unsigned char *)obj;
-    printf("sizeof_obj: %lu\n", sizeof_obj);
-    for (int i = 0; i < sizeof_obj; i++)
-    {
-        printf("%02x ", p[i]);
-    }
-    printf("\n");
-}
-
-void try_hash_compound_key()
-{
-    struct fieldstat_tag tag1 = {"key1", TAG_INTEGER, {.value_longlong = 100}};
-    struct fieldstat_tag tag2 = {"key2", TAG_DOUBLE, {.value_double = 100.0}};
-    struct fieldstat_tag tag3 = {"key3", TAG_CSTRING, {.value_str = "123"}};
-    struct fieldstat_tag tag_arr[] = {
-        {"key1", TAG_INTEGER, {.value_longlong = 100}},
-        {"key2", TAG_DOUBLE, {.value_double = 100.0}},
-        {"key3", TAG_CSTRING, {.value_str = "123"}},
-    };
-
-    bin_print_struct(&tag1, sizeof(tag1));
-    bin_print_struct(&tag2, sizeof(tag2));
-    bin_print_struct(&tag3, sizeof(tag3));
-    bin_print_struct(tag_arr, sizeof(tag_arr));
-}
-
-void performance_cube_add_comprehensive()
-{
-    printf("counter_performance\n");
-    struct fieldstat_tag tags[64000];
-    for (int i = 0; i < 64000; i++) {
-        tags[i] = TEST_TAG_INT;
-        tags[i].value_longlong = i;
-    }
-    getchar();
-    clock_t start, end;
-    struct fieldstat *instance = fieldstat_new();
-    fieldstat_create_cube(instance, &TEST_TAG_INT, 1, SAMPLING_MODE_COMPREHENSIVE, 64000);
-    fieldstat_register_counter(instance, 0, "test");
-    start = clock();
-    for (int i = 0; i < 64000; i++) {
-        (void)fieldstat_cube_add(instance, 0, &tags[i], 1, 1);
-    }
-    end = clock();
-    printf("time: %f\n", (double)(end - start) / CLOCKS_PER_SEC);
-
-    fieldstat_free(instance);
-}
-
-extern void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_tags, char **out_key, size_t *out_key_size);
-void build_dynamic_cell_key_performance()
-{
-    struct fieldstat_tag tags[100000];
-    for (int i = 0; i < 100000; i++) {
-        tags[i] = TEST_TAG_INT;
-        tags[i].value_longlong = i;
-    }
-    char *key;
-    size_t key_size;
-    clock_t start, end;
-    start = clock();
-    printf("start\n");
-    for (int i = 0; i < 100000; i++) {
-        build_dynamic_cell_key(&tags[i], 1, &key, &key_size);
-        free(key);
-    }
-    end = clock();
-    printf("time: %f\n", (double)(end - start) / CLOCKS_PER_SEC);
-}
-
-void topk_K_100_tag_2()
-{
-    printf("topk_K_100_tag_2\n");
-    getchar();
-    struct fieldstat *instance = fieldstat_new();
-    fieldstat_create_cube(instance, &TEST_TAG_INT, 1, SAMPLING_MODE_TOPK, 1000);
-    fieldstat_register_counter(instance, 0, "test");
-    struct fieldstat_tag server_ip_tag = {"server_ip", TAG_CSTRING, {.value_str = "192.168.0.1"}};
-    char client_ip[] = "123.123.123.123.1234";
-    struct fieldstat_tag client_ip_tag = {"client_ip", TAG_CSTRING, {.value_str = client_ip}};
-    struct fieldstat_tag *total = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * 2);
-    for (int i = 0; i < 10000; i++) {
-        char new_ip[sizeof(client_ip)];
-        snprintf(new_ip, sizeof(new_ip), "%d.%d.%d.%d", rand() % 256, rand() % 256, rand() % 256, rand() % 256);
-        client_ip_tag.value_str = new_ip;
-        total[0] = server_ip_tag;
-        total[1] = client_ip_tag;
-        long long int increment = rand() % 5000;
-        int cell_id = fieldstat_cube_add(instance, 0, total, 2, increment);
-        if (cell_id == -1) {
-            continue;
-        }
-        fieldstat_counter_incrby(instance, 0, 0, cell_id, increment);
-    }
-    
-    fieldstat_free(instance);
-    getchar();
-}
-
-int my_cmp_int(const void *a, const void *b)
-{
-    return *(int *)a - *(int *)b;
-}
-
-int topk_and_find_max_cell_id(int K, int *tag_vals, int n_tags)
-{
-    struct fieldstat *instance = fieldstat_new();
-    fieldstat_create_cube(instance, &TEST_TAG_INT, 1, SAMPLING_MODE_TOPK, K);
-    fieldstat_register_counter(instance, 0, "test");
-    struct fieldstat_tag total = TEST_TAG_INT;
-    for (int i = 0; i < n_tags; i++) {
-        total.value_longlong = tag_vals[i];
-        int cell_id = fieldstat_cube_add(instance, 0, &total, 1, 1);
-        if (cell_id == -1) {
-            continue;
-        }
-        fieldstat_counter_incrby(instance, 0, 0, cell_id, 1);
-    }
-    int *ret_cell_ids = NULL;
-    struct fieldstat_tag_list *tag_list = NULL;
-    size_t n_cell = 0;
-    fieldstat_get_cells_used_by_metric(instance, 0, 0, &ret_cell_ids, &tag_list, &n_cell);
-    qsort(ret_cell_ids, n_cell, sizeof(int), my_cmp_int);
-    int max_cell_id = ret_cell_ids[n_cell - 1];
-
-    free(ret_cell_ids);
-    fieldstat_tag_list_arr_free(tag_list, n_cell);
-    fieldstat_free(instance);
-    return max_cell_id;
-}
-
-void determine_K_factor()
-{    
-    int K[] = {10, 100, 1000, 5000};
-    int tag_vals[100000];
-    for (int test_round = 0; test_round < 5; test_round++) {
-        // set rand seed
-        srand(test_round);
-        for (int i = 0; i < 100000; i++) {
-            tag_vals[i] = rand() % 100000; // purely random
-        }
-        for (int i = 0; i < 4; i++) {
-            int max_cell = topk_and_find_max_cell_id(K[i], tag_vals, 100000);
-            printf("K: %d, max_cell: %d\n", K[i], max_cell);
-        }
-    }
-}
+// todo: 问一下贺岚风，tag是什么样子的
 
 int main () {
-    // try_hash_compound_key();
-    // topk_K_100_tag_2();
-    performance_cube_add_comprehensive();
-    // build_dynamic_cell_key_performance();
-    // determine_K_factor();
+    printf("Start profiling...\n");
+    clock_t start, end;
+    struct fieldstat_tag TAG[4] = {
+        {"INT key_", TAG_INTEGER, {.value_longlong = 100}},
+        {"STRING key_", TAG_CSTRING, {.value_str = "10012312312312"}},
+        {"STRING key_", TAG_CSTRING, {.value_str = "100adsffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"}},
+        {"FLOAT key_", TAG_INTEGER, {.value_double = 100.0}},
+    };
+
+    struct fieldstat *instance = fieldstat_new();
+    fieldstat_create_cube(instance, NULL, 0, SAMPLING_MODE_COMPREHENSIVE, 0);
+    fieldstat_register_counter(instance, "counter");
+
+    getchar();
+    start = clock();
+    for (int i = 0; i < ADD_OPER_NUM; i++)
+    {
+        fieldstat_counter_incrby(instance, 0, 0, TAG, 4, 1);
+    }
+    end = clock();
+
+    printf("Time elapsed: %f\n", (double)(end - start) / CLOCKS_PER_SEC);
 }
