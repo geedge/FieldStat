@@ -336,8 +336,11 @@ class TableFormatTable:
             return
 
         #exporter table row name.
+        row_str = []
         for key, value in tags.items():
-            row.append("%s_%s" % (key, str(value)))
+            #row.append("%s_%s" % (key, str(value)))
+            row_str.append("%s_%s" % (key, str(value)))
+        row.append('&'.join(row_str))
 
         #exporter table row value.
         sorted_keys = sorted(fields.keys())
@@ -637,7 +640,7 @@ class LocalExporter:
             self.build_not_table_format_exporter(self.objects_matched)
 
 
-    def print_table_format(self, groupby, columns, enable_speed=True):
+    def print_table_format(self, groupby, columns, enable_speed=True, verbose=False):
         table_fields=[]
         for item in self.objects_matched:
             is_print_table = True
@@ -662,9 +665,10 @@ class LocalExporter:
                 if key not in columns:
                     new_fields["fields"].pop(key)
 
-            for key in tags:
-                if groupby != key:
-                    new_fields["tags"].pop(key)
+            if not verbose:
+                for key in tags:
+                    if groupby != key:
+                        new_fields["tags"].pop(key)
 
             # if enable_speed == False:
             #     new_fields["fields_delta"] = {}
