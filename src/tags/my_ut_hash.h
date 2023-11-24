@@ -7,16 +7,21 @@ extern "C"
 #endif
 
 #include "fieldstat.h"
+#include "xxhash/xxhash.h"
 
-struct tag_hash_key;
+struct tag_hash_key {
+    struct fieldstat_tag *tags; // not used for hash, just to recover the original tags.
+    size_t n_my_tag;
+    unsigned int hashv;
+    XXH128_hash_t hashv128;
+    bool is_deep_copy;
+};
 
-// note that: As to improve performance, the tag_hash_key is a shallow copy of fieldstat_tag, just after been constructed by `tag_hash_key_construct_with_fieldstat_tag`. Use `tag_hash_key_store` to make it a deep copy. 
-struct tag_hash_key *tag_hash_key_construct_with_fieldstat_tag(const struct fieldstat_tag *src, size_t n_src);
+void tag_hash_key_init_with_fieldstat_tag(struct tag_hash_key *tag_key, const struct fieldstat_tag *src, size_t n_src, bool deep_copy);
 void tag_hash_key_convert_to_fieldstat_tag(const struct tag_hash_key *tag_key, struct fieldstat_tag **out, size_t *n_out);
-struct tag_hash_key *tag_hash_key_copy(const struct tag_hash_key *src); // Deep copy
+struct tag_hash_key *tag_hash_key_copy(const struct tag_hash_key *src); // Always deep copy
 void tag_hash_key_free(struct tag_hash_key *tag_key);
 unsigned tag_hash_key_cal_hash_val(const struct tag_hash_key *tag, unsigned seed);
-void tag_hash_key_store(struct tag_hash_key *tag_key); // let the shallow copy of fieldstat_tag in tag_key to be deep copy, if they are shallow copy
 
 void fieldtag_list_free(struct fieldstat_tag *tags, size_t n_tags);
 char *tag_hash_key_get_compound_key(const struct tag_hash_key *tag);

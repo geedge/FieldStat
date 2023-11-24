@@ -9,14 +9,14 @@
 
 const int N_THREAD = 2;
 
-static struct fieldstat_easy *get_hll_fieldstat_easy()
-{
-    /*
-        fieldstat easy does not support hll
-    */
-    assert(0);
-    return NULL;
-}
+// static struct fieldstat_easy *get_hll_fieldstat_easy()
+// {
+//     /*
+//         fieldstat easy does not support hll
+//     */
+//     assert(0);
+//     return NULL;
+// }
 
 extern "C" {
     extern char *fs_easy_output_to_json(struct fieldstat_easy *fs, const struct timeval *timestamp, const struct timeval *timestamp_delta);

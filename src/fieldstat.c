@@ -281,8 +281,8 @@ struct fs_cube *fieldstat_cube_info_init(const struct fieldstat_tag *shared_tags
 
     cube->n_shared_tags = n_tag;
 
-    struct tag_hash_key *shared_tag_key = tag_hash_key_construct_with_fieldstat_tag(shared_tags, n_tag);
-    tag_hash_key_store(shared_tag_key);
+    struct tag_hash_key *shared_tag_key = malloc(sizeof(struct tag_hash_key));
+    tag_hash_key_init_with_fieldstat_tag(shared_tag_key, shared_tags, n_tag, true);
     cube->key_tag = shared_tag_key;
 
     cube->max_n_metric = 64;
@@ -316,9 +316,9 @@ int fieldstat_create_cube(struct fieldstat *instance, const struct fieldstat_tag
     if (max_n_cell == 0) {
         max_n_cell = INT32_MAX;
     }
-    struct tag_hash_key *shared_tag_key = tag_hash_key_construct_with_fieldstat_tag(shared_tags, n_tag);
-    int ret = cube_manager_find(instance->shared_tag_cube_manager, shared_tag_key);
-    tag_hash_key_free(shared_tag_key);
+    struct tag_hash_key shared_tag_key;
+    tag_hash_key_init_with_fieldstat_tag(&shared_tag_key, shared_tags, n_tag, false);
+    int ret = cube_manager_find(instance->shared_tag_cube_manager, &shared_tag_key);
     if (ret != -1) {
         return FS_ERR_INVALID_KEY;
     }
@@ -335,12 +335,14 @@ int fieldstat_cube_add(struct fieldstat *instance, int cube_id, const struct fie
     struct fs_cube *cube = instance->cube[cube_id];
 
     int ret = -1;
-    struct tag_hash_key *tag_key = tag_hash_key_construct_with_fieldstat_tag(tags, n_tag);
+    struct tag_hash_key tag_key;
+
+    tag_hash_key_init_with_fieldstat_tag(&tag_key, tags, n_tag, false);
     if (cube->sampling_mode == SAMPLING_MODE_COMPREHENSIVE) {
-        ret = cell_manager_add_cell(cube->cell_manager, tag_key);
+        ret = cell_manager_add_cell(cube->cell_manager, &tag_key);
     } else {
         int popped_cell_id = -1;
-        ret = cell_manager_add_cell_topk(cube->cell_manager, tag_key, occurrence, &popped_cell_id);
+        ret = cell_manager_add_cell_topk(cube->cell_manager, &tag_key, occurrence, &popped_cell_id);
 
         if (popped_cell_id != -1) {
             for (size_t i = 0; i < cube->valid_metric_arr_len; i++) {
@@ -351,8 +353,6 @@ int fieldstat_cube_add(struct fieldstat *instance, int cube_id, const struct fie
             }
         }
     }
-
-    tag_hash_key_free(tag_key);
 
     if (ret < 0) {
         return -1;
@@ -598,6 +598,7 @@ int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric
 
         occurrence = increment;
     }
+
     int cell_id = fieldstat_cube_add(instance, cube_id, tags, n_tag, occurrence);
     if (cell_id < 0) {
         return FS_ERR_TOO_MANY_CELLS;
@@ -652,8 +653,9 @@ int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id
     // get the occurrence
     long long occurrence = 0;
     if (cube->sampling_mode == SAMPLING_MODE_TOPK && cube->primary_metric_id == metric_id) {
-        struct tag_hash_key *tag_key = tag_hash_key_construct_with_fieldstat_tag(tags, n_tag);
-        cell_id = cell_manager_find(cube->cell_manager, tag_key);
+        struct tag_hash_key tag_key;
+        tag_hash_key_init_with_fieldstat_tag(&tag_key, tags, n_tag, false);
+        cell_id = cell_manager_find(cube->cell_manager, &tag_key);
         if (cell_id >= 0) {
             long long old_value;
             int exist_flag = metric_counter_get(metric, cell_id, &old_value);
@@ -665,7 +667,6 @@ int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id
         } else {
             occurrence = value;
         }
-        tag_hash_key_free(tag_key);
         if (occurrence < 0) {
             return FS_ERR_INVALID_PARAM;
         }
@@ -1190,9 +1191,9 @@ struct fieldstat_tag_list *fieldstat_get_shared_tags(const struct fieldstat *ins
 
 int get_cell_id_by_tag_list(const struct fieldstat *instance, int cube_id, const struct fieldstat_tag_list *tags)
 {
-    struct tag_hash_key *tag_key = tag_hash_key_construct_with_fieldstat_tag(tags->tag, tags->n_tag);
-    int cell_id = cell_manager_find(instance->cube[cube_id]->cell_manager, tag_key);
-    tag_hash_key_free(tag_key);
+    struct tag_hash_key tag_key;
+    tag_hash_key_init_with_fieldstat_tag(&tag_key, tags->tag, tags->n_tag, false);
+    int cell_id = cell_manager_find(instance->cube[cube_id]->cell_manager, &tag_key);
     return cell_id;
 }
 
@@ -1418,9 +1419,9 @@ int fieldstat_find_cube(const struct fieldstat *instance, const struct fieldstat
         return FS_ERR_NULL_HANDLER;
     }
     const struct cube_manager *tag_cube_id_map = instance->shared_tag_cube_manager;
-    struct tag_hash_key *shared_tag_key = tag_hash_key_construct_with_fieldstat_tag(shared_tags, n_shared_tags);
-    int cube_id = cube_manager_find(tag_cube_id_map, shared_tag_key);
-    tag_hash_key_free(shared_tag_key);
+    struct tag_hash_key shared_tag_key;
+    tag_hash_key_init_with_fieldstat_tag(&shared_tag_key, shared_tags, n_shared_tags, false);
+    int cube_id = cube_manager_find(tag_cube_id_map, &shared_tag_key);
     if (cube_id == -1) {
         return FS_ERR_INVALID_KEY;
     }

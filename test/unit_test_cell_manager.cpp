@@ -10,6 +10,7 @@
 #include "fieldstat.h"
 #include "tags/cell_manager.h"
 #include "utils.hpp"
+#include "tags/my_ut_hash.h"
 
 using namespace std;
 
@@ -21,8 +22,8 @@ struct tag_hash_key *test_gen_tag_key(const char *key, int value)
         {.value_str = strdup(to_string(value).c_str())},
     };
 
-    struct tag_hash_key *tag_key = tag_hash_key_construct_with_fieldstat_tag(&tag, 1);
-    tag_hash_key_store(tag_key);
+    struct tag_hash_key *tag_key = (struct tag_hash_key *)malloc(sizeof(struct tag_hash_key));
+    tag_hash_key_init_with_fieldstat_tag(tag_key, &tag, 1, true);
 
     free((void *)tag.value_str);
 
@@ -396,6 +397,15 @@ void add_key_and_assert_find_result_comprehensive(struct cell_manager *cm, const
     EXPECT_EQ(cell_id, 0);
     const struct tag_hash_key *key_get = cell_manager_get_tag_by_cell_id(cm, cell_id);
     EXPECT_TRUE(test_is_tag_equal(key_get, key));
+}
+
+struct tag_hash_key *tag_hash_key_construct_with_fieldstat_tag(const struct fieldstat_tag *src, size_t n_src)
+{
+    struct tag_hash_key *ret_hash_key = (struct tag_hash_key *)malloc(sizeof(struct tag_hash_key));
+
+    tag_hash_key_init_with_fieldstat_tag(ret_hash_key, src, n_src, false);
+
+    return ret_hash_key;
 }
 
 TEST(unit_test_cell_manager, add_with_key_length_is_1_int_type_topk)
