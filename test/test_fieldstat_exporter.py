@@ -351,7 +351,7 @@ class TestCounterTable(unittest.TestCase):
 
             self.assertEqual(len(self.c_table.tables),       math.ceil(100/table_size))
             self.assertEqual(self.c_table.read_tables_num(), math.ceil(100/table_size))
-            self.assertEqual(len(output_str.split('\n')),    math.ceil(100/table_size) * 4 + 1)
+            self.assertEqual(len(output_str.split('\n')),    math.ceil(100/table_size) * 4 + 2)
 
 
 
@@ -362,26 +362,27 @@ class TestTableFormatTable(unittest.TestCase):
 
     def test_create_table(self):
         fields_names_0 = {"column0": 0, "column1": 1}
-        table = self.c_table.create_table(fields_names_0)
-        self.assertEqual(table.field_names, ["", "column0", "column1"])
+        table = self.c_table.create_table(fields_names_0, True)
+        self.assertEqual(table.field_names, ["", "column0", "column0/s", "column1", "column1/s"])
 
         fields_names_1 = {"column2": 2, "column3": 3}
-        table = self.c_table.create_table(fields_names_1)
+        table = self.c_table.create_table(fields_names_1, False)
         self.assertEqual(table.field_names, ["", "column2", "column3"])
 
     def test_add_table_row(self):
         self.c_table.field_names = []
 
-        table = self.c_table.create_table({"column0": 0, "column1": 1})
+        table = self.c_table.create_table({"column0": 0, "column1": 1}, False)
         tags  = {"row": "0"}
         field = {"column0": 0, "column1":1}
-        self.c_table.add_table_row(None,  tags, field)
+        field_delta = {}
+        self.c_table.add_table_row(None, tags, field, field_delta, 0, False)
 
         table_str = table.get_string()
         row_count = len(table_str.split("\n")) - 1
         self.assertEqual(row_count, 0)
         
-        self.c_table.add_table_row(table, tags, field)
+        self.c_table.add_table_row(table, tags, field, field_delta, 0, False)
         row_count = len(table_str.split("\n")) - 1
         self.assertEqual(row_count, 0)
 
@@ -486,7 +487,7 @@ class TestHistogramTable(unittest.TestCase):
             sys.stdout = sys.__stdout__
             
             self.assertEqual(len(self.h_table.tables),    n_operate)
-            self.assertEqual(len(output_str.split('\n')), n_operate * 6 + 1)
+            self.assertEqual(len(output_str.split('\n')), n_operate * 6 + 2)
 
 
     def tearDown(self):

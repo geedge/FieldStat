@@ -140,7 +140,7 @@ Export the metrics of type counter in the form of a determinant.
 We can use the template argument to exporter table format. The template argument include the follow functions:
 functions|description|jinja2 example
 ---|---|---
-print_tables(groupby, columns)|Groupby specifies the tag key as the row of the table. Column specifies the field key as the column of the table.| '{{ print_tables("send_log", ["T_success_log"]) }}{{"\n"}}{{ print_tables("groupby", ["T_fail_log"]) }}'
+print_tables(groupby, columns, enable_speed=True, verbose=False)|Groupby specifies the tag key as the row of the table. Column specifies the field key as the column of the table. Default print speed value. When verbose is True, row name contains information about all tags. | '{{ print_tables("send_log", ["T_success_log"]) }}{{"\n"}}{{ print_tables("groupby", ["T_fail_log"], False) }}'
 print_counters(field_keys)| Export counter metrics specified by the field keys.|'{{ print_counters(["T_success_log"]) }}'
 print_histograms(field_keys)| Export histogram metrics specified by the field keys.|'{{ print_histograms(["list_num"]) }}'
 print_hlls(field_keys)| Export hyperloglog metrics specified by the field keys.| '{{ print_hlls(["external_ip"]) }}'
