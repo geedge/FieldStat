@@ -949,6 +949,27 @@ TEST(export_test, delta_with_two_instance_different_cell)
     fieldstat_free(delta);
 }
 
+// TEST(export_test, sort_tag) {
+//     const struct fieldstat_tag tag1[3] = {TEST_TAG_INT, TEST_TAG_STRING, TEST_TAG_DOUBLE};
+//     const struct fieldstat_tag tag2[3] = {TEST_TAG_STRING, TEST_TAG_DOUBLE, TEST_TAG_INT};
+
+//     struct fieldstat *instance = fieldstat_new();
+//     fieldstat_create_cube(instance, NULL, 0, SAMPLING_MODE_COMPREHENSIVE, 0);
+//     int id_counter = fieldstat_register_counter(instance, "counter");
+//     fieldstat_counter_incrby(instance, 0, id_counter, tag1, 3, 1);
+//     fieldstat_counter_incrby(instance, 0, id_counter, tag2, 3, 10);
+
+//     // export test
+//     cJSON *root_arr = test_exporter_extract_results(instance);
+//     EXPECT_EQ(cJSON_GetArraySize(root_arr), 1);
+//     cJSON *root = cJSON_GetArrayItem(root_arr, 0);
+//     cJSON *metrics = cJSON_GetObjectItem(root, "fields");
+//     cJSON *counter = cJSON_GetObjectItem(metrics, "counter");
+//     EXPECT_EQ(counter->valueint, 11);
+
+//     cJSON_Delete(root_arr);
+//     fieldstat_free(instance);
+// }
 
 extern "C" {
 extern int add_object_to_json_array_start(char *buf, int buf_len);

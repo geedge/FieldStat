@@ -426,7 +426,7 @@ int couple_export_table_find(const struct couple_export_table *tbl, const char *
     struct couple_export_table_item *node;
     HASH_FIND_STR(tbl->items, json, node);
     if (node == NULL) {
-        return false;
+        return -1;
     }
     return node->kv_pair_id;
 }
@@ -449,6 +449,36 @@ void couple_export_table_free(struct couple_export_table *tbl)
 
 // align delta fields to acc fields by matching tag json string, return an array with length n_acc, each of whose element match the corresponding acc element by both tag and index
 const struct cellwise_rec_for_export **rearrange_metric_delta(const struct cellwise_rec_for_export *acc, size_t n_acc, const struct cellwise_rec_for_export *delta, size_t n_delta)
+{
+    struct couple_export_table *map = couple_export_table_new(); // todo: 这个map更新放到exporter里，不要每次都new
+    for (int i = 0; i < n_delta; i++) {
+        const char *tag_json = json_writer_unwrap(delta[i].cjson_tags);
+        if (tag_json == NULL) { // tag might be empty, give it a dummy name
+            tag_json = "\anil";
+        }
+        couple_export_table_add(map, tag_json, i);
+    }
+
+    const struct cellwise_rec_for_export **ret = calloc(n_acc, sizeof(struct cellwise_rec_for_export *));
+
+    for (int id_acc = 0; id_acc < n_acc; id_acc++) {
+        const char *tag_str_acc = json_writer_unwrap(acc[id_acc].cjson_tags);
+        if (tag_str_acc == NULL) { // tag might be empty, give it a dummy name
+            tag_str_acc = "\anil";
+        }
+
+        int id_delta = couple_export_table_find(map, tag_str_acc);
+        if (id_delta == -1) {
+            continue;
+        }
+        ret[id_acc] = &delta[id_delta];
+    }
+
+    couple_export_table_free(map);
+    return ret;
+}
+
+const struct cellwise_rec_for_export **rearrange_metric_delta1(const struct cellwise_rec_for_export *acc, size_t n_acc, const struct cellwise_rec_for_export *delta, size_t n_delta)
 {
     struct couple_export_table *map = couple_export_table_new(); // todo: 这个map更新放到exporter里，不要每次都new
     for (int i = 0; i < n_acc; i++) {

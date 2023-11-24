@@ -145,7 +145,6 @@ XXH128_hash_t cal_tag_hash_xxhash128(const struct fieldstat_tag *tag, size_t n_t
     
     for (int i = 0; i < n_tag; i++)
     {
-        // XXH32_update(&state, (const xxh_u8 *)tag[i].key, strlen(tag[i].key));
         XXH3_128bits_update(state, tag[i].key, strlen(tag[i].key));
 
         if (tag[i].type != TAG_CSTRING) { // sizeof(long long) == sizeof(double)

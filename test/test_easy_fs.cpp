@@ -187,6 +187,7 @@ TEST(test_easy_fieldstat, ensure_data_racing_of_two_output_and_of_incyby)
             for (int i = 0; i < 1000000; i++) { // loop million times to ensure no core dump
                 fieldstat_easy_counter_incrby(fse, thread_id, counter_id, &TEST_TAG_INT, 1, 1);
                 fieldstat_easy_histogram_record(fse, thread_id, hdr_id, &TEST_TAG_INT, 1, rand() % 10000);
+                usleep(1); // 1us * 1000000 = 1s, just long enough to output
             }
         });
     }
