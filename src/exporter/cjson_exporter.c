@@ -958,7 +958,7 @@ char *fieldstat_json_exporter_export_with_delta(const struct fieldstat_json_expo
 
         struct json_writer *field_json_delta = json_writer_init();
         if (expair_delta_rearranged[i] != NULL) {
-            for (int j = 0; j < expair_acc[i].n_metric; j++) {
+            for (int j = 0; j < expair_delta_rearranged[i]->n_metric; j++) {
                 kv_pair_write_to_json(expair_delta_rearranged[i]->metric_pairs[j], field_json_delta);
             }
         }
