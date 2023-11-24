@@ -229,13 +229,13 @@ void tag_hash_key_free(struct tag_hash_key *tag_key)
     free(tag_key);
 }
 
-// todo: 可能可以在每次操作的时候，都和之前比一次cell id对应的tag，如果tag对上了，就沿用上次的cell id。
-// 也许吧。
-
-// FNV-1a hash (http://www.isthe.com/chongo/tech/comp/fnv/)
 unsigned tag_hash_key_cal_hash_val(const struct tag_hash_key *tag, unsigned seed) {
-    // return cal_tag_hash(tag->tags, tag->n_my_tag, seed);
-    return cal_tag_hash_xxhash(tag->tags, tag->n_my_tag, seed);
+    if (seed == 0) { // use default seed
+        return tag->hashv;
+    }
+    XXH128_hash_t hashv = cal_tag_hash_xxhash128(tag->tags, tag->n_my_tag, seed);
+    
+    return hashv.high64 ^ hashv.low64;
 }
 
 void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_tags, char **out_key, size_t *out_key_size)
