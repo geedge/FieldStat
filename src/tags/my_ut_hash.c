@@ -171,7 +171,7 @@ void tag_hash_key_init_with_fieldstat_tag(struct tag_hash_key *tag_key, const st
     }
 
     tag_key->hashv128 = cal_tag_hash_xxhash128(src, n_src, 0);
-    tag_key->hashv = tag_key->hashv128.high64 ^ tag_key->hashv128.low64;
+    tag_key->hashv = tag_key->hashv128.high64;
 
     if (deep_copy) {
         tag_key->tags = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * n_src);
@@ -234,7 +234,7 @@ unsigned tag_hash_key_cal_hash_val(const struct tag_hash_key *tag, unsigned seed
     }
     XXH128_hash_t hashv = cal_tag_hash_xxhash128(tag->tags, tag->n_my_tag, seed);
     
-    return hashv.high64 ^ hashv.low64;
+    return hashv.high64;
 }
 
 void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_tags, char **out_key, size_t *out_key_size)
