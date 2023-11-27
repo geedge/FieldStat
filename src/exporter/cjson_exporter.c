@@ -447,6 +447,8 @@ void couple_export_table_free(struct couple_export_table *tbl)
     free(tbl);
 }
 
+#define NIL_TAG_JSON "\anil"
+
 // align delta fields to acc fields by matching tag json string, return an array with length n_acc, each of whose element match the corresponding acc element by both tag and index
 const struct cellwise_rec_for_export **rearrange_metric_delta(const struct cellwise_rec_for_export *acc, size_t n_acc, const struct cellwise_rec_for_export *delta, size_t n_delta)
 {
@@ -454,7 +456,7 @@ const struct cellwise_rec_for_export **rearrange_metric_delta(const struct cellw
     for (int i = 0; i < n_delta; i++) {
         const char *tag_json = json_writer_unwrap(delta[i].cjson_tags);
         if (tag_json == NULL) { // tag might be empty, give it a dummy name
-            tag_json = "\anil";
+            tag_json = NIL_TAG_JSON;
         }
         couple_export_table_add(map, tag_json, i);
     }
@@ -464,7 +466,7 @@ const struct cellwise_rec_for_export **rearrange_metric_delta(const struct cellw
     for (int id_acc = 0; id_acc < n_acc; id_acc++) {
         const char *tag_str_acc = json_writer_unwrap(acc[id_acc].cjson_tags);
         if (tag_str_acc == NULL) { // tag might be empty, give it a dummy name
-            tag_str_acc = "\anil";
+            tag_str_acc = NIL_TAG_JSON;
         }
 
         int id_delta = couple_export_table_find(map, tag_str_acc);
@@ -472,34 +474,6 @@ const struct cellwise_rec_for_export **rearrange_metric_delta(const struct cellw
             continue;
         }
         ret[id_acc] = &delta[id_delta];
-    }
-
-    couple_export_table_free(map);
-    return ret;
-}
-
-const struct cellwise_rec_for_export **rearrange_metric_delta1(const struct cellwise_rec_for_export *acc, size_t n_acc, const struct cellwise_rec_for_export *delta, size_t n_delta)
-{
-    struct couple_export_table *map = couple_export_table_new(); // todo: 这个map更新放到exporter里，不要每次都new
-    for (int i = 0; i < n_acc; i++) {
-        const char *tag_json = json_writer_unwrap(acc[i].cjson_tags);
-        if (tag_json == NULL) { // tag might be empty, give it a dummy name
-            tag_json = "\anil";
-        }
-        couple_export_table_add(map, tag_json, i);
-    }
-
-    const struct cellwise_rec_for_export **ret = calloc(n_acc, sizeof(struct cellwise_rec_for_export *));
-
-    for (int i = 0; i < n_delta; i++) {
-        const char *tag_json = json_writer_unwrap(delta[i].cjson_tags);
-        if (tag_json == NULL) { // tag might be empty, give it a dummy name
-            tag_json = "\anil";
-        }
-
-        int id_acc = couple_export_table_find(map, tag_json);
-        assert(id_acc < n_acc); // mute cppcheck
-        ret[id_acc] = &delta[i];
     }
 
     couple_export_table_free(map);
