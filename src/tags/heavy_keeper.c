@@ -28,6 +28,8 @@ struct heavy_keeper {
     struct sorted_set *top_K_heap;
     struct heavy_keeper_options params;
     struct Bucket *sketch;
+
+    unsigned int rand_state;
 };
 
 #define FP_HASH_KEY 0
@@ -75,6 +77,7 @@ void params_set_to(struct heavy_keeper_options *p, const struct heavy_keeper_opt
 struct heavy_keeper *heavy_keeper_new(int max_query_num, const struct heavy_keeper_options *params) {
     struct heavy_keeper *hk = (struct heavy_keeper *)malloc(sizeof(struct heavy_keeper));
     hk->K = max_query_num;
+    hk->rand_state = 0;
 
     hk->top_K_heap = sorted_set_new(max_query_num);
 
@@ -125,7 +128,7 @@ bool if_need_to_decay(struct heavy_keeper *hk, struct Bucket *bucket, unsigned c
         return false;
     }
 
-    double r = (double)rand() / (double)RAND_MAX;
+    double r = (double)rand_r(&(hk->rand_state)) / (double)RAND_MAX;
 
     double b = hk->params.decay_exp_rate;
     double decay_rate = pow(b, -exp);
