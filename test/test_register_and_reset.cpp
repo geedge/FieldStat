@@ -499,6 +499,32 @@ TEST(calibrate, master_many_cube)
     fieldstat_free(target);
 }
 
+TEST(test_register, get_cube_mode)
+{
+    // int fieldstat_get_cube_mode(const struct fieldstat *instance, int cube_id, enum sampling_mode *mode, int *primary_metric_id)
+
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 10);
+    fieldstat_register_counter(instance, "counter");
+    fieldstat_register_counter(instance, "counter2");
+    fieldstat_cube_set_primary_metric(instance, cube_id, 1);
+    int cube_id2 = fieldstat_create_cube(instance, &TEST_TAG_INT, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+
+    enum sampling_mode mode;
+    int primary_metric_id;
+    EXPECT_EQ(fieldstat_get_cube_mode(instance, cube_id, &mode, &primary_metric_id), 0);
+    EXPECT_EQ(mode, SAMPLING_MODE_TOPK);
+    EXPECT_EQ(primary_metric_id, 1);
+
+    EXPECT_EQ(fieldstat_get_cube_mode(instance, cube_id2, &mode, &primary_metric_id), 0);
+    EXPECT_EQ(mode, SAMPLING_MODE_COMPREHENSIVE);
+    EXPECT_EQ(primary_metric_id, -1);
+
+    EXPECT_EQ(fieldstat_get_cube_mode(instance, 100, &mode, &primary_metric_id), FS_ERR_INVALID_CUBE_ID);
+
+    fieldstat_free(instance);
+}
+
 int main(int argc, char *argv[]) 
 {
 	testing::InitGoogleTest(&argc, argv);

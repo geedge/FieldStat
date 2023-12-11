@@ -1433,3 +1433,26 @@ int fieldstat_find_cube(const struct fieldstat *instance, const struct fieldstat
 
     return cube_id;
 }
+
+int fieldstat_get_cube_mode(const struct fieldstat *instance, int cube_id, enum sampling_mode *mode, int *primary_metric_id)
+{
+    if (instance == NULL) {
+        return FS_ERR_NULL_HANDLER;
+    }
+    if (cube_id < 0 || cube_id >= instance->valid_cube_arr_length) {
+        return FS_ERR_INVALID_CUBE_ID;
+    }
+    const struct fs_cube *cube = instance->cube[cube_id];
+    if (cube == NULL) {
+        return FS_ERR_INVALID_CUBE_ID;
+    }
+
+    *mode = cube->sampling_mode;
+    if (cube->sampling_mode == SAMPLING_MODE_TOPK) {
+        *primary_metric_id = cube->primary_metric_id;
+    } else {
+        *primary_metric_id = -1;
+    }
+
+    return FS_OK;
+}

@@ -67,6 +67,7 @@ int fieldstat_calibrate(const struct fieldstat *master, struct fieldstat *replic
     * @return cube id, if success; otherwise, return FS_ERR_NULL_HANDLER, or FS_ERR_INVALID_PARAM when (max_n_cell == 0 && mode == TOPK). return FS_ERR_INVALID_KEY when the shared_tags is not unique.
 */
 int fieldstat_create_cube(struct fieldstat *instance, const struct fieldstat_tag *shared_tags, size_t n_tag, enum sampling_mode mode, size_t max_n_cell);
+
 /*
     @brief Change the topk cube primary metric id. When fieldstat_counter_add or fieldstat_counter_set are called on the primary metric, the topk record of such cell will be updated.
             the default primary metric id is 0.
@@ -223,6 +224,13 @@ struct fieldstat_tag_list *fieldstat_get_shared_tags(const struct fieldstat *ins
     return a cube id corresponding to the shared tags. FS_ERR_INVALID_KEY is returned if the shared tags are not found.
 */
 int fieldstat_find_cube(const struct fieldstat *instance, const struct fieldstat_tag *shared_tags, size_t n_shared_tags);
+
+/*
+    return FS_ERR_NULL_HANDLER, FS_ERR_INVALID_CUBE_ID if fail.
+    When return OK, mode == COMPREHENSIVE, primary_metric_id == -1.
+    When return OK, mode == TOPK, primary_metric_id >= 0.
+*/
+int fieldstat_get_cube_mode(const struct fieldstat *instance, int cube_id, enum sampling_mode *mode, int *primary_metric_id);
 
 /* 
     get the cell numbers in a cube. Return FS_ERR_INVALID_CUBE_ID if cube_id is invalid.
