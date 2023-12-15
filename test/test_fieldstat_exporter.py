@@ -361,12 +361,12 @@ class TestTableFormatTable(unittest.TestCase):
 
 
     def test_create_table(self):
-        fields_names_0 = {"column0": 0, "column1": 1}
-        table = self.c_table.create_table(fields_names_0, True)
+        columns = ["column0", "column1"]
+        table = self.c_table.create_table(columns, True)
         self.assertEqual(table.field_names, ["", "column0", "column0/s", "column1", "column1/s"])
 
-        fields_names_1 = {"column2": 2, "column3": 3}
-        table = self.c_table.create_table(fields_names_1, False)
+        columns = ["column2", "column3"]
+        table = self.c_table.create_table(columns, False)
         self.assertEqual(table.field_names, ["", "column2", "column3"])
 
     def test_add_table_row(self):
@@ -375,14 +375,15 @@ class TestTableFormatTable(unittest.TestCase):
         table = self.c_table.create_table({"column0": 0, "column1": 1}, False)
         tags  = {"row": "0"}
         field = {"column0": 0, "column1":1}
+        columns = ["column0", "column1"]
         field_delta = {}
-        self.c_table.add_table_row(None, tags, field, field_delta, 0, False)
+        self.c_table.add_table_row(None, tags, field, field_delta, 0, False, columns)
 
         table_str = table.get_string()
         row_count = len(table_str.split("\n")) - 1
         self.assertEqual(row_count, 0)
-        
-        self.c_table.add_table_row(table, tags, field, field_delta, 0, False)
+
+        self.c_table.add_table_row(table, tags, field, field_delta, 0, False, columns)
         row_count = len(table_str.split("\n")) - 1
         self.assertEqual(row_count, 0)
 

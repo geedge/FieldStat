@@ -300,20 +300,19 @@ class TableFormatTable:
         self.tables = []
         self.rows   = []
 
-    def create_table(self, fields, enable_speed):
+    def create_table(self, columns, enable_speed):
         field_names = []
         field_names.append("")
 
-        sorted_keys = sorted(fields.keys())
         if enable_speed:
-            keys = []
-            for key in sorted_keys:
-                keys.append(key)
-                speed_fields = str(key) + "/s"
-                keys.append(speed_fields)
-            field_names.extend(keys)
+            columns_with_speed = []
+            for item in columns:
+                columns_with_speed.append(item)
+                speed_fields = str(item) + "/s"
+                columns_with_speed.append(speed_fields)
+            field_names.extend(columns_with_speed)
         else:
-            field_names.extend(sorted_keys)
+            field_names.extend(columns)
 
         table = PrettyTable()
         table.vrules = NONE
@@ -329,7 +328,7 @@ class TableFormatTable:
         return table
 
 
-    def add_table_row(self, table, tags, fields, fields_delta, interval_ms, enable_speed):
+    def add_table_row(self, table, tags, fields, fields_delta, interval_ms, enable_speed, columns):
         row = []
 
         if table is None:
@@ -343,18 +342,18 @@ class TableFormatTable:
         row.append('&'.join(row_str))
 
         #exporter table row value.
-        sorted_keys = sorted(fields.keys())
+
         if enable_speed:
-            for key in sorted_keys:
-                row.append(fields[key])
-                if (interval_ms > 0) and (key in fields_delta):
-                    speed_s = fields_delta[key] * 1000 / interval_ms
+            for item in columns:
+                row.append(fields[item])
+                if (interval_ms > 0) and (item in fields_delta):
+                    speed_s = fields_delta[item] * 1000 / interval_ms
                     row.append("{:.2f}".format(speed_s))
                 else:
                     row.append("-")
         else:
-            for key in sorted_keys:
-                row.append(fields[key])
+            for item in columns:
+                row.append(fields[item])
 
         table.add_row(row)
 
@@ -607,7 +606,7 @@ class LocalExporter:
                         self.__build_histogram_type_exporter(tags_new, key, value, value_delta, timestamp_ms_delta)
 
 
-    def build_table_format_exporter(self, json_objects, enable_speed):
+    def build_table_format_exporter(self, json_objects, enable_speed, columns):
         table = None
         for item in json_objects:
             tags   = item["tags"]
@@ -615,9 +614,9 @@ class LocalExporter:
             fields_delta = item["fields_delta"]
             interval_ms = item["timestamp_ms_delta"]
             if table == None:
-                table = self.tftable.create_table(fields, enable_speed)
+                table = self.tftable.create_table(columns, enable_speed)
             
-            self.tftable.add_table_row(table, tags, fields, fields_delta, interval_ms, enable_speed)
+            self.tftable.add_table_row(table, tags, fields, fields_delta, interval_ms, enable_speed, columns)
         return table
 
 
@@ -643,27 +642,37 @@ class LocalExporter:
     def print_table_format(self, groupby, columns, enable_speed=True, verbose=False):
         table_fields=[]
         for item in self.objects_matched:
-            is_print_table = True
             tags   = item["tags"]
             fields = item["fields"]
-            
+
+            #select (groupby in tags key) && ( cloumn0 || column1 ||... in field keys) && (field_value type is int).
+            is_match_table_format = False
+
             if groupby not in tags:
                 continue
+             
             for column in columns:
                 if column not in fields:
-                    is_print_table = False
-                    break
-                if isinstance(fields[column], str):
-                    is_print_table = False
                     continue
-            if is_print_table == False:
+                if isinstance(fields[column], str):
+                    is_match_table_format = False
+                    break
+                else:
+                    is_match_table_format = True
+            
+            if is_match_table_format == False:
                 continue
 
+            # build new field json object.
             new_fields = copy.deepcopy(item)
             
             for key in fields:
                 if key not in columns:
                     new_fields["fields"].pop(key)
+
+            for column in columns:
+                if column not in fields:
+                    new_fields["fields"][column] = "-"
 
             if not verbose:
                 for key in tags:
@@ -674,7 +683,7 @@ class LocalExporter:
             #     new_fields["fields_delta"] = {}
 
             table_fields.append(new_fields)
-        return self.build_table_format_exporter(table_fields, enable_speed)
+        return self.build_table_format_exporter(table_fields, enable_speed, columns)
     
 #   def print_counter(self, [tags], [fields])
     def print_counter_type(self, field_keys):
