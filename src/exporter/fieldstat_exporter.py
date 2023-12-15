@@ -72,6 +72,8 @@ class FieldstatExporterVars:
     hist_format           = ""
     hist_bins             = []
 
+    local_scientific_form = False
+
 ################################################################################
 #  promethues exporter
 ################################################################################
@@ -233,11 +235,22 @@ class CounterTable:
         self.columns     = []
         self.field_names = []  
 
+    def __convert_value_to_str(self, value, speed_s):
+        value_str = ""
+        speed_str = ""
+        if FieldstatExporterVars.local_scientific_form == True:
+            value_str = "{:.2e}".format(value)
+            speed_str = "{:.2e}".format(speed_s)
+        else:
+            value_str = str(value)
+            speed_str = "{:.2f}".format(speed_s)
+        return value_str, speed_str
 
     def add_table_column(self, tags, head, value, speed_s):
-        column = (head, [tags, str(value), "{:.2f}".format(speed_s)])
+        value_str, speed_str = self.__convert_value_to_str(value, speed_s)
+        column = (head, [tags, value_str, speed_str])
         self.columns.append(column)
-        self.min_width = max(self.min_width, len(tags), len(head), len(str(value)))
+        self.min_width = max(self.min_width, len(tags), len(head), len(value_str))
 
     def __build_one_table(self, columns_slice):
         table = PrettyTable()
@@ -343,17 +356,21 @@ class TableFormatTable:
 
         #exporter table row value.
 
-        if enable_speed:
-            for item in columns:
+        for item in columns:
+            if FieldstatExporterVars.local_scientific_form == True:
+                row.append("{:.2e}".format(fields[item]))
+            else:
                 row.append(fields[item])
+
+            if enable_speed:
                 if (interval_ms > 0) and (item in fields_delta):
                     speed_s = fields_delta[item] * 1000 / interval_ms
-                    row.append("{:.2f}".format(speed_s))
+                    if FieldstatExporterVars.local_scientific_form == True:
+                        row.append("{:.2e}".format(speed_s))
+                    else:
+                        row.append("{:.2f}".format(speed_s))
                 else:
                     row.append("-")
-        else:
-            for item in columns:
-                row.append(fields[item])
 
         table.add_row(row)
 
@@ -829,7 +846,8 @@ class FieldstatExporter:
                             help = "Display the tags match metrics")
         parser.add_argument("-t", "--template",   type = str,           default = "",
                             help = "Specify the print template with jinja2.")
-
+        parser.add_argument("--scientific-form",  action = 'store_true', default = False,
+                            help = "Output the counter type value in scientific notation.")
 
     def __parse_bins_str(self, bins_str):
         bins = [] 
@@ -873,6 +891,7 @@ class FieldstatExporter:
             FieldstatExporterVars.local_display_hist    = args.display_hist
             FieldstatExporterVars.local_match_tags      = self.__parse_tags_str(args.match_tags)
             FieldstatExporterVars.local_template        = args.template
+            FieldstatExporterVars.local_scientific_form = args.scientific_form
             self.exporter_mode       = 'local'
             self.local_interval_s    = args.interval
             self.local_enable_loop   = args.loop

@@ -13,7 +13,7 @@ The local exporter reads the fieldstat4 json file and outputs it to the screen.
 ### List of rpm files
     ...
     |-- bin
-        |-- fieldstat_exporter
+        |-- fieldstat_exporter.py
     |-- lib
         |-- ibfieldstat4.a
         |-- libfieldstat4.so
@@ -117,6 +117,7 @@ optional arguments:
                         Display the tags match metrics
   -t TEMPLATE, --template TEMPLATE
                         Specify the print template with jinja2.
+  --scientific-form     Output the value in scientific notation.
 ```
 The local exporter optional arguments default values.
 args|default value
