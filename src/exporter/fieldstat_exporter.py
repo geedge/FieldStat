@@ -329,7 +329,7 @@ class TableFormatTable:
 
         table = PrettyTable()
         table.vrules = NONE
-        table.hrules = NONE
+        #table.hrules = NONE
         table.field_names = field_names
 
         for item in field_names:
