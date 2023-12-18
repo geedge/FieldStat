@@ -68,7 +68,7 @@ class FieldstatExporterVars:
 
     prom_uri_path         = ""
 
-    json_path             = ""
+    json_paths            = []
     hist_format           = ""
     hist_bins             = []
 
@@ -81,7 +81,7 @@ class PrometheusExporter:
     def __init__(self):
         self.hist_bins   = FieldstatExporterVars.hist_bins
         self.hist_format = FieldstatExporterVars.hist_format
-        self.json_path   = FieldstatExporterVars.json_path
+        self.json_paths  = FieldstatExporterVars.json_paths
         self.n_lines     = 0
 
     def __escape_metric_name(self, metric_name):
@@ -171,14 +171,14 @@ class PrometheusExporter:
                     metrics += self.__build_type_histogram(escaped_name, escaped_tags, value)
         return metrics
 
-    def build_metrics_payload(self):
+    def build_metrics_payload(self, json_path):
         payload = ""
         
-        if not os.path.exists(self.json_path):
-            logging.error("Path: {%s} does not exist", self.json_path)
+        if not os.path.exists(json_path):
+            logging.error("Path: {%s} does not exist", json_path)
             return payload
 
-        with open(self.json_path) as file:
+        with open(json_path) as file:
             fcntl.flock(file, fcntl.LOCK_EX)
             json_data = []
             try:
@@ -191,13 +191,19 @@ class PrometheusExporter:
 
         return payload
 
+    def merge_multi_files_payload(self):
+        payloads = ""
+        for item in self.json_paths:
+            payloads += self.build_metrics_payload(item)
+        return payloads
+
     def read_lines_num(self):
         return self.n_lines
 
     @classmethod
     def run_prometheus_exporter(cls):
         builder = cls()
-        return builder.build_metrics_payload()
+        return builder.merge_multi_files_payload()
 
 class PrometheusEndpoint(BaseHTTPRequestHandler):
     def __init__(self, request, client_address, server):
@@ -471,11 +477,11 @@ class HistogramTable:
 class LocalExporter:
     def __init__(self):
         self.terminal_size, _  = shutil.get_terminal_size((128, 64))
-        self.json_path         = FieldstatExporterVars.json_path
-        self.ctable            = CounterTable()
-        self.htable            = HistogramTable()
-        self.hlltable          = CounterTable()
-        self.tftable           = TableFormatTable()
+        self.json_paths        = FieldstatExporterVars.json_paths
+        self.ctable            = None
+        self.htable            = None
+        self.hlltable          = None
+        self.tftable           = None
         self.display_counter   = FieldstatExporterVars.local_display_counter
         self.display_hist      = FieldstatExporterVars.local_display_hist
         self.display_hll       = FieldstatExporterVars.local_display_hll
@@ -483,7 +489,7 @@ class LocalExporter:
         self.template          = FieldstatExporterVars.local_template
         self.__set_default_display()
         self.objects_matched   = []
-        self.template_ja2      = None 
+        self.template_ja2      = None
 
 
     def __set_default_display(self):
@@ -531,13 +537,13 @@ class LocalExporter:
         return True
 
 
-    def read_json_objects_from_file(self):
+    def read_json_objects_from_file(self, json_path):
         #check source json file is exist.
         objects = []
-        if not os.path.exists(self.json_path):
-            logging.error("Path: {%s} does not exist", self.json_path)
+        if not os.path.exists(json_path):
+            logging.error("Path: {%s} does not exist", json_path)
             return objects
-        with open(self.json_path) as fd:
+        with open(json_path) as fd:
             fcntl.flock(fd, fcntl.LOCK_EX)
             try:
                 objects = json.load(fd)
@@ -545,7 +551,6 @@ class LocalExporter:
                 print("Invalid JSON:", e)
             fcntl.flock(fd, fcntl.LOCK_UN)
         return objects
-
 
     def read_match_tags_json_objects(self, json_objects):
         matched_objects = []
@@ -565,42 +570,6 @@ class LocalExporter:
         self.objects_matched = matched_objects
 
         return matched_objects
-
-    # def build_table_format_htable(self, json_objects):
-    #     table_bundle = {}
-    #     table_bundle["not_table_format"] = []
-
-    #     for item in json_objects:
-    #         #set display table option off
-    #         if self.disable_table:
-    #             table_bundle["not_table_format"].append(item)
-    #             continue
-    #         # table: only one tag and same tag key + same field keys + name key
-    #         not_append_table = False
-    #         if len(item["tags"]) != 1:
-    #             table_bundle["not_table_format"].append(item)
-    #             continue
-
-    #         for _, value in item["fields"].items():                
-    #             if isinstance(value, str):
-    #                 not_append_table = True
-    #                 break
-
-    #         if not_append_table == True:
-    #             table_bundle["not_table_format"].append(item)
-    #             continue
-
-    #         key_list  = list(item["tags"].keys()) + sorted(list(item["fields"].keys()))
-    #         key = ''.join(key_list) + item["name"]
-            
-    #         if key in table_bundle:
-    #             val = table_bundle[key]
-    #             val.append(item)
-    #         else:
-    #             table_bundle[key] = [item]
-
-    #     return table_bundle
-
 
     def build_not_table_format_exporter(self, json_objects):
         for item in json_objects:
@@ -647,13 +616,21 @@ class LocalExporter:
         self.template_ja2 = template
 
     def build_local_exporter(self):
-        objects = self.read_json_objects_from_file()
-        self.objects_matched = self.read_match_tags_json_objects(objects)
+        for item in self.json_paths:
+            print("Json file path: " + item)
+            self.ctable = CounterTable()
+            self.htable = HistogramTable()
+            self.hlltable = CounterTable()
+            self.tftable  = TableFormatTable()
+            self.objects_matched = []
+            objects = self.read_json_objects_from_file(item)
+            self.objects_matched = self.read_match_tags_json_objects(objects)
 
-        if len(self.template) > 0:
-            self.export_templates()
-        else:
-            self.build_not_table_format_exporter(self.objects_matched)
+            if len(self.template) > 0:
+                self.export_templates()
+            else:
+                self.build_not_table_format_exporter(self.objects_matched)
+            self.print_local_exporter()
 
 
     def print_table_format(self, groupby, columns, enable_speed=True, verbose=False):
@@ -788,7 +765,6 @@ class LocalExporter:
     def run_local_exporter(cls):
         exporter = cls()
         exporter.build_local_exporter()
-        exporter.print_local_exporter()
 
 
 ################################################################################
@@ -798,7 +774,7 @@ class FieldstatExporter:
     DEFAULT_LISTEN_PORT = 8080
     DEFAULT_HIST_BINS   = [0.1,0.5,0.8,0.9,0.95,0.99]
     DEFAULT_HIST_FORMAT = "summary"
-    DEFAULT_JSON_PATH   = "./fieldstat.json"
+    DEFAULT_JSON_PATHS  = ["./fieldstat.json"]
     DEFAULT_URI_PATH    = "/metrics"
     DEFAULT_INTERVAL_S  = 1
 
@@ -817,8 +793,8 @@ class FieldstatExporter:
                             help = "The metrics of histogram type output bins.")
         parser.add_argument("-f", "--hist-format", type = str, default = self.DEFAULT_HIST_FORMAT,
                             help = "The metrics of histogram type output format.")
-        parser.add_argument("-j", "--json-path",   type = str, default = self.DEFAULT_JSON_PATH,
-                            help = "The input fieldstat metrics json file path.")
+        parser.add_argument("-j", "--json-paths",  nargs='+',  type = str, default = self.DEFAULT_JSON_PATHS,
+                            help = "The input fieldstat metrics json file paths. Support multi path.")
         return parser
 
     def __build_prom_parser(self, subparsers, shared_arg_parser):
@@ -876,7 +852,7 @@ class FieldstatExporter:
 
     def __read_shared_args_value(self, args):
         FieldstatExporterVars.hist_format = args.hist_format
-        FieldstatExporterVars.json_path   = args.json_path
+        FieldstatExporterVars.json_paths  = args.json_paths
         FieldstatExporterVars.hist_bins   = self.__parse_bins_str(args.hist_bins)
 
     def __read_private_args_value(self, args):

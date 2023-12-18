@@ -221,13 +221,11 @@ class TestPrometheusExporter(unittest.TestCase):
     def test_build_metrics_payload(self):
         self.prom.hist_bins   = [0.1,0.2,0.5,0.8,0.9,0.95,0.99]
         self.prom.hist_format = "summary"
-        self.prom.json_path   = "/tmp/invalid_path.json"
         self.prom.n_lines     = 0
 
-        payload = self.prom.build_metrics_payload()
+        payload = self.prom.build_metrics_payload("/tmp/invalid_path.json")
         self.assertEqual(payload, "")
-        self.prom.json_path = FIELDSTAT_INPUT_JSON_PATH
-        payload = self.prom.build_metrics_payload()
+        payload = self.prom.build_metrics_payload(FIELDSTAT_INPUT_JSON_PATH)
         lines   = payload.split('\n')
         self.assertEqual(len(lines), 93 + 1)
         self.assertEqual(self.prom.read_lines_num(), 93)
@@ -381,11 +379,11 @@ class TestTableFormatTable(unittest.TestCase):
 
         table_str = table.get_string()
         row_count = len(table_str.split("\n")) - 1
-        self.assertEqual(row_count, 0)
+        self.assertEqual(row_count, 3)
 
         self.c_table.add_table_row(table, tags, field, field_delta, 0, False, columns)
         row_count = len(table_str.split("\n")) - 1
-        self.assertEqual(row_count, 0)
+        self.assertEqual(row_count, 3)
 
 
 class TestHistogramTable(unittest.TestCase):
@@ -567,7 +565,7 @@ class TestLocalExporter(unittest.TestCase):
             val        = random.randint(1, 100)
             val_delta  = random.randint(10, 20)
             tsms_delta = random.randint(1, 10) * 1000
-            self.local.ctable.columns = []
+            self.local.ctable = CounterTable()
             self.local._LocalExporter__build_counter_type_exporter(self.tags, self.key, val, val_delta, tsms_delta)
             self.assertEqual(self.local.ctable.columns[-1][1][1], str(val))
             self.assertEqual(self.local.ctable.columns[-1][1][2],  "{:.2f}".format(val_delta*1000/tsms_delta))
@@ -578,7 +576,7 @@ class TestLocalExporter(unittest.TestCase):
                    "AEEAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg"\
                    "ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI"\
                    "CAgICAgICAgICAgICAgICAgICAgIAAAAAAAAA"
-
+        self.local.htable = HistogramTable()
         peradd   = len(self.local.htable.tables)
         self.local._LocalExporter__build_histogram_type_exporter(self.tags, self.key, hist_val, None, 0)
         postadd  = len(self.local.htable.tables)
@@ -587,7 +585,7 @@ class TestLocalExporter(unittest.TestCase):
 
     def test__build_hll_type_exporter(self):
         value   = "AQUBDECDAQxAQQUIIEEJCDCFARgQRAUIMIMAAAECAAAAAAAAAA=="
-        
+        self.local.hlltable = CounterTable()
         peradd  = len(self.local.hlltable.columns)
         self.local._LocalExporter__build_hll_type_exporter(self.tags, self.key, value)
         postadd = len(self.local.hlltable.columns)
@@ -668,12 +666,10 @@ class TestLocalExporter(unittest.TestCase):
         self.local.ctable   = CounterTable()
         self.local.htable   = HistogramTable()
 
-        self.local.json_path = "/tmp/noexist.json"
-        objects0 = self.local.read_json_objects_from_file()
+        objects0 = self.local.read_json_objects_from_file("/tmp/noexist.json")
         self.assertEqual(len(objects0), 0)
 
-        self.local.json_path = FIELDSTAT_INPUT_JSON_PATH
-        objects1 = self.local.read_json_objects_from_file()
+        objects1 = self.local.read_json_objects_from_file(FIELDSTAT_INPUT_JSON_PATH)
         self.assertGreater(len(objects1), 0)
 
 
@@ -687,11 +683,11 @@ class TestFieldstatExporter(unittest.TestCase):
 
         self.assertEqual(parser.parse_args([]).hist_bins,   "0.1,0.5,0.8,0.9,0.95,0.99")
         self.assertEqual(parser.parse_args([]).hist_format, "summary")
-        self.assertEqual(parser.parse_args([]).json_path,   "./fieldstat.json")
+        self.assertEqual(parser.parse_args([]).json_paths,  ["./fieldstat.json"])
 
         self.assertEqual(parser.parse_args(["-b", "0.1,0.5,0.8,0.99"]).hist_bins, "0.1,0.5,0.8,0.99")
         self.assertEqual(parser.parse_args(["-f", "histogram"]).hist_format, "histogram")
-        self.assertEqual(parser.parse_args(["-j", "/tmp/sapp_fs.json"]).json_path, "/tmp/sapp_fs.json")
+        self.assertEqual(parser.parse_args(["-j", "/tmp/sapp_fs.json"]).json_paths, ["/tmp/sapp_fs.json"])
 
 
     def test_build_prom_parser(self):
@@ -750,14 +746,14 @@ class TestFieldstatExporter(unittest.TestCase):
 
         self.assertEqual(FieldstatExporterVars.hist_format, "summary")
         self.assertEqual(FieldstatExporterVars.hist_bins,   [0.1, 0.5, 0.8, 0.9, 0.95, 0.99])
-        self.assertEqual(FieldstatExporterVars.json_path,   "./fieldstat.json")
+        self.assertEqual(FieldstatExporterVars.json_paths,  ["./fieldstat.json"])
 
         args = parser.parse_args(["-f", "histogram", "-b", "1,2,3,4,5", "-j", FIELDSTAT_INPUT_JSON_PATH])
         self.exporter._FieldstatExporter__read_shared_args_value(args)
 
         self.assertEqual(FieldstatExporterVars.hist_format, "histogram")
         self.assertEqual(FieldstatExporterVars.hist_bins,   [1.0, 2.0, 3.0, 4.0, 5.0])
-        self.assertEqual(FieldstatExporterVars.json_path,   FIELDSTAT_INPUT_JSON_PATH)
+        self.assertEqual(FieldstatExporterVars.json_paths,  [FIELDSTAT_INPUT_JSON_PATH])
 
 
     def test_read_private_args_value(self):
@@ -839,7 +835,7 @@ class TestFieldstatExporter(unittest.TestCase):
 
         self.assertEqual(FieldstatExporterVars.hist_format,   "summary")
         self.assertEqual(FieldstatExporterVars.hist_bins,     [0.1, 0.5, 0.8, 0.9, 0.95, 0.99])
-        self.assertEqual(FieldstatExporterVars.json_path,     "./fieldstat.json")
+        self.assertEqual(FieldstatExporterVars.json_paths,    ["./fieldstat.json"])
 
         self.assertEqual(FieldstatExporterVars.prom_uri_path, "/metrics")
         self.assertEqual(self.exporter.prom_listen_port,      8080)
@@ -851,7 +847,7 @@ class TestFieldstatExporter(unittest.TestCase):
         self.exporter.read_cmd_options()
         self.assertEqual(FieldstatExporterVars.hist_format,           "summary")
         self.assertEqual(FieldstatExporterVars.hist_bins,             [0.1, 0.5, 0.8, 0.9, 0.95, 0.99])
-        self.assertEqual(FieldstatExporterVars.json_path,             "./fieldstat.json")
+        self.assertEqual(FieldstatExporterVars.json_paths,            ["./fieldstat.json"])
         self.assertEqual(FieldstatExporterVars.local_display_hist,    False)
         self.assertEqual(FieldstatExporterVars.local_display_hll,     False)
         self.assertEqual(FieldstatExporterVars.local_display_counter, False)
