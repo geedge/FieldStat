@@ -199,6 +199,23 @@ TEST(test_easy_fieldstat, ensure_data_racing_of_two_output_and_of_incyby)
     remove(FILENAME);
 }
 
+TEST(test_easy_fieldstat, reset)
+{
+    struct fieldstat_easy *fse = fieldstat_easy_new(3, NULL, NULL, 0);
+    int counter_id = fieldstat_easy_register_counter(fse, "metric counter");
+    fieldstat_easy_counter_incrby(fse, 0, counter_id, &TEST_TAG_INT, 1, 1);
+    fieldstat_easy_counter_incrby(fse, 1, counter_id, &TEST_TAG_INT, 1, 1);
+    
+    fieldstat_easy_reset(fse);
+    char *buff = NULL;
+    size_t buff_len = 0;
+    fieldstat_easy_output(fse, &buff, &buff_len);
+    EXPECT_STREQ(buff, "[]");
+
+    free(buff);
+    fieldstat_easy_free(fse);
+}
+
 int main(int argc, char **argv)
 {
     ::testing::InitGoogleTest(&argc, argv);

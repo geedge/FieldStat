@@ -256,9 +256,11 @@ struct fieldstat *merge_all_instance(struct fieldstat_easy *fse)
     }
 
     // add the outputted data
-    pthread_spin_lock(&fse->outputting_lock);
-    fieldstat_merge(dst, fse->accumulate);
-    pthread_spin_unlock(&fse->outputting_lock);
+    if (fse->output_thread_running) {
+        pthread_spin_lock(&fse->outputting_lock);
+        fieldstat_merge(dst, fse->accumulate);
+        pthread_spin_unlock(&fse->outputting_lock);
+    }
 
     return dst;
 }
@@ -317,4 +319,25 @@ int fieldstat_easy_histogram_record(struct fieldstat_easy *fse, int thread_id, i
     pthread_spin_unlock(&fse->fsu[thread_id].lock);
 
     return ret;
+}
+
+int fieldstat_easy_reset(struct fieldstat_easy *fse)
+{
+    // We can't let the user reset operation affects auto passive output, just let it fail.
+    if (fse->output_thread_running) {
+        printf("fieldstat_easy_reset: reset is not allowed when auto output is enabled.\n");
+        return -1;
+    }
+
+    for (int i = 0; i < fse->max_thread_num; i++) {
+        pthread_spin_lock(&fse->fsu[i].lock);
+        fieldstat_reset(fse->fsu[i].active);
+        // fsu.read_only: Only for output_to_file.
+        pthread_spin_unlock(&fse->fsu[i].lock);
+    }
+
+    // accumulate: Only has data when output_to_file.
+    // delta: Only for output_to_file.
+
+    return 0;
 }

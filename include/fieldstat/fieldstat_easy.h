@@ -21,6 +21,10 @@ struct fieldstat_easy *fieldstat_easy_new(int max_thread_num, const char *name, 
 */
 void fieldstat_easy_free(struct fieldstat_easy *fse);
 /*
+    * reset the instance. Will fail and return -1 if fieldstat_easy_enable_auto_output is called, since the behavior is hard to define.
+*/
+int fieldstat_easy_reset(struct fieldstat_easy *fse);
+/*
     * enable auto output. both data of accumulated and delta will be output.
     * @param output_path: output file path. Should be identical to the one in python config.
     * @param interval_second: output interval in second.
