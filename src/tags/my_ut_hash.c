@@ -140,22 +140,21 @@ unsigned int cal_tag_hash_xxhash(const struct fieldstat_tag *tag, size_t n_tag, 
 
 XXH128_hash_t cal_tag_hash_xxhash128(const struct fieldstat_tag *tag, size_t n_tag, unsigned int seed)
 {
-    XXH3_state_t *state = XXH3_createState();
-    XXH3_128bits_reset_withSeed(state, seed);
+    XXH3_state_t state;
+    XXH3_128bits_reset_withSeed(&state, seed);
     
     for (int i = 0; i < n_tag; i++)
     {
-        XXH3_128bits_update(state, tag[i].key, strlen(tag[i].key));
+        XXH3_128bits_update(&state, tag[i].key, strlen(tag[i].key));
 
         if (tag[i].type != TAG_CSTRING) { // sizeof(long long) == sizeof(double)
-            XXH3_128bits_update(state, &tag[i].value_longlong, sizeof(long long));
+            XXH3_128bits_update(&state, &tag[i].value_longlong, sizeof(long long));
         } else {
-            XXH3_128bits_update(state, tag[i].value_str, strlen(tag[i].value_str));
+            XXH3_128bits_update(&state, tag[i].value_str, strlen(tag[i].value_str));
         }
     }
 
-    XXH128_hash_t ret = XXH3_128bits_digest(state);
-    XXH3_freeState(state);
+    XXH128_hash_t ret = XXH3_128bits_digest(&state);
 
     return ret;
 }
