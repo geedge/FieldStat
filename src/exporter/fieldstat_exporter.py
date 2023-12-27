@@ -69,10 +69,29 @@ class FieldstatExporterVars:
     prom_uri_path         = ""
 
     json_paths            = []
+    json_dirs             = []
     hist_format           = ""
     hist_bins             = []
 
     local_scientific_form = False
+
+################################################################################
+#  global functions
+################################################################################
+def read_json_paths_from_dirs(dirs):
+    json_paths = []
+    for item in dirs:
+        if not os.path.exists(item):
+            logging.error("Dir {%s} is not exist.", item)
+            continue
+        if not os.path.isdir(item):
+            logging.error("Path {%s} is not directory.", item)
+            continue
+        for file in os.listdir(item):
+            if file.endswith(".json"):
+                file_path = os.path.abspath(os.path.join(item, file))
+                json_paths.append(file_path)
+    return json_paths
 
 ################################################################################
 #  promethues exporter
@@ -82,6 +101,7 @@ class PrometheusExporter:
         self.hist_bins   = FieldstatExporterVars.hist_bins
         self.hist_format = FieldstatExporterVars.hist_format
         self.json_paths  = FieldstatExporterVars.json_paths
+        self.json_paths.extend(read_json_paths_from_dirs(FieldstatExporterVars.json_dirs))
         self.n_lines     = 0
 
     def __escape_metric_name(self, metric_name):
@@ -478,6 +498,7 @@ class LocalExporter:
     def __init__(self):
         self.terminal_size, _  = shutil.get_terminal_size((128, 64))
         self.json_paths        = FieldstatExporterVars.json_paths
+        self.json_paths.extend(read_json_paths_from_dirs(FieldstatExporterVars.json_dirs))
         self.ctable            = None
         self.htable            = None
         self.hlltable          = None
@@ -774,7 +795,6 @@ class FieldstatExporter:
     DEFAULT_LISTEN_PORT = 8080
     DEFAULT_HIST_BINS   = [0.1,0.5,0.8,0.9,0.95,0.99]
     DEFAULT_HIST_FORMAT = "summary"
-    DEFAULT_JSON_PATHS  = ["./fieldstat.json"]
     DEFAULT_URI_PATH    = "/metrics"
     DEFAULT_INTERVAL_S  = 1
 
@@ -793,14 +813,16 @@ class FieldstatExporter:
                             help = "The metrics of histogram type output bins.")
         parser.add_argument("-f", "--hist-format", type = str, default = self.DEFAULT_HIST_FORMAT,
                             help = "The metrics of histogram type output format.")
-        parser.add_argument("-j", "--json-paths",  nargs='+',  type = str, default = self.DEFAULT_JSON_PATHS,
+        parser.add_argument("-j", "--json-paths", nargs='+', type = str, default = [],
                             help = "The input fieldstat metrics json file paths. Support multi path.")
+        parser.add_argument("-d", "--dirs",  nargs='+', type = str, default = [],
+                            help ="Specify input fieldstat metrics json file directories.")
         return parser
 
     def __build_prom_parser(self, subparsers, shared_arg_parser):
         parser = subparsers.add_parser('prometheus', help='Set prometheus exporter', parents=[shared_arg_parser])
         parser.add_argument("-p", "--listen-port", type = int, default = self.DEFAULT_LISTEN_PORT,
-                            help = "Specify the prometheus endpoint port to listen. i.e., 80,8080")
+                            help = "Specify the prometheus endpoint port to listen. i.e., 80,8080. The default is {}.".format(self.DEFAULT_LISTEN_PORT))
         parser.add_argument("-u", "--uri-path",    type = str, default = self.DEFAULT_URI_PATH,
                             help = "Specify the prometheus endpoint uri path.")
 
@@ -850,9 +872,25 @@ class FieldstatExporter:
             
         return tags_dict
 
+    def __read_json_paths_from_dirs(self, dirs):
+        json_paths = []
+        for item in dirs:
+            if not os.path.exists(item):
+                logging.error("Dir {%s} is not exist.", item)
+                continue
+            if not os.path.isdir(item):
+                logging.error("Path {%s} is not directory.", item)
+                continue
+            for file in os.listdir(item):
+                if file.endswith(".json"):
+                    file_path = os.path.abspath(os.path.join(item, file))
+                    json_paths.append(file_path)
+        return json_paths
+
     def __read_shared_args_value(self, args):
         FieldstatExporterVars.hist_format = args.hist_format
         FieldstatExporterVars.json_paths  = args.json_paths
+        FieldstatExporterVars.json_dirs   = args.dirs
         FieldstatExporterVars.hist_bins   = self.__parse_bins_str(args.hist_bins)
 
     def __read_private_args_value(self, args):
@@ -941,6 +979,10 @@ class FieldstatExporter:
             time.sleep(self.local_interval_s)
 
     def fieldstat_export(self):
+        if (len(FieldstatExporterVars.json_paths) == 0) and \
+           (len(FieldstatExporterVars.json_dirs)  == 0):
+            logging.error("There is no JSON file path and dir specified. The process will exit.")
+            exit(1)
         try:
             if self.exporter_mode == 'prometheus':
                 self.__enable_prometheus_endpoint()

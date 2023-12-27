@@ -683,7 +683,7 @@ class TestFieldstatExporter(unittest.TestCase):
 
         self.assertEqual(parser.parse_args([]).hist_bins,   "0.1,0.5,0.8,0.9,0.95,0.99")
         self.assertEqual(parser.parse_args([]).hist_format, "summary")
-        self.assertEqual(parser.parse_args([]).json_paths,  ["./fieldstat.json"])
+        self.assertEqual(parser.parse_args([]).json_paths,  [])
 
         self.assertEqual(parser.parse_args(["-b", "0.1,0.5,0.8,0.99"]).hist_bins, "0.1,0.5,0.8,0.99")
         self.assertEqual(parser.parse_args(["-f", "histogram"]).hist_format, "histogram")
@@ -746,7 +746,7 @@ class TestFieldstatExporter(unittest.TestCase):
 
         self.assertEqual(FieldstatExporterVars.hist_format, "summary")
         self.assertEqual(FieldstatExporterVars.hist_bins,   [0.1, 0.5, 0.8, 0.9, 0.95, 0.99])
-        self.assertEqual(FieldstatExporterVars.json_paths,  ["./fieldstat.json"])
+        self.assertEqual(FieldstatExporterVars.json_paths,  [])
 
         args = parser.parse_args(["-f", "histogram", "-b", "1,2,3,4,5", "-j", FIELDSTAT_INPUT_JSON_PATH])
         self.exporter._FieldstatExporter__read_shared_args_value(args)
@@ -835,7 +835,7 @@ class TestFieldstatExporter(unittest.TestCase):
 
         self.assertEqual(FieldstatExporterVars.hist_format,   "summary")
         self.assertEqual(FieldstatExporterVars.hist_bins,     [0.1, 0.5, 0.8, 0.9, 0.95, 0.99])
-        self.assertEqual(FieldstatExporterVars.json_paths,    ["./fieldstat.json"])
+        self.assertEqual(FieldstatExporterVars.json_paths,    [])
 
         self.assertEqual(FieldstatExporterVars.prom_uri_path, "/metrics")
         self.assertEqual(self.exporter.prom_listen_port,      8080)
@@ -847,7 +847,7 @@ class TestFieldstatExporter(unittest.TestCase):
         self.exporter.read_cmd_options()
         self.assertEqual(FieldstatExporterVars.hist_format,           "summary")
         self.assertEqual(FieldstatExporterVars.hist_bins,             [0.1, 0.5, 0.8, 0.9, 0.95, 0.99])
-        self.assertEqual(FieldstatExporterVars.json_paths,            ["./fieldstat.json"])
+        self.assertEqual(FieldstatExporterVars.json_paths,            [])
         self.assertEqual(FieldstatExporterVars.local_display_hist,    False)
         self.assertEqual(FieldstatExporterVars.local_display_hll,     False)
         self.assertEqual(FieldstatExporterVars.local_display_counter, False)
