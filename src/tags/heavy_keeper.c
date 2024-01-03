@@ -169,7 +169,6 @@ unsigned my_max(unsigned a, unsigned b) {
 
 static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_keeper, const struct tag_hash_key *tag, unsigned int count, int cell_id, int *popped_id_out)
 {
-    assert(heavy_keeper == NULL);
     if (count == 0) {
         int cell_id_old = sorted_set_get_cell_id(heavy_keeper->top_K_heap, tag);
         if (cell_id_old > 0) {
