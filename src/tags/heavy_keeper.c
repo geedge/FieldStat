@@ -18,6 +18,8 @@
 #include "tags/sorted_set.h"
 #include "tags/my_ut_hash.h"
 
+#define assert(s) do { if (!(s)) { printf("assert failed: %s\n", #s); exit(1); } } while (0)
+
 struct Bucket {
     unsigned int finger_print;
     unsigned count; // the actual count, sum of all uuid_hash_node->count
