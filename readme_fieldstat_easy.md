@@ -58,9 +58,10 @@ The following is prometheus exporter command line example.
 The following is fieldstat prometheus exporter help info.
 ```txt
 [root@localhost bin]# ./fieldstat_exporter prometheus --help
-usage: fieldstat_exporter prometheus [-h] [-b HIST_BINS] [-f HIST_FORMAT]
-                                     [-j JSON_PATH] [-p LISTEN_PORT]
-                                     [-u URI_PATH]
+usage: fieldstat_exporter.py prometheus [-h] [-b HIST_BINS] [-f HIST_FORMAT]
+                                        [-j JSON_PATHS [JSON_PATHS ...]]
+                                        [-d DIRS [DIRS ...]] [-p LISTEN_PORT]
+                                        [-u URI_PATH]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -68,13 +69,16 @@ optional arguments:
                         The metrics of histogram type output bins.
   -f HIST_FORMAT, --hist-format HIST_FORMAT
                         The metrics of histogram type output format.
-  -j JSON_PATH, --json-path JSON_PATH
-                        The input fieldstat metrics json file path.
+  -j JSON_PATHS [JSON_PATHS ...], --json-paths JSON_PATHS [JSON_PATHS ...]
+                        The input fieldstat metrics json file paths. Support
+                        multi path.
+  -d DIRS [DIRS ...], --dirs DIRS [DIRS ...]
+                        Specify input fieldstat metrics json file directories.
   -p LISTEN_PORT, --listen-port LISTEN_PORT
                         Specify the prometheus endpoint port to listen. i.e.,
-                        80,8080
+                        80,8080. The default is 8080.
   -u URI_PATH, --uri-path URI_PATH
-                        Specify the prometheus endpoint uri path
+                        Specify the prometheus endpoint uri path.
 ```
 The prometheus exporter optional arguments default values.
 args|default value
@@ -91,11 +95,13 @@ The following is local exporter command line example.
 The following is fieldstat local exporter help info.
 ```txt
 [root@localhost bin]# ./fieldstat_exporter local --help
-usage: fieldstat_exporter local [-h] [-b HIST_BINS] [-f HIST_FORMAT]
-                                [-j JSON_PATH] [-i INTERVAL] [-l]
-                                [--clear-screen] [--display-hll]
-                                [--display-hist] [--display-counter]
-                                [-m MATCH_TAGS]
+usage: fieldstat_exporter.py local [-h] [-b HIST_BINS] [-f HIST_FORMAT]
+                                   [-j JSON_PATHS [JSON_PATHS ...]]
+                                   [-d DIRS [DIRS ...]] [-i INTERVAL] [-l]
+                                   [--clear-screen] [--display-hll]
+                                   [--display-hist] [--display-counter]
+                                   [-m MATCH_TAGS] [-t TEMPLATE]
+                                   [--scientific-form]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -103,21 +109,23 @@ optional arguments:
                         The metrics of histogram type output bins.
   -f HIST_FORMAT, --hist-format HIST_FORMAT
                         The metrics of histogram type output format.
-  -j JSON_PATH, --json-path JSON_PATH
-                        The input fieldstat metrics json file path.
+  -j JSON_PATHS [JSON_PATHS ...], --json-paths JSON_PATHS [JSON_PATHS ...]
+                        The input fieldstat metrics json file paths. Support
+                        multi path.
+  -d DIRS [DIRS ...], --dirs DIRS [DIRS ...]
+                        Specify input fieldstat metrics json file directories.
   -i INTERVAL, --interval INTERVAL
                         interval, seconds to wait between print.
   -l, --loop            print loop, exit when recv a signal.
-  --clear-screen        clear screen at start of loop.
-  --display-hll         Display hyperloglog type metrics.
-  --display-hist        Display histogram type metrics.
-  --display-counter     Display counter type metrics.
-  --disable-table       disable display table format.
+  --clear-screen        clear screen at start of loop
+  --display-hll         Display hyperloglog type metrics
+  --display-hist        Display histogram type metrics
+  --display-counter     Display counter type metrics
   -m MATCH_TAGS, --match-tags MATCH_TAGS
                         Display the tags match metrics
   -t TEMPLATE, --template TEMPLATE
                         Specify the print template with jinja2.
-  --scientific-form     Output the value in scientific notation.
+  --scientific-form     Output the counter type value in scientific notation.
 ```
 The local exporter optional arguments default values.
 args|default value
