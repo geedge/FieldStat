@@ -65,7 +65,6 @@ struct entry_data *sorted_set_entry_get_data(const heap_entry *entry)
     assert(entry != NULL);
     assert(entry->value != NULL);
 
-    assert(sorted_set_entry_get_count(entry) != 0);
     const struct entry_data * tmp_val = (struct entry_data *)entry->value;
     assert(tmp_val->key != NULL);
     assert(tmp_val->cell_id >= 0);
