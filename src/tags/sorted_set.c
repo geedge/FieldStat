@@ -11,7 +11,10 @@
 #include "sorted_set.h"
 #include "my_ut_hash.h"
 
-#define assert(s) do { if (!(s)) { printf("assert failed: %s\n", #s); exit(1); } } while (0)
+#define assert(s) do { if (!(s)) { printf("assert failed: %s\n", #s);   \
+        *((int *)0) = 0;   \
+    } \
+    } while (0)
 
 struct entry_data {
     struct tag_hash_key *key;

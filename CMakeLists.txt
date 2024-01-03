@@ -61,6 +61,7 @@ if (CMAKE_CXX_CPPCHECK)
             "--suppress=shadowFunction"
             "--suppress=shiftTooManyBitsSigned"
             "--suppress=preprocessorErrorDirective"
+            "--suppress=nullPointer"
             "--inline-suppr"
             "--suppress=*:${PROJECT_SOURCE_DIR}/vendors/*"
             "--suppress=*:${PROJECT_SOURCE_DIR}/test/utils.hpp"

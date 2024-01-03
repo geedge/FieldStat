@@ -18,7 +18,10 @@
 #include "tags/sorted_set.h"
 #include "tags/my_ut_hash.h"
 
-#define assert(s) do { if (!(s)) { printf("assert failed: %s\n", #s); exit(1); } } while (0)
+#define assert(s) do { if (!(s)) { printf("assert failed: %s\n", #s);   \
+        *((int *)0) = 0;   \
+    } \
+    } while (0)
 
 struct Bucket {
     unsigned int finger_print;
