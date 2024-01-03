@@ -585,11 +585,6 @@ int check_before_add(const struct fieldstat *instance, int cube_id, int metric_i
 
 int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long increment)
 {
-    
-// todo: 可能可以在每次操作的时候，都和之前比一次cell id对应的tag，如果tag对上了，就沿用上次的cell id。
-// 也许吧。
-// 作为一个方案，看看情况
-
     int ret = check_before_add(instance, cube_id, metric_id, METRIC_TYPE_COUNTER);
     if (ret != FS_OK) {
         return ret;

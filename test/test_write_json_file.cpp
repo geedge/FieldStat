@@ -135,42 +135,42 @@ static struct fieldstat *get_hist_fieldstat()
     return instance;
 }
 
-static struct fieldstat_easy *get_table_fieldstat_easy()
-{
-    struct fieldstat_tag global_tags[2];
-    struct fieldstat_tag cell_tags;
+// static struct fieldstat_easy *get_table_fieldstat_easy()
+// {
+//     struct fieldstat_tag global_tags[2];
+//     struct fieldstat_tag cell_tags;
 
-    global_tags[0].key  = "policy_id";
-    global_tags[0].type = TAG_INTEGER;
-    global_tags[0].value_longlong = 1;
-    global_tags[1].key  = "quanlity";
-    global_tags[1].type = TAG_DOUBLE;
-    global_tags[1].value_double = 0.5;
+//     global_tags[0].key  = "policy_id";
+//     global_tags[0].type = TAG_INTEGER;
+//     global_tags[0].value_longlong = 1;
+//     global_tags[1].key  = "quanlity";
+//     global_tags[1].type = TAG_DOUBLE;
+//     global_tags[1].value_double = 0.5;
 
-    const char *cell_tag_value[] = {
-        "sum", "SECURITY-EVENT", "SESSION-RECORD", "INTERNAL-RTP-RECORD",
-        "VOIP-RECORD", "INTERIM-SESSION-RECORD", "TRANSACTION-RECORD",
-        "GTPC-RECORD", "BGP-RECORD", "PROXY-EVENT", "DOS-SKETCH-RECORD",
-        "STATISTICS-RULE-METRIC", "OBJECT-STATISTICS-METRIC"};
+//     const char *cell_tag_value[] = {
+//         "sum", "SECURITY-EVENT", "SESSION-RECORD", "INTERNAL-RTP-RECORD",
+//         "VOIP-RECORD", "INTERIM-SESSION-RECORD", "TRANSACTION-RECORD",
+//         "GTPC-RECORD", "BGP-RECORD", "PROXY-EVENT", "DOS-SKETCH-RECORD",
+//         "STATISTICS-RULE-METRIC", "OBJECT-STATISTICS-METRIC"};
 
-    cell_tags.key  = "send_log";
-    cell_tags.type = TAG_CSTRING;
-    cell_tags.value_str = "true";
+//     cell_tags.key  = "send_log";
+//     cell_tags.type = TAG_CSTRING;
+//     cell_tags.value_str = "true";
 
-    struct fieldstat_easy *fse = fieldstat_easy_new(N_THREAD, NULL, global_tags, 2);
-    int counter_id_0 = fieldstat_easy_register_counter(fse, "T_success_log");
-    int counter_id_1 = fieldstat_easy_register_counter(fse, "T_fail_log");
+//     struct fieldstat_easy *fse = fieldstat_easy_new(N_THREAD, NULL, global_tags, 2);
+//     int counter_id_0 = fieldstat_easy_register_counter(fse, "T_success_log");
+//     int counter_id_1 = fieldstat_easy_register_counter(fse, "T_fail_log");
 
-    for(unsigned int i = 0; i < sizeof(cell_tag_value)/sizeof(cell_tag_value[0]); i++)
-    {
-        cell_tags.value_str = cell_tag_value[i];
-        fieldstat_easy_counter_incrby(fse, rand()%N_THREAD, counter_id_0, &cell_tags, 1, 1);
-        if(i < 5)
-            fieldstat_easy_counter_incrby(fse, rand()%N_THREAD, counter_id_1, &cell_tags, 1, 2);
-    }
+//     for(unsigned int i = 0; i < sizeof(cell_tag_value)/sizeof(cell_tag_value[0]); i++)
+//     {
+//         cell_tags.value_str = cell_tag_value[i];
+//         fieldstat_easy_counter_incrby(fse, rand()%N_THREAD, counter_id_0, &cell_tags, 1, 1);
+//         if(i < 5)
+//             fieldstat_easy_counter_incrby(fse, rand()%N_THREAD, counter_id_1, &cell_tags, 1, 2);
+//     }
 
-    return fse;
-}
+//     return fse;
+// }
 
 void fieldstat_easy_to_file(struct fieldstat_easy *fse, const char *file_path)
 {

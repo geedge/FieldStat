@@ -173,6 +173,8 @@ static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_
             return 1; // the flow is in the sorted set. Use original cell id.
         }
 
+        assert(cell_id >= 0);
+        assert(tag != NULL);
         if (sorted_set_cardinality(heavy_keeper->top_K_heap) < heavy_keeper->K) {
             sorted_set_insert_and_record_popped_back(heavy_keeper->top_K_heap, tag, 0, cell_id, popped_id_out);
             return 0; // newly added
@@ -218,6 +220,8 @@ static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_
     unsigned int tmp_cnt = sorted_set_get_count(summary, tag);
     if (tmp_cnt == 0) {  // the flow is not in sorted set
         if ((maxv - nMin <= count && maxv != nMin) || sorted_set_cardinality(summary) != heavy_keeper->K) {
+            assert(cell_id >= 0);
+            assert(tag != NULL);
             int insert_ret = sorted_set_insert_and_record_popped_back(summary, tag, maxv, cell_id, &user_data_cube_id);
             if (insert_ret == 2) { // insert success and popped one
                 *popped_id_out = user_data_cube_id;
@@ -420,6 +424,8 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
     /* ------------------------------ merge dest ------------------------------ */
     for (int i = 0; i < size_dest; i++) {
         unsigned maxv = find_maxv_in_sketch(dest, tag_arr[i]);
+        assert(tag_arr[i] != NULL);
+        assert(cell_id_arr_dst[i] >= 0);
         sorted_set_insert(new_rec, tag_arr[i], maxv, cell_id_arr_dst[i]);
     }
 
@@ -433,6 +439,7 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
 
     for (int i = 0; i < size_src; i++) {
         const struct tag_hash_key *tag_src = tag_arr[i];
+        assert(tag_src != NULL);
 
         int cell_id_dest = sorted_set_get_cell_id(ss_dest, tag_src);
         int cell_id_src = cell_id_arr_src[i];
@@ -449,6 +456,8 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
         int popped_id = -1;
         int now_idx = next_idx;
         int find_id = find_next_unused_cell_id(cell_id_arr_dst, size_dest, last_find_id, &now_idx);
+        assert(find_id >= 0);
+        assert(now_idx >= 0);
         int tmp_ret = sorted_set_insert_and_record_popped_back(new_rec, tag_src, maxv, find_id, &popped_id);
         if (tmp_ret == 2) { // insert success and popped one.
             cell_id_popped_from_dest_when_merge_src[cell_id_popped_from_dest_when_merge_src_len++] = popped_id;
