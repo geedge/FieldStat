@@ -239,11 +239,11 @@ TEST(test_easy_fieldstat, accuracy_in_multithread)
 
     std::thread threads[N_THREADS];
     for (int thread_id = 0; thread_id < N_THREADS; thread_id++) {
-        threads[thread_id] = std::thread([fse]() {
+        threads[thread_id] = std::thread([thread_id]() {
             for (size_t i = 0; i < 2000000ULL; i++) { // 1 million times
                 // fieldstat_easy_counter_incrby(fse, thread_id, counter_id, &TEST_TAG_INT, 1, 1);
                 if (i % 500000 == 0) {
-                    printf("i: %zu\n", i);
+                    printf("thread_id: %d, i: %zu\n", thread_id, i);
                 }
             }
         });
