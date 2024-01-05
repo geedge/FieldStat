@@ -221,6 +221,25 @@ TEST(test_easy_fieldstat, reset)
     fieldstat_easy_free(fse);
 }
 
+long long get_value(const char *input, const char *key) {
+    std::string input_str(input);
+    size_t start_pos = input_str.find(key);
+    if (start_pos == std::string::npos) {
+        printf("key not found\n");
+        return -1;
+    }
+
+    size_t end_pos = input_str.find("}", start_pos);
+    if (end_pos == std::string::npos) {
+        printf("end not found\n");
+        return -1;
+    }
+
+    std::string value_str = input_str.substr(start_pos + strlen(key) + 2, end_pos - start_pos - strlen(key) - 1); // +2 for ':{'
+    printf("value_str: %s\n", value_str.c_str());
+    return std::stoll(value_str);
+}
+
 // issue：  调用环境为多线程 调用环境为多线程写 ， 没有开启后台线程输出 一个后台线程输出 。 而是使用 没有开启fieldstat的后台线程输出。而是自己启用一个线程，使用 ’fieldstat_easy_output_array‘输出，输出周期1s一次
 // 输到数据库中的统计小于实际incrby的调用次数
 TEST(test_easy_fieldstat, accuracy_in_multithread)
@@ -232,7 +251,7 @@ TEST(test_easy_fieldstat, accuracy_in_multithread)
     std::thread threads[N_THREADS];
     for (int thread_id = 0; thread_id < N_THREADS; thread_id++) {
         threads[thread_id] = std::thread([fse, counter_id, thread_id]() {
-            for (size_t i = 0; i < 100000ULL; i++) { // 1 million times
+            for (size_t i = 0; i < 2000000ULL; i++) { // 1 million times
                 fieldstat_easy_counter_incrby(fse, thread_id, counter_id, &TEST_TAG_INT, 1, 1);
             }
         });
@@ -251,19 +270,9 @@ TEST(test_easy_fieldstat, accuracy_in_multithread)
         if (n_objects == 0) {
             continue;
         }
-        std::string input(objects[0]);
 
-        std::sregex_iterator iter(input.begin(), input.end(), pattern);
-        std::sregex_iterator end;
-        if (iter != end) {
-            for (; iter != end; iter++) {
-                std::smatch match = *iter;
-                total_hit_number += std::stoll(match[1]);
-            }
-        } else {
-            printf("no match, %s\n", objects[0]);
-        }
-
+        total_hit_number += get_value(objects[0], "hit number");
+        
         free(objects[0]);
         free(objects);
     }
@@ -272,7 +281,7 @@ TEST(test_easy_fieldstat, accuracy_in_multithread)
         threads[i].join();
     }
 
-    EXPECT_EQ(total_hit_number, 1000000ULL); // 1 million * 10 threads
+    EXPECT_EQ(total_hit_number, 20000000ULL); // 2 million * 10 threads
 
     fieldstat_easy_free(fse);
 }
