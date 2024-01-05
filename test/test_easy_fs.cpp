@@ -235,7 +235,7 @@ long long get_value(const char *input, const char *key) {
         return -1;
     }
 
-    std::string value_str = input_str.substr(start_pos + strlen(key) + 2, end_pos - start_pos - strlen(key) - 1); // +2 for ':{'
+    std::string value_str = input_str.substr(start_pos + strlen(key) + 2, end_pos - start_pos - strlen(key) - 2); // +2 for ':{'
     printf("value_str: %s\n", value_str.c_str());
     return std::stoll(value_str);
 }
