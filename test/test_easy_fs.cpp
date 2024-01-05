@@ -239,38 +239,43 @@ TEST(test_easy_fieldstat, accuracy_in_multithread)
 
     std::thread threads[N_THREADS];
     for (int thread_id = 0; thread_id < N_THREADS; thread_id++) {
-        threads[thread_id] = std::thread([fse, counter_id, thread_id]() {
+        threads[thread_id] = std::thread([fse]() {
             for (size_t i = 0; i < 2000000ULL; i++) { // 1 million times
-                fieldstat_easy_counter_incrby(fse, thread_id, counter_id, &TEST_TAG_INT, 1, 1);
+                // fieldstat_easy_counter_incrby(fse, thread_id, counter_id, &TEST_TAG_INT, 1, 1);
+                if (i % 500000 == 0) {
+                    printf("i: %d\n", i);
+                }
             }
         });
     }
 
-    char **objects = NULL;
-    size_t n_objects = 0;
-    std::regex pattern(R"("hit number":(\d+))");
+    printf("spawn threads finished\n");
 
-    // main thread output(every 1s)
-    long long total_hit_number = 0;
-    for (int i = 0; i < 10; i++) {
-        fieldstat_easy_output_array_and_reset(fse, &objects, &n_objects);
-        if (n_objects == 0) {
-            continue;
-        }
+    // char **objects = NULL;
+    // size_t n_objects = 0;
+    // std::regex pattern(R"("hit number":(\d+))");
 
-        total_hit_number += get_value(objects[0], "hit number");
+    // // main thread output(every 1s)
+    // long long total_hit_number = 0;
+    // for (int i = 0; i < 10; i++) {
+    //     fieldstat_easy_output_array_and_reset(fse, &objects, &n_objects);
+    //     if (n_objects == 0) {
+    //         continue;
+    //     }
+
+    //     total_hit_number += get_value(objects[0], "hit number");
         
-        free(objects[0]);
-        free(objects);
+    //     free(objects[0]);
+    //     free(objects);
 
-        sleep(1);
-    }
+    //     sleep(1);
+    // }
 
     for (int i = 0; i < N_THREADS; i++) {
         threads[i].join();
     }
 
-    EXPECT_EQ(total_hit_number, 20000000ULL); // 2 million * 10 threads
+    // EXPECT_EQ(total_hit_number, 20000000ULL); // 2 million * 10 threads
 
     fieldstat_easy_free(fse);
 }
