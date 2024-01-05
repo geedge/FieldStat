@@ -222,22 +222,11 @@
 // }
 
 long long get_value(const char *input, const char *key) {
-    std::string input_str(input);
-    size_t start_pos = input_str.find(key);
-    if (start_pos == std::string::npos) {
-        printf("key not found\n");
-        return -1;
-    }
-
-    size_t end_pos = input_str.find("}", start_pos);
-    if (end_pos == std::string::npos) {
-        printf("end not found\n");
-        return -1;
-    }
-
-    std::string value_str = std::string(input_str.begin() + start_pos + strlen(key) + 2, input_str.begin() + end_pos);
-    printf("value_str: %s\n", value_str.c_str());
-    return std::stoll(value_str);
+    cJSON *root = cJSON_Parse(input);
+    cJSON *metric = cJSON_GetObjectItem(root, "fields");
+    long long value = cJSON_GetObjectItem(metric, key)->valueint;
+    cJSON_Delete(root);
+    return value;
 }
 
 // issue：  调用环境为多线程 调用环境为多线程写 ， 没有开启后台线程输出 一个后台线程输出 。 而是使用 没有开启fieldstat的后台线程输出。而是自己启用一个线程，使用 ’fieldstat_easy_output_array‘输出，输出周期1s一次
