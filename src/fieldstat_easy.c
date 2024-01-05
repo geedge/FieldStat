@@ -279,7 +279,7 @@ void fieldstat_easy_output(struct fieldstat_easy *fse, char **buff, size_t *buff
     *buff_len = strlen(*buff);
 }
 
-// output many json string for accumulated data(many objects vs array)
+// output many json string for accumulated data(many objects as elements in an array)
 void fieldstat_easy_output_array(struct fieldstat_easy *fse, char ***json_objects, size_t *n_object)
 {
     struct timeval timestamp = get_current_timestamp();
@@ -287,6 +287,28 @@ void fieldstat_easy_output_array(struct fieldstat_easy *fse, char ***json_object
 
     fieldstat_json_exporter_export_array(fse->exporter, dst, &timestamp, json_objects, n_object);
     fieldstat_free(dst);
+}
+
+int fieldstat_easy_output_array_and_reset(struct fieldstat_easy *fse, char ***json_objects, size_t *n_object)
+{
+    if (fse->output_thread_running) {
+        printf("fieldstat_easy_output_array_and_reset: reset is not allowed when auto output is enabled.\n");
+        return -1;
+    }
+
+    struct fieldstat *dst = fieldstat_new();
+    for (int i = 0; i < fse->max_thread_num; i++) {
+        pthread_spin_lock(&fse->fsu[i].lock);
+        fieldstat_merge(dst, fse->fsu[i].active);
+        fieldstat_reset(fse->fsu[i].active);
+        pthread_spin_unlock(&fse->fsu[i].lock);
+    }
+
+    struct timeval timestamp = get_current_timestamp();
+    fieldstat_json_exporter_export_array(fse->exporter, dst, &timestamp, json_objects, n_object);
+    fieldstat_free(dst);
+
+    return 0;
 }
 
 int fieldstat_easy_counter_incrby(struct fieldstat_easy *fse, int thread_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long increment)
@@ -319,25 +341,4 @@ int fieldstat_easy_histogram_record(struct fieldstat_easy *fse, int thread_id, i
     pthread_spin_unlock(&fse->fsu[thread_id].lock);
 
     return ret;
-}
-
-int fieldstat_easy_reset(struct fieldstat_easy *fse)
-{
-    // We can't let the user reset operation affects auto passive output, just let it fail.
-    if (fse->output_thread_running) {
-        printf("fieldstat_easy_reset: reset is not allowed when auto output is enabled.\n");
-        return -1;
-    }
-
-    for (int i = 0; i < fse->max_thread_num; i++) {
-        pthread_spin_lock(&fse->fsu[i].lock);
-        fieldstat_reset(fse->fsu[i].active);
-        // fsu.read_only: Only for output_to_file.
-        pthread_spin_unlock(&fse->fsu[i].lock);
-    }
-
-    // accumulate: Only has data when output_to_file.
-    // delta: Only for output_to_file.
-
-    return 0;
 }
