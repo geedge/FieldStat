@@ -248,25 +248,27 @@ TEST(test_easy_fieldstat, accuracy_in_multithread)
 
     printf("spawn threads finished\n");
 
-    // char **objects = NULL;
-    // size_t n_objects = 0;
-    // std::regex pattern(R"("hit number":(\d+))");
+    char **objects = NULL;
+    size_t n_objects = 0;
+    // main thread output(every 1s)
+    long long total_hit_number = 0;
+    for (int i = 0; i < 10; i++) {
+        printf("output %d 1\n", i);
+        fieldstat_easy_output_array_and_reset(fse, &objects, &n_objects);
+        if (n_objects == 0) {
+            continue;
+        }
+        printf("output %d 2\n", i);
 
-    // // main thread output(every 1s)
-    // long long total_hit_number = 0;
-    // for (int i = 0; i < 10; i++) {
-    //     fieldstat_easy_output_array_and_reset(fse, &objects, &n_objects);
-    //     if (n_objects == 0) {
-    //         continue;
-    //     }
+        total_hit_number += get_value(objects[0], "hit number");
+        printf("output %d 3\n", i);
 
-    //     total_hit_number += get_value(objects[0], "hit number");
         
-    //     free(objects[0]);
-    //     free(objects);
+        free(objects[0]);
+        free(objects);
 
-    //     sleep(1);
-    // }
+        sleep(1);
+    }
 
     sleep(10); // wait for other threads to finish
 
