@@ -50,9 +50,9 @@ int fieldstat_easy_register_histogram(struct fieldstat_easy *fse, const char *na
 void fieldstat_easy_output(struct fieldstat_easy *fse, char **buff, size_t *buff_len);
 void fieldstat_easy_output_array(struct fieldstat_easy *fse, char ***json_objects, size_t *n_object);
 /*
-    Do fieldstat_easy_output_array and then reset the instance. 
+    Call fieldstat_easy_output_array and then reset the instance. 
     Will fail and return -1 if fieldstat_easy_enable_auto_output is called, since the behavior is hard to define. Return 0 if success.
-    The thread will be blocked until the output is finished.
+    The thread will be blocked until output is finished.
 */
 int fieldstat_easy_output_array_and_reset(struct fieldstat_easy *fse, char ***json_objects, size_t *n_object);
 /*

@@ -81,8 +81,6 @@ struct cell_iter {
     const struct fieldstat *instance;
 };
 
-// todo: 这个结构体太突兀了，就简简单单带上全量metric id，不带cjson_fields。
-// 之后是要拼fields呢，还是只用counter数据写入到history里呢，是之后的事
 struct cellwise_rec_for_export {
     struct json_writer *cjson_tags;
     struct export_kv_pair **metric_pairs;
@@ -452,7 +450,7 @@ void couple_export_table_free(struct couple_export_table *tbl)
 // align delta fields to acc fields by matching tag json string, return an array with length n_acc, each of whose element match the corresponding acc element by both tag and index
 const struct cellwise_rec_for_export **rearrange_metric_delta(const struct cellwise_rec_for_export *acc, size_t n_acc, const struct cellwise_rec_for_export *delta, size_t n_delta)
 {
-    struct couple_export_table *map = couple_export_table_new(); // todo: 这个map更新放到exporter里，不要每次都new
+    struct couple_export_table *map = couple_export_table_new();
     for (int i = 0; i < n_delta; i++) {
         const char *tag_json = json_writer_unwrap(delta[i].cjson_tags);
         if (tag_json == NULL) { // tag might be empty, give it a dummy name

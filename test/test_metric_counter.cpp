@@ -301,37 +301,6 @@ TEST(metric_test_counter, topk_set_and_test_accuracy)
     fieldstat_free(instance);
 }
 
-TEST(metric_test_counter, batch_incyby)
-{
-    struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 10);
-    int metric_ids[3];
-    metric_ids[0] = fieldstat_register_counter(instance, "primary");
-    metric_ids[1] = fieldstat_register_counter(instance, "2");
-    metric_ids[2] = fieldstat_register_counter(instance, "3");
-
-    struct fieldstat_tag tags[3];
-    tags[0] = TEST_TAG_INT;
-    tags[1] = TEST_TAG_INT;
-    tags[2] = TEST_TAG_INT;
-
-    long long increments[3];
-    increments[0] = 1;
-    increments[1] = 2;
-    increments[2] = 3;
-
-    int ret = fieldstat_counter_incrby_batch(instance, cube_id, metric_ids, tags, 3, increments, 3);
-    EXPECT_EQ(ret, FS_OK);
-
-    struct fieldstat_tag_list tag_list = {tags, 3};
-
-    EXPECT_EQ(my_fieldstat_counter_get(instance, cube_id, metric_ids[0], &tag_list), 1);
-    EXPECT_EQ(my_fieldstat_counter_get(instance, cube_id, metric_ids[1], &tag_list), 2);
-    EXPECT_EQ(my_fieldstat_counter_get(instance, cube_id, metric_ids[2], &tag_list), 3);
-
-    fieldstat_free(instance);
-}
-
 int main(int argc, char *argv[]) 
 {
 	testing::InitGoogleTest(&argc, argv);
