@@ -243,7 +243,7 @@ TEST(test_easy_fieldstat, accuracy_in_multithread)
             for (size_t i = 0; i < 2000000ULL; i++) { // 1 million times
                 // fieldstat_easy_counter_incrby(fse, thread_id, counter_id, &TEST_TAG_INT, 1, 1);
                 if (i % 500000 == 0) {
-                    printf("i: %d\n", i);
+                    printf("i: %zu\n", i);
                 }
             }
         });
