@@ -268,6 +268,8 @@ TEST(test_easy_fieldstat, accuracy_in_multithread)
     //     sleep(1);
     // }
 
+    sleep(10); // wait for other threads to finish
+
     for (int i = 0; i < N_THREADS; i++) {
         threads[i].join();
     }
