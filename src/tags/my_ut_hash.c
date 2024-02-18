@@ -232,9 +232,15 @@ unsigned tag_hash_key_cal_hash_val(const struct tag_hash_key *tag, unsigned seed
     if (seed == 0) { // use default seed
         return tag->hashv;
     }
-    XXH128_hash_t hashv = cal_tag_hash_xxhash128(tag->tags, tag->n_my_tag, seed);
-    
-    return hashv.high64;
+
+    // https://www.eecs.harvard.edu/~michaelm/postscripts/tr-02-05.pdf
+    // A technique from the hashing literature is to use two hash functions h1(x) and h2(x) to simulate additional hash functions of the form gi(x) = h1(x) + ih2(x)
+    // Assuming that the 128-bit xxhash function is perfect, we can view it as a combination of two 64-bit hash functions.
+    unsigned h1 = (unsigned)tag->hashv128.high64;
+    unsigned h2 = (unsigned)tag->hashv128.low64;
+    unsigned ret = h1 + seed * h2;
+
+    return ret;
 }
 
 void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_tags, char **out_key, size_t *out_key_size)

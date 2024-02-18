@@ -97,6 +97,23 @@ TEST(test_register, reset_and_try_to_query_cell)
     fieldstat_free(instance);
 }
 
+TEST(test_register, reset_and_new_cell)
+{
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 2);
+    int metric_id = fieldstat_register_counter(instance, "counter");
+    fieldstat_counter_incrby(instance, cube_id, metric_id, &TEST_TAG_INT, 1, 1);
+    fieldstat_counter_incrby(instance, cube_id, metric_id, &TEST_TAG_DOUBLE, 1, 1);
+    int ret = fieldstat_counter_incrby(instance, cube_id, metric_id, &TEST_TAG_STRING, 1, 1);
+    EXPECT_EQ(ret, FS_ERR_TOO_MANY_CELLS);
+
+    fieldstat_reset(instance);
+    ret = fieldstat_counter_incrby(instance, cube_id, metric_id, &TEST_TAG_STRING, 1, 1);
+    EXPECT_EQ(ret, FS_OK);
+
+    fieldstat_free(instance);
+}
+
 TEST(test_register, register_many_cubes)
 {
     struct fieldstat *instance = fieldstat_new();
