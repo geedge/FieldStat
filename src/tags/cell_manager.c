@@ -81,11 +81,11 @@ void tag_id_map_free(struct tag_id_map *head)
 
 void cell_manager_reset(struct cell_manager *pthis)
 {
+    memset(pthis->id_tag_array, 0, sizeof(struct tag_hash_key *) * (pthis->max_cell_id + 1));
     pthis->next_cell_id = 0;
     pthis->max_cell_id = -1;
     pthis->current_cell_num = 0;
-    memset(pthis->id_tag_array, 0, sizeof(struct tag_hash_key *) * (pthis->max_cell_id + 1));
-
+    
     if (pthis->sampling_mode == SAMPLING_MODE_TOPK) {
         heavy_keeper_reset(pthis->topk_tag_id_map);
         return;
