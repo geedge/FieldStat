@@ -310,6 +310,15 @@ int cell_manager_find(const struct cell_manager *pthis, const struct tag_hash_ke
 void cell_manager_merge_topk(struct cell_manager *dest, const struct cell_manager *src, 
     int **cell_id_popped, int *n_cell_id_popped, int **cell_id_old, int **cell_id_added, int *n_cell_id_added)
 {
+    // empty src: return directly
+    if (heavy_keeper_get_cardinality(src->topk_tag_id_map) == 0) {
+        *n_cell_id_popped = 0;
+        *n_cell_id_added = 0;
+        *cell_id_popped = NULL;
+        *cell_id_old = NULL;
+        *cell_id_added = NULL;
+        return;
+    }
     heavy_keeper_merge_recording_id_details(dest->topk_tag_id_map, src->topk_tag_id_map, 
         cell_id_popped, n_cell_id_popped, cell_id_old, cell_id_added, n_cell_id_added);
 

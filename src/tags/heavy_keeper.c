@@ -101,6 +101,9 @@ struct heavy_keeper *heavy_keeper_with_data_new(int max_query_num) {
 }
 
 void heavy_keeper_reset(struct heavy_keeper *hk) {
+    if (heavy_keeper_get_cardinality(hk) == 0) {
+        return;
+    }
     memset(hk->sketch, 0, (size_t)hk->params.array_num * (size_t)hk->params.max_bucket_num * sizeof(struct Bucket));
     sorted_set_reset(hk->top_K_heap);
 }
