@@ -160,6 +160,55 @@ TEST(test_performance, merge_performance_one_instance_topk_counter_full_dest)
     EXPECT_TRUE(elapsed < 2);
 }
 
+struct fieldstat *construct_fs_with_many_empty_cubes(int cube_num, int metric_num, enum sampling_mode mode)
+{
+    struct fieldstat *instance = fieldstat_new();
+    struct fieldstat_tag tmp_tag = TEST_TAG_INT;
+    for (int i = 0; i < cube_num; i++) {
+        tmp_tag.value_longlong = i;
+        fieldstat_create_cube(instance, &tmp_tag, 1, mode, 1000);
+
+        for (int j = 0; j < metric_num; j++) {
+            fieldstat_register_counter(instance, std::to_string(j).c_str());
+        }
+    }
+    return instance;
+}
+
+TEST(test_performance, merge_empty_cubes_comprehensive)
+{
+    struct fieldstat *instance = construct_fs_with_many_empty_cubes(1000, 10, SAMPLING_MODE_COMPREHENSIVE); // many empty cubes, 10 metrics is a common case
+    
+    struct fieldstat *instance_dest = fieldstat_fork(instance);
+    clock_t start = clock();
+    fieldstat_merge(instance_dest, instance);
+    clock_t end = clock();
+
+    double seconds = (double)(end - start) / 1000;
+    printf("merge_empty_cubes_comprehensive time cost: %f s\n", seconds);
+    EXPECT_TRUE(seconds < 1);
+
+    fieldstat_free(instance);
+    fieldstat_free(instance_dest);
+}
+
+TEST(test_performance, merge_empty_cubes_topk)
+{
+    struct fieldstat *instance = construct_fs_with_many_empty_cubes(1000, 10, SAMPLING_MODE_TOPK); // many empty cubes, 10 metrics is a common case
+    
+    struct fieldstat *instance_dest = fieldstat_fork(instance);
+    clock_t start = clock();
+    fieldstat_merge(instance_dest, instance);
+    clock_t end = clock();
+
+    double seconds = (double)(end - start) / 1000;
+    printf("merge_empty_cubes_topk time cost: %f s\n", seconds);
+    EXPECT_TRUE(seconds < 1);
+
+    fieldstat_free(instance);
+    fieldstat_free(instance_dest);
+}
+
 /* -------------------------------------------------------------------------- */
 /*                                     add                                    */
 /* -------------------------------------------------------------------------- */
@@ -400,6 +449,78 @@ TEST(test_performance, export_many_cells)
     for (int i = 0; i < TAG_NUM; i++) {
         delete tags[i];
     }
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                reset related                                */
+/* -------------------------------------------------------------------------- */
+TEST(test_performance, reset_empty_cubes_comprehensive)
+{
+    struct fieldstat *instance = construct_fs_with_many_empty_cubes(1000, 10, SAMPLING_MODE_COMPREHENSIVE); // many empty cubes, 10 metrics is a common case
+    clock_t start = clock();
+    fieldstat_reset(instance);
+    clock_t end = clock();
+
+    double seconds = (double)(end - start) / 1000;
+    printf("reset_empty_cubes_comprehensive time cost: %f s\n", seconds);
+    EXPECT_TRUE(seconds < 1);
+    fieldstat_free(instance);
+}
+
+TEST(test_performance, reset_empty_cubes_topk)
+{
+    struct fieldstat *instance = construct_fs_with_many_empty_cubes(1000, 10, SAMPLING_MODE_TOPK); // many empty cubes, 10 metrics is a common case
+    clock_t start = clock();
+    fieldstat_reset(instance);
+    clock_t end = clock();
+
+    double seconds = (double)(end - start) / 1000;
+    printf("reset_empty_cubes_topk time cost: %f s\n", seconds);
+    EXPECT_TRUE(seconds < 1);
+    fieldstat_free(instance);
+}
+
+TEST(test_performance, callibrate_unchanged)
+{
+    struct fieldstat *instance = construct_fs_with_many_empty_cubes(1000, 10, SAMPLING_MODE_COMPREHENSIVE); // many empty cubes, 10 metrics is a common case
+
+    struct fieldstat *instance_dest = fieldstat_fork(instance);
+    clock_t start = clock();
+    fieldstat_calibrate(instance_dest, instance);
+    clock_t end = clock();
+
+    double seconds = (double)(end - start) / 1000;
+    printf("callibrate_unchanged time cost: %f s\n", seconds);
+    EXPECT_TRUE(seconds < 1);
+    fieldstat_free(instance);
+    fieldstat_free(instance_dest);
+}
+
+struct fieldstat *construct_fs_with_many_cells(int cell_num, enum sampling_mode mode)
+{
+    struct fieldstat *instance = fieldstat_new();
+    fieldstat_create_cube(instance, &TEST_TAG_INT, 1, mode, cell_num);
+    fieldstat_register_counter(instance, "test");
+    struct fieldstat_tag tmp_tag = TEST_TAG_INT;
+    for (int i = 0; i < cell_num; i++) {
+        tmp_tag.value_longlong = i;
+        fieldstat_counter_incrby(instance, 0, 0, &tmp_tag, 1, 1);
+    }
+
+    return instance;
+}
+
+TEST(test_performance, reset_many_cells)
+{
+    struct fieldstat *instance = construct_fs_with_many_cells(1000, SAMPLING_MODE_COMPREHENSIVE); // many empty cubes, 10 metrics is a common case
+    clock_t start = clock();
+    fieldstat_reset(instance);
+    clock_t end = clock();
+
+    double seconds = (double)(end - start) / 1000;
+    printf("reset_many_cells time cost: %f s\n", seconds);
+    EXPECT_TRUE(seconds < 1);
+    fieldstat_free(instance);
 }
 
 int main(int argc, char *argv[]) 
