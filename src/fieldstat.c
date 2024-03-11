@@ -229,7 +229,7 @@ void add_cube_to_position(struct fieldstat *instance, struct fs_cube *cube, int 
     }
     instance->cube[cube_id] = cube;
     instance->cube_version[cube_id] = 0;
-    instance->valid_cube_arr_length++;
+    instance->valid_cube_arr_length = cube_id + 1;
 
     cube_manager_add(instance->shared_tag_cube_manager, cube->key_tag, cube_id);
 }
@@ -239,6 +239,7 @@ int fieldstat_append_cube_to_instance(struct fieldstat *instance, struct fs_cube
     for (int i = 0; i < instance->valid_cube_arr_length; i++) {
         if (instance->cube[i] == NULL) {
             instance->cube[i] = cube;
+            cube_manager_add(instance->shared_tag_cube_manager, cube->key_tag, i);
             return i;
         }
     }

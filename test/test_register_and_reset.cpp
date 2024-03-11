@@ -48,6 +48,7 @@ TEST(test_register, delete_cube_and_register_and_origin_position)
     fieldstat_destroy_cube(instance, cube_id);
     cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
     EXPECT_EQ(cube_id, 0);
+    EXPECT_EQ(fieldstat_find_cube(instance, &TEST_SHARED_TAG, 1) , 0);
     fieldstat_free(instance);
 }
 
