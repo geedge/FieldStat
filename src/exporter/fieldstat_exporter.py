@@ -594,8 +594,16 @@ class LocalExporter:
 
     def build_not_table_format_exporter(self, json_objects):
         for item in json_objects:
-            timestamp_ms_delta = item["timestamp_ms_delta"]
-            fields_delta       = item["fields_delta"]
+            if "timestamp_ms_delta" not in item:
+                timestamp_ms_delta = 0
+            else:
+                timestamp_ms_delta = item["timestamp_ms_delta"]
+                
+            if "fields_delta" not in item:
+                fields_delta = None
+            else:
+                fields_delta = item["fields_delta"]
+
             tags_new           = self.__append_app_name_to_tags(item)
 
             for key,value in item["fields"].items():
@@ -618,8 +626,15 @@ class LocalExporter:
         for item in json_objects:
             tags   = item["tags"]
             fields = item["fields"]
-            fields_delta = item["fields_delta"]
-            interval_ms = item["timestamp_ms_delta"]
+            if "fields_delta" not in item:
+                fields_delta = None
+            else:
+                fields_delta = item["fields_delta"]
+            if "timestamp_ms_delta" not in item:
+                interval_ms = 0
+            else:
+                interval_ms = item["timestamp_ms_delta"]
+
             if table == None:
                 table = self.tftable.create_table(columns, enable_speed)
             
@@ -694,8 +709,6 @@ class LocalExporter:
                     if groupby != key:
                         new_fields["tags"].pop(key)
 
-            # if enable_speed == False:
-            #     new_fields["fields_delta"] = {}
 
             table_fields.append(new_fields)
         return self.build_table_format_exporter(table_fields, enable_speed, columns)
