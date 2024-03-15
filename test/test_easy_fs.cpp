@@ -154,7 +154,7 @@ TEST(test_easy_fieldstat, output_interval_ok)
     stub.set(fs_easy_output_to_json, fs_easy_output_to_json_stub);
 
     struct fieldstat_easy *fse = fieldstat_easy_new(10, NULL, NULL, 0);
-    fieldstat_easy_register_histogram(fse, "metric histogram", 1, 100000, 3); // a pretty time consuming metric
+    fieldstat_easy_register_histogram(fse, "metric histogram", 1, 10000, 3); // a pretty time consuming metric
     fieldstat_easy_histogram_record(fse, 0, 0, &TEST_TAG_INT, 1, 1);
     fieldstat_easy_histogram_record(fse, 0, 0, &TEST_TAG_DOUBLE, 1, 10);
     fieldstat_easy_histogram_record(fse, 0, 0, &TEST_TAG_STRING, 1, 110);

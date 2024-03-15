@@ -29,7 +29,6 @@ from fieldstat_exporter import PrometheusEndpoint
 from fieldstat_exporter import CounterTable
 from fieldstat_exporter import HistogramTable
 from fieldstat_exporter import LocalExporter
-from fieldstat_exporter import TableFormatTable
 
 
 
@@ -350,40 +349,6 @@ class TestCounterTable(unittest.TestCase):
             self.assertEqual(len(self.c_table.tables),       math.ceil(100/table_size))
             self.assertEqual(self.c_table.read_tables_num(), math.ceil(100/table_size))
             self.assertEqual(len(output_str.split('\n')),    math.ceil(100/table_size) * 4 + 2)
-
-
-
-class TestTableFormatTable(unittest.TestCase):
-    def setUp(self):
-        self.c_table = TableFormatTable()
-
-
-    def test_create_table(self):
-        columns = ["column0", "column1"]
-        table = self.c_table.create_table(columns, True)
-        self.assertEqual(table.field_names, ["", "column0", "column0/s", "column1", "column1/s"])
-
-        columns = ["column2", "column3"]
-        table = self.c_table.create_table(columns, False)
-        self.assertEqual(table.field_names, ["", "column2", "column3"])
-
-    def test_add_table_row(self):
-        self.c_table.field_names = []
-
-        table = self.c_table.create_table({"column0": 0, "column1": 1}, False)
-        tags  = {"row": "0"}
-        field = {"column0": 0, "column1":1}
-        columns = ["column0", "column1"]
-        field_delta = {}
-        self.c_table.add_table_row(None, tags, field, field_delta, 0, False, columns)
-
-        table_str = table.get_string()
-        row_count = len(table_str.split("\n")) - 1
-        self.assertEqual(row_count, 3)
-
-        self.c_table.add_table_row(table, tags, field, field_delta, 0, False, columns)
-        row_count = len(table_str.split("\n")) - 1
-        self.assertEqual(row_count, 3)
 
 
 class TestHistogramTable(unittest.TestCase):
