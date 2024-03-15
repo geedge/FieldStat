@@ -56,14 +56,19 @@ void fieldstat_easy_output_array(struct fieldstat_easy *fse, char ***json_object
 */
 int fieldstat_easy_output_array_and_reset(struct fieldstat_easy *fse, char ***json_objects, size_t *n_object);
 /*
-    * @brief let the value of counter metric of cell_id increase by `increment`.
+    * @brief let the value of counter metric of tags increase by `increment`.
     * @param thread_id: thread id. Must be in [0, max_thread_num).
-    * @param metric_id: metric id, previously returned by fieldstat_register_counter.
+    * @param metric_id: metric id, previously returned by fieldstat_easy_register_counter.
     * @param increment: increment of the counter metric. Can be negative.
-    * @return FS_OK if success. FS_ERR_NULL_HANDLER, FS_ERR_INVALID_CUBE_ID, FS_ERR_INVALID_METRIC_ID if fail.
-    * return -1 also when the thread_id is out of range.
+    * return -1 also when the thread_id is out of range.FS_ERR_INVALID_METRIC_ID metric_id is not registered.
 */
 int fieldstat_easy_counter_incrby(struct fieldstat_easy *fse, int thread_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long increment);
+/*
+    * @brief let the value of counter metric of tags equal to `value`.
+    *    for other notes, see fieldstat_easy_counter_incrby.
+    * The value will be output by summing each ones in different threads, exactly the same as values set by fieldstat_easy_counter_incrby.
+*/
+int fieldstat_easy_counter_set(struct fieldstat_easy *fse, int thread_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long value);
 /* 
     * @brief Add a value to the histogram metric of cell_id. Histogram will record the distribution of the values.
              The value bigger than highest_trackable_value will be set to highest_trackable_value. The value less than lowest_trackable_value will be tried to record, and, if succeed, remains in the record as -inf(most of the time) or 0(if value == 0)
