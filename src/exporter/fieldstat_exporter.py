@@ -1016,12 +1016,13 @@ class FieldstatExporter:
             parser.print_help()
             sys.exit(1)
 
+        if args.command == 'local' and args.th:
+            get_jinja_help(args)
+            sys.exit(0)
+
         self.__read_shared_args_value(args)
         self.__read_private_args_value(args)
 
-        if args.th:
-            get_jinja_help(args)
-            sys.exit(0)
 
     def __enable_prometheus_endpoint(self):
         server_address = ('', self.prom_listen_port)
