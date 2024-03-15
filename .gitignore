@@ -19,3 +19,4 @@ test/profiling/tools
 /logs
 /cppcheck*
 */Testing/
+test/deps/example_json/

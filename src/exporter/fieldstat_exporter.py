@@ -65,6 +65,7 @@ class FieldstatExporterVars:
     local_display_hll     = False
     local_match_tags      = {}
     local_template        = ""
+    local_display_notagged = False
 
     prom_uri_path         = ""
 
@@ -332,81 +333,6 @@ class CounterTable:
             print("=" * self.terminal_size)
             
 
-
-class TableFormatTable:
-    def __init__(self):
-        self.terminal_size, _ = shutil.get_terminal_size((128, 64))
-        self.tables = []
-        self.rows   = []
-
-    def create_table(self, columns, enable_speed):
-        field_names = []
-        field_names.append("")
-
-        if enable_speed:
-            columns_with_speed = []
-            for item in columns:
-                columns_with_speed.append(item)
-                speed_fields = str(item) + "/s"
-                columns_with_speed.append(speed_fields)
-            field_names.extend(columns_with_speed)
-        else:
-            field_names.extend(columns)
-
-        table = PrettyTable()
-        table.vrules = NONE
-        #table.hrules = NONE
-        table.field_names = field_names
-
-        for item in field_names:
-            table.align[item] = "r"
-        table.align[""] = "l"
-
-        self.tables.append(table)
-
-        return table
-
-
-    def add_table_row(self, table, tags, fields, fields_delta, interval_ms, enable_speed, columns):
-        row = []
-
-        if table is None:
-            return
-
-        #exporter table row name.
-        row_str = []
-        for key, value in tags.items():
-            #row.append("%s_%s" % (key, str(value)))
-            row_str.append("%s_%s" % (key, str(value)))
-        row.append('&'.join(row_str))
-
-        #exporter table row value.
-
-        for item in columns:
-            if FieldstatExporterVars.local_scientific_form == True:
-                row.append("{:.2e}".format(fields[item]))
-            else:
-                row.append(fields[item])
-
-            if enable_speed:
-                if (interval_ms > 0) and (item in fields_delta):
-                    speed_s = fields_delta[item] * 1000 / interval_ms
-                    if FieldstatExporterVars.local_scientific_form == True:
-                        row.append("{:.2e}".format(speed_s))
-                    else:
-                        row.append("{:.2f}".format(speed_s))
-                else:
-                    row.append("-")
-
-        table.add_row(row)
-
-
-    def print_tables(self):
-        for item in self.tables:
-            print(item)
-        if len(self.tables) > 0:
-            print("=" * self.terminal_size)
-
 class HistogramTable:
     def __init__(self):
         self.format = FieldstatExporterVars.hist_format
@@ -494,6 +420,142 @@ class HistogramTable:
         if len(self.tables) > 0:
             print("=" * self.terminal_size)
 
+def print_dictionary_with_alignment(dict, terminal_width, padding_grid):
+    current_line_length = 0
+    for key, value in dict.items():
+        pair_length = len(key) + len(str(value)) + 1
+
+        # estimate the length used by current pair
+        if pair_length > padding_grid:
+            padding = (pair_length // padding_grid + 1) * padding_grid
+        else:
+            padding = padding_grid
+
+        # if current line space is not enough, then start a new line
+        if current_line_length + padding > terminal_width and current_line_length != 0:
+            print()
+            current_line_length = 0
+
+        # print by padding the space until the length of the pair is equal to padding
+        print(f"{key}:{value}", end=' ' * (padding - pair_length))
+        current_line_length += padding
+
+    print()
+    print("-" * terminal_width)
+
+class hashable_tag:
+    def __init__(self, tags):
+        self.tags = tags
+
+    def __eq__(self, other):
+        return self.tags == other.tags
+
+    def __hash__(self):
+        return hash(frozenset(self.tags.items()))
+
+class JsonParser:
+    def __init__(self, json_objects):
+        # json_objects is a list of json object {tags, fields, fields_delta, timestamp_ms, timestamp_ms_delta}
+        self.tag_info_map = {} # tag:{fieldname, delta fields, timestamp, timestamp_delta}
+
+        for item in json_objects:
+            tags = item["tags"]
+            delta_fields = item["fields_delta"] if "fields_delta" in item else {}
+            timestamp_delta = item["timestamp_ms_delta"] if "timestamp_ms_delta" in item else -1
+            self.tag_info_map[hashable_tag(tags)] = (item["fields"], delta_fields, item["timestamp_ms"], timestamp_delta)
+
+
+    def get_v(self, tags, field_name):
+        if hashable_tag(tags) not in self.tag_info_map:
+            return "invalid tag"
+
+        i_tuple = self.tag_info_map[hashable_tag(tags)]
+        fields = i_tuple[0]
+
+        if field_name[0] == "%" and field_name[-1] == "%":
+            field_name = field_name[1:-1]
+            scientific_form = True
+        else:
+            scientific_form = False
+        def sci_note(v):
+            if isinstance(v, str):
+                return v
+
+            if scientific_form:
+                return "{:.2e}".format(v)
+            if isinstance(v, float):
+                return "{:.2f}".format(v)
+            return v
+
+        if field_name in fields:
+            tmp_v = fields[field_name]
+            if isinstance(tmp_v, str):
+                return "field_value_is_string"
+
+            return sci_note(tmp_v)
+        
+        # try special field name
+        if field_name.startswith("#") == False:
+            return "-"
+        pattern = re.compile(r'^#Ratio<(\w+),(\w+)>')
+        match = pattern.match(field_name)
+        if match:
+            a = match.group(1)
+            b = match.group(2)
+            if a in fields and b in fields:
+                if isinstance(fields[a], str) or isinstance(fields[b], str):
+                    return "field_value_is_string"
+
+                if fields[b] != 0:
+                    tmp_v = fields[a] / fields[b]
+                else:
+                    if fields[a] == 0:
+                        tmp_v = 0
+                    else:
+                        return "-"
+
+                return sci_note(tmp_v)
+            else:
+                return "-"
+    
+        pattern = re.compile(r'^#Speed<(\w+)>')
+        match = pattern.match(field_name)
+        if match:
+            fields_delta = i_tuple[1]
+            timestamp_ms_delta = i_tuple[3]
+            f_name = match.group(1)
+            speed_fields = f_name + "/s"
+            if f_name in fields_delta:
+                tmp_v = fields_delta[f_name]
+                if isinstance(tmp_v, str):
+                    return "field_value_is_string"
+
+                tmp_v = tmp_v * 1000 / timestamp_ms_delta if timestamp_ms_delta > 0 else "-"
+                return sci_note(tmp_v)
+            else:
+                return "-"
+
+        return "-"
+
+def convert_to_header_name(name):
+    if name[0] == "%" and name[-1] == "%":
+        name = name[1:-1]
+
+    if name.startswith("#"):
+        pattern = re.compile(r'(?i)^#Ratio<(\w+),\s*(\w+)>')
+        match = pattern.match(name)
+        if match:
+            a = match.group(1)
+            b = match.group(2)
+            return f"{a}/{b}"
+        
+        pattern = re.compile(r'(?i)^#Speed<(\w+)>')
+        match = pattern.match(name)
+        if match:
+            return f"{match.group(1)}/s"
+
+    return name
+
 class LocalExporter:
     def __init__(self):
         self.terminal_size, _  = shutil.get_terminal_size((128, 64))
@@ -508,6 +570,7 @@ class LocalExporter:
         self.display_hll       = FieldstatExporterVars.local_display_hll
         self.match_tags        = FieldstatExporterVars.local_match_tags
         self.template          = FieldstatExporterVars.local_template
+        self.display_notagged = FieldstatExporterVars.local_display_notagged
         self.__set_default_display()
         self.objects_matched   = []
         self.template_ja2      = None
@@ -578,6 +641,8 @@ class LocalExporter:
 
         for item in json_objects:
             tags = item["tags"]
+            if len(tags) == 0:
+                continue
             #not match tags object. not read.
             if not self.__is_tags_matched(tags):
                 continue
@@ -600,7 +665,7 @@ class LocalExporter:
                 timestamp_ms_delta = item["timestamp_ms_delta"]
                 
             if "fields_delta" not in item:
-                fields_delta = None
+                fields_delta = {}
             else:
                 fields_delta = item["fields_delta"]
 
@@ -621,27 +686,6 @@ class LocalExporter:
                         self.__build_histogram_type_exporter(tags_new, key, value, value_delta, timestamp_ms_delta)
 
 
-    def build_table_format_exporter(self, json_objects, enable_speed, columns):
-        table = None
-        for item in json_objects:
-            tags   = item["tags"]
-            fields = item["fields"]
-            if "fields_delta" not in item:
-                fields_delta = None
-            else:
-                fields_delta = item["fields_delta"]
-            if "timestamp_ms_delta" not in item:
-                interval_ms = 0
-            else:
-                interval_ms = item["timestamp_ms_delta"]
-
-            if table == None:
-                table = self.tftable.create_table(columns, enable_speed)
-            
-            self.tftable.add_table_row(table, tags, fields, fields_delta, interval_ms, enable_speed, columns)
-        return table
-
-
     def export_templates(self):
         env = Environment(loader=FileSystemLoader('templates'))
         env.globals.update(print_tables    =self.print_table_format)
@@ -657,10 +701,10 @@ class LocalExporter:
             self.ctable = CounterTable()
             self.htable = HistogramTable()
             self.hlltable = CounterTable()
-            self.tftable  = TableFormatTable()
             self.objects_matched = []
             objects = self.read_json_objects_from_file(item)
             self.objects_matched = self.read_match_tags_json_objects(objects)
+            self.fields_untagged = [item for item in objects if len(item["tags"]) == 0] if self.display_notagged else []
 
             if len(self.template) > 0:
                 self.export_templates()
@@ -668,52 +712,38 @@ class LocalExporter:
                 self.build_not_table_format_exporter(self.objects_matched)
             self.print_local_exporter()
 
+    def print_table_format(self, groupby, columns, verbose=False):
+        parser = JsonParser(self.objects_matched)
+        ret = PrettyTable()
+        ret.vrules = NONE
 
-    def print_table_format(self, groupby, columns, enable_speed=True, verbose=False):
-        table_fields=[]
+        header = [""]
+        header += [convert_to_header_name(x) for x in columns]
+        ret.field_names = header
+
+        ret.align[""] = "l"
+        for i in header[1:]:
+            ret.align[i] = "r"
+
         for item in self.objects_matched:
-            tags   = item["tags"]
-            fields = item["fields"]
-
-            #select (groupby in tags key) && ( cloumn0 || column1 ||... in field keys) && (field_value type is int).
-            is_match_table_format = False
-
+            tags = item["tags"]
             if groupby not in tags:
                 continue
-             
-            for column in columns:
-                if column not in fields:
-                    continue
-                if isinstance(fields[column], str):
-                    is_match_table_format = False
-                    break
-                else:
-                    is_match_table_format = True
-            
-            if is_match_table_format == False:
-                continue
 
-            # build new field json object.
-            new_fields = copy.deepcopy(item)
-            
-            for key in fields:
-                if key not in columns:
-                    new_fields["fields"].pop(key)
+            if verbose:
+                row_str = []
+                for key, value in tags.items():
+                    row_str.append("%s_%s" % (key, str(value)))
+                row = ['&'.join(row_str)]
+            else: 
+                row = [groupby + "_" + str(tags[groupby])]
+            row += [parser.get_v(tags, x) for x in columns]
+            if FieldstatExporterVars.local_scientific_form:
+                row = ["{:.2e}".format(float(x)) if isinstance(x, int) else x for x in row]
+            ret.add_row(row)
+        
+        return str(ret) + '\n'
 
-            for column in columns:
-                if column not in fields:
-                    new_fields["fields"][column] = "-"
-
-            if not verbose:
-                for key in tags:
-                    if groupby != key:
-                        new_fields["tags"].pop(key)
-
-
-            table_fields.append(new_fields)
-        return self.build_table_format_exporter(table_fields, enable_speed, columns)
-    
-#   def print_counter(self, [tags], [fields])
     def print_counter_type(self, field_keys):
         counter_fields = []
         for item in self.objects_matched:
@@ -776,12 +806,15 @@ class LocalExporter:
         num_of_equals  = (self.terminal_size - len(formatted_time)) // 2
         print('=' * num_of_equals + formatted_time + '=' * num_of_equals)
 
+        if self.display_notagged:
+            if len(self.fields_untagged) > 0:
+                print_dictionary_with_alignment(self.fields_untagged[0]["fields"], self.terminal_size, 30)
+
         if len(self.template) > 0:
             print(self.template_ja2.render())
         else:
             if self.display_counter:
                 self.ctable.print_tables()
-                self.tftable.print_tables()
 
             if self.display_hist:
                 self.htable.print_tables()
@@ -800,6 +833,26 @@ class LocalExporter:
         exporter = cls()
         exporter.build_local_exporter()
 
+def get_jinja_help(args):
+    # 根据参数值打印不同的帮助信息
+    if args.th == 'print_tables':
+        print("fieldstat_exporter.py local -t '{{ print_tables(<tag key used to filter the metrics>, <field name list>, [verbose mode] }}'")
+        print("Print a table. Its row is organized by the tag key used to filter the metrics, and its column is organized by the field name list.")
+        print("Special field name format: #Ratio<field1,field2> means the ratio of field1 and field2.")
+        print("Special field name format: #Speed<field> means printout the speed of the field value changing per second.")
+        print("Verbose mode is optional, if true, it will print all the tags used by the shown metrics.")
+        print("To print out scientific notation for a specific field, use %<value>% in the field name list. e.g. %#Speed<IN_Bytes>%")
+        print("Example: fieldstat_exporter.py local -t '{{ print_tables(\"statistic_items\", [\"T_success_log\",\"T_total_log\",\"%IN_Bytes%\"\"#Ratio<T_success_log,T_total_log>\",\"%#Speed<IN_Bytes>%\"], True) }}'")
+    elif args.th == 'print_counts':
+        print("fieldstat_exporter.py local -t '{{ print_counts(<field name list>'")
+        print("Print the counter type metrics. Only the metrics with name in the field name list will be printed.")
+    elif args.th == 'print_histograms':
+        print("fieldstat_exporter.py local -t '{{ print_histograms(<field name list>'")
+        print("Print the histogram type metrics. Only the metrics with name in the field name list will be printed.")
+        print("the bins and formats of histogram are set by -b and -f separately.")
+    else:
+        print("The -t option only supports 'print_tables', 'print_counts', 'print_histograms'.")
+        print("try -th print_tables, -th print_counts, -th print_histograms for specific usage.")
 
 ################################################################################
 #  fieldstat exporter
@@ -856,9 +909,14 @@ class FieldstatExporter:
         parser.add_argument("-m", "--match-tags", type = str,           default = "",
                             help = "Display the tags match metrics")
         parser.add_argument("-t", "--template",   type = str,           default = "",
-                            help = "Specify the print template with jinja2.")
+                            help = "Specify the print template with jinja2. For specific usage, try -th") # todo，在打印错误后给一个具体的帮助信息
+        parser.add_argument("-e", "--no-tagged",      action = 'store_true', default = False,
+                    help = "Print all counter metrics without tags in one list.")
+
         parser.add_argument("--scientific-form",  action = 'store_true', default = False,
                             help = "Output the counter type value in scientific notation.")
+
+        parser.add_argument('-th', choices=['print_tables', 'print_counts', 'print_histograms'], help='Print out the help for -t option usage.')
 
     def __parse_bins_str(self, bins_str):
         bins = [] 
@@ -885,21 +943,6 @@ class FieldstatExporter:
             
         return tags_dict
 
-    def __read_json_paths_from_dirs(self, dirs):
-        json_paths = []
-        for item in dirs:
-            if not os.path.exists(item):
-                logging.error("Dir {%s} is not exist.", item)
-                continue
-            if not os.path.isdir(item):
-                logging.error("Path {%s} is not directory.", item)
-                continue
-            for file in os.listdir(item):
-                if file.endswith(".json"):
-                    file_path = os.path.abspath(os.path.join(item, file))
-                    json_paths.append(file_path)
-        return json_paths
-
     def __read_shared_args_value(self, args):
         FieldstatExporterVars.hist_format = args.hist_format
         FieldstatExporterVars.json_paths  = args.json_paths
@@ -919,6 +962,7 @@ class FieldstatExporter:
             FieldstatExporterVars.local_match_tags      = self.__parse_tags_str(args.match_tags)
             FieldstatExporterVars.local_template        = args.template
             FieldstatExporterVars.local_scientific_form = args.scientific_form
+            FieldstatExporterVars.local_display_notagged = args.no_tagged
             self.exporter_mode       = 'local'
             self.local_interval_s    = args.interval
             self.local_enable_loop   = args.loop
@@ -975,6 +1019,9 @@ class FieldstatExporter:
         self.__read_shared_args_value(args)
         self.__read_private_args_value(args)
 
+        if args.th:
+            get_jinja_help(args)
+            sys.exit(0)
 
     def __enable_prometheus_endpoint(self):
         server_address = ('', self.prom_listen_port)
