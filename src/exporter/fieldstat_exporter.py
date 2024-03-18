@@ -487,6 +487,11 @@ class JsonParser:
                 return "{:.2f}".format(v)
             return v
 
+        pattern = r'#Name<(.*?)>'
+        match = re.search(pattern, field_name)
+        if match:
+            field_name = re.sub(pattern, '', field_name)
+            
         if field_name in fields:
             tmp_v = fields[field_name]
             if isinstance(tmp_v, str):
@@ -497,28 +502,37 @@ class JsonParser:
         # try special field name
         if field_name.startswith("#") == False:
             return "-"
-        pattern = re.compile(r'^#Ratio<(\w+),(\w+)>')
+        pattern = re.compile(r'#Ratio<(\w+),(\w+)(,.+?)?>')
         match = pattern.match(field_name)
         if match:
-            a = match.group(1)
-            b = match.group(2)
-            if a in fields and b in fields:
-                if isinstance(fields[a], str) or isinstance(fields[b], str):
+            field_n = match.group(1)
+            field_d = match.group(2)
+            scaling = match.group(3)
+            if scaling:
+                scaling = float(scaling[1:])
+            if field_n in fields and field_d in fields:
+                if isinstance(fields[field_n], str) or isinstance(fields[field_d], str):
                     return "field_value_is_string"
 
-                if fields[b] != 0:
-                    tmp_v = fields[a] / fields[b]
+                if fields[field_d] != 0:
+                    tmp_v = fields[field_n] / fields[field_d]
                 else:
-                    if fields[a] == 0:
+                    if fields[field_n] == 0:
                         tmp_v = 0
                     else:
                         return "-"
+                
+                if scaling:
+                    if scaling > 0:
+                        tmp_v *= scaling
+                    else:
+                        tmp_v /= -scaling
 
                 return sci_note(tmp_v)
             else:
                 return "-"
     
-        pattern = re.compile(r'^#Speed<(\w+)>')
+        pattern = re.compile(r'#Speed<(\w+)>')
         match = pattern.match(field_name)
         if match:
             fields_delta = i_tuple[1]
@@ -541,15 +555,20 @@ def convert_to_header_name(name):
     if name[0] == "%" and name[-1] == "%":
         name = name[1:-1]
 
+    pattern = r'#Name<(.*?)>'
+    match = re.search(pattern, name)
+    if match:
+        return match.group(1)
+
     if name.startswith("#"):
-        pattern = re.compile(r'(?i)^#Ratio<(\w+),\s*(\w+)>')
+        pattern = re.compile(r'#Ratio<(\w+),(\w+)>')
         match = pattern.match(name)
         if match:
             a = match.group(1)
             b = match.group(2)
             return f"{a}/{b}"
         
-        pattern = re.compile(r'(?i)^#Speed<(\w+)>')
+        pattern = re.compile(r'#Speed<(\w+)>')
         match = pattern.match(name)
         if match:
             return f"{match.group(1)}/s"
@@ -837,12 +856,13 @@ def get_jinja_help(args):
     # 根据参数值打印不同的帮助信息
     if args.th == 'print_tables':
         print("fieldstat_exporter.py local -t '{{ print_tables(<tag key used to filter the metrics>, <field name list>, [verbose mode] }}'")
-        print("Print a table. Its row is organized by the tag key used to filter the metrics, and its column is organized by the field name list.")
-        print("Special field name format: #Ratio<field1,field2> means the ratio of field1 and field2.")
-        print("Special field name format: #Speed<field> means printout the speed of the field value changing per second.")
-        print("Verbose mode is optional, if true, it will print all the tags used by the shown metrics.")
-        print("To print out scientific notation for a specific field, use %<value>% in the field name list. e.g. %#Speed<IN_Bytes>%")
-        print("Example: fieldstat_exporter.py local -t '{{ print_tables(\"statistic_items\", [\"T_success_log\",\"T_total_log\",\"%IN_Bytes%\"\"#Ratio<T_success_log,T_total_log>\",\"%#Speed<IN_Bytes>%\"], True) }}'")
+        print("- Print a table. Its row is organized by the tag key used to filter the metrics, and its column is organized by the field name list.")
+        print("- Special field name format: #Ratio<field1,field2[,scale]> means the ratio of field1 and field2.\n  The third optional parameter scale is to multiply the ratio by a scale factor. If scale is negative, it will divide the ratio by the absolute value of scale. The default scale is 1.\n  e.g. #Ratio<In bytes,cputick,-1000> outputs In bytes/(cputick*1000).")
+        print("- Special field name format: #Speed<field> means printout the speed of the field value changing per second.")
+        print("- Apart from the two format above, add #Name<the metric name you defined>, to change the column name. It's optional, it the column name is not defined, it will use the field name.\n  As for ratio, the default name is field1/field2, and for speed, the default name is field/s.")
+        print("- Verbose mode is optional, if true, it will print all the tags used by the shown metrics. The default value is false, and it will only print the tags with keys equal to groupby.")
+        print("- To print out scientific notation for a specific field, use %<value>% in the field name list.\n  The percent marks should be used at the outermost. e.g. %#Name<in speed>#Speed<IN_Bytes>%")
+        print("- Use Example:\n  fieldstat_exporter.py local -t '{{ print_tables(\"statistic_items\", [\"T_success_log\",\"T_total_log\",\"%IN_Bytes%\"\"#Name<geedge>#Ratio<T_success_log,T_total_log>\",\"#Speed<IN_Bytes>\"], True) }}'")
     elif args.th == 'print_counts':
         print("fieldstat_exporter.py local -t '{{ print_counts(<field name list>'")
         print("Print the counter type metrics. Only the metrics with name in the field name list will be printed.")
@@ -1060,6 +1080,23 @@ class FieldstatExporter:
         exporter.read_cmd_options()
         exporter.fieldstat_export()
 
+
+# -tl 
+# 展示配置
+# -tc 创建一个表格列模板
+# -tt 创建一个表格模板
+# -tc field_name_list
+# -tt print_tables("tag", ["field1", "field2", "field3"]或者一串数字，表示列模板。)
+# -t "print_tables('tag', ['field1', 'field2', 'field3'])" 直接手动输入，或者-t 指定表格模板名，或者-t print_tables('tag', 列模板名)
+# 以下三个都是合法的：
+# -t "{{ print_tables('tag', ['field1', 'field2', 'field3']) }}{{ print_tables('tag2', ['field1', 'field4']) }}" 
+
+# -tt "print_tables('tag', ['field1', 'field2', 'field3'])"
+# -tt “print_tables('tag2', ['field1', 'field4'])”
+# -t "1 2" 
+
+# -tc field1 field2 field3
+# -t "{{print_tables('tag', 3)}} 2"
 
 if __name__ == '__main__':
     FieldstatExporter.run_fieldstat_exporter()
