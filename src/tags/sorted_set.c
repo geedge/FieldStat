@@ -39,6 +39,9 @@ struct entry_data *entry_data_construct(const struct tag_hash_key *tag, int cell
 {
     assert(cell_id >= 0);
     assert(tag != NULL);
+    long long tmp_v = tag->hashv;
+    assert(tmp_v >= 0);
+
     struct entry_data *entry_data = (struct entry_data *)malloc(sizeof(struct entry_data));
 
     entry_data->key = tag_hash_key_copy(tag);
@@ -71,6 +74,9 @@ struct entry_data *sorted_set_entry_get_data(const heap_entry *entry)
 
     const struct entry_data * tmp_val = (struct entry_data *)entry->value;
     assert(tmp_val->key != NULL);
+    long long tmp_v = tmp_val->key->hashv;
+    assert(tmp_v >= 0);
+
     assert(tmp_val->cell_id >= 0);
     return entry->value;
 }
@@ -230,6 +236,9 @@ int sorted_set_insert(struct sorted_set *ss, const struct tag_hash_key *tag, uns
 {
     assert(cell_id >= 0);
     assert(tag != NULL);
+    long long tmp_v = tag->hashv;
+    assert(tmp_v >= 0);
+
     if (sorted_set_check_is_full(ss)) {
         if (cnt <= sorted_set_get_min_count(ss)) {
             return 0;
@@ -244,6 +253,9 @@ int sorted_set_insert_and_record_popped_back(struct sorted_set *ss, const struct
 {
     assert(cell_id >= 0);
     assert(tag != NULL);
+    long long tmp_v = tag->hashv;
+    assert(tmp_v >= 0);
+
     // if there is a dying record, reborn it to use.
     heap_entry *entry = sorted_set_find_entry(ss, tag);
     if (entry != NULL) {
@@ -365,11 +377,15 @@ void sorted_set_dump(const struct sorted_set *ss, unsigned *scores_out, struct t
         tmp_nodes[n_living_entry].val = sorted_set_entry_get_data(entry);
         n_living_entry++;
     }
+    assert(n_living_entry == ss->n_living_entry);
     qsort(tmp_nodes, n_living_entry, sizeof(tmp_heap_node), cmp_tmp_heap_node);
     for (int i = 0; i < n_living_entry; i++) {
         assert(tmp_nodes[i].val != NULL);
         assert(tmp_nodes[i].val->cell_id >= 0);
         assert(tmp_nodes[i].val->key != NULL);
+        long long tmp_haha = tmp_nodes[i].val->key->hashv;
+        assert(tmp_haha >= 0);
+        
         scores_out[i] = tmp_nodes[i].key;
         tags_out[i] = tmp_nodes[i].val->key;
         user_data_out[i] = tmp_nodes[i].val->cell_id;

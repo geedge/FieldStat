@@ -183,6 +183,9 @@ static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_
 
         assert(cell_id >= 0);
         assert(tag != NULL);
+        long long tmp_v = tag->hashv;
+        assert(tmp_v >= 0);
+
         if (sorted_set_cardinality(heavy_keeper->top_K_heap) < heavy_keeper->K) {
             sorted_set_insert_and_record_popped_back(heavy_keeper->top_K_heap, tag, 0, cell_id, popped_id_out);
             return 0; // newly added
@@ -230,6 +233,9 @@ static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_
         if ((maxv - nMin <= count && maxv != nMin) || sorted_set_cardinality(summary) != heavy_keeper->K) {
             assert(cell_id >= 0);
             assert(tag != NULL);
+            long long tmp_v = tag->hashv;
+            assert(tmp_v >= 0);
+
             int insert_ret = sorted_set_insert_and_record_popped_back(summary, tag, maxv, cell_id, &user_data_cube_id);
             if (insert_ret == 2) { // insert success and popped one
                 *popped_id_out = user_data_cube_id;
@@ -419,7 +425,8 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
     int max_size = size_dest > size_src ? size_dest : size_src;
 
     unsigned *count_arr = (unsigned *)malloc(max_size * sizeof(unsigned));
-    struct tag_hash_key **tag_arr = (struct tag_hash_key **)malloc(max_size * sizeof(struct tag_hash_key *));
+    // struct tag_hash_key **tag_arr = (struct tag_hash_key **)malloc(max_size * sizeof(struct tag_hash_key *));
+    struct tag_hash_key **tag_arr = (struct tag_hash_key **)calloc(max_size, sizeof(struct tag_hash_key *));
     int *cell_id_arr_dst = (int *)malloc(size_dest * sizeof(int));
 
     sorted_set_dump(ss_dest, count_arr, tag_arr, cell_id_arr_dst);
@@ -440,7 +447,8 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
     qsort(cell_id_arr_dst, size_dest, sizeof(int), cmp_int); // use in find_next_unused_cell_id to find the minimum unused cell_id
 
     /* ------------------------------ merge source ------------------------------ */
-    int *cell_id_arr_src = (int *)malloc(size_src * sizeof(int));
+    // int *cell_id_arr_src = (int *)malloc(size_src * sizeof(int));
+    int *cell_id_arr_src = (int*)calloc(size_src, sizeof(int));
     sorted_set_dump(ss_src, count_arr, tag_arr, cell_id_arr_src);
     int last_find_id = -1;
     int next_idx = 0;
