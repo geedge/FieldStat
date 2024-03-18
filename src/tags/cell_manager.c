@@ -84,7 +84,7 @@ void cell_manager_reset(struct cell_manager *pthis)
     pthis->next_cell_id = 0;
     pthis->max_cell_id = -1;
     pthis->current_cell_num = 0;
-    memset(pthis->id_tag_array, 0, sizeof(struct tag_hash_key *) * (pthis->max_cell_id + 1));
+    memset(pthis->id_tag_array, 0, sizeof(struct tag_hash_key *) * pthis->id_tag_array_len);
 
     if (pthis->sampling_mode == SAMPLING_MODE_TOPK) {
         heavy_keeper_reset(pthis->topk_tag_id_map);
@@ -132,7 +132,7 @@ void cell_manager_id_tag_array_add(struct cell_manager *pthis, int cell_id, stru
 
         struct tag_hash_key **new_array = (struct tag_hash_key **)calloc(new_len, sizeof(struct tag_hash_key *));
         assert(new_array != NULL);
-        memcpy(new_array, pthis->id_tag_array, sizeof(struct tag_hash_key *) * (pthis->max_cell_id + 1));
+        memcpy(new_array, pthis->id_tag_array, sizeof(struct tag_hash_key *) * pthis->id_tag_array_len);
         free(pthis->id_tag_array);
         pthis->id_tag_array = new_array;
         pthis->id_tag_array_len = new_len;
@@ -313,7 +313,7 @@ void cell_manager_merge_topk(struct cell_manager *dest, const struct cell_manage
     heavy_keeper_merge_recording_id_details(dest->topk_tag_id_map, src->topk_tag_id_map, 
         cell_id_popped, n_cell_id_popped, cell_id_old, cell_id_added, n_cell_id_added);
 
-    memset(dest->id_tag_array, 0, sizeof(struct tag_hash_key *) * (dest->max_cell_id+1));
+    memset(dest->id_tag_array, 0, sizeof(struct tag_hash_key *) * dest->id_tag_array_len);
     struct heavy_keeper_result *result = heavy_keeper_query(dest->topk_tag_id_map);
     for (size_t i = 0; i < result->n_key; i++) {
         cell_manager_id_tag_array_add(dest, result->cell_id[i], result->tags[i]);
