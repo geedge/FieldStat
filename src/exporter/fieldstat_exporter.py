@@ -101,7 +101,7 @@ class PrometheusExporter:
     def __init__(self):
         self.hist_bins   = FieldstatExporterVars.hist_bins
         self.hist_format = FieldstatExporterVars.hist_format
-        self.json_paths  = FieldstatExporterVars.json_paths
+        self.json_paths  = copy.deepcopy(FieldstatExporterVars.json_paths)
         self.json_paths.extend(read_json_paths_from_dirs(FieldstatExporterVars.json_dirs))
         self.n_lines     = 0
 
@@ -578,7 +578,7 @@ def convert_to_header_name(name):
 class LocalExporter:
     def __init__(self):
         self.terminal_size, _  = shutil.get_terminal_size((128, 64))
-        self.json_paths        = FieldstatExporterVars.json_paths
+        self.json_paths        = copy.deepcopy(FieldstatExporterVars.json_paths)
         self.json_paths.extend(read_json_paths_from_dirs(FieldstatExporterVars.json_dirs))
         self.ctable            = None
         self.htable            = None
