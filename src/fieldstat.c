@@ -228,10 +228,9 @@ void add_cube_to_position(struct fieldstat *instance, struct fs_cube *cube, int 
         free(old_ver_arr);
     }
     instance->cube[cube_id] = cube;
-    instance->cube_version[cube_id] = 0;
-    instance->valid_cube_arr_length = cube_id + 1;
-
-    cube_manager_add(instance->shared_tag_cube_manager, cube->key_tag, cube_id);
+    if (cube_id >= instance->valid_cube_arr_length) {
+        instance->valid_cube_arr_length = cube_id + 1;
+    }
 }
 
 int fieldstat_append_cube_to_instance(struct fieldstat *instance, struct fs_cube *cube)
@@ -245,6 +244,7 @@ int fieldstat_append_cube_to_instance(struct fieldstat *instance, struct fs_cube
     }
     int cube_id = instance->valid_cube_arr_length;
     add_cube_to_position(instance, cube, cube_id);
+    cube_manager_add(instance->shared_tag_cube_manager, cube->key_tag, cube_id);
 
     return cube_id;
 }
@@ -361,14 +361,9 @@ int fieldstat_cube_add(struct fieldstat *instance, int cube_id, const struct fie
     return ret;
 }
 
-void fieldstat_cube_free(struct fieldstat *instance, int cube_id)
+void fieldstat_cube_free_contents(struct fieldstat *instance, int cube_id)
 {
     struct fs_cube *cube = instance->cube[cube_id];
-    if (cube == NULL) {
-        return;
-    }
-    
-    cube_manager_delete(instance->shared_tag_cube_manager, cube->key_tag);
 
     cell_manager_free(cube->cell_manager);
     fieldstat_free_tag_array(cube->shared_tags, cube->n_shared_tags);
@@ -383,6 +378,21 @@ void fieldstat_cube_free(struct fieldstat *instance, int cube_id)
 
     free(cube);
     instance->cube[cube_id] = NULL;
+
+    if (cube_id == instance->valid_cube_arr_length - 1) {
+        instance->valid_cube_arr_length--;
+    }
+}
+
+void fieldstat_cube_free(struct fieldstat *instance, int cube_id)
+{
+    if (instance->cube[cube_id] == NULL) {
+        return;
+    }
+    
+    cube_manager_delete(instance->shared_tag_cube_manager, instance->cube[cube_id]->key_tag);
+
+    fieldstat_cube_free_contents(instance, cube_id);
 }
 
 struct fs_cube *fieldstat_cube_fork(const struct fs_cube *cube) {
@@ -989,15 +999,18 @@ int fieldstat_calibrate(const struct fieldstat *master, struct fieldstat *replic
         replica->max_n_cube = master->max_n_cube;
     }
 
-    size_t longer_arr_len = master->valid_cube_arr_length > replica->valid_cube_arr_length ? master->valid_cube_arr_length : replica->valid_cube_arr_length;
+    size_t len_master = master->valid_cube_arr_length;
+    size_t len_replica = replica->valid_cube_arr_length;
+    size_t longer_arr_len = len_master > len_replica ? len_master : len_replica;
     for (size_t i = 0; i < longer_arr_len; i++) {
-        const struct fs_cube *cube_master = i >= master->valid_cube_arr_length ? NULL : master->cube[i];
-        const struct fs_cube *cube_target = i >= replica->valid_cube_arr_length ? NULL : replica->cube[i];
+        const struct fs_cube *cube_master = i >= len_master ? NULL : master->cube[i];
+        const struct fs_cube *cube_target = i >= len_replica ? NULL : replica->cube[i];
+
         if (cube_master == NULL && cube_target == NULL) {
             continue;
         }
         if (cube_master == NULL && cube_target != NULL) {
-            fieldstat_cube_free(replica, i);
+            fieldstat_cube_free_contents(replica, i);
             continue;
         }
         if (cube_master != NULL && cube_target == NULL) {
@@ -1009,8 +1022,8 @@ int fieldstat_calibrate(const struct fieldstat *master, struct fieldstat *replic
         if (master->cube_version[i] == replica->cube_version[i] && tag_hash_key_cmp(cube_master->key_tag, cube_target->key_tag) == 0) {
             continue;
         }
-        
-        fieldstat_cube_free(replica, i);
+
+        fieldstat_cube_free_contents(replica, i);
         struct fs_cube *cube_dup = fieldstat_cube_fork(cube_master);
         add_cube_to_position(replica, cube_dup, i);
     }
@@ -1018,6 +1031,7 @@ int fieldstat_calibrate(const struct fieldstat *master, struct fieldstat *replic
     memcpy(replica->cube_version, master->cube_version, sizeof(unsigned long) * master->max_n_cube);
     replica->valid_cube_arr_length = master->valid_cube_arr_length;
 
+    cube_manager_calibrate(replica->shared_tag_cube_manager, master->shared_tag_cube_manager);
     calibrate_metrics_in_instance(master, replica);
 
     return FS_OK;

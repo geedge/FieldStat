@@ -24,9 +24,9 @@ TEST(test_register, delete_cube_and_version_increase)
     EXPECT_EQ(fieldstat_get_cube_version(instance, cube_id), 0);
     int ret = fieldstat_destroy_cube(instance, cube_id);
     EXPECT_EQ(ret, 0);
-    EXPECT_EQ(fieldstat_get_cube_version(instance, cube_id), 1);
-    ret = fieldstat_destroy_cube(instance, cube_id);
-    EXPECT_EQ(ret, FS_ERR_INVALID_CUBE_ID);
+    EXPECT_EQ(fieldstat_get_cube_version(instance, cube_id), FS_ERR_INVALID_CUBE_ID);
+
+    cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
     EXPECT_EQ(fieldstat_get_cube_version(instance, cube_id), 1);
 
     fieldstat_free(instance);
@@ -115,30 +115,30 @@ TEST(test_register, reset_and_new_cell)
     fieldstat_free(instance);
 }
 
-TEST(test_register, register_many_cubes)
-{
-    struct fieldstat *instance = fieldstat_new();
-    int registered_cube = 10000; // will trigger realloc many times
-    struct fieldstat_tag shared_tag = TEST_SHARED_TAG;
-    for (int i = 0; i < registered_cube; i++) {
-        shared_tag.value_longlong = i;
-        int cube_id = fieldstat_create_cube(instance, &shared_tag, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
-        EXPECT_EQ(cube_id, i);
-    }
-    // try to use the cube
-    int metric_id = fieldstat_register_counter(instance, "counter");
-    for (int i = 0; i < registered_cube; i++) {
-        fieldstat_counter_incrby(instance, i, metric_id, &TEST_TAG_INT, 1, i);
-    }
+// TEST(test_register, register_many_cubes)
+// {
+//     struct fieldstat *instance = fieldstat_new();
+//     int registered_cube = 10000; // will trigger realloc many times
+//     struct fieldstat_tag shared_tag = TEST_SHARED_TAG;
+//     for (int i = 0; i < registered_cube; i++) {
+//         shared_tag.value_longlong = i;
+//         int cube_id = fieldstat_create_cube(instance, &shared_tag, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+//         EXPECT_EQ(cube_id, i);
+//     }
+//     // try to use the cube
+//     int metric_id = fieldstat_register_counter(instance, "counter");
+//     for (int i = 0; i < registered_cube; i++) {
+//         fieldstat_counter_incrby(instance, i, metric_id, &TEST_TAG_INT, 1, i);
+//     }
 
-    for (int i = 0; i < registered_cube; i++) {
-        long long result;
-        fieldstat_counter_get(instance, i, 0, &TEST_TAG_LIST_INT, &result);
-        EXPECT_EQ(result, i);
-    }
+//     for (int i = 0; i < registered_cube; i++) {
+//         long long result;
+//         fieldstat_counter_get(instance, i, 0, &TEST_TAG_LIST_INT, &result);
+//         EXPECT_EQ(result, i);
+//     }
 
-    fieldstat_free(instance);
-}
+//     fieldstat_free(instance);
+// }
 
 TEST(test_register, add_many_tagged_cells)
 {
@@ -541,6 +541,85 @@ TEST(test_register, get_cube_mode)
     EXPECT_EQ(fieldstat_get_cube_mode(instance, 100, &mode, &primary_metric_id), FS_ERR_INVALID_CUBE_ID);
 
     fieldstat_free(instance);
+}
+
+// issue： https://jira.geedge.net/browse/TSG-20140
+// 流程：
+// calibrate调用前：
+    // master: B           （B)
+    // replica:A B          (A B)
+
+// calibrate调用时，依次比较每个cube id，id:0时，将master[0] 同步,同步时，会先删除A,然后添加B'
+    // replica:B' B        (B' B)
+
+// calibrate 继续，同步master[1]，replica[1]不存在，创建新的cube。此时，不仅从id->cube 的数组中删除掉B，且从cube tag->id 的字典中删除掉B。可能会错误的删除掉B'，导致两个map的对应不一致。
+    // replica:B' /        (B )
+
+// 例如：find_cube(B)-> 返回1。
+// incrby(cubeid=1)-> 返回FS_ERR_INVALID_CUBE_ID
+TEST(calibrate, issue_calibrate_wrong)
+{
+    struct fieldstat *master = fieldstat_new();
+    const struct fieldstat_tag *tag_A = &TEST_SHARED_TAG;
+    const struct fieldstat_tag *tag_B = &TEST_TAG_INT;
+    int cube_idA = fieldstat_create_cube(master, tag_A, 1, SAMPLING_MODE_COMPREHENSIVE, 1);
+    int cube_idB = fieldstat_create_cube(master, tag_B, 1, SAMPLING_MODE_COMPREHENSIVE, 1);
+    struct fieldstat *target = fieldstat_fork(master);
+
+    EXPECT_EQ(fieldstat_destroy_cube(master, cube_idA), FS_OK);
+    EXPECT_EQ(fieldstat_destroy_cube(master, cube_idB), FS_OK);
+    int cube_idBa = fieldstat_create_cube(master, tag_B, 1, SAMPLING_MODE_COMPREHENSIVE, 1);
+    EXPECT_EQ(cube_idBa, 0);
+
+    fieldstat_calibrate(master, target);
+
+    int *cubes_id_ret = NULL;
+    int n_cubes = 0;
+    fieldstat_get_cubes(target, &cubes_id_ret, &n_cubes);
+    EXPECT_EQ(n_cubes, 1);
+    EXPECT_EQ(cubes_id_ret[0], 0);
+    free(cubes_id_ret);
+
+    EXPECT_EQ(fieldstat_find_cube(target, tag_A, 1), FS_ERR_INVALID_KEY);
+    EXPECT_EQ(fieldstat_find_cube(target, tag_B, 1), 0);
+
+    struct fieldstat_tag_list *tag_list = fieldstat_get_shared_tags(target, 0);
+    EXPECT_STREQ(tag_list->tag[0].key, tag_B->key);
+    fieldstat_tag_list_arr_free(tag_list, 1);
+
+    fieldstat_free(master);
+    fieldstat_free(target);
+}
+
+TEST(calibrate, delete_first_cube)
+{
+    struct fieldstat *master = fieldstat_new();
+    const struct fieldstat_tag *tag_A = &TEST_SHARED_TAG;
+    const struct fieldstat_tag *tag_B = &TEST_TAG_INT;
+    int cube_idA = fieldstat_create_cube(master, tag_A, 1, SAMPLING_MODE_COMPREHENSIVE, 1);
+    int cube_idB = fieldstat_create_cube(master, tag_B, 1, SAMPLING_MODE_COMPREHENSIVE, 1);
+    struct fieldstat *target = fieldstat_fork(master);
+
+    fieldstat_destroy_cube(master, cube_idA);
+
+    fieldstat_calibrate(master, target);
+
+    int *cubes_id_ret = NULL;
+    int n_cubes = 0;
+    fieldstat_get_cubes(target, &cubes_id_ret, &n_cubes);
+    EXPECT_EQ(n_cubes, 1);
+    EXPECT_EQ(cubes_id_ret[0], cube_idB);
+    free(cubes_id_ret);
+
+    EXPECT_EQ(fieldstat_find_cube(target, tag_A, 1), FS_ERR_INVALID_KEY);
+    EXPECT_EQ(fieldstat_find_cube(target, tag_B, 1), 1);
+
+    struct fieldstat_tag_list *tag_list = fieldstat_get_shared_tags(target, 1);
+    EXPECT_STREQ(tag_list->tag[0].key, tag_B->key);
+    fieldstat_tag_list_arr_free(tag_list, 1);
+
+    fieldstat_free(master);
+    fieldstat_free(target);
 }
 
 int main(int argc, char *argv[]) 

@@ -373,3 +373,27 @@ int cube_manager_find(const struct cube_manager *pthis, const struct tag_hash_ke
         return node->cell_id;
     }
 }
+
+void cube_manager_calibrate(struct cube_manager *pthis, const struct cube_manager *master)
+{
+    struct tag_id_map *node = NULL;
+    struct tag_id_map *tmp = NULL;
+    HASH_ITER(hh, pthis->head, node, tmp) {
+        int cube_id = cube_manager_find(master, node->tag);
+        if (cube_id == -1) {
+            HASH_DEL(pthis->head, node);
+            tag_hash_key_free(node->tag);
+            free(node);
+        } else {
+            node->cell_id = cube_id;
+        }
+    }
+
+    // exist in master but not in self
+    HASH_ITER(hh, master->head, node, tmp) {
+        int cube_id = cube_manager_find(pthis, node->tag);
+        if (cube_id == -1) {
+            cube_manager_add(pthis, node->tag, node->cell_id);
+        }
+    }
+}
