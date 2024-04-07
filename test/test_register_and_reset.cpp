@@ -115,30 +115,30 @@ TEST(test_register, reset_and_new_cell)
     fieldstat_free(instance);
 }
 
-// TEST(test_register, register_many_cubes)
-// {
-//     struct fieldstat *instance = fieldstat_new();
-//     int registered_cube = 10000; // will trigger realloc many times
-//     struct fieldstat_tag shared_tag = TEST_SHARED_TAG;
-//     for (int i = 0; i < registered_cube; i++) {
-//         shared_tag.value_longlong = i;
-//         int cube_id = fieldstat_create_cube(instance, &shared_tag, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
-//         EXPECT_EQ(cube_id, i);
-//     }
-//     // try to use the cube
-//     int metric_id = fieldstat_register_counter(instance, "counter");
-//     for (int i = 0; i < registered_cube; i++) {
-//         fieldstat_counter_incrby(instance, i, metric_id, &TEST_TAG_INT, 1, i);
-//     }
+TEST(test_register, register_many_cubes)
+{
+    struct fieldstat *instance = fieldstat_new();
+    int registered_cube = 10000; // will trigger realloc many times
+    struct fieldstat_tag shared_tag = TEST_SHARED_TAG;
+    for (int i = 0; i < registered_cube; i++) {
+        shared_tag.value_longlong = i;
+        int cube_id = fieldstat_create_cube(instance, &shared_tag, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+        EXPECT_EQ(cube_id, i);
+    }
+    // try to use the cube
+    int metric_id = fieldstat_register_counter(instance, "counter");
+    for (int i = 0; i < registered_cube; i++) {
+        fieldstat_counter_incrby(instance, i, metric_id, &TEST_TAG_INT, 1, i);
+    }
 
-//     for (int i = 0; i < registered_cube; i++) {
-//         long long result;
-//         fieldstat_counter_get(instance, i, 0, &TEST_TAG_LIST_INT, &result);
-//         EXPECT_EQ(result, i);
-//     }
+    for (int i = 0; i < registered_cube; i++) {
+        long long result;
+        fieldstat_counter_get(instance, i, 0, &TEST_TAG_LIST_INT, &result);
+        EXPECT_EQ(result, i);
+    }
 
-//     fieldstat_free(instance);
-// }
+    fieldstat_free(instance);
+}
 
 TEST(test_register, add_many_tagged_cells)
 {
@@ -182,17 +182,17 @@ TEST(test_register, add_long_tagged_cells)
     free(long_string);
 }
 
-TEST(test_register, register_too_many_metrics)
+TEST(test_register, register_many_metrics)
 {
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
     int metric_id = 0;
-    for (int i = 0; i < 50; i++) {
+    for (int i = 0; i < 200; i++) {
         metric_id = fieldstat_register_counter(instance, (std::string("counter ") + std::to_string(i)).c_str());
         EXPECT_EQ(metric_id, i);
     }
 
-    for (int i = 0; i < 50; i++) {
+    for (int i = 0; i < 200; i++) {
         EXPECT_EQ(fieldstat_counter_incrby(instance, cube_id, i, &TEST_TAG_INT, 1, 1), 0);
     }
 

@@ -115,6 +115,9 @@ void *fs_easy_output_thread(void *arg) // return void * for pthread_create check
 }
 
 struct fieldstat_easy *fieldstat_easy_new(int max_thread_num, const char *name, const struct fieldstat_tag *tags, size_t n_tag) {
+    if (max_thread_num <= 0) {
+        return NULL;
+    }
     struct fieldstat_easy *fse = calloc(1, sizeof(struct fieldstat_easy));
     fse->fsu = malloc(sizeof(struct fs_easy_thread) * max_thread_num);
     fse->max_thread_num = max_thread_num;
