@@ -11,6 +11,7 @@ import datetime
 import time
 import copy
 import fcntl
+from itertools import chain
 from prettytable import PrettyTable,NONE,HEADER
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from jinja2 import Environment, FileSystemLoader
@@ -723,7 +724,7 @@ class LocalExporter:
             self.objects_matched = []
             objects = self.read_json_objects_from_file(item)
             self.objects_matched = self.read_match_tags_json_objects(objects)
-            self.fields_untagged = [item for item in objects if len(item["tags"]) == 0] if self.display_notagged else []
+            self.fields_untagged = [item for item in objects if len(item["tags"]) == 0] if len(self.match_tags) == 0 else []
 
             if len(self.template) > 0:
                 self.export_templates()
@@ -765,7 +766,7 @@ class LocalExporter:
 
     def print_counter_type(self, field_keys):
         counter_fields = []
-        for item in self.objects_matched:
+        for item in chain(self.objects_matched, self.fields_untagged):
             fields = item["fields"]
 
             new_fields = copy.deepcopy(item)
@@ -863,16 +864,16 @@ def get_jinja_help(args):
         print("- Verbose mode is optional, if true, it will print all the tags used by the shown metrics. The default value is false, and it will only print the tags with keys equal to groupby.")
         print("- To print out scientific notation for a specific field, use %<value>% in the field name list.\n  The percent marks should be used at the outermost. e.g. %#Name<in speed>#Speed<IN_Bytes>%")
         print("- Use Example:\n  fieldstat_exporter.py local -t '{{ print_tables(\"statistic_items\", [\"T_success_log\",\"T_total_log\",\"%IN_Bytes%\"\"#Name<geedge>#Ratio<T_success_log,T_total_log>\",\"#Speed<IN_Bytes>\"], True) }}'")
-    elif args.th == 'print_counts':
-        print("fieldstat_exporter.py local -t '{{ print_counts(<field name list>'")
+    elif args.th == 'print_counters':
+        print("fieldstat_exporter.py local -t '{{ print_counters(<field name list>)}}'")
         print("Print the counter type metrics. Only the metrics with name in the field name list will be printed.")
     elif args.th == 'print_histograms':
-        print("fieldstat_exporter.py local -t '{{ print_histograms(<field name list>'")
+        print("fieldstat_exporter.py local -t '{{ print_histograms(<field name list>)}}'")
         print("Print the histogram type metrics. Only the metrics with name in the field name list will be printed.")
         print("the bins and formats of histogram are set by -b and -f separately.")
     else:
-        print("The -t option only supports 'print_tables', 'print_counts', 'print_histograms'.")
-        print("try -th print_tables, -th print_counts, -th print_histograms for specific usage.")
+        print("The -t option only supports 'print_tables', 'print_counters', 'print_histograms'.")
+        print("try -th print_tables, -th print_counters, -th print_histograms for specific usage.")
 
 ################################################################################
 #  fieldstat exporter
@@ -936,7 +937,7 @@ class FieldstatExporter:
         parser.add_argument("--scientific-form",  action = 'store_true', default = False,
                             help = "Output the counter type value in scientific notation.")
 
-        parser.add_argument('-th', choices=['print_tables', 'print_counts', 'print_histograms'], help='Print out the help for -t option usage.')
+        parser.add_argument('-th', choices=['print_tables', 'print_counters', 'print_histograms'], help='Print out the help for -t option usage.')
 
     def __parse_bins_str(self, bins_str):
         bins = [] 
