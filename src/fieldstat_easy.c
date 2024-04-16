@@ -361,3 +361,8 @@ int fieldstat_easy_histogram_record(struct fieldstat_easy *fse, int thread_id, i
 
     return ret;
 }
+
+void fieldstat_easy_enable_delta_in_active_output(struct fieldstat_easy *fse)
+{
+    fieldstat_json_exporter_enable_delta(fse->exporter);
+}

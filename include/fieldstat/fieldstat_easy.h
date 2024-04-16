@@ -27,6 +27,17 @@ void fieldstat_easy_free(struct fieldstat_easy *fse);
     * @return: 0 if success, -1 if failed to open file. -2 if the output is already enabled.
 */
 int fieldstat_easy_enable_auto_output(struct fieldstat_easy *pthis, const char *output_path, int interval_second);
+
+/*
+    affect the output of fieldstat_easy_output and fieldstat_easy_output_array.
+    let json exporter output delta value by the side of the original value(accumulated). If a cell / metric is new, the delta value is the same as the original value.
+    Outputting delta value is disabled by default.
+    When the fieldstat instance is reset, the delta value will be reset. (next output will be the original value)
+    Only affects the metrics of counter type.
+    Outputting delta value is time-consuming. Be cautious when enabling it.
+*/
+void fieldstat_easy_enable_delta_in_active_output(struct fieldstat_easy *fse);
+
 /*
     * @brief add a metric to the cube of cube_id. One metric may be associated with different cells.
     * @param metric_name: name of the metric. Cannot be NULL. Must be unique.
