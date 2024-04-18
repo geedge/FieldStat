@@ -379,6 +379,9 @@ void write_delta_to_json(struct fieldstat_json_exporter *exporter, struct cellwi
 {
     // for every tag_field_pair, get the tag json string
     const char *tag_json = json_writer_unwrap(tag_field_pair->cjson_tags);
+    if (tag_json == NULL) {
+        tag_json = "\a\t\a"; // just a dummy string
+    }
     for (int j = 0; j < tag_field_pair->n_metric; j++) {
         if (tag_field_pair->metric_pairs[j]->type != TAG_INTEGER) { // only counter type need to write delta
             continue;

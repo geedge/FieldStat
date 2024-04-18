@@ -42,15 +42,15 @@ TEST(test_easy_fieldstat, output_to_buff)
 
 TEST(test_easy_fieldstat, output_to_buff_with_delta)
 {
-    struct fieldstat_easy *fse = fieldstat_easy_new(10, NULL, &TEST_TAG_STRING, 1);
+    struct fieldstat_easy *fse = fieldstat_easy_new(1, NULL, NULL, 0);
     fieldstat_easy_enable_delta_in_active_output(fse);
     fieldstat_easy_register_counter(fse, "metric counter");
-    fieldstat_easy_counter_incrby(fse, 0, 0, &TEST_TAG_INT, 1, 1);
+    fieldstat_easy_counter_incrby(fse, 0, 0, NULL, 0, 1);
     char *buff = NULL;
     size_t buff_len = 0;
     fieldstat_easy_output(fse, &buff, &buff_len);
     free(buff);
-    fieldstat_easy_counter_incrby(fse, 0, 0, &TEST_TAG_INT, 1, 1);
+    fieldstat_easy_counter_incrby(fse, 0, 0, NULL, 0, 1);
     fieldstat_easy_output(fse, &buff, &buff_len);
 
     cJSON *root = cJSON_Parse(buff);
