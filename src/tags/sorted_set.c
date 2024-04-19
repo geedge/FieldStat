@@ -3,7 +3,6 @@
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
-#include <limits.h>
 
 #include "my_ut_hash_inner.h"
 #include "xxhash/xxhash.h"
@@ -213,8 +212,8 @@ bool sorted_set_check_is_full(const struct sorted_set *ss)
 
 unsigned long long safe_add(unsigned long long a, unsigned long long b)
 {
-    if (ULLONG_MAX - a < b) {
-        return ULLONG_MAX;
+    if (UINT64_MAX - a < b) {
+        return UINT64_MAX;
     }
     return a + b;
 }

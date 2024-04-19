@@ -9,7 +9,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include <limits.h>
 
 #include "minheap/heap.h"
 #include "mpack/mpack.h"
@@ -158,8 +157,8 @@ struct Bucket *map_flow_id_hash_to_bucket(struct heavy_keeper *hk, int array_ind
 }
 
 unsigned long long count_add(unsigned long long a, unsigned long long b) {
-    if (a > LLONG_MAX - b) {
-        return LLONG_MAX;
+    if (a > UINT64_MAX - b) {
+        return UINT64_MAX;
     }
     return a + b;
 }
@@ -434,7 +433,7 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
     int cell_id_in_src_before_merge_len = 0;
     int cell_id_in_dest_corresponding[dest->K]; // length == cell_id_in_src_before_merge_len
 
-    /* ------------------------------ merge dest ------------------------------ *
+    /* ------------------------------ merge dest ------------------------------ */
     for (int i = 0; i < size_dest; i++) {
         unsigned long long maxv = find_maxv_in_sketch(dest, tag_arr[i]);
         assert(tag_arr[i] != NULL);
