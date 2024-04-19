@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <limits.h>
 
 #include "minheap/heap.h"
 #include "mpack/mpack.h"
@@ -157,8 +158,8 @@ struct Bucket *map_flow_id_hash_to_bucket(struct heavy_keeper *hk, int array_ind
 }
 
 unsigned long long count_add(unsigned long long a, unsigned long long b) {
-    if (a > UINT64_MAX - b) {
-        return UINT64_MAX;
+    if (a > LLONG_MAX - b) {
+        return LLONG_MAX;
     }
     return a + b;
 }
@@ -335,7 +336,7 @@ static void heavy_keeper_merge_sketch(struct heavy_keeper *dest, const struct he
             const struct Bucket *bucket_src = &(src->sketch[array_id * w + bucket_id]);
 
             if (bucket_dest->finger_print == bucket_src->finger_print) {
-                bucket_dest->count += bucket_src->count;
+                bucket_dest->count = count_add(bucket_dest->count, bucket_src->count);
             } else {
                 if (bucket_dest->count < bucket_src->count) {  // bucket_src stores the elephant flow.
                     bucket_dest->count = bucket_src->count;
@@ -433,7 +434,7 @@ void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *des
     int cell_id_in_src_before_merge_len = 0;
     int cell_id_in_dest_corresponding[dest->K]; // length == cell_id_in_src_before_merge_len
 
-    /* ------------------------------ merge dest ------------------------------ */
+    /* ------------------------------ merge dest ------------------------------ *
     for (int i = 0; i < size_dest; i++) {
         unsigned long long maxv = find_maxv_in_sketch(dest, tag_arr[i]);
         assert(tag_arr[i] != NULL);

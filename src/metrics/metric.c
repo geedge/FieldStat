@@ -4,6 +4,8 @@
 #include <assert.h>
 #include <string.h>
 #include <stdarg.h>
+#include <limits.h>
+
 
 #include "uthash.h"
 #include "histogram_encoder.h"
@@ -711,11 +713,22 @@ struct metric *metric_counter_new(const char *name)
     return pthis;
 }
 
+long long safe_add_longlong(long long a, long long b)
+{
+    if (a > 0 && b > LLONG_MAX - a) {
+        return LLONG_MAX;
+    }
+    if (a < 0 && b < LLONG_MIN - a) {
+        return LLONG_MIN;
+    }
+    return a + b;
+}
+
 void metric_counter_incrby(struct metric *pthis, int cell_id, long long value)
 {
     struct metric_measure_data *data = metric_find_or_new_cell(pthis, cell_id);
     struct metric_counter_or_gauge *counter = data->counter;
-    counter->value += value;
+    counter->value = safe_add_longlong(counter->value, value);
 }
 
 int metric_counter_set(struct metric *pthis, int cell_id, long long value)

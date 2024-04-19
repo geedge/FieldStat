@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
+#include <limits.h>
 
 #include "my_ut_hash_inner.h"
 #include "xxhash/xxhash.h"
@@ -210,14 +211,17 @@ bool sorted_set_check_is_full(const struct sorted_set *ss)
     return ss->heap->cur_size >= ss->heap->max_size;
 }
 
+unsigned long long safe_add(unsigned long long a, unsigned long long b)
+{
+    if (ULLONG_MAX - a < b) {
+        return ULLONG_MAX;
+    }
+    return a + b;
+}
+
 void sorted_set_insert_to_available_heap(struct sorted_set *ss, const struct tag_hash_key *tag, unsigned long long cnt, int cell_id)
 {
-    // cnt += 1; // sorted set will let the count start from 1, 0 for dying entry.
-    if (cnt >= UINT64_MAX) {
-        cnt = UINT64_MAX;
-    } else {
-        cnt += 1; // sorted set will let the count start from 1, 0 for dying entry.
-    }
+    cnt = safe_add(cnt, 1); // sorted set will let the count start from 1, 0 for dying entry.
     unsigned long long *tmp_cnt = (unsigned long long*)malloc(sizeof(unsigned long long));
     *tmp_cnt = cnt;
     struct entry_data *tmp_data = entry_data_construct(tag, cell_id);
@@ -267,12 +271,8 @@ int sorted_set_insert_and_record_popped_back(struct sorted_set *ss, const struct
         if (!sorted_set_entry_dying(entry)) {
             return -1;
         }
-        if (cnt >= UINT64_MAX) {
-            cnt = UINT64_MAX;
-        } else {
-            cnt += 1; // sorted set will let the count start from 1, 0 for dying entry.
-        }
-        sorted_set_entry_set_key(ss, entry, cnt); // count 0 for dying entry.
+        
+        sorted_set_entry_set_key(ss, entry, safe_add(cnt, 1)); // sorted set will let the count start from 1, 0 for dying entry.
         struct entry_data *data = sorted_set_entry_get_data(entry);
         data->cell_id = cell_id;
         ss->n_living_entry++;
@@ -350,7 +350,8 @@ int sorted_set_incrby(struct sorted_set *ss, const struct tag_hash_key *tag, uns
     if (entry == NULL) {
         return -1;
     }
-    sorted_set_entry_set_key(ss, entry, sorted_set_entry_get_count(entry) + count);
+    unsigned long long cnt_old = sorted_set_entry_get_count(entry);
+    sorted_set_entry_set_key(ss, entry, safe_add(count, cnt_old));
     return 0;
 }
 
