@@ -58,9 +58,9 @@ void entry_data_destroy(struct entry_data *entry_data)
     free(entry_data);
 }
 
-unsigned sorted_set_entry_get_count(const heap_entry *entry)
+unsigned long long sorted_set_entry_get_count(const heap_entry *entry)
 {
-    unsigned count = *(unsigned *)entry->key;
+    unsigned long long count = *(unsigned long long *)entry->key;
     if (count == 0) {
         return 0;
     }
@@ -86,7 +86,7 @@ struct entry_data *sorted_set_entry_get_data(const heap_entry *entry)
 */
 bool sorted_set_entry_dying(const heap_entry *entry)
 {
-    unsigned count = *(unsigned *)entry->key;
+    unsigned long long count = *(unsigned long long *)entry->key;
     return count == 0;    
 }
 
@@ -156,21 +156,21 @@ heap_entry *sorted_set_find_entry(const struct sorted_set *ss, const struct tag_
     return (heap_entry *)s->val;
 }
 
-void sorted_set_entry_set_key(struct sorted_set *ss, heap_entry *entry, unsigned count)
+void sorted_set_entry_set_key(struct sorted_set *ss, heap_entry *entry, unsigned long long count)
 {
-    *(unsigned *)(entry->key) = count;
+    *(unsigned long long *)(entry->key) = count;
 
     adjust_heap_node(ss->heap, entry);
 }
 
-unsigned sorted_set_pop_and_record_popped_back(struct sorted_set *ss, int *popped_cell_id)
+unsigned long long sorted_set_pop_and_record_popped_back(struct sorted_set *ss, int *popped_cell_id)
 {
     struct hash_node *hash_tbl = ss->hash_tbl;
     heap_entry *entry = (heap_entry *)pop_heap(ss->heap);
     if (entry == NULL) {
         return 0;
     }
-    unsigned count_ret = sorted_set_entry_get_count(entry);
+    unsigned long long count_ret = sorted_set_entry_get_count(entry);
     struct entry_data *tmp_data = sorted_set_entry_get_data(entry);
 
     struct hash_node *s = NULL;
@@ -197,10 +197,10 @@ unsigned sorted_set_pop_and_record_popped_back(struct sorted_set *ss, int *poppe
     return count_ret;
 }
 
-unsigned sorted_set_pop(struct sorted_set *ss)
+unsigned long long sorted_set_pop(struct sorted_set *ss)
 {
     int dummy;
-    unsigned count_ret = sorted_set_pop_and_record_popped_back(ss, &dummy);
+    unsigned long long count_ret = sorted_set_pop_and_record_popped_back(ss, &dummy);
     
     return count_ret;
 }
@@ -210,10 +210,15 @@ bool sorted_set_check_is_full(const struct sorted_set *ss)
     return ss->heap->cur_size >= ss->heap->max_size;
 }
 
-void sorted_set_insert_to_available_heap(struct sorted_set *ss, const struct tag_hash_key *tag, unsigned cnt, int cell_id)
+void sorted_set_insert_to_available_heap(struct sorted_set *ss, const struct tag_hash_key *tag, unsigned long long cnt, int cell_id)
 {
-    cnt += 1; // sorted set will let the count start from 1, 0 for dying entry.
-    unsigned *tmp_cnt = (unsigned *)malloc(sizeof(unsigned));
+    // cnt += 1; // sorted set will let the count start from 1, 0 for dying entry.
+    if (cnt >= UINT64_MAX) {
+        cnt = UINT64_MAX;
+    } else {
+        cnt += 1; // sorted set will let the count start from 1, 0 for dying entry.
+    }
+    unsigned long long *tmp_cnt = (unsigned long long*)malloc(sizeof(unsigned long long));
     *tmp_cnt = cnt;
     struct entry_data *tmp_data = entry_data_construct(tag, cell_id);
     heap_entry *node = (heap_entry *)malloc(sizeof(heap_entry));
@@ -232,7 +237,7 @@ void sorted_set_insert_to_available_heap(struct sorted_set *ss, const struct tag
     ss->n_living_entry++;
 }
 
-int sorted_set_insert(struct sorted_set *ss, const struct tag_hash_key *tag, unsigned cnt, int cell_id)
+int sorted_set_insert(struct sorted_set *ss, const struct tag_hash_key *tag, unsigned long long cnt, int cell_id)
 {
     assert(cell_id >= 0);
     assert(tag != NULL);
@@ -249,7 +254,7 @@ int sorted_set_insert(struct sorted_set *ss, const struct tag_hash_key *tag, uns
     return 1;
 }
 
-int sorted_set_insert_and_record_popped_back(struct sorted_set *ss, const struct tag_hash_key *tag, unsigned cnt, int cell_id, int *popped_user_data)
+int sorted_set_insert_and_record_popped_back(struct sorted_set *ss, const struct tag_hash_key *tag, unsigned long long cnt, int cell_id, int *popped_user_data)
 {
     assert(cell_id >= 0);
     assert(tag != NULL);
@@ -262,7 +267,12 @@ int sorted_set_insert_and_record_popped_back(struct sorted_set *ss, const struct
         if (!sorted_set_entry_dying(entry)) {
             return -1;
         }
-        sorted_set_entry_set_key(ss, entry, cnt + 1); // count 0 for dying entry.
+        if (cnt >= UINT64_MAX) {
+            cnt = UINT64_MAX;
+        } else {
+            cnt += 1; // sorted set will let the count start from 1, 0 for dying entry.
+        }
+        sorted_set_entry_set_key(ss, entry, cnt); // count 0 for dying entry.
         struct entry_data *data = sorted_set_entry_get_data(entry);
         data->cell_id = cell_id;
         ss->n_living_entry++;
@@ -285,7 +295,7 @@ int sorted_set_insert_and_record_popped_back(struct sorted_set *ss, const struct
     return popped ? 2 : 1;
 }
 
-unsigned sorted_set_get_min_count(const struct sorted_set *ss)
+unsigned long long sorted_set_get_min_count(const struct sorted_set *ss)
 {   
     heap *heap = ss->heap;
     if (heap->cur_size == 0) {
@@ -293,14 +303,14 @@ unsigned sorted_set_get_min_count(const struct sorted_set *ss)
     }
     const heap_entry *ret = (heap_entry *)(heap->nodes[0]);
 
-    unsigned int count = *(unsigned int *)ret->key;
+    unsigned long long count = *(unsigned long long *)ret->key;
     if (count == 0) {
         return 0;
     }
     return count - 1; // sorted set will let the count start from 1, 0 for dying entry.
 }
 
-unsigned sorted_set_get_count(const struct sorted_set *ss, const struct tag_hash_key *tag)
+unsigned long long sorted_set_get_count(const struct sorted_set *ss, const struct tag_hash_key *tag)
 {
     if (sorted_set_cardinality(ss) == 0) {
         return 0;
@@ -334,7 +344,7 @@ int sorted_set_cardinality(const struct sorted_set *ss)
     return ss->n_living_entry;
 }
 
-int sorted_set_incrby(struct sorted_set *ss, const struct tag_hash_key *tag, unsigned count)
+int sorted_set_incrby(struct sorted_set *ss, const struct tag_hash_key *tag, unsigned long long count)
 {
     heap_entry *entry = sorted_set_find_entry(ss, tag);
     if (entry == NULL) {
@@ -345,7 +355,7 @@ int sorted_set_incrby(struct sorted_set *ss, const struct tag_hash_key *tag, uns
 }
 
 typedef struct {
-    unsigned key;
+    unsigned long long key;
     struct entry_data *val;
 } tmp_heap_node;
 
@@ -363,7 +373,7 @@ int cmp_tmp_heap_node(const void *a, const void *b)
     }
 }
 
-void sorted_set_dump(const struct sorted_set *ss, unsigned *scores_out, struct tag_hash_key **tags_out, int *user_data_out)
+void sorted_set_dump(const struct sorted_set *ss, unsigned long long *scores_out, struct tag_hash_key **tags_out, int *user_data_out)
 {
     struct minheap *h = ss->heap;
     tmp_heap_node *tmp_nodes = (tmp_heap_node *)malloc(sizeof(tmp_heap_node) * h->cur_size);
@@ -416,14 +426,14 @@ void sorted_set_reset(struct sorted_set *ss)
     struct hash_node *h_node, *tmp;
     HASH_ITER(hh, tbl, h_node, tmp) {
         heap_entry *entry = (heap_entry *)h_node->val;
-        *(unsigned *)entry->key = 0;
+        *(unsigned long long *)entry->key = 0;
     }
 
     heap *heap = ss->heap;
     heap_entry *entry;
     for (int i = 0; i < heap->cur_size; i++) {
         entry = (heap_entry *)heap->nodes[i];
-        *(unsigned *)entry->key = 0;
+        *(unsigned long long *)entry->key = 0;
     }
 
     ss->n_living_entry = 0;

@@ -152,7 +152,7 @@ long long cell_manager_get_count_by_tag(const struct cell_manager *pthis, const 
         return -1;
     }
 
-    unsigned int count = 0;
+    unsigned long long int count = 0;
     int ret = heavy_keeper_query_one(pthis->topk_tag_id_map, tag, &count, NULL);
     if (ret == -1) {
         return -1;
@@ -191,7 +191,7 @@ int cell_manager_add_cell(struct cell_manager *pthis, const struct tag_hash_key 
     return pthis->next_cell_id++;
 }
 
-int cell_manager_add_cell_topk(struct cell_manager *pthis, const struct tag_hash_key *tag, unsigned int count, int *popped_cell_id)
+int cell_manager_add_cell_topk(struct cell_manager *pthis, const struct tag_hash_key *tag, unsigned long long int count, int *popped_cell_id)
 {
     int ret = heavy_keeper_add(pthis->topk_tag_id_map, tag, count, pthis->next_cell_id, popped_cell_id);
     if (ret == -1) { // didn't add

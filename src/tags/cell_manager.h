@@ -20,7 +20,7 @@ int cell_manager_find(const struct cell_manager *pthis, const struct tag_hash_ke
 int cell_manager_get_cardinality(const struct cell_manager *pthis);
 
 int cell_manager_add_cell(struct cell_manager *pthis, const struct tag_hash_key *tag);
-int cell_manager_add_cell_topk(struct cell_manager *pthis, const struct tag_hash_key *tag, unsigned int count, int *popped_cell_id);
+int cell_manager_add_cell_topk(struct cell_manager *pthis, const struct tag_hash_key *tag, unsigned long long int count, int *popped_cell_id);
 int cell_manager_delete_cell(struct cell_manager *pthis, const struct tag_hash_key *tag);
 
 void cell_manager_merge_topk(struct cell_manager *dest, const struct cell_manager *src, 
