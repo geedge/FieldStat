@@ -18,10 +18,6 @@
 #include "tags/sorted_set.h"
 #include "tags/my_ut_hash.h"
 
-#define assert(s) do { if (!(s)) { printf("assert failed: %s\n", #s);   \
-        *((int *)0) = 0;   \
-    } \
-    } while (0)
 
 struct Bucket {
     unsigned int finger_print;
@@ -226,7 +222,7 @@ static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_
     }
 
     unsigned long long int tmp_cnt = sorted_set_get_count(summary, tag);
-    if (tmp_cnt == 0) {  // the flow is not in sorted set
+    if (tmp_cnt == INVALID_COUNT) {  // the flow is not in sorted set
         if ((maxv - nMin <= count && maxv != nMin) || sorted_set_cardinality(summary) != heavy_keeper->K) {
             assert(cell_id >= 0);
             assert(tag != NULL);
@@ -302,7 +298,7 @@ int heavy_keeper_query_one(const struct heavy_keeper *hk, const struct tag_hash_
 {
     if (count_out != NULL) {
         unsigned long long int count = sorted_set_get_count(hk->top_K_heap, tag);
-        if (count == 0) {
+        if (count == INVALID_COUNT) {
             *count_out = 0;
             return -1;
         }

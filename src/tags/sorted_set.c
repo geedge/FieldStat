@@ -11,10 +11,6 @@
 #include "sorted_set.h"
 #include "my_ut_hash.h"
 
-#define assert(s) do { if (!(s)) { printf("assert failed: %s\n", #s);   \
-        *((int *)0) = 0;   \
-    } \
-    } while (0)
 
 struct entry_data {
     struct tag_hash_key *key;
@@ -312,11 +308,14 @@ unsigned long long sorted_set_get_min_count(const struct sorted_set *ss)
 unsigned long long sorted_set_get_count(const struct sorted_set *ss, const struct tag_hash_key *tag)
 {
     if (sorted_set_cardinality(ss) == 0) {
-        return 0;
+        return INVALID_COUNT;
     }
     const heap_entry *entry = sorted_set_find_entry(ss, tag);
     if (entry == NULL) {
-        return 0;
+        return INVALID_COUNT;
+    }
+    if (sorted_set_entry_dying(entry)) {
+        return INVALID_COUNT;
     }
 
     return sorted_set_entry_get_count(entry);

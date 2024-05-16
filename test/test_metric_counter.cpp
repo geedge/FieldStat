@@ -268,6 +268,38 @@ TEST(metric_test_counter, set_on_primary_metric_going_bigger)
     fieldstat_free(instance);
 }
 
+TEST(metric_test_counter, primary_counter_add_after_first)
+{
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 10);
+    int metric_id_primary = fieldstat_register_counter(instance, "primary");
+    int metric_id2 = fieldstat_register_counter(instance, "using");
+    fieldstat_cube_set_primary_metric(instance, cube_id, metric_id_primary);
+
+
+    int ret = fieldstat_counter_incrby(instance, cube_id, metric_id2, &TEST_TAG_INT, 1, 10);
+    EXPECT_EQ(ret, FS_OK);
+    ret = fieldstat_counter_incrby(instance, cube_id, metric_id_primary, &TEST_TAG_INT, 1, 20);
+    EXPECT_EQ(ret, FS_OK);
+
+    EXPECT_EQ(my_fieldstat_counter_get(instance, cube_id, metric_id_primary), 20);
+    EXPECT_EQ(my_fieldstat_counter_get(instance, cube_id, metric_id2), 10);
+
+    // TOPK functions well
+    struct fieldstat_tag tag = TEST_TAG_INT;
+    for (int i = 0; i < 9; i++) {
+        tag.value_longlong = i + 123;
+        ret = fieldstat_counter_incrby(instance, cube_id, metric_id_primary, &tag, 1, 1 + i);
+        EXPECT_EQ(ret, FS_OK);
+    }
+    // now the TOPK is full, add a new one
+    tag.value_longlong = 321;
+    ret = fieldstat_counter_incrby(instance, cube_id, metric_id_primary, &tag, 1, 1);
+    EXPECT_EQ(ret, FS_ERR_TOO_MANY_CELLS);
+
+    fieldstat_free(instance);
+}
+
 TEST(metric_test_counter, topk_set_and_test_accuracy)
 {
     struct fieldstat *instance = fieldstat_new();

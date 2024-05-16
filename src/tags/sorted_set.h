@@ -7,6 +7,8 @@
 extern "C"{
 #endif
 
+#define INVALID_COUNT UINT64_MAX
+
 struct sorted_set;
 
 /**
