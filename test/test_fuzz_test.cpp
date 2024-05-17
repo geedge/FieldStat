@@ -327,6 +327,45 @@ TEST(Fuzz_test, many_instance_random_flow_unregister_calibrate_reset_fork_merge_
     }
 }
 
+TEST(Fuzz_test, add_and_reset_with_randomly_generated_flows_and_randomly_chosen_metric)
+{
+    const int FLOW_NUM = 50000;
+    
+    Fieldstat_tag_list_wrapper *tag_list_wrapper[FLOW_NUM];
+    fill_with_elephant_flows(tag_list_wrapper, FLOW_NUM);
+
+    struct fieldstat *instance = fieldstat_new();
+    int primary_metric_id = fieldstat_register_counter(instance, "counter");
+    int counter2_id = fieldstat_register_counter(instance, "counter2");
+    int cube_id = fieldstat_create_cube(instance,NULL,0,SAMPLING_MODE_TOPK, 1); // K = 1, just to increase the possibility of FS_ERR_TOO_MANY_CELLS
+    fieldstat_counter_incrby(instance, cube_id, primary_metric_id, tag_list_wrapper[0]->get_tag(), tag_list_wrapper[0]->get_tag_count(), 1);
+    fieldstat_counter_incrby(instance, cube_id, counter2_id, tag_list_wrapper[0]->get_tag(), tag_list_wrapper[0]->get_tag_count(), 1);
+
+    struct fieldstat_tag_list tag_list_tmp = {NULL, 0};
+
+    for(int i = 0; i < FLOW_NUM; i++) {
+        int using_id = rand() % 2 == 0 ? primary_metric_id : counter2_id;
+
+        int ret = fieldstat_counter_incrby(instance, cube_id, using_id, tag_list_wrapper[i]->get_tag(), tag_list_wrapper[i]->get_tag_count(), 1);
+        if (ret == FS_ERR_TOO_MANY_CELLS) {
+            struct fieldstat_tag_list *tag_list = NULL;
+            size_t n_cell = 0;
+            fieldstat_get_cells_used_by_cube(instance, cube_id, &tag_list, &n_cell);
+            ASSERT_EQ(n_cell, 1);
+
+            long long value;
+            tag_list_tmp.tag = (struct fieldstat_tag *)tag_list_wrapper[i]->get_tag();
+            tag_list_tmp.n_tag = tag_list_wrapper[i]->get_tag_count();
+            int counter_exist = fieldstat_counter_get(instance, cube_id, using_id, &tag_list_tmp, &value);
+            ASSERT_EQ(counter_exist, FS_ERR_INVALID_TAG); // the tag is not added to the cube
+            fieldstat_tag_list_arr_free(tag_list, n_cell);
+        }
+
+        if (i % 1000 == 0) {
+            fieldstat_reset(instance);
+        }
+    }
+}
 
 int main(int argc, char *argv[]) 
 {

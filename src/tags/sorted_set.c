@@ -244,7 +244,8 @@ int sorted_set_insert(struct sorted_set *ss, const struct tag_hash_key *tag, uns
     assert(tmp_v >= 0);
 
     if (sorted_set_check_is_full(ss)) {
-        if (cnt <= sorted_set_get_min_count(ss)) {
+        unsigned long long tmp_mincnt = sorted_set_get_min_count(ss);
+        if (tmp_mincnt != INVALID_COUNT && cnt <= tmp_mincnt) { // even if all cells in sorted set are dying, the sorted set can still be a full one, in which case, the min count is invalid.
             return 0;
         }
         sorted_set_pop(ss);
@@ -266,7 +267,6 @@ int sorted_set_insert_and_record_popped_back(struct sorted_set *ss, const struct
         if (!sorted_set_entry_dying(entry)) {
             return -1;
         }
-        
         sorted_set_entry_set_key(ss, entry, safe_add(cnt, 1)); // sorted set will let the count start from 1, 0 for dying entry.
         struct entry_data *data = sorted_set_entry_get_data(entry);
         data->cell_id = cell_id;
@@ -276,7 +276,8 @@ int sorted_set_insert_and_record_popped_back(struct sorted_set *ss, const struct
 
     bool popped = false;
     if (sorted_set_check_is_full(ss)) {
-        if (cnt <= sorted_set_get_min_count(ss)) {
+        unsigned long long tmp_mincnt = sorted_set_get_min_count(ss);
+        if (tmp_mincnt != INVALID_COUNT && cnt <= tmp_mincnt) { // even if all cells in sorted set are dying, the sorted set can still be a full one, in which case, the min count is invalid.
             return 0;
         }
         sorted_set_pop_and_record_popped_back(ss, popped_user_data);
@@ -294,13 +295,13 @@ unsigned long long sorted_set_get_min_count(const struct sorted_set *ss)
 {   
     heap *heap = ss->heap;
     if (heap->cur_size == 0) {
-        return 0;
+        return INVALID_COUNT;
     }
     const heap_entry *ret = (heap_entry *)(heap->nodes[0]);
 
     unsigned long long count = *(unsigned long long *)ret->key;
     if (count == 0) {
-        return 0;
+        return INVALID_COUNT;
     }
     return count - 1; // sorted set will let the count start from 1, 0 for dying entry.
 }
