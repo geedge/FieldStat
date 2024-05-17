@@ -89,7 +89,12 @@ bool sorted_set_entry_dying(const heap_entry *entry)
 // cppcheck-suppress [constParameterCallback, unmatchedSuppression]
 static bool cmp_int(void *aa, void *bb)
 {
-    if (sorted_set_entry_get_count(aa) < sorted_set_entry_get_count(bb)) {
+    heap_entry *a = (heap_entry *)aa;
+    heap_entry *b = (heap_entry *)bb;
+    unsigned long long count_a = *(unsigned long long *)a->key;
+    unsigned long long count_b = *(unsigned long long *)b->key;
+
+    if (count_a < count_b) {
         return true;
     }
     return false;
@@ -349,7 +354,13 @@ int sorted_set_incrby(struct sorted_set *ss, const struct tag_hash_key *tag, uns
     if (entry == NULL) {
         return -1;
     }
-    unsigned long long cnt_old = sorted_set_entry_get_count(entry);
+    unsigned long long cnt_old;
+    if (sorted_set_entry_dying(entry) == false) {
+        cnt_old = sorted_set_entry_get_count(entry);
+        cnt_old += 1; // sorted set will let the count start from 1, 0 for dying entry.
+    } else {
+        cnt_old = 0;
+    }
     sorted_set_entry_set_key(ss, entry, safe_add(count, cnt_old));
     return 0;
 }
