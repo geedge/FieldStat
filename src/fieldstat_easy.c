@@ -295,16 +295,14 @@ void fieldstat_easy_output_array(struct fieldstat_easy *fse, char ***json_object
 int fieldstat_easy_output_array_and_reset(struct fieldstat_easy *fse, char ***json_objects, size_t *n_object)
 {
     if (fse->output_thread_running) {
-        printf("fieldstat_easy_output_array_and_reset: reset is not allowed when auto output is enabled.\n");
+        printf("fieldstat_easy_output_array_and_reset: Output is not allowed when auto output is enabled.\n");
         return -1;
     }
 
     struct fieldstat *dst = fieldstat_new();
     for (int i = 0; i < fse->max_thread_num; i++) {
-        pthread_spin_lock(&fse->fsu[i].lock);
-        fieldstat_merge(dst, fse->fsu[i].active);
-        fieldstat_reset(fse->fsu[i].active);
-        pthread_spin_unlock(&fse->fsu[i].lock);
+        rcu_reclaim_handler(fse->fsu + i);
+        fieldstat_merge(dst, fse->fsu[i].read_only);
     }
 
     struct timeval timestamp = get_current_timestamp();
