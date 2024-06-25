@@ -116,23 +116,40 @@ void heavy_keeper_free(struct heavy_keeper *hk) {
 
 /*********************************add and query*************************************/
 /***********************************************************************************/
-bool if_need_to_decay(struct heavy_keeper *hk, struct Bucket *bucket, unsigned long long count) {
-    if (bucket->count == 0) {
-        return true;
-    }
+const double DECAY_POW_TABLE[147] = { // 1.17 ^ exp, exp is in [0,146]
+    1.0,0.8547008547009,0.7305135510264,0.6243705564328,0.5336500482332,0.456111152336,0.3898385917402,0.3331953775557,0.2847823739793,0.2434037384438,0.2080373832853,0.1778097293037,0.15197412761,
+    0.1298924167607,0.1110191596245,0.0948881706192,0.0811010005293,0.0693170944695,0.0592453798884,0.0506370768277,0.0432795528442,0.036991070807,0.031616299835,0.0270224784915,0.0230961354628,0.0197402867204,
+    0.0168720399319,0.0144205469504,0.0123252538037,0.0105344049605,0.0090037649235,0.0076955255756,0.0065773722868,0.0056216857153,0.0048048595857,0.0041067175946,0.0035100150381,0.0030000128531,0.0025641135497,
+    0.0021915500424,0.0018731196944,0.0016009570038,0.0013683393194,0.0011695207859,0.0009995904153,0.0008543507823,0.0007302143438,0.0006241148238,0.0005334314733,0.0004559243362,0.0003896789198,0.0003330589058,
+    0.0002846657315,0.000243304044,0.0002079521743,0.0001777369012,0.0001519118813,0.0001298392148,0.0001109736879,0.0000948493059,0.0000810677828,0.0000692887032,0.0000592211139,0.0000506163367,0.0000432618262,
+    0.0000369759198,0.0000316033503,0.0000270114105,0.0000230866756,0.0000197322014,0.0000168651294,0.0000144146405,0.0000123202056,0.0000105300902,0.0000090000771,0.0000076923736,0.0000065746783,0.0000056193832,
+    0.0000048028916,0.0000041050355,0.0000035085774,0.0000029987841,0.0000025630633,0.0000021906524,0.0000018723525,0.0000016003013,0.0000013677789,0.0000011690418,0.000000999181,0.0000008540009,0.0000007299153,
+    0.0000006238592,0.000000533213,0.0000004557376,0.0000003895193,0.0000003329225,0.0000002845491,0.0000002432044,0.000000207867,0.0000001776641,0.0000001518497,0.000000129786,0.0000001109282,0.0000000948105,
+    0.0000000810346,0.0000000692603,0.0000000591969,0.0000000505956,0.0000000432441,0.0000000369608,0.0000000315904,0.0000000270003,0.0000000230772,0.0000000197241,0.0000000168582,0.0000000144087,0.0000000123152,
+    0.0000000105258,0.0000000089964,0.0000000076892,0.000000006572,0.0000000056171,0.0000000048009,0.0000000041034,0.0000000035071,0.0000000029976,0.000000002562,0.0000000021898,0.0000000018716,0.0000000015996,
+    0.0000000013672,0.0000000011686,0.0000000009988,0.0000000008537,0.0000000007296,0.0000000006236,0.000000000533,0.0000000004556,0.0000000003894,0.0000000003328,0.0000000002844,0.0000000002431,0.0000000002078,
+    0.0000000001776,0.0000000001518,0.0000000001297,0.0000000001109
+};
+
+bool if_need_to_decay(struct heavy_keeper *hk, const struct Bucket *bucket, unsigned long long count) {
     if (count == 0) {
         return false;
     }
+    if (bucket->count < count) { // the exp is 0, so the decay rate is 1
+        return true;
+    }
 
-    double exp = (double)bucket->count / count;
-    if (exp > 250) {  // decay_exp_rate ^ (-250) is very small, so regard the chance as 0.
+    unsigned long long exp = bucket->count / count;
+    if (exp > 146) {  // 1.17 ^ 146 < 1 / RAND_MAX < rand_r / RAND_MAX, so there is no chance to decay 
         return false;
     }
 
     double r = (double)rand_r(&(hk->rand_state)) / (double)RAND_MAX;
 
-    double b = hk->params.decay_exp_rate;
-    double decay_rate = pow(b, -exp);
+    // double b = hk->params.decay_exp_rate;
+    // double decay_rate = pow(b, -exp);
+    // p->decay_exp_rate = 1.17 is fixed, search table to get result directly.
+    double decay_rate = DECAY_POW_TABLE[exp];
 
     if (r < decay_rate) {
         return true;
@@ -190,6 +207,11 @@ static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_
     struct sorted_set *summary = heavy_keeper->top_K_heap;
 
     unsigned nMin = sorted_set_get_min_count(summary);
+    if (nMin == INVALID_COUNT) {
+        nMin = 0;
+    }
+    unsigned long long int old_cnt = sorted_set_get_count(summary, tag);
+    bool not_in_sorted_set = (old_cnt == INVALID_COUNT);
     unsigned long long maxv = 0;
     
     unsigned int FP = tag_hash_key_cal_hash_val(tag, FP_HASH_KEY);
@@ -201,7 +223,7 @@ static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_
             // The flows whose counts are both larger than nmin and not in min-heap must have the same xxhash value, and its FP stored in bucket represents another tag,
             // In this case, the sketch won't be updated. This flow is expected to be taken into account in another array,
             //  where its FP is different from the one it should collided with, so that element flows won't be missed.
-            if (bucket->count > nMin && sorted_set_get_cell_id(summary, tag) == -1) {
+            if (bucket->count > nMin && not_in_sorted_set) {
                 continue;
             }
             bucket->count = count_add(bucket->count, count);
@@ -221,8 +243,8 @@ static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_
         }
     }
 
-    unsigned long long int tmp_cnt = sorted_set_get_count(summary, tag);
-    if (tmp_cnt == INVALID_COUNT) {  // the flow is not in sorted set
+    
+    if (not_in_sorted_set) {
         if ((maxv - nMin <= count && maxv != nMin) || sorted_set_cardinality(summary) != heavy_keeper->K) {
             assert(cell_id >= 0);
             assert(tag != NULL);
@@ -243,8 +265,8 @@ static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_
         }
         return -1; // the flow is not added to the sorted set
     } else {
-        if (maxv > tmp_cnt) {
-            sorted_set_incrby(summary, tag, maxv - tmp_cnt);
+        if (maxv > old_cnt) {
+            sorted_set_incrby(summary, tag, maxv - old_cnt);
         }
         return 1; // no popped, but the tag definitely exists in the sorted set
     }

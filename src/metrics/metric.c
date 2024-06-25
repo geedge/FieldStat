@@ -82,7 +82,7 @@ struct metric {
 /* -------------------------------------------------------------------------- */
 /*                                 id cell map                                */
 /* -------------------------------------------------------------------------- */
-struct metric_measure_data *metric_find_one_cell(const struct metric *pthis, int id) {
+static inline struct metric_measure_data *metric_find_one_cell(const struct metric *pthis, int id) {
     if (id >= pthis->max_n_array_item) {
         return NULL;
     }
@@ -694,10 +694,10 @@ void metric_delete_cell(struct metric *pthis, int cell_id)
 /*                           metric operations                                */ 
 /* -------------------------------------------------------------------------- */
 
-struct metric_measure_data *metric_find_or_new_cell(struct metric *pthis, int cell_id)
+static inline struct metric_measure_data *metric_find_or_new_cell(struct metric *pthis, int cell_id)
 {
     struct metric_measure_data *data = metric_find_one_cell(pthis, cell_id);
-
+    
     if (data == NULL) {
         data = pthis->scheme->new(pthis->info->paras);
         metric_add_one_cell(pthis, cell_id, data);
@@ -713,30 +713,16 @@ struct metric *metric_counter_new(const char *name)
     return pthis;
 }
 
-long long safe_add_longlong(long long a, long long b)
-{
-    if (a > 0 && b > LLONG_MAX - a) {
-        return LLONG_MAX;
-    }
-    if (a < 0 && b < LLONG_MIN - a) {
-        return LLONG_MIN;
-    }
-    return a + b;
-}
-
 void metric_counter_incrby(struct metric *pthis, int cell_id, long long value)
 {
     struct metric_measure_data *data = metric_find_or_new_cell(pthis, cell_id);
-    struct metric_counter_or_gauge *counter = data->counter;
-    counter->value = safe_add_longlong(counter->value, value);
+    data->counter->value += value;
 }
 
 int metric_counter_set(struct metric *pthis, int cell_id, long long value)
 {
     struct metric_measure_data *data = metric_find_or_new_cell(pthis, cell_id);
-    struct metric_counter_or_gauge *counter = data->counter;
-
-    counter->value = value;
+    data->counter->value = value;
 
     return 0;
 }

@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 2.8.8...3.10)
 
 message("-- CMAKE_C_COMPILER: ${CMAKE_C_COMPILER_ID}")
+message("compiling in: ${CMAKE_BUILD_TYPE} mode")
 
 set(lib_name fieldstat4)
 
@@ -65,7 +66,7 @@ if (CMAKE_CXX_CPPCHECK)
             "--inline-suppr"
             "--suppress=*:${PROJECT_SOURCE_DIR}/vendors/*"
             "--suppress=*:${PROJECT_SOURCE_DIR}/test/utils.hpp"
-            "--suppress=*:${PROJECT_SOURCE_DIR}/test/deps/*"
+            "--suppress=*:${PROJECT_SOURCE_DIR}/test/*"
             "--suppress=*:${PROJECT_SOURCE_DIR}/test/unit_test_serialize.cpp"
             "--suppress=*:${PROJECT_SOURCE_DIR}/src/logger/log_handle.c"
     )
