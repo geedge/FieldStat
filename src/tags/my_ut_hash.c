@@ -140,7 +140,7 @@ unsigned int cal_tag_hash_xxhash(const struct fieldstat_tag *tag, size_t n_tag, 
 
 XXH128_hash_t cal_tag_hash_xxhash128_obsolete(const struct fieldstat_tag *tag, size_t n_tag, unsigned int seed)
 {
-    XXH3_state_t state;
+    XXH3_state_t state = {0};
     XXH3_128bits_reset_withSeed(&state, seed);
     
     for (int i = 0; i < n_tag; i++)
@@ -185,7 +185,7 @@ static FORCE_INLINE uint64_t fmix64 ( uint64_t k )
   return k;
 }
 
-static FORCE_INLINE murmurhash_string(uint64_t *h1_io, uint64_t *h2_io, const char *key, const int len) {
+static FORCE_INLINE void murmurhash_string(uint64_t *h1_io, uint64_t *h2_io, const char *key, const int len) {
     uint64_t h1 = *h1_io;
     uint64_t h2 = *h2_io;
     const uint8_t * data = (const uint8_t*)key;
@@ -243,28 +243,30 @@ static FORCE_INLINE murmurhash_string(uint64_t *h1_io, uint64_t *h2_io, const ch
     *h2_io = h2;
 }
 
-static FORCE_INLINE murmurhash_int64(uint64_t *h1_io, uint64_t h2, long long value) {
-    uint64_t h1 = *h1_io;
-    uint64_t k1 = value;
+static FORCE_INLINE void murmurhash_int64(uint64_t *h2_io, uint64_t h1, long long value) {
+    // uint64_t h1 = *h1_io;
+    uint64_t h2 = *h2_io;
+    uint64_t k2 = value;
 
-    k1 *= C1; k1  = ROTL64(k1,31); k1 *= C2; h1 ^= k1;
-    h1 = ROTL64(h1,27); h1 += h2; h1 = h1*5+0x52dce729;
+    k2 *= C2; k2  = ROTL64(k2,33); k2 *= C1; h2 ^= k2;
+    h2 = ROTL64(h2,31); h2 += h1; h2 = h2*5+0x38495ab5;
 
-    *h1_io = h1;
+    // *h1_io = h1;
+    *h2_io = h2;
 }
 
 XXH128_hash_t my_murmurHash_128_tag(const struct fieldstat_tag *tag, size_t n_tag, unsigned int seed)
 {
     uint64_t h1 = seed;
     uint64_t h2 = seed;
-    struct fieldstat_tag *tmp_tag;
+    const struct fieldstat_tag *tmp_tag;
 
     for (int i = 0; i < n_tag; i++) {
         tmp_tag = tag + i;
 
         murmurhash_string(&h1, &h2, tmp_tag->key, strlen(tmp_tag->key));
         if (tmp_tag->type != TAG_CSTRING) {
-            murmurhash_int64(&h1, h2, tmp_tag->value_longlong); // sizeof(long long) == sizeof(double)
+            murmurhash_int64(&h2, h1, tmp_tag->value_longlong); // sizeof(long long) == sizeof(double)
         } else {
             murmurhash_string(&h1, &h2, tmp_tag->value_str, strlen(tmp_tag->value_str));
         }

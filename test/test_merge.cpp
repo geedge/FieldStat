@@ -411,7 +411,7 @@ TEST(unit_test_merge, merge_accuracy_test_with_K_large_enough_topk)
 
 TEST(unit_test_merge, merge_accuracy_test_gen_dest_full_all_inserted_given_src_flows_larger)
 {
-    int K = 100;
+    int K = 1000;
     vector<Fieldstat_tag_list_wrapper *> flows_in_src = test_gen_topk_flows(10000, K);
     struct fieldstat *instance_src = test_push_flows(flows_in_src, K, 1000); // 1000 times larger than dest 1
     vector<Fieldstat_tag_list_wrapper *> flows_in_dest;
@@ -434,7 +434,7 @@ TEST(unit_test_merge, merge_accuracy_test_gen_dest_full_all_inserted_given_src_f
     flows_in_dest.insert(flows_in_dest.end(), std::make_move_iterator(flows_in_src.begin()), std::make_move_iterator(flows_in_src.end()));
     double accuracy = test_cal_accuracy_given_expected_key(flows_in_dest, flows_in_merged);
 
-    EXPECT_GT(accuracy, 0.99); // should be 1.0
+    EXPECT_GT(accuracy, 0.999); // should be 1.0
 
     fieldstat_free(instance_src);
     fieldstat_free(instance_dest);

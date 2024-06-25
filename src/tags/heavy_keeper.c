@@ -157,14 +157,9 @@ bool if_need_to_decay(struct heavy_keeper *hk, const struct Bucket *bucket, unsi
     return false;
 }
 
-struct Bucket *map_flow_id_hash_to_bucket(struct heavy_keeper *hk, int array_index, const struct tag_hash_key *tag, unsigned int already_hashed_flow_id) {
+struct Bucket *map_flow_id_hash_to_bucket(struct heavy_keeper *hk, int array_index, const struct tag_hash_key *tag) {
     int w = hk->params.max_bucket_num;
-    int Hsh;
-    if (array_index == FP_HASH_KEY) {
-        Hsh = already_hashed_flow_id % w;
-    } else {
-        Hsh = tag_hash_key_cal_hash_val(tag, array_index) % w;
-    }
+    int Hsh = tag_hash_key_cal_hash_val(tag, array_index) % w;
 
     return &(hk->sketch[array_index * w + Hsh]);
 }
@@ -216,7 +211,7 @@ static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_
     
     unsigned int FP = tag_hash_key_cal_hash_val(tag, FP_HASH_KEY);
     for (int j = 0; j < heavy_keeper->params.array_num; j++) {
-        struct Bucket *bucket = map_flow_id_hash_to_bucket(heavy_keeper, j, tag, FP);
+        struct Bucket *bucket = map_flow_id_hash_to_bucket(heavy_keeper, j, tag);
 
         if (bucket->finger_print == FP) {
             // If a flow is not in the min-heap, then the estimated flow size should be no larger than nmin.
@@ -370,7 +365,7 @@ unsigned long long find_maxv_in_sketch(struct heavy_keeper *hk, const struct tag
 
     unsigned long long maxv = 0;
     for (int array_id = 0; array_id < hk->params.array_num; array_id++) {
-        bucket = map_flow_id_hash_to_bucket(hk, array_id, tag, tag_hash_key_cal_hash_val(tag, FP_HASH_KEY));  // hk->sketch is the merge of two. So just check one
+        bucket = map_flow_id_hash_to_bucket(hk, array_id, tag);  // hk->sketch is the merge of two. So just check one
 
         if (bucket->finger_print == fp) {
             maxv = my_max(maxv, bucket->count);
