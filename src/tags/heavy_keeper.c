@@ -159,7 +159,8 @@ bool if_need_to_decay(struct heavy_keeper *hk, const struct Bucket *bucket, unsi
 
 struct Bucket *map_flow_id_hash_to_bucket(struct heavy_keeper *hk, int array_index, const struct tag_hash_key *tag) {
     int w = hk->params.max_bucket_num;
-    int Hsh = tag_hash_key_cal_hash_val(tag, array_index) % w;
+    int Hsh = tag_hash_key_cal_hash_val(tag, array_index + 1) % w; // +1: the let any row do not use FP as hashing key directly.
+    // Otherwise, when different key has the same FP(in 2^-64 probability), they will also in the same bucket in the row #0 and hash collision will happen more severely.
 
     return &(hk->sketch[array_index * w + Hsh]);
 }
