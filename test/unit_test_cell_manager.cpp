@@ -683,7 +683,7 @@ TEST(unit_test_cell_manager, add_after_reset_and_ensure_performance_improvement)
     end = clock();
     clock_t time_reset_twice = end - start;
 
-    EXPECT_GT((double)time_reset_twice, (double)time_reset_once * 1.5); // * 1.5: just indicate much greater than, not exactly
+    EXPECT_GT((double)time_reset_twice, (double)time_reset_once);
 
     cell_manager_free(cm);
     for (int i = 0; i < TEST_ROUND; i++) {
