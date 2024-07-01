@@ -780,7 +780,7 @@ int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id
     args.tags = tags;
     args.n_tags = n_tag;
 
-    struct exdata *cell_data;
+    struct exdata *cell_data = NULL;
     switch (cube->sampling_mode)
     {
     case SAMPLING_MODE_TOPK: {
@@ -823,7 +823,7 @@ int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id
         assert(0);
         break;
     }
-
+    assert(cell_data != NULL); // to mute the warning
     struct metric *metric = construct_or_find_metric_to_exdata(instance, cell_data, metric_id);
     metric_counter_set(metric, value);
     return FS_OK;

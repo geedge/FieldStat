@@ -517,8 +517,7 @@ TEST(unit_test_merge, primary_metric_id_different)
     int metric_primary_dst = fieldstat_register_counter(instance_dst, "primary");
     fieldstat_cube_set_primary_metric(instance_dst, cube_id_dst, metric_primary_dst);
 
-    int ret = fieldstat_merge(instance_dst, instance);
-    EXPECT_EQ(ret, FS_ERR_INVALID_PARAM);
+    ASSERT_DEBUG_DEATH(fieldstat_merge(instance_dst, instance), ".*");
 
     fieldstat_free(instance);
     fieldstat_free(instance_dst);
