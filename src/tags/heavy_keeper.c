@@ -78,27 +78,22 @@ struct heavy_keeper {
 };
 
 static void *default_new_fn(void *arg) {
-    printf("default_new_fn\n");
     return NULL;
 }
 
 static void default_free_fn(void *exdata) {
-    printf("default_free_fn\n");
     return;
 }
 
 static void default_merge_fn(void *dest, void *src) {
-    printf("default_merge_fn\n");
     return;
 }
 
 static void default_reset_fn(void *exdata) {
-    printf("default_reset_fn\n");
     return;
 } 
 
 static void *default_copy_fn(void *exdata) {
-    printf("default_copy_fn\n");
     return exdata;
 }
 
