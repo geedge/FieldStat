@@ -371,67 +371,68 @@ TEST(Fuzz_test, add_and_reset_with_randomly_generated_flows_and_randomly_chosen_
 }
 
 
-// TEST(Fuzz_test, simple_one_for_perf)
-// {
-//     const int CUBE_NUM = 5;
-//     const int FLOW_NUM = 50000;
-//     const int CELL_MAX = 50;
-//     const int TEST_ROUND = 500000;
-//     const int OUT_GAP = 10000;
-//     struct fieldstat *master = fieldstat_new();
+TEST(Fuzz_test, simple_one_for_perf)
+{
+    const int CUBE_NUM = 5;
+    const int FLOW_NUM = 50000;
+    const int CELL_MAX = 50;
+    const int TEST_ROUND = 500000;
+    const int OUT_GAP = 10000;
+    struct fieldstat *master = fieldstat_new();
     
-//     Fieldstat_tag_list_wrapper *shared_tags[CUBE_NUM];
+    Fieldstat_tag_list_wrapper *shared_tags[CUBE_NUM];
 
-//     // init cube
-//     for (int i = 0; i < CUBE_NUM; i++) {
-//         shared_tags[i] = new Fieldstat_tag_list_wrapper("shared_tag", i);
-//         int cube_id = fieldstat_create_cube(master, shared_tags[i]->get_tag(), shared_tags[i]->get_tag_count(), SAMPLING_MODE_TOPK, CELL_MAX);
-//         EXPECT_EQ(cube_id, i);
-//     }
-//     // init metric
-//     fieldstat_register_counter(master, "topk");
-//     // all the possible tags
-//     Fieldstat_tag_list_wrapper *tag_list_wrapper[FLOW_NUM];
-//     fill_with_elephant_flows(tag_list_wrapper, FLOW_NUM);
-//     //all the possible operations
-//     long long *rand_nums = new long long[TEST_ROUND];
-//     for (int i = 0; i < TEST_ROUND; i++) {
-//         rand_nums[i] = rand() % 1000;
-//     }
+    // init cube
+    for (int i = 0; i < CUBE_NUM; i++) {
+        shared_tags[i] = new Fieldstat_tag_list_wrapper("shared_tag", i);
+        int cube_id = fieldstat_create_cube(master, shared_tags[i]->get_tag(), shared_tags[i]->get_tag_count(), SAMPLING_MODE_TOPK, CELL_MAX);
+        EXPECT_EQ(cube_id, i);
+    }
+    // init metric
+    fieldstat_register_counter(master, "topk");
+    // all the possible tags
+    Fieldstat_tag_list_wrapper *tag_list_wrapper[FLOW_NUM];
+    fill_with_elephant_flows(tag_list_wrapper, FLOW_NUM);
+    //all the possible operations
+    long long *rand_nums = new long long[TEST_ROUND];
+    for (int i = 0; i < TEST_ROUND; i++) {
+        rand_nums[i] = rand() % 1000;
+    }
 
-//     struct fieldstat *instance = master;
+    struct fieldstat *instance = master;
 
-//     clock_t start = clock();
-//     int next_shared_tag_value = CUBE_NUM;
-//     printf("press any key to start\n");
-//     getchar();
+    clock_t start = clock();
+    int next_shared_tag_value = CUBE_NUM;
+    printf("press any key to start\n");
+    getchar();
 
-//     for (int i = 0; i < TEST_ROUND; i++) {
+    for (int i = 0; i < TEST_ROUND; i++) {
         
-//         const Fieldstat_tag_list_wrapper * tag = tag_list_wrapper[rand() % FLOW_NUM];
-//         int cube_id = rand() % CUBE_NUM;
+        const Fieldstat_tag_list_wrapper * tag = tag_list_wrapper[rand() % FLOW_NUM];
+        int cube_id = rand() % CUBE_NUM;
 
-//         (void)fieldstat_counter_incrby(instance, cube_id, 0, tag->get_tag(), tag->get_tag_count(), rand_nums[i]);
-//     }
+        (void)fieldstat_counter_incrby(instance, cube_id, 0, tag->get_tag(), tag->get_tag_count(), rand_nums[i]);
+    }
 
-//     clock_t end = clock();
-//     printf("time: %lf\n", (double)(end - start) / CLOCKS_PER_SEC);
+    clock_t end = clock();
+    printf("time: %lf\n", (double)(end - start) / CLOCKS_PER_SEC);
 
-//     for (int i = 0; i < FLOW_NUM; i++) {
-//         delete tag_list_wrapper[i];
-//     }
-//     for (int i = 0; i < CUBE_NUM; i++) {
-//         delete shared_tags[i];
-//     }
-//     delete[] rand_nums;
-//     fieldstat_free(master);
-// }
+    for (int i = 0; i < FLOW_NUM; i++) {
+        delete tag_list_wrapper[i];
+    }
+    for (int i = 0; i < CUBE_NUM; i++) {
+        delete shared_tags[i];
+    }
+    delete[] rand_nums;
+    fieldstat_free(master);
+}
 
 
 int main(int argc, char *argv[]) 
 {
 	testing::InitGoogleTest(&argc, argv);
     // testing::GTEST_FLAG(filter) = "Fuzz_test.many_instance_random_flow_unregister_calibrate_reset_fork_merge_topk";
+    testing::GTEST_FLAG(filter) = "-Fuzz_test.simple_one_for_perf";
 
 	return RUN_ALL_TESTS();
 }

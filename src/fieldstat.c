@@ -797,7 +797,7 @@ int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id
             long long current_count = 0;
             cell_data = heavy_keeper_get0_exdata(cube->cells.topk, &tag_key);
             if (cell_data != NULL) {
-                struct metric *tmp_metric = find_metric_in_exdata(cell_data, metric_id);
+                const struct metric *tmp_metric = find_metric_in_exdata(cell_data, metric_id);
                 if (tmp_metric != NULL) {
                     current_count = metric_counter_get(tmp_metric);
                 }
@@ -1010,7 +1010,7 @@ struct fieldstat *fieldstat_fork(const struct fieldstat *instance)
     new_instance->max_n_cube = instance->max_n_cube;
     new_instance->cube = calloc(new_instance->max_n_cube, sizeof(struct fs_cube *));
     for (size_t i = 0; i < new_instance->valid_cube_arr_length; i++) {
-        struct fs_cube *cube = instance->cube[i];
+        const struct fs_cube *cube = instance->cube[i];
         if (cube == NULL) {
             continue;
         }
@@ -1181,7 +1181,7 @@ struct fieldstat_tag_list *fieldstat_get_shared_tags(const struct fieldstat *ins
     if (instance == NULL || cube_id >= instance->valid_cube_arr_length || cube_id < 0) {
         return NULL;
     }
-    struct fs_cube *cube = instance->cube[cube_id];
+    const struct fs_cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
         return NULL;
     }
@@ -1224,7 +1224,7 @@ const struct metric *get_metric_by_tag_list(const struct fieldstat *instance, in
         *ret = FS_ERR_INVALID_CUBE_ID;
         return NULL;
     }
-    struct fs_cube *cube = instance->cube[cube_id];
+    const struct fs_cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
         *ret = FS_ERR_INVALID_CUBE_ID;
         return NULL;

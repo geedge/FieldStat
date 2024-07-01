@@ -582,9 +582,6 @@ unsigned my_max(unsigned a, unsigned b) {
 */
 int heavy_keeper_add(struct heavy_keeper *heavy_keeper, const struct tag_hash_key *tag, int count, void *arg) {
     if (count == 0) {
-        heap_entry *entry = sorted_set_find_entry(heavy_keeper->top_K_heap, tag);
-        assert(entry == NULL); // TODO: 删了这个多余的查找
-
         if (sorted_set_cardinality(heavy_keeper->top_K_heap) < heavy_keeper->K) {
             sorted_set_insert(heavy_keeper->top_K_heap, tag, count, arg);
             return 1;
@@ -659,15 +656,15 @@ int heavy_keeper_set_exdata_schema(struct heavy_keeper *hk, exdata_new_cb new_fn
     return 0;
 }
 
-void *heavy_keeper_get0_exdata(struct heavy_keeper *hk, const struct tag_hash_key *key) {
-    heap_entry *entry = sorted_set_find_entry(hk->top_K_heap, key);
+void *heavy_keeper_get0_exdata(const struct heavy_keeper *hk, const struct tag_hash_key *key) {
+    const heap_entry *entry = sorted_set_find_entry(hk->top_K_heap, key);
     if (entry == NULL || sorted_set_entry_dying(entry)) {
         return NULL;
     }
     return sorted_set_entry_get_data(entry)->exdata;
 }
 
-int heavy_keeper_get_count(struct heavy_keeper *hk) {
+int heavy_keeper_get_count(const struct heavy_keeper *hk) {
     return sorted_set_cardinality(hk->top_K_heap);
 }
 
@@ -736,7 +733,7 @@ void heavy_keeper_merge(struct heavy_keeper *dest, struct heavy_keeper *src) {
 
     struct sorted_set *new_rec = sorted_set_new(dest->K); // merging result
     sorted_set_schema_set(new_rec, dest->new_fn, dest->free_fn, dest->merge_fn, dest->reset_fn, dest->copy_fn);
-    struct sorted_set *ss_dest = dest->top_K_heap; // original ss in dest
+    const struct sorted_set *ss_dest = dest->top_K_heap; // original ss in dest
     const struct sorted_set *ss_src = src->top_K_heap; // the ss to be merged
     int size_dest = sorted_set_cardinality(ss_dest);
     int size_src = sorted_set_cardinality(ss_src);
@@ -760,7 +757,7 @@ void heavy_keeper_merge(struct heavy_keeper *dest, struct heavy_keeper *src) {
     for (int i = 0; i < size_src; i++) {
         const struct tag_hash_key *tag_src = tag_arr[i];
 
-        heap_entry *entry = sorted_set_find_entry(new_rec, tag_src);
+        const heap_entry *entry = sorted_set_find_entry(new_rec, tag_src);
         if (entry != NULL) { // the tag is in both dest and src, so has been processed in the previous loop. The reason why no need to sum up result is that merged sketch already keeps its summed up count
             // merge exdata
             void *exdata_new = sorted_set_entry_get_data(entry)->exdata;
@@ -811,11 +808,11 @@ struct heavy_keeper *heavy_keeper_copy(const struct heavy_keeper *src) {
     return ret;
 }
 
-void heavy_keeper_one_point_query(struct heavy_keeper *hk, const struct tag_hash_key *tag, int *count_out, void **exdata_out) {
+void heavy_keeper_one_point_query(const struct heavy_keeper *hk, const struct tag_hash_key *tag, int *count_out, void **exdata_out) {
     *count_out = 0;
     *exdata_out = NULL;
 
-    heap_entry *entry = sorted_set_find_entry(hk->top_K_heap, tag);
+    const heap_entry *entry = sorted_set_find_entry(hk->top_K_heap, tag);
     if (entry == NULL) {
         return;
     }

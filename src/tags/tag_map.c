@@ -135,7 +135,7 @@ void *tag_map_get0_exdata(struct tag_map *pthis, const struct tag_hash_key *tag)
     return item->exdata;
 }
 
-int tag_map_get_count(struct tag_map *pthis) {
+int tag_map_get_count(const struct tag_map *pthis) {
     return pthis->current_cell_num;
 }
 
