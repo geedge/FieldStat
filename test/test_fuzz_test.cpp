@@ -377,7 +377,6 @@ TEST(Fuzz_test, simple_one_for_perf)
     const int FLOW_NUM = 50000;
     const int CELL_MAX = 50;
     const int TEST_ROUND = 500000;
-    const int OUT_GAP = 10000;
     struct fieldstat *master = fieldstat_new();
     
     Fieldstat_tag_list_wrapper *shared_tags[CUBE_NUM];
@@ -402,7 +401,6 @@ TEST(Fuzz_test, simple_one_for_perf)
     struct fieldstat *instance = master;
 
     clock_t start = clock();
-    int next_shared_tag_value = CUBE_NUM;
     printf("press any key to start\n");
     getchar();
 

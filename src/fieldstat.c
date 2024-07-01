@@ -950,6 +950,7 @@ int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
         if (metric_get_type(metric_src) != metric_get_type(metric_dst) || 
                 strcmp(metric_get_name(metric_src), metric_get_name(metric_dst)) != 0
             ) {
+            assert(0);
             return FS_ERR_INVALID_PARAM;
         }
     }

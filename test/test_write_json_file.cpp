@@ -22,7 +22,7 @@ extern "C" {
     extern char *fs_easy_output_to_json(struct fieldstat_easy *fs, const struct timeval *timestamp, const struct timeval *timestamp_delta);
 }
 
-static struct fieldstat_easy *get_hist_fieldstat_easy()
+[[gnu::unused]] static struct fieldstat_easy *get_hist_fieldstat_easy()
 {
     struct fieldstat_tag global_tags[2];
     struct fieldstat_tag cell_tags[2];
@@ -58,8 +58,7 @@ static struct fieldstat_easy *get_hist_fieldstat_easy()
     return fse;
 }
 
-static struct fieldstat *get_hll_fieldsstat()
-{
+static void write_hll(struct fieldstat *instance) {
     struct fieldstat_tag shared_tags[1];
 
     shared_tags[0].key  = "rule_id";
@@ -67,9 +66,6 @@ static struct fieldstat *get_hll_fieldsstat()
     shared_tags[0].value_longlong = 1;
 
     const char *hll_name[] = {"external_ip", "internal_ip", "acc_ip"};
-
-    struct fieldstat *instance = fieldstat_new();
-    EXPECT_NE(nullptr, instance);
     int cube_id = fieldstat_create_cube(instance, shared_tags, 1, 
                                           SAMPLING_MODE_COMPREHENSIVE, 100);
 
@@ -85,15 +81,10 @@ static struct fieldstat *get_hll_fieldsstat()
             int ret = fieldstat_hll_add(instance, cube_id, hll_id, NULL, 0, ip_str, strlen(ip_str));
             EXPECT_EQ(0, ret);
         }
-
     }
-
-    return instance;
 }
 
-
-static struct fieldstat *get_hist_fieldstat()
-{
+void write_histogram(struct fieldstat *instance) {
     struct fieldstat_tag shared_tags[2];
     struct fieldstat_tag cell_tags[2];
 
@@ -116,11 +107,8 @@ static struct fieldstat *get_hist_fieldstat()
                                 "bye/udp", "oth_mtd/udp"};
 
 
-    struct fieldstat *instance = fieldstat_new();
-    EXPECT_NE(nullptr, instance);
     int cube_id = fieldstat_create_cube(instance, shared_tags, 2, 
                                           SAMPLING_MODE_COMPREHENSIVE, 100);
-    EXPECT_EQ(0, cube_id);
 
     for(unsigned int i = 0; i < sizeof(hist_names)/sizeof(hist_names[0]); i++)
     {
@@ -131,8 +119,6 @@ static struct fieldstat *get_hist_fieldstat()
             fieldstat_hist_record(instance, cube_id, hist_id, cell_tags, 2, i*100 + j);
         }
     }
-
-    return instance;
 }
 
 // static struct fieldstat_easy *get_table_fieldstat_easy()
@@ -179,8 +165,7 @@ void fieldstat_easy_to_file(struct fieldstat_easy *fse, const char *file_path)
     fieldstat_easy_free(fse); // only by free to stop exporting
 }
 
-static struct fieldstat *get_table_fieldstat()
-{
+void write_table(struct fieldstat *instance) {
     struct fieldstat_tag shared_tags[2];   
     shared_tags[0].key  = "policy_id";
     shared_tags[0].type = TAG_INTEGER;
@@ -200,12 +185,8 @@ static struct fieldstat *get_table_fieldstat()
     cell_tags.type = TAG_CSTRING;
     cell_tags.value_str = "true";
 
-    struct fieldstat *instance = fieldstat_new();
-    EXPECT_NE(nullptr, instance);
-
     int cube_id = fieldstat_create_cube(instance, shared_tags, 2, 
                                           SAMPLING_MODE_COMPREHENSIVE, 100);
-    EXPECT_EQ(0, cube_id);
 
     int counter_id_0 = fieldstat_register_counter(instance, "T_success_log");
 
@@ -218,8 +199,6 @@ static struct fieldstat *get_table_fieldstat()
         if(i < 5)
             fieldstat_counter_incrby(instance, cube_id, counter_id_1, &cell_tags, 1, 2);
     }
-
-    return instance;
 }
 
 static int write_json_to_file(const char *filename, char *json_str) 
@@ -239,13 +218,11 @@ TEST(ExporterLocal, TableBuild)
 {
     struct timeval current   = {100, 10000};
     struct fieldstat *merger = fieldstat_new();
-    struct fieldstat *hll    = get_hll_fieldsstat();
-    struct fieldstat *hist   = get_hist_fieldstat();
-    struct fieldstat *table  = get_table_fieldstat();
 
-    fieldstat_merge(merger, hll);
-    fieldstat_merge(merger, hist);
-    fieldstat_merge(merger, table);
+    write_hll(merger);
+    write_histogram(merger);
+    write_table(merger);
+
     struct fieldstat_json_exporter *exporter = fieldstat_json_exporter_new();
     fieldstat_json_exporter_enable_delta(exporter);
     char *str_json = fieldstat_json_exporter_export(exporter, merger, &current);
