@@ -299,6 +299,8 @@ void tag_hash_key_init_with_fieldstat_tag(struct tag_hash_key *tag_key, const st
     if (n_src == 0) {
         tag_key->tags = NULL;
         tag_key->hashv = 0;
+        tag_key->hashv128.high64 = 0;
+        tag_key->hashv128.low64 = 0;
         return;
     }
 
@@ -460,6 +462,13 @@ void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_tags, ch
 
 char *tag_hash_key_get_compound_key(const struct tag_hash_key *tag)
 {
+    if (tag == NULL) {
+        return strdup("NULL");
+    }
+    if (tag->n_my_tag == 0) {
+        return strdup("no tags");
+    }
+
     char *key;
     size_t key_size;
     build_dynamic_cell_key(tag->tags, tag->n_my_tag, &key, &key_size);

@@ -163,6 +163,8 @@ TEST(Fuzz_test, many_instance_random_flow_unregister_calibrate_reset_fork_merge_
         delete shared_tags[i];
     }
 
+    long long dummy_ll;
+    double dummy_d;
     int *cube_ids;
     int cube_num;
     struct fieldstat *instance_in_focus = dest;
@@ -172,14 +174,11 @@ TEST(Fuzz_test, many_instance_random_flow_unregister_calibrate_reset_fork_merge_
 
         size_t cell_num0;
         struct fieldstat_tag_list *tags0;
-        fieldstat_get_cells_used_by_metric(instance_in_focus, cube_ids[i], METRIC_ID_COUNTER, &tags0, &cell_num0);
-        size_t cell_num1;
-        struct fieldstat_tag_list *tags1;
-        fieldstat_get_cells_used_by_metric(instance_in_focus, cube_ids[i], METRIC_ID_HLL, &tags1, &cell_num1);
+        fieldstat_get_cells_used_by_cube(instance_in_focus, cube_ids[i], &tags0, &cell_num0);
 
-        EXPECT_EQ(cell_num0, cell_num1);
         for (size_t j = 0; j < cell_num0; j++) {
-            EXPECT_TRUE(Fieldstat_tag_list_wrapper(&tags0[j]) == Fieldstat_tag_list_wrapper(&tags1[j]));
+            EXPECT_EQ(fieldstat_counter_get(instance_in_focus, cube_ids[i], METRIC_ID_COUNTER, &tags0[j], &dummy_ll), FS_OK);
+            EXPECT_EQ(fieldstat_hll_get(instance_in_focus, cube_ids[i], METRIC_ID_HLL, &tags0[j], &dummy_d), FS_OK);
         }
 
         for (size_t j = 0; j < cell_num0; j++) {
@@ -190,7 +189,6 @@ TEST(Fuzz_test, many_instance_random_flow_unregister_calibrate_reset_fork_merge_
         }
 
         fieldstat_tag_list_arr_free(tags0, cell_num0);
-        fieldstat_tag_list_arr_free(tags1, cell_num1);
         fieldstat_tag_list_arr_free(shared_tag_out, 1);
     }
     free(cube_ids);
@@ -302,7 +300,7 @@ TEST(Fuzz_test, many_instance_random_flow_unregister_calibrate_reset_fork_merge_
 
         size_t cell_num;
         struct fieldstat_tag_list *tags;
-        fieldstat_get_cells_used_by_metric(instance_in_focus, cube_ids[i], 0, &tags, &cell_num);
+        fieldstat_get_cells_used_by_cube(instance_in_focus, cube_ids[i], &tags, &cell_num);
 
         std::vector<struct Fieldstat_tag_list_wrapper *> test_result;
         for (size_t j = 0; j < cell_num; j++) {
@@ -365,6 +363,11 @@ TEST(Fuzz_test, add_and_reset_with_randomly_generated_flows_and_randomly_chosen_
             fieldstat_reset(instance);
         }
     }
+
+    for (int i = 0; i < FLOW_NUM; i++) {
+        delete tag_list_wrapper[i];
+    }
+    fieldstat_free(instance);
 }
 
 
@@ -428,5 +431,7 @@ TEST(Fuzz_test, add_and_reset_with_randomly_generated_flows_and_randomly_chosen_
 int main(int argc, char *argv[]) 
 {
 	testing::InitGoogleTest(&argc, argv);
+    // testing::GTEST_FLAG(filter) = "Fuzz_test.many_instance_random_flow_unregister_calibrate_reset_fork_merge_topk";
+
 	return RUN_ALL_TESTS();
 }

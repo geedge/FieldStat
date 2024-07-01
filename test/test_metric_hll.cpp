@@ -28,10 +28,17 @@ void test_assert_standard_instance(const struct fieldstat *instance)
 
     struct fieldstat_tag_list *tag_list = NULL;
     size_t n_cell = 0;
-    fieldstat_get_cells_used_by_metric(instance, 0, 0, &tag_list, &n_cell);
+    fieldstat_get_cells_used_by_cube(instance, 0, &tag_list, &n_cell);
     EXPECT_EQ(n_cell, 1);
     EXPECT_EQ(tag_list->n_tag, 1);
     EXPECT_STREQ(tag_list->tag[0].key, TEST_TAG_INT.key);
+    
+    int *metric_id = NULL;
+    size_t n_metric = 0;
+    fieldstat_get_metric_in_cell(instance, 0, &tag_list[0], &metric_id, &n_metric);
+    EXPECT_EQ(n_metric, 1);
+    EXPECT_EQ(metric_id[0], 0);
+    free(metric_id);
 
     fieldstat_tag_list_arr_free(tag_list, n_cell);
 }

@@ -13,15 +13,53 @@
 #include "minheap/heap.h"
 #include "mpack/mpack.h"
 #include "xxhash/xxhash.h"
-#include "cjson/cJSON.h"
 
-#include "tags/sorted_set.h"
-#include "tags/my_ut_hash.h"
+#include "my_ut_hash_inner.h"
+#include "exdata.h"
+
+#define FP_HASH_KEY 0
+#define INVALID_COUNT UINT64_MAX
+
+struct entry_data { // the value constitute of a sorted set entry
+    struct tag_hash_key *key;
+
+    void *exdata;
+};
+
+struct sorted_set {
+    heap *heap;
+    struct hash_node *hash_tbl;
+
+    int n_living_entry;
+
+    exdata_new_cb new_fn;
+    exdata_free_cb free_fn;
+    exdata_merge_cb merge_fn;
+    exdata_reset_cb reset_fn;
+    exdata_copy_cb copy_fn;
+};
+
+struct hash_node {
+    struct tag_hash_key *key; // value is equal to entry_data::key(point to the same memory)
+    heap_entry *val;
+    UT_hash_handle hh;
+};
 
 
 struct Bucket {
     unsigned int finger_print;
     unsigned long long count; // the actual count, sum of all uuid_hash_node->count
+};
+
+// Parameters used in algorithm
+struct heavy_keeper_options{
+    int array_num;  // the size of the array. Default value: 4
+                    // Set it by how accurate you want. Value of 4 guarantees an accuracy more than 90% and around 97% in all tests.
+                    // Not too big because it have an impact on both time and memory efficiency.
+    int max_bucket_num; // M2, the maximum number of buckets every array keeps. Default value: k*log(k) and no less than 100. 
+                        // Basically, as long as big enough, it won't affect the accuracy significantly.
+    double decay_exp_rate; // b, bigger variance of flow size is(elephant flows take more ratio), smaller it should be.
+                           //  Must bigger than 1. Better not bigger than 1.3, otherwise some elephant flow will be missed.
 };
 
 struct heavy_keeper {
@@ -31,9 +69,400 @@ struct heavy_keeper {
     struct Bucket *sketch;
 
     unsigned int rand_state;
+
+    exdata_new_cb new_fn;
+    exdata_free_cb free_fn;
+    exdata_merge_cb merge_fn;
+    exdata_reset_cb reset_fn;
+    exdata_copy_cb copy_fn;
 };
 
-#define FP_HASH_KEY 0
+static void *default_new_fn(void *arg) {
+    printf("default_new_fn\n");
+    return NULL;
+}
+
+static void default_free_fn(void *exdata) {
+    printf("default_free_fn\n");
+    return;
+}
+
+static void default_merge_fn(void *dest, void *src) {
+    printf("default_merge_fn\n");
+    return;
+}
+
+static void default_reset_fn(void *exdata) {
+    printf("default_reset_fn\n");
+    return;
+} 
+
+static void *default_copy_fn(void *exdata) {
+    printf("default_copy_fn\n");
+    return exdata;
+}
+
+struct entry_data *entry_data_construct(const struct tag_hash_key *tag, void *exdata)
+{
+    struct entry_data *entry_data = (struct entry_data *)malloc(sizeof(struct entry_data));
+
+    entry_data->key = tag_hash_key_copy(tag);
+    entry_data->exdata = exdata;
+    return entry_data;
+}
+
+void entry_data_destroy(struct entry_data *entry_data, exdata_free_cb free_fn)
+{
+    if (entry_data == NULL) {
+        return;
+    }
+    tag_hash_key_free(entry_data->key);
+    free_fn(entry_data->exdata);
+    free(entry_data);
+}
+
+unsigned long long sorted_set_entry_get_count(const heap_entry *entry)
+{
+    unsigned long long count = *(unsigned long long *)entry->key;
+    if (count == 0) {
+        return 0;
+    }
+    return count - 1; // sorted set will let the count start from 1, 0 for dying entry.
+}
+
+struct entry_data *sorted_set_entry_get_data(const heap_entry *entry)
+{
+    return entry->value;
+}
+
+/*
+    dying: To reduce the time of HASH_ADD, and to support merely recording a key without any value, give a dying status.
+*/
+bool sorted_set_entry_dying(const heap_entry *entry)
+{
+    unsigned long long count = *(unsigned long long *)entry->key;
+    return count == 0;    
+}
+
+// cppcheck-suppress [constParameterCallback, unmatchedSuppression]
+static bool cmp_entry_by_count(void *aa, void *bb)
+{
+    heap_entry *a = (heap_entry *)aa;
+    heap_entry *b = (heap_entry *)bb;
+    unsigned long long count_a = *(unsigned long long *)a->key;
+    unsigned long long count_b = *(unsigned long long *)b->key;
+
+    if (count_a < count_b) {
+        return true;
+    }
+    return false;
+}
+
+static inline unsigned long long safe_add(unsigned long long a, unsigned long long b)
+{
+    if (UINT64_MAX - a < b) {
+        return UINT64_MAX;
+    }
+    return a + b;
+}
+
+static int my_entry_get_index(void *a)
+{
+    return ((heap_entry *)a)->index;
+}
+
+void my_entry_set_index(int index, void *a)
+{
+    ((heap_entry *)a)->index = index;
+}
+
+struct sorted_set *sorted_set_new(int set_size)
+{
+    struct sorted_set *ret = (struct sorted_set *)malloc(sizeof(struct sorted_set));
+    ret->hash_tbl = NULL;
+    ret->n_living_entry = 0;
+    heap *h = (heap *)malloc(sizeof(heap));
+    init_heap(h, set_size, cmp_entry_by_count, my_entry_get_index, my_entry_set_index);
+
+    ret->heap = h;
+
+    ret->new_fn = default_new_fn;
+    ret->free_fn = default_free_fn;
+    ret->merge_fn = default_merge_fn;
+    ret->reset_fn = default_reset_fn;
+    ret->copy_fn = default_copy_fn;
+
+    return ret;
+}
+
+void sorted_set_schema_set(struct sorted_set *ss, exdata_new_cb new_fn, exdata_free_cb free_fn, exdata_merge_cb merge_fn, exdata_reset_cb reset_fn, exdata_copy_cb copy_fn)
+{
+    ss->new_fn = new_fn;
+    ss->free_fn = free_fn;
+    ss->merge_fn = merge_fn;
+    ss->reset_fn = reset_fn;
+    ss->copy_fn = copy_fn;
+}
+
+void sorted_set_free(struct sorted_set *ss)
+{
+    struct hash_node *tbl = ss->hash_tbl;
+    struct hash_node *h_node, *tmp;
+    HASH_ITER(hh, tbl, h_node, tmp) {
+        HASH_DEL(tbl, h_node);  
+        free(h_node);
+    }
+
+    heap *heap = ss->heap;
+    heap_entry *node;
+    for (int i = 0; i < heap->cur_size; i++) {
+        node = (heap_entry *)heap->nodes[i];
+        entry_data_destroy(node->value, ss->free_fn);
+        free(node->key);
+        free(node);
+    }
+    free(heap->nodes);
+    free(heap);
+
+    free(ss);
+}
+
+heap_entry *sorted_set_find_entry(const struct sorted_set *ss, const struct tag_hash_key *tag)
+{
+    struct hash_node *hash_tbl = ss->hash_tbl;
+    struct hash_node *s = NULL;
+    HASH_FIND_TAG(hash_tbl, tag, s);
+
+    if (s == NULL) {
+        return NULL;
+    }
+    return (heap_entry *)s->val;
+}
+
+void sorted_set_entry_set_key(struct sorted_set *ss, heap_entry *entry, unsigned long long count)
+{
+    *(unsigned long long *)(entry->key) = count;
+
+    adjust_heap_node(ss->heap, entry);
+}
+
+int sorted_set_pop(struct sorted_set *ss)
+{
+    struct hash_node *hash_tbl = ss->hash_tbl;
+    heap_entry *entry = (heap_entry *)pop_heap(ss->heap);
+    if (entry == NULL) {
+        return -1;
+    }
+    struct entry_data *tmp_data = sorted_set_entry_get_data(entry);
+
+    struct hash_node *s = NULL;
+    HASH_FIND_TAG(hash_tbl, tmp_data->key, s);
+    assert(s!=NULL);
+
+    HASH_DEL(hash_tbl, s);
+    free(s);
+    ss->hash_tbl = hash_tbl;
+
+    int ret;
+    if (sorted_set_entry_dying(entry)) {
+        ret = 0;
+    } else {
+        ss->n_living_entry--;
+        ret = 1;
+    }
+
+    entry_data_destroy(tmp_data, ss->free_fn);
+    free(entry->key);
+    free(entry);
+
+    return ret;
+}
+
+bool sorted_set_check_is_full(const struct sorted_set *ss)
+{
+    return ss->heap->cur_size >= ss->heap->max_size;
+}
+
+unsigned long long sorted_set_get_min_count(const struct sorted_set *ss)
+{   
+    heap *heap = ss->heap;
+    if (heap->cur_size == 0) {
+        return INVALID_COUNT;
+    }
+    const heap_entry *ret = (heap_entry *)(heap->nodes[0]);
+
+    unsigned long long count = *(unsigned long long *)ret->key;
+    if (count == 0) {
+        return INVALID_COUNT;
+    }
+    return count - 1; // sorted set will let the count start from 1, 0 for dying entry.
+}
+
+void sorted_set_insert_to_available_heap(struct sorted_set *ss, const struct tag_hash_key *tag, unsigned long long cnt, void *exdata)
+{
+    cnt = safe_add(cnt, 1); // sorted set will let the count start from 1, 0 for dying entry.
+    unsigned long long *tmp_cnt = (unsigned long long*)malloc(sizeof(unsigned long long));
+    *tmp_cnt = cnt;
+    struct entry_data *tmp_data = entry_data_construct(tag, exdata);
+    heap_entry *node = (heap_entry *)malloc(sizeof(heap_entry));
+    node->key = tmp_cnt;
+    node->value = tmp_data;
+
+    push_heap(ss->heap, (void *)node);
+
+    struct hash_node *hash_tbl = ss->hash_tbl;
+    struct hash_node *s = (struct hash_node *)malloc(sizeof(struct hash_node));
+    s->key = sorted_set_entry_get_data(node)->key;
+    s->val = node;
+    HASH_ADD_TAG(hash_tbl, key, s);
+    ss->hash_tbl = hash_tbl;
+
+    ss->n_living_entry++;
+}
+
+int sorted_set_insert(struct sorted_set *ss, const struct tag_hash_key *tag, unsigned long long cnt, void *args)
+{
+    // if there is a dying record, reborn it to use.
+    heap_entry *entry = sorted_set_find_entry(ss, tag);
+    if (entry != NULL) {
+        if (!sorted_set_entry_dying(entry)) {
+            assert(0);
+            return -1;
+        }
+        sorted_set_entry_set_key(ss, entry, safe_add(cnt, 1)); // sorted set will let the count start from 1, 0 for dying entry.
+
+        ss->n_living_entry++;
+        return 1;
+    }
+
+    if (sorted_set_check_is_full(ss)) {
+        unsigned long long tmp_mincnt = sorted_set_get_min_count(ss);
+        if (tmp_mincnt != INVALID_COUNT && cnt <= tmp_mincnt) { // even if all cells in sorted set are dying, the sorted set can still be a full one, in which case, the min count is invalid.
+            return 0;
+        }
+        int ret = sorted_set_pop(ss);
+        assert(ret != -1);
+    }
+    sorted_set_insert_to_available_heap(ss, tag, cnt, ss->new_fn(args));
+    return 1;
+}
+
+int sorted_set_cardinality(const struct sorted_set *ss)
+{
+    return ss->n_living_entry;
+}
+
+unsigned long long sorted_set_get_count(const struct sorted_set *ss, const struct tag_hash_key *tag)
+{
+    if (sorted_set_cardinality(ss) == 0) {
+        return INVALID_COUNT;
+    }
+    const heap_entry *entry = sorted_set_find_entry(ss, tag);
+    if (entry == NULL) {
+        return INVALID_COUNT;
+    }
+    if (sorted_set_entry_dying(entry)) {
+        return INVALID_COUNT;
+    }
+
+    return sorted_set_entry_get_count(entry);
+}
+
+int sorted_set_incrby(struct sorted_set *ss, const struct tag_hash_key *tag, unsigned long long count)
+{
+    heap_entry *entry = sorted_set_find_entry(ss, tag);
+    if (entry == NULL) {
+        return -1;
+    }
+    unsigned long long cnt_old;
+    if (sorted_set_entry_dying(entry) == false) {
+        cnt_old = sorted_set_entry_get_count(entry);
+        cnt_old += 1; // sorted set will let the count start from 1, 0 for dying entry.
+    } else {
+        cnt_old = 0;
+    }
+    sorted_set_entry_set_key(ss, entry, safe_add(count, cnt_old));
+    return 0;
+}
+
+typedef struct {
+    unsigned long long key;
+    struct entry_data *val;
+} tmp_heap_node;
+
+int cmp_tmp_heap_node(const void *a, const void *b)
+{
+    const tmp_heap_node *aa = (tmp_heap_node *)a;
+    const tmp_heap_node *bb = (tmp_heap_node *)b;
+
+    if (aa->key < bb->key) {
+        return 1;
+    } else if (aa->key > bb->key) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+void sorted_set_dump(const struct sorted_set *ss, struct tag_hash_key **tags_out, void **exdata_out)
+{
+    struct minheap *h = ss->heap;
+    tmp_heap_node *tmp_nodes = (tmp_heap_node *)malloc(sizeof(tmp_heap_node) * h->cur_size);
+    size_t n_living_entry = 0;
+    for (int i = 0; i < h->cur_size; i++) {
+        const heap_entry *entry = (heap_entry *)h->nodes[i];
+        if (sorted_set_entry_dying(entry)) {
+            continue;
+        }
+        tmp_nodes[n_living_entry].key = sorted_set_entry_get_count(entry);
+        tmp_nodes[n_living_entry].val = sorted_set_entry_get_data(entry);
+        n_living_entry++;
+    }
+
+    assert(n_living_entry == ss->n_living_entry);
+    qsort(tmp_nodes, n_living_entry, sizeof(tmp_heap_node), cmp_tmp_heap_node);
+    for (int i = 0; i < n_living_entry; i++) {
+        tags_out[i] = tmp_nodes[i].val->key;
+        exdata_out[i] = tmp_nodes[i].val->exdata;
+    }
+    free(tmp_nodes);
+}
+
+struct sorted_set *sorted_set_copy(const struct sorted_set *ss)
+{
+    struct sorted_set *ret = sorted_set_new(ss->heap->max_size);
+    sorted_set_schema_set(ret, ss->new_fn, ss->free_fn, ss->merge_fn, ss->reset_fn, ss->copy_fn);
+    
+    for (int i = 0; i < ss->heap->cur_size; i++) {
+        const heap_entry *entry = (heap_entry *)ss->heap->nodes[i];
+        if (sorted_set_entry_dying(entry)) {
+            continue;
+        }
+        const struct entry_data *data = sorted_set_entry_get_data(entry);
+        sorted_set_insert_to_available_heap(ret, data->key, sorted_set_entry_get_count(entry), ss->copy_fn(data->exdata));
+    }
+
+    return ret;
+}
+
+// set all the entry to dying status. They will be the first to be popped.
+void sorted_set_reset(struct sorted_set *ss)
+{
+    heap *heap = ss->heap;
+    heap_entry *entry;
+    for (int i = 0; i < heap->cur_size; i++) {
+        entry = (heap_entry *)heap->nodes[i];
+        *(unsigned long long *)entry->key = 0;
+
+        ss->reset_fn(sorted_set_entry_get_data(entry)->exdata);
+    }
+
+    ss->n_living_entry = 0;
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                heavy keeper                                */
+/* -------------------------------------------------------------------------- */
 
 struct Bucket *new_sketch(struct heavy_keeper_options *params) {
     size_t array_len = (size_t)params->array_num * (size_t)params->max_bucket_num;
@@ -63,19 +492,8 @@ void params_set_to_default(struct heavy_keeper_options *p, int K) {
     }
 }
 
-void params_set_to(struct heavy_keeper_options *p, const struct heavy_keeper_options *src) {
-    if (src->array_num != 0) {
-        p->array_num = src->array_num;
-    }
-    if (src->decay_exp_rate != 0) {
-        p->decay_exp_rate = src->decay_exp_rate;
-    }
-    if (src->max_bucket_num != 0) {
-        p->max_bucket_num = src->max_bucket_num;
-    }
-}
 
-struct heavy_keeper *heavy_keeper_new(int max_query_num, const struct heavy_keeper_options *params) {
+struct heavy_keeper *heavy_keeper_new(int max_query_num) {
     struct heavy_keeper *hk = (struct heavy_keeper *)malloc(sizeof(struct heavy_keeper));
     hk->K = max_query_num;
     hk->rand_state = 0;
@@ -84,39 +502,29 @@ struct heavy_keeper *heavy_keeper_new(int max_query_num, const struct heavy_keep
 
     params_set_to_default(&(hk->params), max_query_num);
 
-    if (params != NULL) {
-        params_set_to(&(hk->params), params);
-    }
     hk->sketch = new_sketch(&(hk->params));
+
+    hk->new_fn = default_new_fn;
+    hk->free_fn = default_free_fn;
+    hk->merge_fn = default_merge_fn;
+    hk->reset_fn = default_reset_fn;
+
     return hk;
-}
-
-struct heavy_keeper *heavy_keeper_with_data_new(int max_query_num) {
-    struct heavy_keeper *hk = heavy_keeper_new(max_query_num, NULL);
-    return hk;
-}
-
-void heavy_keeper_reset(struct heavy_keeper *hk) {
-    memset(hk->sketch, 0, (size_t)hk->params.array_num * (size_t)hk->params.max_bucket_num * sizeof(struct Bucket));
-    sorted_set_reset(hk->top_K_heap);
-}
-
-void heavy_keeper_result_free(struct heavy_keeper_result *stats_hd) {
-    free(stats_hd->count);
-    free(stats_hd->tags);
-    free(stats_hd->cell_id);
-    free(stats_hd);
 }
 
 void heavy_keeper_free(struct heavy_keeper *hk) {
     sorted_set_free(hk->top_K_heap);
     free(hk->sketch);
+
     free(hk);
 }
 
-/*********************************add and query*************************************/
-/***********************************************************************************/
-const double DECAY_POW_TABLE[147] = { // 1.17 ^ exp, exp is in [0,146]
+void heavy_keeper_reset(struct heavy_keeper *hk) {
+    sorted_set_reset(hk->top_K_heap);
+    memset(hk->sketch, 0, sizeof(struct Bucket) * (size_t)hk->params.array_num * (size_t)hk->params.max_bucket_num);
+}
+
+const double DECAY_POW_TABLE[128] = { // 1.17 ^ exp, exp is in [0,127]
     1.0,0.8547008547009,0.7305135510264,0.6243705564328,0.5336500482332,0.456111152336,0.3898385917402,0.3331953775557,0.2847823739793,0.2434037384438,0.2080373832853,0.1778097293037,0.15197412761,
     0.1298924167607,0.1110191596245,0.0948881706192,0.0811010005293,0.0693170944695,0.0592453798884,0.0506370768277,0.0432795528442,0.036991070807,0.031616299835,0.0270224784915,0.0230961354628,0.0197402867204,
     0.0168720399319,0.0144205469504,0.0123252538037,0.0105344049605,0.0090037649235,0.0076955255756,0.0065773722868,0.0056216857153,0.0048048595857,0.0041067175946,0.0035100150381,0.0030000128531,0.0025641135497,
@@ -126,11 +534,8 @@ const double DECAY_POW_TABLE[147] = { // 1.17 ^ exp, exp is in [0,146]
     0.0000048028916,0.0000041050355,0.0000035085774,0.0000029987841,0.0000025630633,0.0000021906524,0.0000018723525,0.0000016003013,0.0000013677789,0.0000011690418,0.000000999181,0.0000008540009,0.0000007299153,
     0.0000006238592,0.000000533213,0.0000004557376,0.0000003895193,0.0000003329225,0.0000002845491,0.0000002432044,0.000000207867,0.0000001776641,0.0000001518497,0.000000129786,0.0000001109282,0.0000000948105,
     0.0000000810346,0.0000000692603,0.0000000591969,0.0000000505956,0.0000000432441,0.0000000369608,0.0000000315904,0.0000000270003,0.0000000230772,0.0000000197241,0.0000000168582,0.0000000144087,0.0000000123152,
-    0.0000000105258,0.0000000089964,0.0000000076892,0.000000006572,0.0000000056171,0.0000000048009,0.0000000041034,0.0000000035071,0.0000000029976,0.000000002562,0.0000000021898,0.0000000018716,0.0000000015996,
-    0.0000000013672,0.0000000011686,0.0000000009988,0.0000000008537,0.0000000007296,0.0000000006236,0.000000000533,0.0000000004556,0.0000000003894,0.0000000003328,0.0000000002844,0.0000000002431,0.0000000002078,
-    0.0000000001776,0.0000000001518,0.0000000001297,0.0000000001109
+    0.0000000105258,0.0000000089964,0.0000000076892,0.000000006572,0.0000000056171,0.0000000048009,0.0000000041034,0.0000000035071,0.0000000029976,0.000000002562,0.0000000021898,
 };
-
 bool if_need_to_decay(struct heavy_keeper *hk, const struct Bucket *bucket, unsigned long long count) {
     if (count == 0) {
         return false;
@@ -140,14 +545,13 @@ bool if_need_to_decay(struct heavy_keeper *hk, const struct Bucket *bucket, unsi
     }
 
     unsigned long long exp = bucket->count / count;
-    if (exp > 146) {  // 1.17 ^ 146 < 1 / RAND_MAX < rand_r / RAND_MAX, so there is no chance to decay 
+    if (exp > 127) {  // too small, almost no chance to decay 
         return false;
     }
 
     double r = (double)rand_r(&(hk->rand_state)) / (double)RAND_MAX;
 
-    // double b = hk->params.decay_exp_rate;
-    // double decay_rate = pow(b, -exp);
+    // double decay_rate = pow(hk->params.decay_exp_rate, -exp);
     // p->decay_exp_rate = 1.17 is fixed, search table to get result directly.
     double decay_rate = DECAY_POW_TABLE[exp];
 
@@ -160,16 +564,10 @@ bool if_need_to_decay(struct heavy_keeper *hk, const struct Bucket *bucket, unsi
 struct Bucket *map_flow_id_hash_to_bucket(struct heavy_keeper *hk, int array_index, const struct tag_hash_key *tag) {
     int w = hk->params.max_bucket_num;
     int Hsh = tag_hash_key_cal_hash_val(tag, array_index + 1) % w; // +1: the let any row do not use FP as hashing key directly.
+
     // Otherwise, when different key has the same FP(in 2^-64 probability), they will also in the same bucket in the row #0 and hash collision will happen more severely.
 
     return &(hk->sketch[array_index * w + Hsh]);
-}
-
-unsigned long long count_add(unsigned long long a, unsigned long long b) {
-    if (a > UINT64_MAX - b) {
-        return UINT64_MAX;
-    }
-    return a + b;
 }
 
 unsigned my_max(unsigned a, unsigned b) {
@@ -179,29 +577,22 @@ unsigned my_max(unsigned a, unsigned b) {
     return b;
 }
 
-static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_keeper, const struct tag_hash_key *tag, unsigned long long int count, int cell_id, int *popped_id_out)
-{
+/*
+1 for newly add something. 0 for not add. -1 for unexpected cases.
+*/
+int heavy_keeper_add(struct heavy_keeper *heavy_keeper, const struct tag_hash_key *tag, int count, void *arg) {
     if (count == 0) {
-        int cell_id_old = sorted_set_get_cell_id(heavy_keeper->top_K_heap, tag);
-        if (cell_id_old > 0) {
-            return 1; // the flow is in the sorted set. Use original cell id.
-        }
-
-        assert(cell_id >= 0);
-        assert(tag != NULL);
-        long long tmp_v = tag->hashv;
-        assert(tmp_v >= 0);
+        heap_entry *entry = sorted_set_find_entry(heavy_keeper->top_K_heap, tag);
+        assert(entry == NULL); // TODO: 删了这个多余的查找
 
         if (sorted_set_cardinality(heavy_keeper->top_K_heap) < heavy_keeper->K) {
-            sorted_set_insert_and_record_popped_back(heavy_keeper->top_K_heap, tag, 0, cell_id, popped_id_out);
-            return 0; // newly added
+            sorted_set_insert(heavy_keeper->top_K_heap, tag, count, arg);
+            return 1;
         }
-        return -1; // not added
+        return 0;
     }
 
-    int user_data_cube_id = 0;
     struct sorted_set *summary = heavy_keeper->top_K_heap;
-
     unsigned nMin = sorted_set_get_min_count(summary);
     if (nMin == INVALID_COUNT) {
         nMin = 0;
@@ -209,25 +600,28 @@ static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_
     unsigned long long int old_cnt = sorted_set_get_count(summary, tag);
     bool not_in_sorted_set = (old_cnt == INVALID_COUNT);
     unsigned long long maxv = 0;
-    
     unsigned int FP = tag_hash_key_cal_hash_val(tag, FP_HASH_KEY);
+
     for (int j = 0; j < heavy_keeper->params.array_num; j++) {
         struct Bucket *bucket = map_flow_id_hash_to_bucket(heavy_keeper, j, tag);
 
         if (bucket->finger_print == FP) {
             // If a flow is not in the min-heap, then the estimated flow size should be no larger than nmin.
+            // or if the min-heap is not full(nmin == 0), every flow should be taken into account, so of course it should be added.
+            // in neither case, bucket->count > nMin && not_in_sorted_set should happen.
             // The flows whose counts are both larger than nmin and not in min-heap must have the same xxhash value, and its FP stored in bucket represents another tag,
             // In this case, the sketch won't be updated. This flow is expected to be taken into account in another array,
             //  where its FP is different from the one it should collided with, so that element flows won't be missed.
             if (bucket->count > nMin && not_in_sorted_set) {
                 continue;
             }
-            bucket->count = count_add(bucket->count, count);
+            bucket->count = safe_add(bucket->count, count);
             maxv = my_max(maxv, bucket->count);
         } else {
             if (!if_need_to_decay(heavy_keeper, bucket, count)) {
                 continue;
             }
+
             if (bucket->count < count) {
                 bucket->finger_print = FP;
                 bucket->count = count;
@@ -239,106 +633,60 @@ static int heavy_keeper_add_by_recording_popped_data(struct heavy_keeper *heavy_
         }
     }
 
-    
     if (not_in_sorted_set) {
         if ((maxv - nMin <= count && maxv != nMin) || sorted_set_cardinality(summary) != heavy_keeper->K) {
-            assert(cell_id >= 0);
-            assert(tag != NULL);
-            long long tmp_v = tag->hashv;
-            assert(tmp_v >= 0);
-
-            int insert_ret = sorted_set_insert_and_record_popped_back(summary, tag, maxv, cell_id, &user_data_cube_id);
-            if (insert_ret == 2) { // insert success and popped one
-                *popped_id_out = user_data_cube_id;
-                return 0;
-            } else if (insert_ret == 0) { // insert failed
-                return -1;
-            } else if (insert_ret == 1) { // insert success without popping 
-                return 0;
-            } else {
-                return 2;
-            }
+            int insert_ret = sorted_set_insert(summary, tag, maxv, arg);
+            assert(insert_ret != -1 && insert_ret != 0);
+            return 1;
         }
-        return -1; // the flow is not added to the sorted set
+        return 0;
     } else {
         if (maxv > old_cnt) {
             sorted_set_incrby(summary, tag, maxv - old_cnt);
         }
         return 1; // no popped, but the tag definitely exists in the sorted set
     }
-
-    // should not reach here
-    return -1;
 }
 
-int heavy_keeper_add(struct heavy_keeper *hk, const struct tag_hash_key *tag, unsigned long long int count, int cell_id, int *popped_id_out)
-{
-    *popped_id_out = -1;
-    heavy_keeper_add_by_recording_popped_data(hk, tag, count, cell_id, popped_id_out);
-
-    int cell_id_tmp = sorted_set_get_cell_id(hk->top_K_heap, tag);
-    if (cell_id_tmp >= 0) {
-        if (cell_id_tmp == cell_id) { // insert success
-            return 0;
-        } else {
-            return 1; // insert success, but use the different cell_id
-        }
-    } else {
-        return -1;
-    }
-
-    return -1; // should not reach here
-}
-
-struct tag_hash_key *heavy_keeper_get_true_pst_tag(const struct heavy_keeper *hk, const struct tag_hash_key *tag)
-{
-    return sorted_set_get_true_pst_tag(hk->top_K_heap, tag);
-}
-
-struct heavy_keeper_result *heavy_keeper_query(const struct heavy_keeper *hk) {
-    size_t query_entry_num = sorted_set_cardinality(hk->top_K_heap);
-    struct heavy_keeper_result *stats = (struct heavy_keeper_result *)malloc(sizeof(struct heavy_keeper_result));
-    stats->count = (unsigned long long *)malloc(query_entry_num * sizeof(unsigned long long));
-    stats->tags = (struct tag_hash_key **)malloc(query_entry_num * sizeof(struct tag_hash_key *));
-    stats->cell_id = (int *)malloc(query_entry_num * sizeof(int));
-    stats->n_key = query_entry_num;
-
-    sorted_set_dump(hk->top_K_heap, stats->count, stats->tags, stats->cell_id);
-
-    return stats;
-}
-
-size_t heavy_keeper_get_cardinality(const struct heavy_keeper *hk) {
-    return sorted_set_cardinality(hk->top_K_heap);
-}
-
-int heavy_keeper_query_one(const struct heavy_keeper *hk, const struct tag_hash_key *tag, unsigned long long int *count_out, int *cell_id_out)
-{
-    if (count_out != NULL) {
-        unsigned long long int count = sorted_set_get_count(hk->top_K_heap, tag);
-        if (count == INVALID_COUNT) {
-            *count_out = 0;
-            return -1;
-        }
-        *count_out = count;
-    }
-
-    if (cell_id_out == NULL) {
-        return 0;
-    }
-
-    int cell_id = sorted_set_get_cell_id(hk->top_K_heap, tag);
-    if (cell_id == -1) {
-        *cell_id_out = -1;
-        return -1;
-    }
-    *cell_id_out = cell_id;
+int heavy_keeper_set_exdata_schema(struct heavy_keeper *hk, exdata_new_cb new_fn, exdata_free_cb free_fn, exdata_merge_cb merge_fn, exdata_reset_cb reset_fn, exdata_copy_cb copy_fn) {
+    sorted_set_schema_set(hk->top_K_heap, new_fn, free_fn, merge_fn, reset_fn, copy_fn);
+    hk->new_fn = new_fn;
+    hk->free_fn = free_fn;
+    hk->merge_fn = merge_fn;
+    hk->reset_fn = reset_fn;
+    hk->copy_fn = copy_fn;
 
     return 0;
 }
 
-/*****************************************merge *****************************************/
-/****************************************************************************************/
+void *heavy_keeper_get0_exdata(struct heavy_keeper *hk, const struct tag_hash_key *key) {
+    heap_entry *entry = sorted_set_find_entry(hk->top_K_heap, key);
+    if (entry == NULL || sorted_set_entry_dying(entry)) {
+        return NULL;
+    }
+    return sorted_set_entry_get_data(entry)->exdata;
+}
+
+int heavy_keeper_get_count(struct heavy_keeper *hk) {
+    return sorted_set_cardinality(hk->top_K_heap);
+}
+
+void heavy_keeper_list(const struct heavy_keeper *hk, void ***exdatas, size_t *n_exdatas) {
+    *n_exdatas = sorted_set_cardinality(hk->top_K_heap);
+    if (*n_exdatas == 0) {
+        *exdatas = NULL;
+        return;
+    }
+
+    void **exdatas_ret = (void **)malloc(sizeof(void *) * (*n_exdatas));
+    *exdatas = exdatas_ret;
+
+    struct tag_hash_key **tags = (struct tag_hash_key **)malloc(sizeof(struct tag_hash_key *) * hk->K);
+    sorted_set_dump(hk->top_K_heap, tags, exdatas_ret);
+
+    free(tags);
+}
+
 static void heavy_keeper_merge_sketch(struct heavy_keeper *dest, const struct heavy_keeper *src) {
     int w = dest->params.max_bucket_num;
     int d = dest->params.array_num;
@@ -349,7 +697,7 @@ static void heavy_keeper_merge_sketch(struct heavy_keeper *dest, const struct he
             const struct Bucket *bucket_src = &(src->sketch[array_id * w + bucket_id]);
 
             if (bucket_dest->finger_print == bucket_src->finger_print) {
-                bucket_dest->count = count_add(bucket_dest->count, bucket_src->count);
+                bucket_dest->count = safe_add(bucket_dest->count, bucket_src->count);
             } else {
                 if (bucket_dest->count < bucket_src->count) {  // bucket_src stores the elephant flow.
                     bucket_dest->count = bucket_src->count;
@@ -359,6 +707,7 @@ static void heavy_keeper_merge_sketch(struct heavy_keeper *dest, const struct he
         }
     }
 }
+
 
 unsigned long long find_maxv_in_sketch(struct heavy_keeper *hk, const struct tag_hash_key *tag) {
     struct Bucket *bucket;
@@ -376,188 +725,100 @@ unsigned long long find_maxv_in_sketch(struct heavy_keeper *hk, const struct tag
     return maxv;
 }
 
-int find_next_unused_cell_id(const int *sorted_cell_id_arr, size_t arr_len, int last_find_result, int *next_idx)
-{
-    int cur_idx = *next_idx;
-
-    if (arr_len == 0) {
-        if (last_find_result < 0) {
-            return 0;
-        } else {
-            return last_find_result + 1;
-        }
-    }
-
-    if (cur_idx >= arr_len) {
-        int max_id = sorted_cell_id_arr[arr_len - 1];
-        if (last_find_result <= max_id) { //  this first time reach the end of sorted_pst_cell_id_arr
-            return max_id + 1;
-        } else {
-            return last_find_result + 1;
-        }
-    }
-
-    int expected_id = last_find_result + 1;
-    while (cur_idx < arr_len) {
-        int cur_id = sorted_cell_id_arr[cur_idx];
-
-        // check if expected_id id is used
-        if (cur_id == expected_id) { // used
-            expected_id++;
-            cur_idx++;
-        } else if (cur_id > expected_id) { // not used
-            *next_idx = cur_idx;
-            return expected_id;
-        } else { // still cannot guarantee expected_id is not used
-            cur_idx++;
-        }
-    }
-
-    // all cell_id in sorted_pst_cell_id_arr is used
-    int max_id = sorted_cell_id_arr[arr_len - 1];
-    *next_idx = arr_len;
-    return max_id + 1;
-}
-
 int cmp_int(const void *a, const void *b) {
     return *(int *)a - *(int *)b;
 }
 
-void heavy_keeper_merge_sorted_set_recording_id_details(struct heavy_keeper *dest, const struct heavy_keeper *src, 
-    int **cell_id_popped_from_dest_when_merge_src_out, int *cell_id_popped_from_dest_when_merge_src_len_out,
-    int **cell_id_in_src_before_merge_out, int **cell_id_in_dest_corresponding_out, int *cell_id_in_src_before_merge_len_out) 
-{
-    struct sorted_set *new_rec = sorted_set_new(dest->K); // merging result
+void heavy_keeper_merge(struct heavy_keeper *dest, struct heavy_keeper *src) {
+    assert(dest->K == src->K);
 
+    heavy_keeper_merge_sketch(dest, src);
+
+    struct sorted_set *new_rec = sorted_set_new(dest->K); // merging result
+    sorted_set_schema_set(new_rec, dest->new_fn, dest->free_fn, dest->merge_fn, dest->reset_fn, dest->copy_fn);
     struct sorted_set *ss_dest = dest->top_K_heap; // original ss in dest
     const struct sorted_set *ss_src = src->top_K_heap; // the ss to be merged
     int size_dest = sorted_set_cardinality(ss_dest);
     int size_src = sorted_set_cardinality(ss_src);
     int max_size = size_dest > size_src ? size_dest : size_src;
 
-    unsigned long long *count_arr = (unsigned long long *)malloc(max_size * sizeof(unsigned long long));
-    // struct tag_hash_key **tag_arr = (struct tag_hash_key **)malloc(max_size * sizeof(struct tag_hash_key *));
     struct tag_hash_key **tag_arr = (struct tag_hash_key **)calloc(max_size, sizeof(struct tag_hash_key *));
-    int *cell_id_arr_dst = (int *)malloc(size_dest * sizeof(int));
+    void **exdatas_dst = (void **)calloc(size_dest, sizeof(void *));
+    sorted_set_dump(ss_dest, tag_arr, exdatas_dst);
 
-    sorted_set_dump(ss_dest, count_arr, tag_arr, cell_id_arr_dst);
-    int cell_id_popped_from_dest_when_merge_src[dest->K];
-    int cell_id_popped_from_dest_when_merge_src_len = 0;
-    int cell_id_in_src_before_merge[dest->K];
-    int cell_id_in_src_before_merge_len = 0;
-    int cell_id_in_dest_corresponding[dest->K]; // length == cell_id_in_src_before_merge_len
 
     /* ------------------------------ merge dest ------------------------------ */
     for (int i = 0; i < size_dest; i++) {
         unsigned long long maxv = find_maxv_in_sketch(dest, tag_arr[i]);
-        assert(tag_arr[i] != NULL);
-        assert(cell_id_arr_dst[i] >= 0);
-        sorted_set_insert(new_rec, tag_arr[i], maxv, cell_id_arr_dst[i]);
+        sorted_set_insert_to_available_heap(new_rec, tag_arr[i], maxv, dest->copy_fn(exdatas_dst[i]));
     }
 
-    qsort(cell_id_arr_dst, size_dest, sizeof(int), cmp_int); // use in find_next_unused_cell_id to find the minimum unused cell_id
-
-    /* ------------------------------ merge source ------------------------------ */
-    // int *cell_id_arr_src = (int *)malloc(size_src * sizeof(int));
-    int *cell_id_arr_src = (int*)calloc(size_src, sizeof(int));
-    sorted_set_dump(ss_src, count_arr, tag_arr, cell_id_arr_src);
-    int last_find_id = -1;
-    int next_idx = 0;
-
+    /* ------------------------------ merge src ------------------------------ */
+    void **exdatas_src = (void **)calloc(size_src, sizeof(void *));
+    sorted_set_dump(ss_src, tag_arr, exdatas_src);
+    
     for (int i = 0; i < size_src; i++) {
         const struct tag_hash_key *tag_src = tag_arr[i];
-        assert(tag_src != NULL);
 
-        int cell_id_dest = sorted_set_get_cell_id(ss_dest, tag_src);
-        int cell_id_src = cell_id_arr_src[i];
-    
-        if (cell_id_dest != -1) {  // the tag is in both dest and src, so has been processed in the previous loop. The reason why no need to sum up result is that merging sketch already gets its summed up count
-            cell_id_in_src_before_merge[cell_id_in_src_before_merge_len] = cell_id_src;
-            cell_id_in_dest_corresponding[cell_id_in_src_before_merge_len] = cell_id_dest;
-            cell_id_in_src_before_merge_len++;
+        heap_entry *entry = sorted_set_find_entry(new_rec, tag_src);
+        if (entry != NULL) { // the tag is in both dest and src, so has been processed in the previous loop. The reason why no need to sum up result is that merged sketch already keeps its summed up count
+            // merge exdata
+            void *exdata_new = sorted_set_entry_get_data(entry)->exdata;
+            void *exdata_src = exdatas_src[i];
+            dest->merge_fn(exdata_new, exdata_src);
 
             continue;
         }
 
-        unsigned long long maxv = find_maxv_in_sketch(dest, tag_src); // the dest heavy keeper has been merged, so the maxv is the maxv in the merged sketch, instead of the dest sketch
-        int popped_id = -1;
-        int now_idx = next_idx;
-        int find_id = find_next_unused_cell_id(cell_id_arr_dst, size_dest, last_find_id, &now_idx);
-        assert(find_id >= 0);
-        assert(now_idx >= 0);
-        int tmp_ret = sorted_set_insert_and_record_popped_back(new_rec, tag_src, maxv, find_id, &popped_id);
-        if (tmp_ret == 2) { // insert success and popped one.
-            cell_id_popped_from_dest_when_merge_src[cell_id_popped_from_dest_when_merge_src_len++] = popped_id;
-        } 
-        if (tmp_ret != 0) { // insert success
-            last_find_id = find_id;
-            next_idx = now_idx;
-        
-            cell_id_in_src_before_merge[cell_id_in_src_before_merge_len] = cell_id_src;
-            cell_id_in_dest_corresponding[cell_id_in_src_before_merge_len] = last_find_id;
-            cell_id_in_src_before_merge_len++;
+        unsigned long long maxv = find_maxv_in_sketch(dest, tag_src);// the dest heavy keeper has been merged, so the maxv is the maxv in the merged sketch, instead of the one in the dest
+
+        if (sorted_set_check_is_full(new_rec)) {
+            unsigned long long tmp_mincnt = sorted_set_get_min_count(new_rec);
+            if (maxv > tmp_mincnt) {
+                sorted_set_pop(new_rec); // TODO:  如果dest 和 new 共用指针，这里pop 出来以后，dest 的内存好像会变得有点问题。先别纠结这么复杂的事，new 和 dest 使用copy后的data 先试试。
+                sorted_set_insert_to_available_heap(new_rec, tag_src, maxv, dest->copy_fn(exdatas_src[i]));
+            }
+        } else {
+            sorted_set_insert_to_available_heap(new_rec, tag_src, maxv, dest->copy_fn(exdatas_src[i]));
         }
     }
 
-    free(count_arr);
     free(tag_arr);
-    free(cell_id_arr_dst);
-    free(cell_id_arr_src);
-    sorted_set_free(ss_dest);
-
+    free(exdatas_dst);
+    free(exdatas_src);
+    // dest->top_K_heap->free_fn = default_free_fn; // do not free exdata in the original top_K_heap, because they are either moved to new_rec or freed when popped out when add source to dest.
+    sorted_set_free(dest->top_K_heap);
     dest->top_K_heap = new_rec;
-
-    if (cell_id_popped_from_dest_when_merge_src_len == 0) {
-        *cell_id_popped_from_dest_when_merge_src_out = NULL;
-        *cell_id_popped_from_dest_when_merge_src_len_out = 0;
-    } else {
-        *cell_id_popped_from_dest_when_merge_src_out = (int *)malloc(cell_id_popped_from_dest_when_merge_src_len * sizeof(int));
-        memcpy(*cell_id_popped_from_dest_when_merge_src_out, cell_id_popped_from_dest_when_merge_src, cell_id_popped_from_dest_when_merge_src_len * sizeof(int));
-        *cell_id_popped_from_dest_when_merge_src_len_out = cell_id_popped_from_dest_when_merge_src_len;
-    }
-    if (cell_id_in_src_before_merge_len == 0) {
-        *cell_id_in_src_before_merge_out = NULL;
-        *cell_id_in_src_before_merge_len_out = 0;
-        *cell_id_in_dest_corresponding_out = NULL;
-    } else {
-        *cell_id_in_src_before_merge_out = (int *)malloc(cell_id_in_src_before_merge_len * sizeof(int));
-        memcpy(*cell_id_in_src_before_merge_out, cell_id_in_src_before_merge, cell_id_in_src_before_merge_len * sizeof(int));
-        *cell_id_in_src_before_merge_len_out = cell_id_in_src_before_merge_len;
-        *cell_id_in_dest_corresponding_out = (int *)malloc(cell_id_in_src_before_merge_len * sizeof(int));
-        memcpy(*cell_id_in_dest_corresponding_out, cell_id_in_dest_corresponding, cell_id_in_src_before_merge_len * sizeof(int));
-    }
 }
 
-int heavy_keeper_merge_recording_id_details(struct heavy_keeper *dest, const struct heavy_keeper *src,
-    int **cell_id_popped_from_dest_when_merge_src_out, int *cell_id_popped_from_dest_when_merge_src_len_out,
-    int **cell_id_in_src_before_merge_out, int **cell_id_in_dest_corresponding_out, int *cell_id_in_src_before_merge_len_out)
-{
-    if (dest->params.array_num != src->params.array_num ||
-        dest->params.max_bucket_num != src->params.max_bucket_num ||
-        dest->K != src->K) {
-        return -1;
+struct heavy_keeper *heavy_keeper_copy(const struct heavy_keeper *src) {
+    struct heavy_keeper *ret = (struct heavy_keeper *)malloc(sizeof(struct heavy_keeper));
+    ret->K = src->K;
+    ret->rand_state = 0;
+
+    ret->top_K_heap = sorted_set_copy(src->top_K_heap);
+
+    ret->params = src->params;
+    ret->sketch = (struct Bucket *)malloc(sizeof(struct Bucket) * (size_t)ret->params.array_num * (size_t)ret->params.max_bucket_num);
+    memcpy(ret->sketch, src->sketch, sizeof(struct Bucket) * (size_t)ret->params.array_num * (size_t)ret->params.max_bucket_num);
+
+    ret->new_fn = src->new_fn;
+    ret->free_fn = src->free_fn;
+    ret->merge_fn = src->merge_fn;
+    ret->reset_fn = src->reset_fn;
+    ret->copy_fn = src->copy_fn;
+
+    return ret;
+}
+
+void heavy_keeper_one_point_query(struct heavy_keeper *hk, const struct tag_hash_key *tag, int *count_out, void **exdata_out) {
+    *count_out = 0;
+    *exdata_out = NULL;
+
+    heap_entry *entry = sorted_set_find_entry(hk->top_K_heap, tag);
+    if (entry == NULL) {
+        return;
     }
-    
-    heavy_keeper_merge_sketch(dest, src);
-    heavy_keeper_merge_sorted_set_recording_id_details(dest, src,
-        cell_id_popped_from_dest_when_merge_src_out, cell_id_popped_from_dest_when_merge_src_len_out,
-        cell_id_in_src_before_merge_out, cell_id_in_dest_corresponding_out, cell_id_in_src_before_merge_len_out);
-    return 0;
-}
-
-struct heavy_keeper *heavy_keeper_copy(const struct heavy_keeper *src)
-{
-    struct heavy_keeper *hk = (struct heavy_keeper *)malloc(sizeof(struct heavy_keeper));
-    hk->params = src->params;
-    hk->K = src->K;
-    hk->sketch = (struct Bucket *)malloc(hk->params.array_num * hk->params.max_bucket_num * sizeof(struct Bucket));
-    memcpy(hk->sketch, src->sketch, hk->params.array_num * hk->params.max_bucket_num * sizeof(struct Bucket));
-
-    hk->top_K_heap = sorted_set_copy(src->top_K_heap);
-    return hk;
-}
-
-int heavy_keeper_get_config_K(const struct heavy_keeper *hk)
-{
-    return hk->K;
+    *count_out = sorted_set_entry_get_count(entry);
+    *exdata_out = sorted_set_entry_get_data(entry)->exdata;
 }

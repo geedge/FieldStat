@@ -10,6 +10,7 @@ const struct fieldstat_tag TEST_TAG_INT = {"INT key_", TAG_INTEGER, {.value_long
 const struct fieldstat_tag_list TEST_TAG_LIST_INT = {(struct fieldstat_tag *)&TEST_TAG_INT, 1};
 const struct fieldstat_tag TEST_TAG_INT_collided = {"collided", TAG_INTEGER, {.value_longlong = 2}};
 const struct fieldstat_tag TEST_TAG_DOUBLE = {"DOUBLE key_", TAG_DOUBLE, {.value_double = 100.1}};
+const struct fieldstat_tag_list TEST_TAG_LIST_DOUBLE = {(struct fieldstat_tag *)&TEST_TAG_DOUBLE, 1};
 const struct fieldstat_tag TEST_TAG_DOUBLE_collided = {"collided", TAG_DOUBLE, {.value_double = 2.0}};
 const struct fieldstat_tag TEST_SHARED_TAG = {"shared", TAG_INTEGER, {.value_longlong = 1}};
 const struct timeval TEST_TIMEVAL = {100, 10000};

@@ -184,27 +184,17 @@ struct fieldstat_tag_list
 void fieldstat_get_cubes(const struct fieldstat *instance, int **cube_ids, int *n_cube);
 
 /*
-    * @brief Get all the registered metrics of a cube.
-    * @return return FS_ERR_NULL_HANDLER or FS_ERR_INVALID_CUBE_ID. Or FS_OK
-*/
-int fieldstat_get_metrics_used_by_cube(const struct fieldstat *instance, int cube_id, int **metric_id_out, size_t *n_metric);
-
-/*
     * @brief Get all the registered metrics by fieldstat_register_counter, fieldstat_register_hll, fieldstat_register_hist.
 */
 void fieldstat_get_metrics(const struct fieldstat *instance, int **metric_id_out, size_t *n_metric);
+
+void fieldstat_get_metric_in_cell(const struct fieldstat *instance, int cube_id, const struct fieldstat_tag_list *tags, int **metric_id_out, size_t *n_metric_out);
 
 // query the name of the metric, return NULL if metric_id is invalid.
 const char *fieldstat_get_metric_name(const struct fieldstat *instance, int metric_id);
 
 // query the type of the metric. return (enum metric_type)-1 if metric_id is invalid.
 enum metric_type fieldstat_get_metric_type(const struct fieldstat *instance, int metric_id);
-
-/*
-    get the tags added to metric when calling fieldstat_counter_incrby, fieldstat_counter_set, fieldstat_hll_add, fieldstat_hist_record.
-*/
-void fieldstat_get_cells_used_by_metric(const struct fieldstat *instance, int cube_id, int metric_id,
-    struct fieldstat_tag_list **tag_list, size_t *n_cell);
 
 /*
     get the tags added to cube when calling fieldstat_counter_incrby, fieldstat_counter_set, fieldstat_hll_add, fieldstat_hist_record.

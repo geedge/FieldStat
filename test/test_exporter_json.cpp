@@ -1,6 +1,7 @@
 
 #include <gtest/gtest.h>
 #include <random>
+#include <unordered_set>
 #include "cjson/cJSON.h"
 #include "base64/b64.h"
 
@@ -247,6 +248,7 @@ TEST(export_test, cjson_export_on_one_cube_of_topk_sampling)
     int arr_num = cJSON_GetArraySize(root_arr);
     EXPECT_EQ(arr_num, TEST_TOPK_STANDARD_K);
 
+    std::unordered_set<long long> topk_tag_value_set;
     for (int i = 0; i < arr_num; i++)
     {
         cJSON *root = cJSON_GetArrayItem(root_arr, i);
@@ -255,9 +257,10 @@ TEST(export_test, cjson_export_on_one_cube_of_topk_sampling)
         cJSON *tag = cJSON_GetObjectItem(root, "tags");
         EXPECT_NE(tag, nullptr);
         
-        Fieldstat_tag_list_wrapper *added_tmp = new Fieldstat_tag_list_wrapper("flow id key", i);
-        test_check_if_tag_list_is_in_json(tag, added_tmp);
-        delete added_tmp;
+        cJSON *tag_val = cJSON_GetObjectItem(tag, "flow id key");
+        EXPECT_NE(tag_val, nullptr);
+        EXPECT_EQ(tag_val->type, cJSON_Number);
+        topk_tag_value_set.insert(tag_val->valueint);
 
         struct fieldstat_tag_list tmp_tag = {(struct fieldstat_tag *)&TEST_TAG_SHARED1, 3};
         Fieldstat_tag_list_wrapper shared_wrapper = Fieldstat_tag_list_wrapper(&tmp_tag);
@@ -269,6 +272,12 @@ TEST(export_test, cjson_export_on_one_cube_of_topk_sampling)
         const char *metric_name[TEST_METRIC_NUM] = {"topk1", "topk2"};
         test_check_if_metric_topk_correct(metrics, (const char **)metric_name, test_expected_big_count, TEST_METRIC_NUM);
     }
+
+    EXPECT_EQ(topk_tag_value_set.size(), TEST_TOPK_STANDARD_K);
+    for (int i = 0; i < TEST_TOPK_STANDARD_K; i++) { // the top k flow id is [0, TEST_TOPK_STANDARD_K - 1]
+        EXPECT_NE(topk_tag_value_set.find(i), topk_tag_value_set.end());
+    }
+
     cJSON_Delete(root_arr);
 
     fieldstat_free(instance);
@@ -1080,6 +1089,7 @@ int main(int argc, char *argv[])
     init_hll_standard_oper();
     init_histogram_standard_oper();
 	testing::InitGoogleTest(&argc, argv);
+    // testing::GTEST_FLAG(filter) = "export_test.cjson_export_on_one_cube_of_topk_sampling";
 	int ret = RUN_ALL_TESTS();
 
     ST_hyperloglog_free(g_hll_standard);

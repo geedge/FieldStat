@@ -199,7 +199,7 @@ TEST(test_register, register_many_metrics)
     fieldstat_free(instance);
 }
 
-TEST(test_register, dup_registered_info_from_empty_one)
+TEST(test_register, fork_registered_info_from_empty_one)
 {
     struct fieldstat *instance = fieldstat_new();
     
@@ -214,7 +214,7 @@ TEST(test_register, dup_registered_info_from_empty_one)
     fieldstat_free(instance);
 }
 
-TEST(test_register, dup_registered_info_with_cube_and_metric_without_cell)
+TEST(test_register, fork_registered_info_with_cube_and_metric)
 {
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
@@ -240,7 +240,7 @@ TEST(test_register, dup_registered_info_with_cube_and_metric_without_cell)
 
     struct fieldstat_tag_list *tag_list = NULL;
     size_t n_cell = 0;
-    fieldstat_get_cells_used_by_metric(dup, cube_id, metric_id, &tag_list, &n_cell);
+    fieldstat_get_cells_used_by_cube(dup, cube_id, &tag_list, &n_cell);
     EXPECT_EQ(n_cell, 0);
 
     fieldstat_free(dup);

@@ -393,8 +393,8 @@ static double bias_estimate(const struct ST_hyperloglog *h, double raw_est) {
     else
         return (biases[idx] + biases[idx-1]) / 2;
 }
- __attribute__ ((unused)) static double ST_HLL_count_no_sliding(const struct ST_hyperloglog *h)
-{
+
+double ST_hyperloglog_count(const struct ST_hyperloglog *h){
     int num_zero = 0;
     int num_reg = NUM_REG(h->cfg.precision);
     double raw_est = raw_estimate(h, &num_zero);
@@ -419,27 +419,6 @@ static double bias_estimate(const struct ST_hyperloglog *h, double raw_est) {
     } else {
         return raw_est;
     }
-}
-double ST_hyperloglog_count(const struct ST_hyperloglog *h)
-{
-    int num_zero=0;
-    double raw_est=raw_estimate(h, &num_zero);
-    raw_est*=alpha(h->cfg.precision);
-
-    double num_reg=NUM_REG(h->cfg.precision);
-    if (raw_est <= 5 * num_reg) {
-        raw_est -= bias_estimate(h, raw_est);
-    }
-    if(raw_est<=5*num_reg/2)
-    {
-        if(num_zero)
-            return linear_count(h, num_zero);
-    }
-    if(raw_est>INT32_MAX/30)
-    {
-        return INT32_MIN*log(1-raw_est/INT32_MAX);
-    }
-    return raw_est;
 }
 
 /**

@@ -1,42 +1,18 @@
 #pragma once
 
 #include <stddef.h>
-#include <uuid/uuid.h>
-
-/* ---------------------------------------------------------------------------------------
-TOP K using heavykeeper algorithm. 
-Author: Chen Zizhan 
-Time: 2023/4/26
----------------------------------------------------------------------------------------------*/
 
 #ifdef __cplusplus
 extern "C"{
 #endif
 
+#include "exdata.h"
+#include "my_ut_hash.h"
 
-// Query result
-struct heavy_keeper_result {
-    size_t n_key; // number of result
-    struct tag_hash_key **tags;
-    unsigned long long *count; // count[i] is the metric count of the corresponding flow id
-
-    int *cell_id;
-};
-
-// Parameters used in algorithm
-struct heavy_keeper_options{
-    int array_num;  // the size of the array. Default value: 4
-                    // Set it by how accurate you want. Value of 4 guarantees an accuracy more than 90% and around 97% in all tests.
-                    // Not too big because it have an impact on both time and memory efficiency.
-    int max_bucket_num; // M2, the maximum number of buckets every array keeps. Default value: k*log(k) and no less than 100. 
-                        // Basically, as long as big enough, it won't affect the accuracy significantly.
-    double decay_exp_rate; // b, bigger variance of flow size is(elephant flows take more ratio), smaller it should be.
-                           //  Must bigger than 1. Better not bigger than 1.3, otherwise some elephant flow will be missed.
-};
 
 struct heavy_keeper;
 
-struct heavy_keeper *heavy_keeper_with_data_new(int max_query_num);
+struct heavy_keeper *heavy_keeper_new(int max_query_num);
 /**
  * @brief   free a heavy keeper.
  * @param   hk            the pointer to the heavy keeper.
@@ -44,66 +20,35 @@ struct heavy_keeper *heavy_keeper_with_data_new(int max_query_num);
 void heavy_keeper_free(struct heavy_keeper *hk);
 
 /*
- * @brief   clear a heavy keeper. It will clear all the data in the heavy keeper.
+ * @brief   clear a heavy keeper. It will clear all the data in the heavy keeper. as for every exdata, use the reset function `exdata_reset_cb` to reset it.
     * @param   hk            the pointer to the heavy keeper.
 */
 void heavy_keeper_reset(struct heavy_keeper *hk);
 
-// tag: the pointer to the tag, user should alloc it. Its memory will be freed by heavy keeper, so don't free it after calling heavy_keeper_add.
-// return -1 when the key is not inserted to the heavy keeper(not fail). popped_id_out is -1 if not popped. any other value >= 0 means the id of the popped member.
-// the cube id will give the key if the key is new, in which case return 0, if the key is already in the heavy keeper, return 1.
-int heavy_keeper_add(struct heavy_keeper *hk, const struct tag_hash_key *tag, unsigned long long int count, int cube_id, int *popped_id_out);
+// int heavy_keeper_add(struct heavy_keeper *hk, const char *key, size_t key_len, int count, void *arg);
 
-/**
- * @brief   Query the top-K flows.The flow id with bigger count ranks at smaller index.
- * @param   hk            the pointer to the heavy keeper.
- * @return  a pointer to the heavy keeper query result. User should free it after use by calling heavy_keeper_result_free.
- */
-struct heavy_keeper_result *heavy_keeper_query(const struct heavy_keeper *hk);
+int heavy_keeper_add(struct heavy_keeper *hk, const struct tag_hash_key *tag, int count, void *arg);
 
-int heavy_keeper_query_one(const struct heavy_keeper *hk, const struct tag_hash_key *tag, unsigned long long int *count_out, int *cube_id_out);
 
-size_t heavy_keeper_get_cardinality(const struct heavy_keeper *hk);
-/**
- * @brief   free a heavy keeper query result.
- * @param   stats_hd     the pointer to the heavy keeper query result.
- */
-void heavy_keeper_result_free(struct heavy_keeper_result *stats_hd);
+int heavy_keeper_set_exdata_schema(struct heavy_keeper *hk, exdata_new_cb new_fn, exdata_free_cb free_fn, exdata_merge_cb merge_fn, exdata_reset_cb reset_fn, exdata_copy_cb copy_fn);
 
-int heavy_keeper_merge_recording_id_details(struct heavy_keeper *dest, const struct heavy_keeper *src,
-    int **cell_id_popped_from_dest_when_merge_src_out, int *cell_id_popped_from_dest_when_merge_src_len_out,
-    int **cell_id_in_src_before_merge_out, int **cell_id_in_dest_corresponding_out, int *cell_id_in_src_before_merge_len_out);
+// void *heavy_keeper_get0_exdata(struct heavy_keeper *hk, const char *key, size_t key_len);
+void *heavy_keeper_get0_exdata(struct heavy_keeper *hk, const struct tag_hash_key *tag);
 
+// get the number of cells in the heavy keeper
+int heavy_keeper_get_count(struct heavy_keeper *hk);
+
+void heavy_keeper_list(const struct heavy_keeper *hk, void ***exdatas, size_t *n_exdatas); //use list: void **exdatas, heavy_keeper_list(&exdatas); void *exdata = exdatas[i]; free(exdatas);
+
+void heavy_keeper_merge(struct heavy_keeper *dest, struct heavy_keeper *src);
 /*
     Equal to heavy_keeper_merge, with empty dest, but much faster.
 */
 struct heavy_keeper *heavy_keeper_copy(const struct heavy_keeper *src);
 
-/**
- * @brief   Serialize a heavy keeper.
- * @param   hk            the pointer to the heavy keeper.
- * @param   blob          output of the serialized data. Must be freed by caller. *blob can be NULL, the function will allocate memory for it.
- * @param   blob_sz       Output, the size of the serialized data.
-*/
-void heavy_keeper_serialization(const struct heavy_keeper *hk, char **blob, size_t *blob_sz);
+// for test
+void heavy_keeper_one_point_query(struct heavy_keeper *hk, const struct tag_hash_key *tag, int *count_out, void **exdata_out);
 
-/**
- * @brief   Deserialize a heavy keeper.
- * @param   blob          the serialized data. From heavy_keeper_serialization.
- * @param   size          the size of the serialized data.
- * @returns a pointer to the heavy keeper.
-*/
-struct heavy_keeper *heavy_keeper_deserialization(const char *blob, size_t size);
-
-
-/**
- * @brief   Get the "K" parameter of the heavy keeper.
-*/
-int heavy_keeper_get_config_K(const struct heavy_keeper *hk);
-
-void heavy_keeper_get_config_metric_header(struct heavy_keeper *hk, char **metric_names, size_t *n_metric, size_t *primary_metric_index);
-
-struct tag_hash_key *heavy_keeper_get_true_pst_tag(const struct heavy_keeper *hk, const struct tag_hash_key *tag);
 
 #ifdef __cplusplus
 }

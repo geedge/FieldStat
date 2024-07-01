@@ -75,9 +75,6 @@ struct cell_iter {
     size_t n_cell;
     size_t curr_cell_idx;
 
-    int *metric_ids;
-    size_t n_metric;
-
     const struct fieldstat *instance;
 };
 
@@ -508,7 +505,6 @@ void cell_iter_free(struct cell_iter *iter) {
         fieldstat_tag_list_arr_free(iter->shared_tag, 1);
     }
     free(iter->cube_ids);
-    free(iter->metric_ids);
 
     free(iter);
 }
@@ -518,16 +514,8 @@ int cell_iter_next_cube(struct cell_iter *iter) {
     while (iter->curr_cube_idx < iter->n_cube - 1) {
         int cube_id_next = iter->cube_ids[++iter->curr_cube_idx];
 
-        fieldstat_get_metrics_used_by_cube(instance, cube_id_next, &iter->metric_ids, &iter->n_metric);
-        if (iter->n_metric == 0) {
-            continue;
-        }
-
-        // get cell info 
         fieldstat_get_cells_used_by_cube(instance, cube_id_next, &iter->tag_list, &iter->n_cell);
         if (iter->n_cell == 0) {
-            free(iter->metric_ids);
-            iter->metric_ids = NULL;
             continue;
         }
 
@@ -562,8 +550,7 @@ int cell_iter_next(struct cell_iter *iter) {
     cell_iter_free_cell_records(iter);
     fieldstat_tag_list_arr_free(iter->shared_tag, 1);
     iter->shared_tag = NULL;
-    free(iter->metric_ids);
-    iter->metric_ids = NULL;
+
     if (cell_iter_next_cube(iter)) {
         return 1;
     }
@@ -689,19 +676,26 @@ void kv_pair_free_list(struct export_kv_pair *pairs, size_t len)
 int cjson_map_add(struct cellwise_rec_for_export *tag_field_pair, const struct cell_iter *iter)
 {
     struct export_kv_pair **fields = NULL;
-    int n_nonempty_metrics = 0;
+    int *metric_ids = NULL;
+    size_t n_metric = 0;
+    fieldstat_get_metric_in_cell(iter->instance, iter->cube_ids[iter->curr_cube_idx], &iter->tag_list[iter->curr_cell_idx], &metric_ids, &n_metric);
+    if (n_metric == 0) {
+        // printf("cannot get metric in cell\n");
+        return 0;
+    }
 
-    for (int i = 0; i < iter->n_metric; i++) {
-        struct export_kv_pair *field = cell_query_with_iter(iter, iter->metric_ids[i]);
+    int n_nonempty_metrics = 0;
+    for (int i = 0; i < n_metric; i++) {
+        struct export_kv_pair *field = cell_query_with_iter(iter, metric_ids[i]);
         if (field == NULL) {
             continue;
         }
         if (fields == NULL) {
-            fields = malloc(sizeof(struct export_kv_pair *) * iter->n_metric);
+            fields = malloc(sizeof(struct export_kv_pair *) * n_metric);
         }
         fields[n_nonempty_metrics++] = field;
     }
-
+    free(metric_ids);
     if (fields == NULL) { // all fields are null
         return 0;
     }
