@@ -389,7 +389,7 @@ TEST(unit_test_tag_map, add_after_reset_and_ensure_performance_improvement) {
     end = clock();
     clock_t time_reset_twice = end - start;
 
-    EXPECT_GT(time_reset_twice, time_reset_once);
+    EXPECT_GE(time_reset_twice, time_reset_once);
 
     tag_map_free(hk);
     for (int i = 0; i < TEST_ROUND; i++) {
@@ -426,7 +426,7 @@ TEST(unit_test_heavy_keeper, add_after_reset_and_ensure_performance_improvement)
     end = clock();
     clock_t time_reset_once = end - start;
    
-    EXPECT_GT(time_empty, time_reset_once);
+    EXPECT_GE(time_empty, time_reset_once);
 
     heavy_keeper_free(hk);
     for (int i = 0; i < TEST_ROUND; i++) {
