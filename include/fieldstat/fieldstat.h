@@ -151,7 +151,7 @@ int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, co
     * @return FS_OK if success. FS_ERR_NULL_HANDLER, FS_ERR_INVALID_CUBE_ID, FS_ERR_INVALID_METRIC_ID if fail.
     *         FS_ERR_INVALID_PARAM when value is less than 0, or the cube is topk.
 */
-int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long value); // TODO: 看看能不能改成histogram(重命名）。
+int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long value);
 
 /*
     * @brief Delete all the cells, also the content of every metrics. The cube and metrics are not deleted. Increase cell_version by 1.
