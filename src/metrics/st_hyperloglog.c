@@ -129,16 +129,16 @@ int ST_hyperloglog_add(struct ST_hyperloglog *h, const char *key, size_t keylen)
    return hll_add_hash(h, hash);
 }
 // https://djhworld.github.io/hyperloglog/merging/
-int ST_hyperloglog_merge(struct ST_hyperloglog *dst, const struct ST_hyperloglog *src)
+int ST_hyperloglog_merge(struct ST_hyperloglog *dest, const struct ST_hyperloglog *src)
 {
-    if(dst->cfg.precision != src->cfg.precision) return -1;
-    int n_register=NUM_REG(dst->cfg.precision);
+    if(dest->cfg.precision != src->cfg.precision) return -1;
+    int n_register=NUM_REG(dest->cfg.precision);
     int s_reg=0, d_reg=0;
     for(int i=0; i<n_register; i++)
     {
         s_reg=get_register(src, i);
-        d_reg=get_register(dst, i);
-        set_register(dst, i, MAX(s_reg, d_reg));
+        d_reg=get_register(dest, i);
+        set_register(dest, i, MAX(s_reg, d_reg));
     }
     return 0;
 }
@@ -219,10 +219,10 @@ void ST_hyperloglog_serialize_for_networking(const struct ST_hyperloglog *h, cha
     return;
 }
 
-void ST_hyperloglog_merge_blob(struct ST_hyperloglog *dst, const char *blob, size_t blob_sz)
+void ST_hyperloglog_merge_blob(struct ST_hyperloglog *dest, const char *blob, size_t blob_sz)
 {
     struct ST_hyperloglog *src=ST_hyperloglog_deserialize(blob, blob_sz);
-    ST_hyperloglog_merge(dst, src);
+    ST_hyperloglog_merge(dest, src);
     ST_hyperloglog_free(src);
     return;
 }

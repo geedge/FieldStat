@@ -18,7 +18,7 @@
 #define DEFAULT_N_CUBE 128
 
 
-struct exdata { // TODO: 重命名成cell 
+struct cell {
     struct metric **metrics;
     size_t valid_metric_arr_len; // TODO: 单纯就是每次超过就realloc，使用UTARRAY
     size_t max_n_metric;
@@ -31,13 +31,13 @@ union cell_manager {
 
 }; // todo: 移到cube里了, 名字叫cell tabel
 
-struct fs_cube { // TODO rename 到 cube
+struct cube {
     enum sampling_mode sampling_mode;
     union cell_manager cells;
     size_t max_n_cell;
 
     // the key of cube is the combination of shared tags
-    struct fieldstat_tag *shared_tags; // TODO: CUBE IDENTIFIER 
+    struct fieldstat_tag *cube_identifier;
     size_t n_shared_tags;
     struct tag_hash_key *key_tag; // TODO: 删了它
     // const char *key_tag;
@@ -62,7 +62,7 @@ struct exdata_new_args {
 };
 
 struct fieldstat {
-    struct fs_cube **cube;
+    struct cube **cube;
     unsigned long *cube_version; // increase from 0 every time the cube is deleted
     unsigned long cell_version; // increase from 0 every time fieldstat_reset is called
     size_t valid_cube_arr_length;
@@ -142,42 +142,42 @@ struct metric_name_id_map *name_id_map_copy(struct metric_name_id_map *map)
     return map_dup;
 }
 
-void add_metric_to_exdata(struct exdata *exdata, struct metric *metric, int metric_id)
+void add_metric_to_cell(struct cell *cell, struct metric *metric, int metric_id)
 {
-    if (metric_id >= exdata->max_n_metric) {
-        exdata->max_n_metric *= 2;
-        exdata->metrics = realloc(exdata->metrics, sizeof(struct metric *) * exdata->max_n_metric);
-        memset(exdata->metrics + exdata->valid_metric_arr_len, 0, sizeof(struct metric *) * (exdata->max_n_metric - exdata->valid_metric_arr_len));
+    if (metric_id >= cell->max_n_metric) {
+        cell->max_n_metric *= 2;
+        cell->metrics = realloc(cell->metrics, sizeof(struct metric *) * cell->max_n_metric);
+        memset(cell->metrics + cell->valid_metric_arr_len, 0, sizeof(struct metric *) * (cell->max_n_metric - cell->valid_metric_arr_len));
     }
 
-    exdata->metrics[metric_id] = metric;
-    if (metric_id >= exdata->valid_metric_arr_len) {
-        exdata->valid_metric_arr_len = metric_id + 1;
+    cell->metrics[metric_id] = metric;
+    if (metric_id >= cell->valid_metric_arr_len) {
+        cell->valid_metric_arr_len = metric_id + 1;
     }
 }
 
-struct metric *find_metric_in_exdata(const struct exdata *exdata, int metric_id)
+struct metric *find_metric_in_cell(const struct cell *cell, int metric_id)
 {
-    if (metric_id >= exdata->valid_metric_arr_len) {
+    if (metric_id >= cell->valid_metric_arr_len) {
         return NULL;
     }
-    return exdata->metrics[metric_id];
+    return cell->metrics[metric_id];
 }
 
-struct metric *construct_or_find_metric_to_exdata(struct fieldstat *instance, struct exdata *exdata, int metric_id)
+struct metric *add_or_find_metric_in_cell(struct fieldstat *instance, struct cell *cell, int metric_id)
 {
-    struct metric *metric = find_metric_in_exdata(exdata, metric_id);
+    struct metric *metric = find_metric_in_cell(cell, metric_id);
     if (metric != NULL) {
         return metric;
     }
    
     metric = metric_fork(instance->metric_masters[metric_id]);
-    add_metric_to_exdata(exdata, metric, metric_id);
+    add_metric_to_cell(cell, metric, metric_id);
     return metric;
 }
 
-struct exdata *exdata_new(const struct exdata_new_args *args) {
-    struct exdata *pthis = malloc(sizeof(struct exdata));
+struct cell *cell_new(const struct exdata_new_args *args) {
+    struct cell *pthis = malloc(sizeof(struct cell));
     pthis->metrics = calloc(DEFAULT_N_METRIC, sizeof(struct metric *));
     pthis->valid_metric_arr_len = 0;
     pthis->max_n_metric = DEFAULT_N_METRIC;
@@ -188,7 +188,7 @@ struct exdata *exdata_new(const struct exdata_new_args *args) {
     return pthis;
 }
 
-void exdata_free(struct exdata *pthis) {
+void cell_free(struct cell *pthis) {
     for (size_t i = 0; i < pthis->valid_metric_arr_len; i++) {
         metric_free(pthis->metrics[i]);
     }
@@ -203,8 +203,8 @@ void exdata_free(struct exdata *pthis) {
     free(pthis);
 }
 
-struct exdata *exdata_copy(const struct exdata *src) {
-    struct exdata *pthis = malloc(sizeof(struct exdata));
+struct cell *cell_copy(const struct cell *src) {
+    struct cell *pthis = malloc(sizeof(struct cell));
     pthis->metrics = calloc(src->max_n_metric, sizeof(struct metric *));
     pthis->valid_metric_arr_len = src->valid_metric_arr_len;
     pthis->max_n_metric = src->max_n_metric;
@@ -223,7 +223,7 @@ struct exdata *exdata_copy(const struct exdata *src) {
     return pthis;
 }
 
-void exdata_reset(struct exdata *pthis) {
+void cell_reset(struct cell *pthis) {
     for (size_t i = 0; i < pthis->valid_metric_arr_len; i++) {
         if (pthis->metrics[i] == NULL) {
             continue;
@@ -232,18 +232,18 @@ void exdata_reset(struct exdata *pthis) {
     }
 }
 
-void exdata_merge(struct exdata *dest, const struct exdata *src) {
+void cell_merge(struct cell *dest, const struct cell *src) {
     for (size_t i = 0; i < src->valid_metric_arr_len; i++) {
         const struct metric *metric_src = src->metrics[i];
         if (metric_src == NULL) {
             continue;
         }
-        struct metric *metric_dst = find_metric_in_exdata(dest, i);
+        struct metric *metric_dst = find_metric_in_cell(dest, i);
         assert(strcmp(metric_get_name(metric_src), metric_get_name(metric_dst)) == 0);
 
         if (metric_dst == NULL) {
             metric_dst = metric_copy(metric_src);
-            add_metric_to_exdata(dest, metric_dst, i);
+            add_metric_to_cell(dest, metric_dst, i);
         } else {
             metric_merge(metric_dst, metric_src);
         }
@@ -251,32 +251,35 @@ void exdata_merge(struct exdata *dest, const struct exdata *src) {
 }
 
 void *exdata_new_i(void *arg) {
-    return exdata_new((struct exdata_new_args *)arg);
+    return cell_new((struct exdata_new_args *)arg);
 }
 
 void exdata_free_i(void *exdata) {
-    exdata_free((struct exdata *)exdata);
+    cell_free((struct cell *)exdata);
 }
 
 void exdata_reset_i(void *exdata) {
-    exdata_reset((struct exdata *)exdata);
+    cell_reset((struct cell *)exdata);
 }
 
 void exdata_merge_i(void *dest, void *src) {
-    exdata_merge((struct exdata *)dest, (struct exdata *)src);
+    cell_merge((struct cell *)dest, (struct cell *)src);
 }
 
 void *exdata_copy_i(void *exdata) {
-    return exdata_copy((struct exdata *)exdata);
+    return cell_copy((struct cell *)exdata);
 }
 
+/* -------------------------------------------------------------------------- */
+/*                                  fieldstat                                 */
+/* -------------------------------------------------------------------------- */
 
 struct fieldstat *fieldstat_new()
 {
     struct fieldstat *instance = calloc(1, sizeof(struct fieldstat));
 
     instance->max_n_cube = DEFAULT_N_CUBE;
-    instance->cube = calloc(instance->max_n_cube, sizeof(struct fs_cube *));
+    instance->cube = calloc(instance->max_n_cube, sizeof(struct cube *));
     instance->cube_version = calloc(instance->max_n_cube, sizeof(unsigned long));
 
     instance->max_n_metric_master = DEFAULT_N_METRIC;
@@ -316,7 +319,7 @@ void fieldstat_reset(struct fieldstat *instance)
         return;
     }
     for (size_t i = 0; i < instance->valid_cube_arr_length; i++) {
-        struct fs_cube *cube = instance->cube[i];
+        struct cube *cube = instance->cube[i];
         if (cube == NULL) {
             continue;
         }
@@ -350,7 +353,7 @@ int fieldstat_destroy_cube(struct fieldstat *instance, int cube_id)
         return FS_ERR_INVALID_CUBE_ID;
     }
 
-    const struct fs_cube *cube = instance->cube[cube_id];
+    const struct cube *cube = instance->cube[cube_id];
     cube_manager_delete(instance->shared_tag_cube_manager, cube->key_tag);
 
     fieldstat_cube_free(instance, cube_id);
@@ -391,13 +394,13 @@ void fieldstat_free_tag_array(struct fieldstat_tag *tags, size_t n_tags)
     free(tags);
 }
 
-void add_cube_to_position(struct fieldstat *instance, struct fs_cube *cube, int cube_id)
+void add_cube_to_position(struct fieldstat *instance, struct cube *cube, int cube_id)
 {
     if (cube_id >= instance->max_n_cube) {
         instance->max_n_cube *= 2;
-        struct fs_cube **old_cube_arr = instance->cube;
-        instance->cube = calloc(instance->max_n_cube, sizeof(struct fs_cube *));
-        memcpy(instance->cube, old_cube_arr, sizeof(struct fs_cube *) * instance->valid_cube_arr_length);
+        struct cube **old_cube_arr = instance->cube;
+        instance->cube = calloc(instance->max_n_cube, sizeof(struct cube *));
+        memcpy(instance->cube, old_cube_arr, sizeof(struct cube *) * instance->valid_cube_arr_length);
         free(old_cube_arr);
 
         unsigned long *old_ver_arr = instance->cube_version;
@@ -411,7 +414,7 @@ void add_cube_to_position(struct fieldstat *instance, struct fs_cube *cube, int 
     }
 }
 
-int fieldstat_append_cube_to_instance(struct fieldstat *instance, struct fs_cube *cube)
+int fieldstat_append_cube_to_instance(struct fieldstat *instance, struct cube *cube)
 {
     for (int i = 0; i < instance->valid_cube_arr_length; i++) {
         if (instance->cube[i] == NULL) {
@@ -427,16 +430,16 @@ int fieldstat_append_cube_to_instance(struct fieldstat *instance, struct fs_cube
     return cube_id;
 }
 
-struct fs_cube *fieldstat_cube_info_init(const struct fieldstat_tag *shared_tags, size_t n_tag, enum sampling_mode mode, size_t max_n_cell)
+struct cube *fieldstat_cube_info_init(const struct fieldstat_tag *shared_tags, size_t n_tag, enum sampling_mode mode, size_t max_n_cell)
 {
-    struct fs_cube *cube = calloc(1, sizeof(struct fs_cube));
+    struct cube *cube = calloc(1, sizeof(struct cube));
     cube->sampling_mode = mode;
 
     if (n_tag == 0) {
-        cube->shared_tags = NULL;
+        cube->cube_identifier = NULL;
     } else {
-        cube->shared_tags = malloc(sizeof(struct fieldstat_tag) * n_tag);
-        tag_array_copy(cube->shared_tags, shared_tags, n_tag);
+        cube->cube_identifier = malloc(sizeof(struct fieldstat_tag) * n_tag);
+        tag_array_copy(cube->cube_identifier, shared_tags, n_tag);
     }
 
     cube->n_shared_tags = n_tag;
@@ -450,9 +453,9 @@ struct fs_cube *fieldstat_cube_info_init(const struct fieldstat_tag *shared_tags
     return cube;
 }
 
-struct fs_cube *fieldstat_cube_new(const struct fieldstat_tag *shared_tags, size_t n_tag, enum sampling_mode mode, size_t max_n_cell)
+struct cube *fieldstat_cube_new(const struct fieldstat_tag *shared_tags, size_t n_tag, enum sampling_mode mode, size_t max_n_cell)
 {
-    struct fs_cube *cube = fieldstat_cube_info_init(shared_tags, n_tag, mode, max_n_cell);
+    struct cube *cube = fieldstat_cube_info_init(shared_tags, n_tag, mode, max_n_cell);
 
     switch (mode)
     {
@@ -495,7 +498,7 @@ int fieldstat_create_cube(struct fieldstat *instance, const struct fieldstat_tag
         return FS_ERR_INVALID_KEY;
     }
 
-    struct fs_cube *cube = fieldstat_cube_new(shared_tags, n_tag, mode, max_n_cell);
+    struct cube *cube = fieldstat_cube_new(shared_tags, n_tag, mode, max_n_cell);
 
     int cube_id = fieldstat_append_cube_to_instance(instance, cube);
 
@@ -504,7 +507,7 @@ int fieldstat_create_cube(struct fieldstat *instance, const struct fieldstat_tag
 
 void fieldstat_cube_free_contents(struct fieldstat *instance, int cube_id)
 {
-    struct fs_cube *cube = instance->cube[cube_id];
+    struct cube *cube = instance->cube[cube_id];
 
     switch (cube->sampling_mode)
     {
@@ -519,7 +522,7 @@ void fieldstat_cube_free_contents(struct fieldstat *instance, int cube_id)
         break;
     }
 
-    fieldstat_free_tag_array(cube->shared_tags, cube->n_shared_tags);
+    fieldstat_free_tag_array(cube->cube_identifier, cube->n_shared_tags);
     tag_hash_key_free(cube->key_tag);
 
     free(cube);
@@ -549,7 +552,7 @@ int fieldstat_cube_set_primary_metric(struct fieldstat *instance, int cube_id, i
     if (cube_id < 0 || cube_id >= instance->valid_cube_arr_length) {
         return FS_ERR_INVALID_CUBE_ID;
     }
-    struct fs_cube *cube = instance->cube[cube_id];
+    struct cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
         return FS_ERR_INVALID_CUBE_ID;
     }
@@ -688,9 +691,9 @@ int check_before_add(const struct fieldstat *instance, int cube_id, int metric_i
     return FS_OK;
 }
 
-struct exdata *find_or_add_exdata_comprehensive(struct tag_map *comprehensive, const char *key, size_t key_len, struct exdata_new_args *args)
+struct cell *find_or_add_exdata_comprehensive(struct tag_map *comprehensive, const char *key, size_t key_len, struct exdata_new_args *args)
 {
-    struct exdata *cell_data = tag_map_get0_exdata(comprehensive, key, key_len);
+    struct cell *cell_data = tag_map_get0_exdata(comprehensive, key, key_len);
     if (cell_data == NULL) {
         int tmp_ret = tag_map_add(comprehensive, key, key_len, args);
         if (tmp_ret != 1) {
@@ -708,7 +711,7 @@ int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric
         return ret;
     }
 
-    const struct fs_cube *cube = instance->cube[cube_id];
+    const struct cube *cube = instance->cube[cube_id];
     
     char *tag_in_string;
     size_t tag_len;
@@ -718,7 +721,7 @@ int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric
     args.tags = tags;
     args.n_tags = n_tag;
 
-    struct exdata *cell_data = NULL;
+    struct cell *cell_data = NULL;
     switch (cube->sampling_mode)
     {
     case SAMPLING_MODE_TOPK:
@@ -763,7 +766,7 @@ int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric
         break;
     }
 
-    struct metric *metric = construct_or_find_metric_to_exdata(instance, cell_data, metric_id);
+    struct metric *metric = add_or_find_metric_in_cell(instance, cell_data, metric_id);
 
     metric_counter_incrby(metric, increment);
     free(tag_in_string);
@@ -776,7 +779,7 @@ int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id
     if (ret != FS_OK) {
         return ret;
     }
-    const struct fs_cube *cube = instance->cube[cube_id];
+    const struct cube *cube = instance->cube[cube_id];
     char *tag_in_string;
     size_t tag_len;
     build_dynamic_cell_key(tags, n_tag, &tag_in_string, &tag_len);
@@ -785,7 +788,7 @@ int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id
     args.tags = tags;
     args.n_tags = n_tag;
 
-    struct exdata *cell_data = NULL;
+    struct cell *cell_data = NULL;
     switch (cube->sampling_mode)
     {
     case SAMPLING_MODE_TOPK: {
@@ -803,7 +806,7 @@ int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id
             long long current_count = 0;
             cell_data = heavy_keeper_get0_exdata(cube->cells.topk, tag_in_string, tag_len);
             if (cell_data != NULL) {
-                const struct metric *tmp_metric = find_metric_in_exdata(cell_data, metric_id);
+                const struct metric *tmp_metric = find_metric_in_cell(cell_data, metric_id);
                 if (tmp_metric != NULL) {
                     current_count = metric_counter_get(tmp_metric);
                 }
@@ -832,7 +835,7 @@ int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id
         break;
     }
     assert(cell_data != NULL); // to mute the warning
-    struct metric *metric = construct_or_find_metric_to_exdata(instance, cell_data, metric_id);
+    struct metric *metric = add_or_find_metric_in_cell(instance, cell_data, metric_id);
     free(tag_in_string);
     metric_counter_set(metric, value);
     return FS_OK;
@@ -856,8 +859,8 @@ int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, co
     args.tags = tags;
     args.n_tags = n_tag;
 
-    struct exdata *cell_data = find_or_add_exdata_comprehensive(instance->cube[cube_id]->cells.comprehensive, tag_in_string, tag_len, &args);
-    struct metric *metric = construct_or_find_metric_to_exdata(instance, cell_data, metric_id);
+    struct cell *cell_data = find_or_add_exdata_comprehensive(instance->cube[cube_id]->cells.comprehensive, tag_in_string, tag_len, &args);
+    struct metric *metric = add_or_find_metric_in_cell(instance, cell_data, metric_id);
 
     metric_hll_add(metric, key, key_len);
     free(tag_in_string);
@@ -883,12 +886,12 @@ int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id
     args.tags = tags;
     args.n_tags = n_tag;
 
-    struct exdata *cell_data = find_or_add_exdata_comprehensive(instance->cube[cube_id]->cells.comprehensive, tag_in_string, tag_len, &args);
+    struct cell *cell_data = find_or_add_exdata_comprehensive(instance->cube[cube_id]->cells.comprehensive, tag_in_string, tag_len, &args);
 
     free(tag_in_string);
 
     // // metric_histogram_record may fail, unlike the other add functions.
-    struct metric *metric = find_metric_in_exdata(cell_data, metric_id);
+    struct metric *metric = find_metric_in_cell(cell_data, metric_id);
     if (metric != NULL) {
         ret = metric_histogram_record(metric, value);
         if (ret < 0) {
@@ -901,7 +904,7 @@ int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id
             metric_free(metric);
             return FS_ERR_INVALID_PARAM;
         }
-        add_metric_to_exdata(cell_data, metric, metric_id);
+        add_metric_to_cell(cell_data, metric, metric_id);
     }
 
     return FS_OK;
@@ -911,9 +914,9 @@ int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id
 /*                                    merge                                   */
 /* -------------------------------------------------------------------------- */
 
-struct fs_cube *fieldstat_cube_copy(const struct fs_cube *cube)
+struct cube *fieldstat_cube_copy(const struct cube *cube)
 {
-    struct fs_cube *cube_dup = fieldstat_cube_info_init(cube->shared_tags, cube->n_shared_tags, cube->sampling_mode, cube->max_n_cell);
+    struct cube *cube_dup = fieldstat_cube_info_init(cube->cube_identifier, cube->n_shared_tags, cube->sampling_mode, cube->max_n_cell);
     cube_dup->primary_metric_id = cube->primary_metric_id;
 
     switch (cube->sampling_mode)
@@ -932,7 +935,7 @@ struct fs_cube *fieldstat_cube_copy(const struct fs_cube *cube)
     return cube_dup;
 }
 
-void fieldstat_cube_merge(struct fs_cube *dest, const struct fs_cube *src)
+void fieldstat_cube_merge(struct cube *dest, const struct cube *src)
 {
     assert(dest->sampling_mode == src->sampling_mode);
 
@@ -979,7 +982,7 @@ int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
     const struct cube_manager *tag_cube_id_map = instance->shared_tag_cube_manager;
     int ret = 0;
     for (int i = 0; i < n_cube_src; i++) {
-        const struct fs_cube *cube_src = src->cube[i];
+        const struct cube *cube_src = src->cube[i];
         if (cube_src == NULL) {
             continue;
         }
@@ -987,10 +990,10 @@ int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
         const struct tag_hash_key *shared_tag_key_src = cube_src->key_tag;
         int cube_id_tmp = cube_manager_find(tag_cube_id_map, shared_tag_key_src);
         if (cube_id_tmp == -1) {
-            struct fs_cube *copied_cube = fieldstat_cube_copy(cube_src);
+            struct cube *copied_cube = fieldstat_cube_copy(cube_src);
             fieldstat_append_cube_to_instance(instance, copied_cube);
         } else {
-            struct fs_cube *cube_dst = instance->cube[cube_id_tmp];
+            struct cube *cube_dst = instance->cube[cube_id_tmp];
             if (cube_dst->sampling_mode != cube_src->sampling_mode) {
                 ret = FS_ERR_INVALID_PARAM;
                 continue;
@@ -1007,8 +1010,8 @@ int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
 }
 
 // only copy the cube configurations, leave the cells empty
-struct fs_cube *fieldstat_cube_fork(const struct fs_cube *cube) {
-    struct fs_cube *ret = fieldstat_cube_new(cube->shared_tags, cube->n_shared_tags, cube->sampling_mode, cube->max_n_cell);
+struct cube *fieldstat_cube_fork(const struct cube *cube) {
+    struct cube *ret = fieldstat_cube_new(cube->cube_identifier, cube->n_shared_tags, cube->sampling_mode, cube->max_n_cell);
     ret->primary_metric_id = cube->primary_metric_id;
 
     return ret;
@@ -1024,9 +1027,9 @@ struct fieldstat *fieldstat_fork(const struct fieldstat *instance)
 
     new_instance->valid_cube_arr_length = instance->valid_cube_arr_length;
     new_instance->max_n_cube = instance->max_n_cube;
-    new_instance->cube = calloc(new_instance->max_n_cube, sizeof(struct fs_cube *));
+    new_instance->cube = calloc(new_instance->max_n_cube, sizeof(struct cube *));
     for (size_t i = 0; i < new_instance->valid_cube_arr_length; i++) {
-        const struct fs_cube *cube = instance->cube[i];
+        const struct cube *cube = instance->cube[i];
         if (cube == NULL) {
             continue;
         }
@@ -1094,8 +1097,8 @@ int fieldstat_calibrate(const struct fieldstat *master, struct fieldstat *replic
     }
 
     if (replica->max_n_cube < master->max_n_cube) {
-        replica->cube = (struct fs_cube **)realloc(replica->cube, sizeof(struct fs_cube *) * master->max_n_cube);
-        memset(replica->cube + replica->max_n_cube, 0, sizeof(struct fs_cube *) * (master->max_n_cube - replica->max_n_cube));
+        replica->cube = (struct cube **)realloc(replica->cube, sizeof(struct cube *) * master->max_n_cube);
+        memset(replica->cube + replica->max_n_cube, 0, sizeof(struct cube *) * (master->max_n_cube - replica->max_n_cube));
         replica->cube_version = (unsigned long *)realloc(replica->cube_version, sizeof(unsigned long) * master->max_n_cube);
         memset(replica->cube_version + replica->max_n_cube, 0, sizeof(unsigned long) * (master->max_n_cube - replica->max_n_cube));
         replica->max_n_cube = master->max_n_cube;
@@ -1105,8 +1108,8 @@ int fieldstat_calibrate(const struct fieldstat *master, struct fieldstat *replic
     size_t len_replica = replica->valid_cube_arr_length;
     size_t longer_arr_len = len_master > len_replica ? len_master : len_replica;
     for (size_t i = 0; i < longer_arr_len; i++) {
-        const struct fs_cube *cube_master = i >= len_master ? NULL : master->cube[i];
-        const struct fs_cube *cube_target = i >= len_replica ? NULL : replica->cube[i];
+        const struct cube *cube_master = i >= len_master ? NULL : master->cube[i];
+        const struct cube *cube_target = i >= len_replica ? NULL : replica->cube[i];
 
         if (cube_master == NULL && cube_target == NULL) {
             continue;
@@ -1116,7 +1119,7 @@ int fieldstat_calibrate(const struct fieldstat *master, struct fieldstat *replic
             continue;
         }
         if (cube_master != NULL && cube_target == NULL) {
-            struct fs_cube *cube_dup = fieldstat_cube_fork(cube_master);
+            struct cube *cube_dup = fieldstat_cube_fork(cube_master);
             add_cube_to_position(replica, cube_dup, i);
             continue;
         }
@@ -1126,7 +1129,7 @@ int fieldstat_calibrate(const struct fieldstat *master, struct fieldstat *replic
         }
 
         fieldstat_cube_free_contents(replica, i);
-        struct fs_cube *cube_dup = fieldstat_cube_fork(cube_master);
+        struct cube *cube_dup = fieldstat_cube_fork(cube_master);
         add_cube_to_position(replica, cube_dup, i);
     }
 
@@ -1153,7 +1156,7 @@ void fieldstat_get_cubes(const struct fieldstat *instance, int **cube_ids, int *
 
     int *tmp_ids = (int *)malloc(sizeof(int) * instance->valid_cube_arr_length);
     for (int i = 0; i < instance->valid_cube_arr_length; i++) {
-        const struct fs_cube *tmp_cube = instance->cube[i];
+        const struct cube *tmp_cube = instance->cube[i];
         if (tmp_cube == NULL) {
             continue;
         }
@@ -1197,7 +1200,7 @@ struct fieldstat_tag_list *fieldstat_get_shared_tags(const struct fieldstat *ins
     if (instance == NULL || cube_id >= instance->valid_cube_arr_length || cube_id < 0) {
         return NULL;
     }
-    const struct fs_cube *cube = instance->cube[cube_id];
+    const struct cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
         return NULL;
     }
@@ -1212,14 +1215,14 @@ struct fieldstat_tag_list *fieldstat_get_shared_tags(const struct fieldstat *ins
 
     tag_list->tag = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * cube->n_shared_tags);
     tag_list->n_tag = cube->n_shared_tags;
-    tag_array_copy(tag_list->tag, cube->shared_tags, cube->n_shared_tags);
+    tag_array_copy(tag_list->tag, cube->cube_identifier, cube->n_shared_tags);
 
     return tag_list;
 }
 
-const struct exdata *get_exdata_by_tag_list(const struct fs_cube *cube, const struct fieldstat_tag_list *tags)
+const struct cell *get_exdata_by_tag_list(const struct cube *cube, const struct fieldstat_tag_list *tags)
 {
-    const struct exdata *ret = NULL;
+    const struct cell *ret = NULL;
     char *tag_in_string;
     size_t tag_len;
     build_dynamic_cell_key(tags->tag, tags->n_tag, &tag_in_string, &tag_len);
@@ -1247,13 +1250,13 @@ const struct metric *get_metric_by_tag_list(const struct fieldstat *instance, in
         *ret = FS_ERR_INVALID_CUBE_ID;
         return NULL;
     }
-    const struct fs_cube *cube = instance->cube[cube_id];
+    const struct cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
         *ret = FS_ERR_INVALID_CUBE_ID;
         return NULL;
     }
 
-    const struct exdata *data = get_exdata_by_tag_list(cube, tags);
+    const struct cell *data = get_exdata_by_tag_list(cube, tags);
     
     if (data == NULL) {
         *ret = FS_ERR_INVALID_TAG;
@@ -1385,12 +1388,12 @@ void fieldstat_get_cells_used_by_cube(const struct fieldstat *instance, int cube
     if (instance == NULL || cube_id < 0 || cube_id >= instance->valid_cube_arr_length) {
         return;
     }
-    const struct fs_cube *cube = instance->cube[cube_id];
+    const struct cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
         return;
     }
     
-    struct exdata **cell_datas = NULL;
+    struct cell **cell_datas = NULL;
     size_t n_cell_tmp = 0;
     switch (cube->sampling_mode) {
         case SAMPLING_MODE_COMPREHENSIVE:
@@ -1414,7 +1417,7 @@ void fieldstat_get_cells_used_by_cube(const struct fieldstat *instance, int cube
     *n_cell = n_cell_tmp;
 
     for (int i = 0; i < n_cell_tmp; i++) {
-        struct exdata *cell_data = cell_datas[i];
+        struct cell *cell_data = cell_datas[i];
         struct fieldstat_tag_list *tag_list_tmp = &tag_list_ret[i];
         tag_list_tmp->n_tag = cell_data->tags.n_tag;
         if (tag_list_tmp->n_tag == 0) {
@@ -1436,7 +1439,7 @@ int fieldstat_get_used_sampling(const struct fieldstat *instance, int cube_id)
     if (cube_id < 0 || cube_id >= instance->valid_cube_arr_length) {
         return FS_ERR_INVALID_CUBE_ID;
     }
-    const struct fs_cube *cube = instance->cube[cube_id];
+    const struct cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
         return FS_ERR_INVALID_CUBE_ID;
     }
@@ -1475,7 +1478,7 @@ int fieldstat_get_cube_mode(const struct fieldstat *instance, int cube_id, enum 
     if (cube_id < 0 || cube_id >= instance->valid_cube_arr_length) {
         return FS_ERR_INVALID_CUBE_ID;
     }
-    const struct fs_cube *cube = instance->cube[cube_id];
+    const struct cube *cube = instance->cube[cube_id];
     if (cube == NULL) {
         return FS_ERR_INVALID_CUBE_ID;
     }
@@ -1492,7 +1495,7 @@ int fieldstat_get_cube_mode(const struct fieldstat *instance, int cube_id, enum 
 
 void fieldstat_get_metric_in_cell(const struct fieldstat *instance, int cube_id, const struct fieldstat_tag_list *tags, int **metric_id_out, size_t *n_metric_out)
 {
-    const struct exdata *cell_data = get_exdata_by_tag_list(instance->cube[cube_id], tags);
+    const struct cell *cell_data = get_exdata_by_tag_list(instance->cube[cube_id], tags);
     if (cell_data == NULL) {
         *metric_id_out = NULL;
         *n_metric_out = 0;

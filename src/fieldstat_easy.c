@@ -250,35 +250,35 @@ struct timeval get_current_timestamp()
 
 struct fieldstat *merge_all_instance(struct fieldstat_easy *fse)
 {
-    struct fieldstat *dst = fieldstat_new();
+    struct fieldstat *dest = fieldstat_new();
     // collect all the data recorded since last passive output, if passive output happened. Otherwise, its the data since the program started.
     for (int i = 0; i < fse->max_thread_num; i++) {
         pthread_spin_lock(&fse->fsu[i].lock);
-        fieldstat_merge(dst, fse->fsu[i].active);
+        fieldstat_merge(dest, fse->fsu[i].active);
         pthread_spin_unlock(&fse->fsu[i].lock);
     }
 
     // add the outputted data
     if (fse->output_thread_running) {
         pthread_spin_lock(&fse->outputting_lock);
-        fieldstat_merge(dst, fse->accumulate);
+        fieldstat_merge(dest, fse->accumulate);
         pthread_spin_unlock(&fse->outputting_lock);
     }
 
-    return dst;
+    return dest;
 }
 
 // output an json string for accumulated data
 void fieldstat_easy_output(struct fieldstat_easy *fse, char **buff, size_t *buff_len)
 {
-    struct fieldstat *dst = merge_all_instance(fse);
+    struct fieldstat *dest = merge_all_instance(fse);
     struct timeval timestamp = get_current_timestamp();
 
-    *buff = fieldstat_json_exporter_export(fse->exporter, dst, &timestamp);
+    *buff = fieldstat_json_exporter_export(fse->exporter, dest, &timestamp);
     if (*buff == NULL) {
         *buff = strdup("[]");
     }
-    fieldstat_free(dst);
+    fieldstat_free(dest);
     *buff_len = strlen(*buff);
 }
 
@@ -286,10 +286,10 @@ void fieldstat_easy_output(struct fieldstat_easy *fse, char **buff, size_t *buff
 void fieldstat_easy_output_array(struct fieldstat_easy *fse, char ***json_objects, size_t *n_object)
 {
     struct timeval timestamp = get_current_timestamp();
-    struct fieldstat *dst = merge_all_instance(fse);
+    struct fieldstat *dest = merge_all_instance(fse);
 
-    fieldstat_json_exporter_export_array(fse->exporter, dst, &timestamp, json_objects, n_object);
-    fieldstat_free(dst);
+    fieldstat_json_exporter_export_array(fse->exporter, dest, &timestamp, json_objects, n_object);
+    fieldstat_free(dest);
 }
 
 int fieldstat_easy_output_array_and_reset(struct fieldstat_easy *fse, char ***json_objects, size_t *n_object)
@@ -299,15 +299,15 @@ int fieldstat_easy_output_array_and_reset(struct fieldstat_easy *fse, char ***js
         return -1;
     }
 
-    struct fieldstat *dst = fieldstat_new();
+    struct fieldstat *dest = fieldstat_new();
     for (int i = 0; i < fse->max_thread_num; i++) {
         rcu_reclaim_handler(fse->fsu + i);
-        fieldstat_merge(dst, fse->fsu[i].read_only);
+        fieldstat_merge(dest, fse->fsu[i].read_only);
     }
 
     struct timeval timestamp = get_current_timestamp();
-    fieldstat_json_exporter_export_array(fse->exporter, dst, &timestamp, json_objects, n_object);
-    fieldstat_free(dst);
+    fieldstat_json_exporter_export_array(fse->exporter, dest, &timestamp, json_objects, n_object);
+    fieldstat_free(dest);
 
     return 0;
 }

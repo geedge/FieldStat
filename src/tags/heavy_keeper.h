@@ -36,7 +36,7 @@ int heavy_keeper_get_count(const struct heavy_keeper *hk);
 // size_t heavy_keeper_list(const struct heavy_keeper *hk, void **exdatas, size_t n_exdatas); //use list: void **exdatas, heavy_keeper_list(&exdatas); void *exdata = exdatas[i]; // TODO: 用户申请exdata 数组
 void heavy_keeper_list(const struct heavy_keeper *hk, void ***exdatas, size_t *n_exdatas); 
 
-void heavy_keeper_merge(struct heavy_keeper *dest, const struct heavy_keeper *src); // TODO: dst 和 dest 统一一下
+void heavy_keeper_merge(struct heavy_keeper *dest, const struct heavy_keeper *src);
 
 struct heavy_keeper *heavy_keeper_copy(const struct heavy_keeper *src);
 

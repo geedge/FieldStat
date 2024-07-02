@@ -336,22 +336,22 @@ void tag_hash_key_convert_to_fieldstat_tag(const struct tag_hash_key *tag_key, s
 
 struct tag_hash_key *tag_hash_key_copy(const struct tag_hash_key *src)
 {
-    struct tag_hash_key *dst = (struct tag_hash_key *)malloc(sizeof(struct tag_hash_key));
-    dst->n_my_tag = src->n_my_tag;
-    dst->hashv = src->hashv;
-    dst->is_deep_copy = true;
-    dst->hashv128 = src->hashv128;
+    struct tag_hash_key *dest = (struct tag_hash_key *)malloc(sizeof(struct tag_hash_key));
+    dest->n_my_tag = src->n_my_tag;
+    dest->hashv = src->hashv;
+    dest->is_deep_copy = true;
+    dest->hashv128 = src->hashv128;
 
-    if (dst->n_my_tag == 0) {
-        dst->tags = NULL;
+    if (dest->n_my_tag == 0) {
+        dest->tags = NULL;
     } else {
-        dst->tags = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * dst->n_my_tag);
-        for (int i = 0; i < dst->n_my_tag; i++) {
-            fieldtag_copy(&dst->tags[i], &src->tags[i]);
+        dest->tags = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * dest->n_my_tag);
+        for (int i = 0; i < dest->n_my_tag; i++) {
+            fieldtag_copy(&dest->tags[i], &src->tags[i]);
         }
     }
 
-    return dst;
+    return dest;
 }
 
 void tag_hash_key_free(struct tag_hash_key *tag_key)
