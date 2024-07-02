@@ -24,7 +24,7 @@ int tag_map_add(struct tag_map *pthis, const char *key, size_t key_len, void *ar
 // void *tag_map_get0_exdata(struct tag_map *pthis, const char *key, size_t key_len);
 void *tag_map_get0_exdata(struct tag_map *pthis, const char *key, size_t key_len);
 int tag_map_get_count(const struct tag_map *pthis);
-void tag_map_list(const struct tag_map *pthis, void ***exdatas, size_t *n_exdatas);
+size_t tag_map_list(const struct tag_map *pthis, void **exdatas, size_t n_exdatas);
 
 #ifdef __cplusplus
 }

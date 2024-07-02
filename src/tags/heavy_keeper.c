@@ -346,8 +346,7 @@ int sorted_set_insert(struct sorted_set *ss, const char *key, size_t key_len, un
         if (tmp_mincnt != INVALID_COUNT && cnt <= tmp_mincnt) { // even if all cells in sorted set are dying, the sorted set can still be a full one, in which case, the min count is invalid.
             return 0;
         }
-        int ret = sorted_set_pop(ss);
-        assert(ret != -1);
+        sorted_set_pop(ss);
     }
     sorted_set_insert_to_available_heap(ss, key, key_len, cnt, ss->new_fn(args));
     return 1;
@@ -679,22 +678,27 @@ int heavy_keeper_get_count(const struct heavy_keeper *hk) {
     return sorted_set_cardinality(hk->top_K_heap);
 }
 
-void heavy_keeper_list(const struct heavy_keeper *hk, void ***exdatas, size_t *n_exdatas) {
-    *n_exdatas = sorted_set_cardinality(hk->top_K_heap);
-    if (*n_exdatas == 0) {
-        *exdatas = NULL;
-        return;
+size_t heavy_keeper_list(const struct heavy_keeper *hk, void **exdatas, size_t n_exdatas) {
+    size_t actual_len = sorted_set_cardinality(hk->top_K_heap);
+    if (actual_len == 0) {
+        return 0;
     }
 
-    void **exdatas_ret = (void **)malloc(sizeof(void *) * (*n_exdatas));
-    *exdatas = exdatas_ret;
-
-    char **keys_dummy = (char **)malloc(sizeof(char *) * (*n_exdatas));
-    size_t *key_lens_dummy = (size_t *)malloc(sizeof(size_t) * (*n_exdatas));
-    sorted_set_dump(hk->top_K_heap, keys_dummy, key_lens_dummy, exdatas_ret);
+    char **keys_dummy = (char **)malloc(sizeof(char *) * actual_len);
+    size_t *key_lens_dummy = (size_t *)malloc(sizeof(size_t) * actual_len);
+    if (n_exdatas < actual_len) {
+        void **exdatas_ret = (void **)malloc(sizeof(void *) * actual_len);
+        sorted_set_dump(hk->top_K_heap, keys_dummy, key_lens_dummy, exdatas_ret);
+        memcpy(exdatas, exdatas_ret, sizeof(void *) * n_exdatas);
+        free(exdatas_ret);
+    } else {
+        sorted_set_dump(hk->top_K_heap, keys_dummy, key_lens_dummy, exdatas);
+    }
 
     free(keys_dummy);
     free(key_lens_dummy);
+
+    return actual_len < n_exdatas ? actual_len : n_exdatas;
 }
 
 static void heavy_keeper_merge_sketch(struct heavy_keeper *dest, const struct heavy_keeper *src) {

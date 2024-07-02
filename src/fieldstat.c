@@ -1397,10 +1397,14 @@ void fieldstat_get_cells_used_by_cube(const struct fieldstat *instance, int cube
     size_t n_cell_tmp = 0;
     switch (cube->sampling_mode) {
         case SAMPLING_MODE_COMPREHENSIVE:
-            tag_map_list(cube->cells.comprehensive, (void ***)&cell_datas, &n_cell_tmp);
+            n_cell_tmp = tag_map_get_count(cube->cells.comprehensive);
+            cell_datas = (struct cell **)malloc(sizeof(struct cell *) * n_cell_tmp);
+            tag_map_list(cube->cells.comprehensive, (void **)cell_datas, n_cell_tmp);
             break;
         case SAMPLING_MODE_TOPK:
-            heavy_keeper_list(cube->cells.topk, (void ***)&cell_datas, &n_cell_tmp);
+            n_cell_tmp = heavy_keeper_get_count(cube->cells.topk);
+            cell_datas = (struct cell **)malloc(sizeof(struct cell *) * n_cell_tmp);
+            heavy_keeper_list(cube->cells.topk, (void **)cell_datas, n_cell_tmp);
             break;
         default:
             assert(0);

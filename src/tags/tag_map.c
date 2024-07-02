@@ -148,15 +148,11 @@ int tag_map_get_count(const struct tag_map *pthis) {
     return pthis->current_cell_num;
 }
 
-void tag_map_list(const struct tag_map *pthis, void ***exdatas, size_t *n_exdatas) {
-    *n_exdatas = pthis->current_cell_num;
-    if (*n_exdatas == 0) {
-        *exdatas = NULL;
-        return;
+size_t tag_map_list(const struct tag_map *pthis, void **exdatas, size_t n_exdatas) {
+    size_t actual_len = pthis->current_cell_num;
+    if (actual_len == 0) {
+        return 0;
     }
-
-    void **exdatas_ret = calloc(*n_exdatas, sizeof(void *));
-    *exdatas = exdatas_ret;
 
     struct tag_exdata_item *item, *tmp;
     size_t i = 0;
@@ -164,9 +160,13 @@ void tag_map_list(const struct tag_map *pthis, void ***exdatas, size_t *n_exdata
         if (item->dying) {
             continue;
         }
-        exdatas_ret[i] = item->exdata;
+        if (i >= n_exdatas) {
+            break;
+        }
+        exdatas[i] = item->exdata;
         i++;
     }
+    return actual_len < n_exdatas ? actual_len : n_exdatas;
 }
 
 int tag_map_merge(struct tag_map *dest, struct tag_map *src) {

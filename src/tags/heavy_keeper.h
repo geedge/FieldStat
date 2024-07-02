@@ -33,8 +33,8 @@ void *heavy_keeper_get0_exdata(const struct heavy_keeper *hk, const char *key, s
 // get the number of cells in the heavy keeper
 int heavy_keeper_get_count(const struct heavy_keeper *hk);
 
-// size_t heavy_keeper_list(const struct heavy_keeper *hk, void **exdatas, size_t n_exdatas); //use list: void **exdatas, heavy_keeper_list(&exdatas); void *exdata = exdatas[i]; // TODO: 用户申请exdata 数组
-void heavy_keeper_list(const struct heavy_keeper *hk, void ***exdatas, size_t *n_exdatas); 
+size_t heavy_keeper_list(const struct heavy_keeper *hk, void **exdatas, size_t n_exdatas);
+// void heavy_keeper_list(const struct heavy_keeper *hk, void ***exdatas, size_t *n_exdatas); 
 
 void heavy_keeper_merge(struct heavy_keeper *dest, const struct heavy_keeper *src);
 
