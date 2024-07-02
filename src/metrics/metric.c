@@ -45,7 +45,7 @@ typedef void (*metric_func_free)(struct metric_data *);
 typedef int (*metric_func_merge)(struct metric_data *, const struct metric_data *);
 typedef int (*metric_func_copy)(struct metric_data *, const struct metric_data *);
 typedef void (*metric_func_serialize)(const struct metric_data *, char **/*blob*/, size_t */*blob_size*/);
-typedef struct metric_data * (*metric_func_deserialize)(const char *, size_t );
+// typedef struct metric_data * (*metric_func_deserialize)(const char *, size_t );
 typedef void (*metric_func_reset)(struct metric_data *);
 struct metric_scheme {
     metric_func_new new;
@@ -53,7 +53,7 @@ struct metric_scheme {
     metric_func_merge merge;
     metric_func_copy copy;
     metric_func_serialize serialize;
-    metric_func_deserialize deserialize;
+    // metric_func_deserialize deserialize;
     metric_func_reset reset;
 };
 
@@ -237,7 +237,7 @@ static const struct metric_scheme g_metric_scheme_table[] = {
         .new = metric_scheme_counter_new,
         .free = metric_scheme_counter_free,
         .serialize = metric_scheme_counter_serialize,
-        .deserialize = metric_scheme_counter_deserialize,
+        // .deserialize = metric_scheme_counter_deserialize,
         .merge = metric_scheme_counter_merge,
         .copy = metric_scheme_counter_copy,
         .reset = metric_scheme_counter_reset,
@@ -246,7 +246,7 @@ static const struct metric_scheme g_metric_scheme_table[] = {
         .new = metric_scheme_hll_new,
         .free = metric_scheme_hll_free,
         .serialize = metric_scheme_hll_serialize,
-        .deserialize = metric_scheme_hll_deserialize,
+        // .deserialize = metric_scheme_hll_deserialize,
         .merge = metric_scheme_hll_merge,
         .copy = metric_scheme_hll_copy,
         .reset = metric_scheme_hll_reset,
@@ -255,7 +255,7 @@ static const struct metric_scheme g_metric_scheme_table[] = {
         .new = metric_scheme_histogram_new,
         .free = metric_scheme_histogram_free,
         .serialize = metric_scheme_histogram_serialize,
-        .deserialize = metric_scheme_histogram_deserialize,
+        // .deserialize = metric_scheme_histogram_deserialize,
         .merge = metric_scheme_histogram_merge,
         .copy = metric_scheme_histogram_copy,
         .reset = metric_scheme_histogram_reset,
