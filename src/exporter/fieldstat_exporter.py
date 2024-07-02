@@ -930,7 +930,7 @@ class FieldstatExporter:
         parser.add_argument("-m", "--match-tags", type = str,           default = "",
                             help = "Display the tags match metrics")
         parser.add_argument("-t", "--template",   type = str,           default = "",
-                            help = "Specify the print template with jinja2. For specific usage, try -th") # todo，在打印错误后给一个具体的帮助信息
+                            help = "Specify the print template with jinja2. For specific usage, try -th")
         parser.add_argument("-e", "--no-tagged",      action = 'store_true', default = False,
                     help = "Print all counter metrics without tags in one list.")
 

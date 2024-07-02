@@ -24,15 +24,12 @@ struct cell {
     struct fieldstat_tag_list tags; // cell identifier
 };
 
-union cell_manager {
-    struct heavy_keeper *topk;
-    struct tag_map *comprehensive;
-
-}; // todo: 移到cube里了, 名字叫cell tabel
-
 struct cube {
     enum sampling_mode sampling_mode;
-    union cell_manager cells;
+    union {
+        struct heavy_keeper *topk;
+        struct tag_map *comprehensive;
+    };
     size_t max_n_cell;
 
     // the key of cube is the combination of shared tags
@@ -316,9 +313,9 @@ void fieldstat_reset(struct fieldstat *instance)
         }
 
         if (cube->sampling_mode == SAMPLING_MODE_TOPK) {
-            heavy_keeper_reset(cube->cells.topk);
+            heavy_keeper_reset(cube->topk);
         } else {
-            tag_map_reset(cube->cells.comprehensive);
+            tag_map_reset(cube->comprehensive);
         }
     }
     instance->cell_version++;
@@ -450,12 +447,12 @@ struct cube *fieldstat_cube_new(const struct fieldstat_tag *shared_tags, size_t 
     switch (mode)
     {
         case SAMPLING_MODE_TOPK:
-            cube->cells.topk = heavy_keeper_new(max_n_cell);
-            heavy_keeper_set_exdata_schema(cube->cells.topk, exdata_new_i, exdata_free_i, exdata_merge_i, exdata_reset_i, exdata_copy_i);
+            cube->topk = heavy_keeper_new(max_n_cell);
+            heavy_keeper_set_exdata_schema(cube->topk, exdata_new_i, exdata_free_i, exdata_merge_i, exdata_reset_i, exdata_copy_i);
             break;
         case SAMPLING_MODE_COMPREHENSIVE:
-            cube->cells.comprehensive = tag_map_new(max_n_cell);
-            tag_map_set_exdata_schema(cube->cells.comprehensive, exdata_new_i, exdata_free_i, exdata_merge_i, exdata_reset_i, exdata_copy_i);
+            cube->comprehensive = tag_map_new(max_n_cell);
+            tag_map_set_exdata_schema(cube->comprehensive, exdata_new_i, exdata_free_i, exdata_merge_i, exdata_reset_i, exdata_copy_i);
             break;
         default:
             assert(0);
@@ -502,10 +499,10 @@ void fieldstat_cube_free_contents(struct fieldstat *instance, int cube_id)
     switch (cube->sampling_mode)
     {
     case SAMPLING_MODE_TOPK:
-        heavy_keeper_free(cube->cells.topk);
+        heavy_keeper_free(cube->topk);
         break;
     case SAMPLING_MODE_COMPREHENSIVE:
-        tag_map_free(cube->cells.comprehensive);
+        tag_map_free(cube->comprehensive);
         break;
     default:
         assert(0);
@@ -715,15 +712,15 @@ int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric
     {
     case SAMPLING_MODE_TOPK:
         if (cube->primary_metric_id != metric_id) {
-            cell_data = heavy_keeper_get0_exdata(cube->cells.topk, tag_in_string, tag_len);
+            cell_data = heavy_keeper_get0_exdata(cube->topk, tag_in_string, tag_len);
 
             if (cell_data == NULL) {
-                int tmp_ret = heavy_keeper_add(cube->cells.topk, tag_in_string, tag_len, 0, &args);
+                int tmp_ret = heavy_keeper_add(cube->topk, tag_in_string, tag_len, 0, &args);
                 if (tmp_ret != 1) {
                     free(tag_in_string);
                     return FS_ERR_TOO_MANY_CELLS;
                 }
-                cell_data = heavy_keeper_get0_exdata(cube->cells.topk, tag_in_string, tag_len);
+                cell_data = heavy_keeper_get0_exdata(cube->topk, tag_in_string, tag_len);
             }
         } else {
             if (increment < 0) {
@@ -735,16 +732,16 @@ int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric
             }
 
             // heavy_keeper_add should be called anyway, to let the topk record update.
-            int tmp_ret = heavy_keeper_add(cube->cells.topk, tag_in_string, tag_len, increment, &args);
+            int tmp_ret = heavy_keeper_add(cube->topk, tag_in_string, tag_len, increment, &args);
             if (tmp_ret != 1) {
                 free(tag_in_string);
                 return FS_ERR_TOO_MANY_CELLS;
             }
-            cell_data = heavy_keeper_get0_exdata(cube->cells.topk, tag_in_string, tag_len);
+            cell_data = heavy_keeper_get0_exdata(cube->topk, tag_in_string, tag_len);
         }
         break;
     case SAMPLING_MODE_COMPREHENSIVE:
-        cell_data = find_or_add_exdata_comprehensive(cube->cells.comprehensive, tag_in_string, tag_len, &args);
+        cell_data = find_or_add_exdata_comprehensive(cube->comprehensive, tag_in_string, tag_len, &args);
         if (cell_data == NULL) {
             free(tag_in_string);
             return FS_ERR_TOO_MANY_CELLS;
@@ -782,18 +779,18 @@ int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id
     {
     case SAMPLING_MODE_TOPK: {
         if (cube->primary_metric_id != metric_id) {
-            cell_data = heavy_keeper_get0_exdata(cube->cells.topk, tag_in_string, tag_len);
+            cell_data = heavy_keeper_get0_exdata(cube->topk, tag_in_string, tag_len);
             if (cell_data == NULL) {
-                int tmp_ret = heavy_keeper_add(cube->cells.topk, tag_in_string, tag_len, 0, &args);
+                int tmp_ret = heavy_keeper_add(cube->topk, tag_in_string, tag_len, 0, &args);
                 if (tmp_ret != 1) {
                     free(tag_in_string);
                     return FS_ERR_TOO_MANY_CELLS;
                 }
-                cell_data = heavy_keeper_get0_exdata(cube->cells.topk, tag_in_string, tag_len);
+                cell_data = heavy_keeper_get0_exdata(cube->topk, tag_in_string, tag_len);
             }
         } else {
             long long current_count = 0;
-            cell_data = heavy_keeper_get0_exdata(cube->cells.topk, tag_in_string, tag_len);
+            cell_data = heavy_keeper_get0_exdata(cube->topk, tag_in_string, tag_len);
             if (cell_data != NULL) {
                 const struct metric *tmp_metric = find_metric_in_cell(cell_data, metric_id);
                 if (tmp_metric != NULL) {
@@ -809,15 +806,15 @@ int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id
                 return FS_OK;
             }
             
-            int tmp_ret = heavy_keeper_add(cube->cells.topk, tag_in_string, tag_len, increment, &args);
+            int tmp_ret = heavy_keeper_add(cube->topk, tag_in_string, tag_len, increment, &args);
             if (tmp_ret != 1) {
                 return FS_ERR_TOO_MANY_CELLS;
             }
-            cell_data = heavy_keeper_get0_exdata(cube->cells.topk, tag_in_string, tag_len);
+            cell_data = heavy_keeper_get0_exdata(cube->topk, tag_in_string, tag_len);
         }
         break;}
     case SAMPLING_MODE_COMPREHENSIVE: {
-        cell_data = find_or_add_exdata_comprehensive(cube->cells.comprehensive, tag_in_string, tag_len, &args);
+        cell_data = find_or_add_exdata_comprehensive(cube->comprehensive, tag_in_string, tag_len, &args);
         break;}
     default:
         assert(0);
@@ -848,7 +845,7 @@ int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, co
     args.tags = tags;
     args.n_tags = n_tag;
 
-    struct cell *cell_data = find_or_add_exdata_comprehensive(instance->cube[cube_id]->cells.comprehensive, tag_in_string, tag_len, &args);
+    struct cell *cell_data = find_or_add_exdata_comprehensive(instance->cube[cube_id]->comprehensive, tag_in_string, tag_len, &args);
     struct metric *metric = add_or_find_metric_in_cell(instance, cell_data, metric_id);
 
     metric_hll_add(metric, key, key_len);
@@ -875,7 +872,7 @@ int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id
     args.tags = tags;
     args.n_tags = n_tag;
 
-    struct cell *cell_data = find_or_add_exdata_comprehensive(instance->cube[cube_id]->cells.comprehensive, tag_in_string, tag_len, &args);
+    struct cell *cell_data = find_or_add_exdata_comprehensive(instance->cube[cube_id]->comprehensive, tag_in_string, tag_len, &args);
 
     free(tag_in_string);
 
@@ -911,10 +908,10 @@ struct cube *fieldstat_cube_copy(const struct cube *cube)
     switch (cube->sampling_mode)
     {
     case SAMPLING_MODE_TOPK:
-        cube_dup->cells.topk = heavy_keeper_copy(cube->cells.topk);
+        cube_dup->topk = heavy_keeper_copy(cube->topk);
         break;
     case SAMPLING_MODE_COMPREHENSIVE:
-        cube_dup->cells.comprehensive = tag_map_copy(cube->cells.comprehensive);
+        cube_dup->comprehensive = tag_map_copy(cube->comprehensive);
         break;
     default:
         assert(0);
@@ -931,10 +928,10 @@ void fieldstat_cube_merge(struct cube *dest, const struct cube *src)
     switch (dest->sampling_mode)
     {
     case SAMPLING_MODE_TOPK:
-        heavy_keeper_merge(dest->cells.topk, src->cells.topk);
+        heavy_keeper_merge(dest->topk, src->topk);
         break;
     case SAMPLING_MODE_COMPREHENSIVE:
-        tag_map_merge(dest->cells.comprehensive, src->cells.comprehensive);
+        tag_map_merge(dest->comprehensive, src->comprehensive);
         break;
     default:
         assert(0);
@@ -1214,10 +1211,10 @@ const struct cell *get_exdata_by_tag_list(const struct cube *cube, const struct 
     switch (cube->sampling_mode)
     {
     case SAMPLING_MODE_TOPK:
-        ret = heavy_keeper_get0_exdata(cube->cells.topk, tag_in_string, tag_len);
+        ret = heavy_keeper_get0_exdata(cube->topk, tag_in_string, tag_len);
         break;
     case SAMPLING_MODE_COMPREHENSIVE:
-        ret = tag_map_get0_exdata(cube->cells.comprehensive, tag_in_string, tag_len);
+        ret = tag_map_get0_exdata(cube->comprehensive, tag_in_string, tag_len);
         break;
     default:
         assert(0);
@@ -1381,14 +1378,14 @@ void fieldstat_get_cells_used_by_cube(const struct fieldstat *instance, int cube
     size_t n_cell_tmp = 0;
     switch (cube->sampling_mode) {
         case SAMPLING_MODE_COMPREHENSIVE:
-            n_cell_tmp = tag_map_get_count(cube->cells.comprehensive);
+            n_cell_tmp = tag_map_get_count(cube->comprehensive);
             cell_datas = (struct cell **)malloc(sizeof(struct cell *) * n_cell_tmp);
-            tag_map_list(cube->cells.comprehensive, (void **)cell_datas, n_cell_tmp);
+            tag_map_list(cube->comprehensive, (void **)cell_datas, n_cell_tmp);
             break;
         case SAMPLING_MODE_TOPK:
-            n_cell_tmp = heavy_keeper_get_count(cube->cells.topk);
+            n_cell_tmp = heavy_keeper_get_count(cube->topk);
             cell_datas = (struct cell **)malloc(sizeof(struct cell *) * n_cell_tmp);
-            heavy_keeper_list(cube->cells.topk, (void **)cell_datas, n_cell_tmp);
+            heavy_keeper_list(cube->topk, (void **)cell_datas, n_cell_tmp);
             break;
         default:
             assert(0);
@@ -1434,9 +1431,9 @@ int fieldstat_get_used_sampling(const struct fieldstat *instance, int cube_id)
 
     switch (cube->sampling_mode) {
         case SAMPLING_MODE_COMPREHENSIVE:
-            return tag_map_get_count(cube->cells.comprehensive);
+            return tag_map_get_count(cube->comprehensive);
         case SAMPLING_MODE_TOPK:
-            return heavy_keeper_get_count(cube->cells.topk);
+            return heavy_keeper_get_count(cube->topk);
         default:
             return FS_ERR_INVALID_PARAM;
     }

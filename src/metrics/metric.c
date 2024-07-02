@@ -35,7 +35,6 @@ struct metric_parameter {
 };
 
 struct metric_manifest {
-    int id;
     char *name;
     struct metric_parameter *paras;
     enum metric_type type;
@@ -67,7 +66,6 @@ struct metric_data {
 };
 
 struct metric {
-    const struct metric_scheme *scheme;
     struct metric_manifest *info;
     struct metric_data *data;
 };
@@ -297,7 +295,6 @@ struct metric_manifest *metric_info_new(const char *name, enum metric_type type,
     info->name = strdup(name);
     info->paras = para;
     info->type = type;
-    info->id = -1;
     return info;
 }
 
@@ -312,7 +309,6 @@ struct metric *metric_new(const char *name, enum metric_type type, struct metric
 {
     struct metric *pthis = (struct metric *)calloc(1, sizeof(struct metric));
     pthis->info = metric_info_new(name, type, para);
-    pthis->scheme = &g_metric_scheme_table[type]; // todo: 改成Switch type
     pthis->data = NULL;
 
     return pthis;
@@ -325,14 +321,14 @@ void metric_free(struct metric *pthis)
     }
 
     if (pthis->data) {
-        pthis->scheme->free(pthis->data);
+        g_metric_scheme_table[pthis->info->type].free(pthis->data);
     }
     metric_info_free(pthis->info);
     free(pthis);
 }
 
 void metric_reset(struct metric *pthis) {
-    pthis->scheme->reset(pthis->data);
+    g_metric_scheme_table[pthis->info->type].reset(pthis->data);
 }
 
 void metric_info_copy(struct metric_manifest *dest, const struct metric_manifest *src)
@@ -346,43 +342,42 @@ void metric_info_copy(struct metric_manifest *dest, const struct metric_manifest
     }
 
     dest->type = src->type;
-    dest->id = src->id;
 }
 
 struct metric *metric_fork(const struct metric *src) {
     struct metric *dest = (struct metric *)malloc(sizeof(struct metric));
     dest->info = (struct metric_manifest *)malloc(sizeof(struct metric_manifest));
     metric_info_copy(dest->info, src->info);
-    dest->scheme = &g_metric_scheme_table[src->info->type];
 
-    dest->data = dest->scheme->new(dest->info->paras);
+    dest->data = g_metric_scheme_table[dest->info->type].new(dest->info->paras);
 
     return dest;
 }
 
 struct metric *metric_copy(const struct metric *src) {
     struct metric *dest = metric_fork(src);
-    src->scheme->copy(dest->data, src->data);
+    g_metric_scheme_table[dest->info->type].copy(dest->data, src->data);
 
     return dest;
 }
 
 //return -1 when merge error. 0 when success. 1 when src has no cell.
 int metric_merge(struct metric *dest, const struct metric *src) {
-    return dest->scheme->merge(dest->data, src->data);
+    return g_metric_scheme_table[dest->info->type].merge(dest->data, src->data);
 }
 
 void metric_get_plain_blob(const struct metric *pthis, char **blob, size_t *blob_size) {
     struct metric_data *data = pthis->data;
-    if (pthis->info->type == METRIC_TYPE_HLL) {
+    enum metric_type type = pthis->info->type;
+    if (type == METRIC_TYPE_HLL) {
         ST_hyperloglog_serialize_for_networking(data->hll, blob, blob_size);
         return;
     }
-    if (pthis->info->type == METRIC_TYPE_HISTOGRAM) {
+    if (type == METRIC_TYPE_HISTOGRAM) {
         histogram_encode_into_b64(data->hdr, blob, blob_size);
         return;
     }
-    pthis->scheme->serialize(data, blob, blob_size);
+    g_metric_scheme_table[type].serialize(data, blob, blob_size);
 }
 
 /* -------------------------------------------------------------------------- */
