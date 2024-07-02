@@ -5,13 +5,15 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "uthash.h"
+
 #include "fieldstat.h"
-#include "my_ut_hash_inner.h"
 #include "my_ut_hash.h"
 #include "exdata.h"
 
 struct tag_exdata_item {
-    struct tag_hash_key *tag;
+    char *key;
+    size_t key_len;
     void *exdata;
     bool dying;
     UT_hash_handle hh;
@@ -66,7 +68,7 @@ void tag_map_free(struct tag_map *pthis) {
     struct tag_exdata_item *item, *tmp;
     HASH_ITER(hh, pthis->tag_id_map, item, tmp) {
         HASH_DEL(pthis->tag_id_map, item);
-        tag_hash_key_free(item->tag);
+        free(item->key);
         pthis->free_fn(item->exdata);
         free(item);
     }
@@ -82,7 +84,7 @@ void tag_map_reset(struct tag_map *pthis) {
             continue;
         }
         HASH_DEL(pthis->tag_id_map, node);
-        tag_hash_key_free(node->tag);
+        free(node->key);
         pthis->free_fn(node->exdata);
         free(node);
     }
@@ -90,9 +92,15 @@ void tag_map_reset(struct tag_map *pthis) {
     pthis->current_cell_num = 0;
 }
 
-int tag_map_add(struct tag_map *pthis, const struct tag_hash_key *tag, void *arg) {
+static char *my_keydup(const char *key, size_t key_len) {
+    char *ret = calloc(1, key_len + 1);
+    memcpy(ret, key, key_len);
+    return ret;
+}
+
+int tag_map_add(struct tag_map *pthis, const char *key, size_t key_len, void *arg) {
     struct tag_exdata_item *item;
-    HASH_FIND_TAG(pthis->tag_id_map, tag, item);
+    HASH_FIND(hh, pthis->tag_id_map, key, key_len, item);
     if (item != NULL && !item->dying) {
         return 1;
     }
@@ -109,10 +117,11 @@ int tag_map_add(struct tag_map *pthis, const struct tag_hash_key *tag, void *arg
     }
 
     item = calloc(1, sizeof(struct tag_exdata_item));
-    item->tag = tag_hash_key_copy(tag);
+    item->key = my_keydup(key, key_len);
+    item->key_len = key_len;
     item->exdata = pthis->new_fn(arg);
     item->dying = false;
-    HASH_ADD_TAG(pthis->tag_id_map, tag, item);
+    HASH_ADD_KEYPTR(hh, pthis->tag_id_map, item->key, key_len, item);
 
     pthis->current_cell_num++;
     return 1;
@@ -126,9 +135,9 @@ void tag_map_set_exdata_schema(struct tag_map *pthis, exdata_new_cb new_fn, exda
     pthis->copy_fn = copy_fn;
 }
 
-void *tag_map_get0_exdata(struct tag_map *pthis, const struct tag_hash_key *tag) {
+void *tag_map_get0_exdata(struct tag_map *pthis, const char *key, size_t key_len) {
     struct tag_exdata_item *item;
-    HASH_FIND_TAG(pthis->tag_id_map, tag, item);
+    HASH_FIND(hh, pthis->tag_id_map, key, key_len, item);
     if (item == NULL || item->dying) {
         return NULL;
     }
@@ -168,7 +177,7 @@ int tag_map_merge(struct tag_map *dest, struct tag_map *src) {
             continue;
         }
 
-        HASH_FIND_TAG(dest->tag_id_map, item_src->tag, item_dst);
+        HASH_FIND(hh, dest->tag_id_map, item_src->key, item_src->key_len, item_dst);
         if (item_dst != NULL && !item_dst->dying) {
             dest->merge_fn(item_dst->exdata, item_src->exdata);
             continue;
@@ -180,10 +189,11 @@ int tag_map_merge(struct tag_map *dest, struct tag_map *src) {
 
         if (item_dst == NULL) {
             item_dst = calloc(1, sizeof(struct tag_exdata_item));
-            item_dst->tag = tag_hash_key_copy(item_src->tag);
+            item_dst->key = my_keydup(item_src->key, item_src->key_len);
+            item_dst->key_len = item_src->key_len;
             item_dst->dying = false;
             item_dst->exdata = dest->copy_fn(item_src->exdata);
-            HASH_ADD_TAG(dest->tag_id_map, tag, item_dst);
+            HASH_ADD_KEYPTR(hh, dest->tag_id_map, item_dst->key, item_dst->key_len, item_dst);
             dest->current_cell_num++;
         } else {
             assert(item_dst->dying);
@@ -211,10 +221,11 @@ struct tag_map *tag_map_copy(const struct tag_map *src) {
             continue;
         }
         struct tag_exdata_item *new_item = calloc(1, sizeof(struct tag_exdata_item));
-        new_item->tag = tag_hash_key_copy(item->tag);
+        new_item->key = my_keydup(item->key, item->key_len);
+        new_item->key_len = item->key_len;
         new_item->exdata = pthis->copy_fn(item->exdata);
         new_item->dying = false;
-        HASH_ADD_TAG(pthis->tag_id_map, tag, new_item);
+        HASH_ADD_KEYPTR(hh, pthis->tag_id_map, new_item->key, new_item->key_len, new_item);
     }
     return pthis;
 }

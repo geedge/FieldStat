@@ -6,6 +6,8 @@
 
 struct metric;
 
+// TODO: 删掉metric，单纯提供一个metric_manifest 类，直接把定义写进来，由fieldstat 和 cube 共同依赖。
+
 const char *metric_get_name(const struct metric *metrics); // don't free the return value
 enum metric_type metric_get_type(const struct metric *metrics);
 void metric_free(struct metric *pthis);

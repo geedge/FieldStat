@@ -34,7 +34,7 @@ struct metric_parameter {
     };
 };
 
-struct metric_info {
+struct metric_info { // TODO: 别用info 这个词，用manifest。另外新建一个这样的结构体。
     int id;
     char *name;
     struct metric_parameter *paras;
@@ -50,7 +50,7 @@ typedef struct metric_measure_data * (*metric_func_deserialize)(const char *, si
 typedef void (*metric_func_reset)(struct metric_measure_data *);
 struct metric_scheme {
     metric_func_new new;
-    metric_func_del del;
+    metric_func_del del; // TODO: del -> free
     metric_func_merge merge;
     metric_func_copy copy;
     metric_func_serialize serialize;
@@ -58,7 +58,7 @@ struct metric_scheme {
     metric_func_reset reset;
 };
 
-struct metric_measure_data {
+struct metric_measure_data { // TODO: 改成data 就行
     union {
         struct metric_counter_or_gauge *counter;
         struct ST_hyperloglog *hll;
@@ -69,7 +69,7 @@ struct metric_measure_data {
 struct metric {
     const struct metric_scheme *scheme;
     struct metric_info *info;
-    struct metric_measure_data *data_array;
+    struct metric_measure_data *data_array; // todo: 重命名，data
 };
 
 /* -------------------------------------------------------------------------- */
@@ -312,7 +312,7 @@ struct metric *metric_new(const char *name, enum metric_type type, struct metric
 {
     struct metric *pthis = (struct metric *)calloc(1, sizeof(struct metric));
     pthis->info = metric_info_new(name, type, para);
-    pthis->scheme = &g_metric_scheme_table[type];
+    pthis->scheme = &g_metric_scheme_table[type]; // todo: 改成Switch type
     pthis->data_array = NULL;
 
     return pthis;

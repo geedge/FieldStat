@@ -141,6 +141,9 @@ int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id
 */
 int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, const char *key, size_t key_len);
 
+// TODO: 增加：
+// int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, const struct fieldstat_tag *tags, size_t n_tag);
+
 /* 
     * @brief Add a value to the histogram metric of cell_id. Histogram will record the distribution of the values.
              The value bigger than highest_trackable_value will be set to highest_trackable_value. The value less than lowest_trackable_value will be tried to record, and, if succeed, remains in the record as -inf(most of the time) or 0(if value == 0)
@@ -148,7 +151,7 @@ int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, co
     * @return FS_OK if success. FS_ERR_NULL_HANDLER, FS_ERR_INVALID_CUBE_ID, FS_ERR_INVALID_METRIC_ID if fail.
     *         FS_ERR_INVALID_PARAM when value is less than 0, or the cube is topk.
 */
-int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long value);
+int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long value); // TODO: 看看能不能改成histogram(重命名）。
 
 /*
     * @brief Delete all the cells, also the content of every metrics. The cube and metrics are not deleted. Increase cell_version by 1.

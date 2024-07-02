@@ -622,6 +622,92 @@ TEST(calibrate, delete_first_cube)
     fieldstat_free(target);
 }
 
+/*
+
+// // reset once will not delete the cells, just let them be discared, so in such case, cube_add will just add to the same cell.
+TEST(unit_test_tag_map, add_after_reset_and_ensure_performance_improvement) {
+    clock_t start, end;
+    const int TEST_ROUND = 100000;
+    // struct cell_manager *hk = cell_manager_new(SAMPLING_MODE_COMPREHENSIVE, TEST_ROUND);
+    struct tag_map *hk = tag_map_new(TEST_ROUND);
+    vector<struct tag_hash_key *> keys;
+    for (int i = 0; i < TEST_ROUND; i++)
+    {
+        struct tag_hash_key *key = test_gen_tag_key("key", i);
+        keys.push_back(key);
+    }
+
+    for (int i = 0; i < TEST_ROUND; i++) {
+        tag_map_add(hk, keys[i], NULL);
+    }
+
+    tag_map_reset(hk);
+    start = clock();
+    for (int i = 0; i < TEST_ROUND; i++)
+    {
+        tag_map_add(hk, keys[i], NULL);
+    }
+    end = clock();
+    clock_t time_reset_once = end - start;
+
+
+    tag_map_reset(hk);
+    tag_map_reset(hk);
+    start = clock();
+    for (int i = 0; i < TEST_ROUND; i++)
+    {
+        tag_map_add(hk, keys[i], NULL);
+    }
+    end = clock();
+    clock_t time_reset_twice = end - start;
+
+    EXPECT_GE(time_reset_twice, time_reset_once);
+
+    tag_map_free(hk);
+    for (int i = 0; i < TEST_ROUND; i++) {
+        tag_hash_key_free(keys[i]);
+    }
+}
+
+TEST(unit_test_heavy_keeper, add_after_reset_and_ensure_performance_improvement) {
+    clock_t start, end;
+    const int K = 1000;
+    const int TEST_ROUND = K;
+
+    struct heavy_keeper *hk = heavy_keeper_new(K);
+    vector<struct tag_hash_key *> keys;
+    for (int i = 0; i < TEST_ROUND; i++)
+    {
+        struct tag_hash_key *key = test_gen_tag_key("key", i % K);
+        keys.push_back(key);
+    }
+
+    start = clock();
+    for (int i = 0; i < TEST_ROUND; i++) {
+        heavy_keeper_add(hk, keys[i], 1, NULL);
+    }
+    end = clock();
+    clock_t time_empty = end - start;
+
+    heavy_keeper_reset(hk);
+    start = clock();
+    for (int i = 0; i < TEST_ROUND; i++)
+    {
+        heavy_keeper_add(hk, keys[i], 1, NULL);
+    }
+    end = clock();
+    clock_t time_reset_once = end - start;
+   
+    EXPECT_GE(time_empty, time_reset_once);
+
+    heavy_keeper_free(hk);
+    for (int i = 0; i < TEST_ROUND; i++) {
+        tag_hash_key_free(keys[i]);
+    }
+}
+
+*/
+
 int main(int argc, char *argv[]) 
 {
 	testing::InitGoogleTest(&argc, argv);

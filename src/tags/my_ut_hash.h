@@ -27,6 +27,8 @@ void fieldtag_list_free(struct fieldstat_tag *tags, size_t n_tags);
 char *tag_hash_key_get_compound_key(const struct tag_hash_key *tag);
 int tag_hash_key_cmp(const struct tag_hash_key *a, const struct tag_hash_key *b);
 
+void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_tags, char **out_key, size_t *out_key_size);
+
 #ifdef __cplusplus
 }
 #endif

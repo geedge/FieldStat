@@ -12,16 +12,18 @@
 
 #include "minheap/heap.h"
 #include "mpack/mpack.h"
+#include "uthash.h"
 #include "xxhash/xxhash.h"
 
-#include "my_ut_hash_inner.h"
 #include "exdata.h"
 
 #define FP_HASH_KEY 0
 #define INVALID_COUNT UINT64_MAX
+#define MAX(a, b)  	(((a) > (b)) ? (a) : (b))
 
 struct entry_data { // the value constitute of a sorted set entry
-    struct tag_hash_key *key;
+    char *key;
+    size_t key_len;
 
     void *exdata;
 };
@@ -40,7 +42,8 @@ struct sorted_set {
 };
 
 struct hash_node {
-    struct tag_hash_key *key; // value is equal to entry_data::key(point to the same memory)
+    const char *key; // value is equal to entry_data::key(point to the same memory)
+    size_t key_len;
     heap_entry *val;
     UT_hash_handle hh;
 };
@@ -97,11 +100,18 @@ static void *default_copy_fn(void *exdata) {
     return exdata;
 }
 
-struct entry_data *entry_data_construct(const struct tag_hash_key *tag, void *exdata)
+static char *my_key_dup(const char *key, size_t key_len) {
+    char *ret = (char *)malloc(key_len);
+    memcpy(ret, key, key_len);
+    return ret;
+}
+
+struct entry_data *entry_data_construct(const char *key, size_t key_len, void *exdata)
 {
     struct entry_data *entry_data = (struct entry_data *)malloc(sizeof(struct entry_data));
 
-    entry_data->key = tag_hash_key_copy(tag);
+    entry_data->key = my_key_dup(key, key_len);
+    entry_data->key_len = key_len;
     entry_data->exdata = exdata;
     return entry_data;
 }
@@ -111,7 +121,7 @@ void entry_data_destroy(struct entry_data *entry_data, exdata_free_cb free_fn)
     if (entry_data == NULL) {
         return;
     }
-    tag_hash_key_free(entry_data->key);
+    free(entry_data->key);
     free_fn(entry_data->exdata);
     free(entry_data);
 }
@@ -222,11 +232,11 @@ void sorted_set_free(struct sorted_set *ss)
     free(ss);
 }
 
-heap_entry *sorted_set_find_entry(const struct sorted_set *ss, const struct tag_hash_key *tag)
+heap_entry *sorted_set_find_entry(const struct sorted_set *ss, const char *key, size_t key_len)
 {
     struct hash_node *hash_tbl = ss->hash_tbl;
     struct hash_node *s = NULL;
-    HASH_FIND_TAG(hash_tbl, tag, s);
+    HASH_FIND(hh, hash_tbl, key, key_len, s);
 
     if (s == NULL) {
         return NULL;
@@ -251,7 +261,7 @@ int sorted_set_pop(struct sorted_set *ss)
     struct entry_data *tmp_data = sorted_set_entry_get_data(entry);
 
     struct hash_node *s = NULL;
-    HASH_FIND_TAG(hash_tbl, tmp_data->key, s);
+    HASH_FIND(hh, hash_tbl, tmp_data->key, tmp_data->key_len, s);
     assert(s!=NULL);
 
     HASH_DEL(hash_tbl, s);
@@ -293,12 +303,12 @@ unsigned long long sorted_set_get_min_count(const struct sorted_set *ss)
     return count - 1; // sorted set will let the count start from 1, 0 for dying entry.
 }
 
-void sorted_set_insert_to_available_heap(struct sorted_set *ss, const struct tag_hash_key *tag, unsigned long long cnt, void *exdata)
+void sorted_set_insert_to_available_heap(struct sorted_set *ss, const char *key, size_t key_len, unsigned long long cnt, void *exdata)
 {
     cnt = safe_add(cnt, 1); // sorted set will let the count start from 1, 0 for dying entry.
     unsigned long long *tmp_cnt = (unsigned long long*)malloc(sizeof(unsigned long long));
     *tmp_cnt = cnt;
-    struct entry_data *tmp_data = entry_data_construct(tag, exdata);
+    struct entry_data *tmp_data = entry_data_construct(key, key_len, exdata);
     heap_entry *node = (heap_entry *)malloc(sizeof(heap_entry));
     node->key = tmp_cnt;
     node->value = tmp_data;
@@ -308,17 +318,18 @@ void sorted_set_insert_to_available_heap(struct sorted_set *ss, const struct tag
     struct hash_node *hash_tbl = ss->hash_tbl;
     struct hash_node *s = (struct hash_node *)malloc(sizeof(struct hash_node));
     s->key = sorted_set_entry_get_data(node)->key;
+    s->key_len = key_len;
     s->val = node;
-    HASH_ADD_TAG(hash_tbl, key, s);
+    HASH_ADD_KEYPTR(hh, hash_tbl, s->key, key_len, s);
     ss->hash_tbl = hash_tbl;
 
     ss->n_living_entry++;
 }
 
-int sorted_set_insert(struct sorted_set *ss, const struct tag_hash_key *tag, unsigned long long cnt, void *args)
+int sorted_set_insert(struct sorted_set *ss, const char *key, size_t key_len, unsigned long long cnt, void *args)
 {
     // if there is a dying record, reborn it to use.
-    heap_entry *entry = sorted_set_find_entry(ss, tag);
+    heap_entry *entry = sorted_set_find_entry(ss, key, key_len);
     if (entry != NULL) {
         if (!sorted_set_entry_dying(entry)) {
             assert(0);
@@ -338,7 +349,7 @@ int sorted_set_insert(struct sorted_set *ss, const struct tag_hash_key *tag, uns
         int ret = sorted_set_pop(ss);
         assert(ret != -1);
     }
-    sorted_set_insert_to_available_heap(ss, tag, cnt, ss->new_fn(args));
+    sorted_set_insert_to_available_heap(ss, key, key_len, cnt, ss->new_fn(args));
     return 1;
 }
 
@@ -347,12 +358,12 @@ int sorted_set_cardinality(const struct sorted_set *ss)
     return ss->n_living_entry;
 }
 
-unsigned long long sorted_set_get_count(const struct sorted_set *ss, const struct tag_hash_key *tag)
+unsigned long long sorted_set_get_count(const struct sorted_set *ss, const char *key, size_t key_len)
 {
     if (sorted_set_cardinality(ss) == 0) {
         return INVALID_COUNT;
     }
-    const heap_entry *entry = sorted_set_find_entry(ss, tag);
+    const heap_entry *entry = sorted_set_find_entry(ss, key, key_len);
     if (entry == NULL) {
         return INVALID_COUNT;
     }
@@ -363,9 +374,9 @@ unsigned long long sorted_set_get_count(const struct sorted_set *ss, const struc
     return sorted_set_entry_get_count(entry);
 }
 
-int sorted_set_incrby(struct sorted_set *ss, const struct tag_hash_key *tag, unsigned long long count)
+int sorted_set_incrby(struct sorted_set *ss, const char *key, size_t key_len, unsigned long long count)
 {
-    heap_entry *entry = sorted_set_find_entry(ss, tag);
+    heap_entry *entry = sorted_set_find_entry(ss, key, key_len);
     if (entry == NULL) {
         return -1;
     }
@@ -399,7 +410,7 @@ int cmp_tmp_heap_node(const void *a, const void *b)
     }
 }
 
-void sorted_set_dump(const struct sorted_set *ss, struct tag_hash_key **tags_out, void **exdata_out)
+void sorted_set_dump(const struct sorted_set *ss, char **key_out, size_t *key_len_out, void **exdata_out)
 {
     struct minheap *h = ss->heap;
     tmp_heap_node *tmp_nodes = (tmp_heap_node *)malloc(sizeof(tmp_heap_node) * h->cur_size);
@@ -417,7 +428,8 @@ void sorted_set_dump(const struct sorted_set *ss, struct tag_hash_key **tags_out
     assert(n_living_entry == ss->n_living_entry);
     qsort(tmp_nodes, n_living_entry, sizeof(tmp_heap_node), cmp_tmp_heap_node);
     for (int i = 0; i < n_living_entry; i++) {
-        tags_out[i] = tmp_nodes[i].val->key;
+        key_out[i] = tmp_nodes[i].val->key;
+        key_len_out[i] = tmp_nodes[i].val->key_len;
         exdata_out[i] = tmp_nodes[i].val->exdata;
     }
     free(tmp_nodes);
@@ -434,7 +446,7 @@ struct sorted_set *sorted_set_copy(const struct sorted_set *ss)
             continue;
         }
         const struct entry_data *data = sorted_set_entry_get_data(entry);
-        sorted_set_insert_to_available_heap(ret, data->key, sorted_set_entry_get_count(entry), ss->copy_fn(data->exdata));
+        sorted_set_insert_to_available_heap(ret, data->key, data->key_len, sorted_set_entry_get_count(entry), ss->copy_fn(data->exdata));
     }
 
     return ret;
@@ -556,14 +568,19 @@ bool if_need_to_decay(struct heavy_keeper *hk, const struct Bucket *bucket, unsi
     return false;
 }
 
-struct Bucket *map_flow_id_hash_to_bucket(struct heavy_keeper *hk, int array_index, const struct tag_hash_key *tag) {
+unsigned int cal_hash_val_with_seed(const char *key, size_t key_len, unsigned int seed) {
+    return XXH3_64bits_withSeed(key, key_len, seed);
+}
+
+struct Bucket *find_bucket_by_key(struct heavy_keeper *hk, int array_index, const char *key, size_t key_len) {
     int w = hk->params.max_bucket_num;
-    int Hsh = tag_hash_key_cal_hash_val(tag, array_index + 1) % w; // +1: the let any row do not use FP as hashing key directly.
+    unsigned int Hsh = cal_hash_val_with_seed(key, key_len, array_index + 1) % w; // +1: the let any row do not use FP as hashing key directly.
 
     // Otherwise, when different key has the same FP(in 2^-64 probability), they will also in the same bucket in the row #0 and hash collision will happen more severely.
 
     return &(hk->sketch[array_index * w + Hsh]);
 }
+
 
 unsigned my_max(unsigned a, unsigned b) {
     if (a > b) {
@@ -575,10 +592,10 @@ unsigned my_max(unsigned a, unsigned b) {
 /*
 1 for newly add something. 0 for not add. -1 for unexpected cases.
 */
-int heavy_keeper_add(struct heavy_keeper *heavy_keeper, const struct tag_hash_key *tag, int count, void *arg) {
+int heavy_keeper_add(struct heavy_keeper *heavy_keeper, const char *key, size_t key_len, int count, void *arg) {
     if (count == 0) {
         if (sorted_set_cardinality(heavy_keeper->top_K_heap) < heavy_keeper->K) {
-            sorted_set_insert(heavy_keeper->top_K_heap, tag, count, arg);
+            sorted_set_insert(heavy_keeper->top_K_heap, key, key_len, count, arg);
             return 1;
         }
         return 0;
@@ -589,13 +606,13 @@ int heavy_keeper_add(struct heavy_keeper *heavy_keeper, const struct tag_hash_ke
     if (nMin == INVALID_COUNT) {
         nMin = 0;
     }
-    unsigned long long int old_cnt = sorted_set_get_count(summary, tag);
+    unsigned long long int old_cnt = sorted_set_get_count(summary, key, key_len);
     bool not_in_sorted_set = (old_cnt == INVALID_COUNT);
     unsigned long long maxv = 0;
-    unsigned int FP = tag_hash_key_cal_hash_val(tag, FP_HASH_KEY);
+    unsigned int FP = cal_hash_val_with_seed(key, key_len, FP_HASH_KEY);
 
     for (int j = 0; j < heavy_keeper->params.array_num; j++) {
-        struct Bucket *bucket = map_flow_id_hash_to_bucket(heavy_keeper, j, tag);
+        struct Bucket *bucket = find_bucket_by_key(heavy_keeper, j, key, key_len);
 
         if (bucket->finger_print == FP) {
             // If a flow is not in the min-heap, then the estimated flow size should be no larger than nmin.
@@ -608,7 +625,7 @@ int heavy_keeper_add(struct heavy_keeper *heavy_keeper, const struct tag_hash_ke
                 continue;
             }
             bucket->count = safe_add(bucket->count, count);
-            maxv = my_max(maxv, bucket->count);
+            maxv = MAX(maxv, bucket->count);
         } else {
             if (!if_need_to_decay(heavy_keeper, bucket, count)) {
                 continue;
@@ -618,7 +635,7 @@ int heavy_keeper_add(struct heavy_keeper *heavy_keeper, const struct tag_hash_ke
                 bucket->finger_print = FP;
                 bucket->count = count;
 
-                maxv = my_max(maxv, count);
+                maxv = MAX(maxv, count);
             } else {
                 bucket->count -= count;
             }
@@ -627,14 +644,13 @@ int heavy_keeper_add(struct heavy_keeper *heavy_keeper, const struct tag_hash_ke
 
     if (not_in_sorted_set) {
         if ((maxv - nMin <= count && maxv != nMin) || sorted_set_cardinality(summary) != heavy_keeper->K) {
-            int insert_ret = sorted_set_insert(summary, tag, maxv, arg);
-            assert(insert_ret != -1 && insert_ret != 0);
+            sorted_set_insert(summary, key, key_len, maxv, arg);
             return 1;
         }
         return 0;
     } else {
         if (maxv > old_cnt) {
-            sorted_set_incrby(summary, tag, maxv - old_cnt);
+            sorted_set_incrby(summary, key, key_len, maxv - old_cnt);
         }
         return 1; // no popped, but the tag definitely exists in the sorted set
     }
@@ -651,8 +667,8 @@ int heavy_keeper_set_exdata_schema(struct heavy_keeper *hk, exdata_new_cb new_fn
     return 0;
 }
 
-void *heavy_keeper_get0_exdata(const struct heavy_keeper *hk, const struct tag_hash_key *key) {
-    const heap_entry *entry = sorted_set_find_entry(hk->top_K_heap, key);
+void *heavy_keeper_get0_exdata(const struct heavy_keeper *hk, const char *key, size_t key_len) {
+    const heap_entry *entry = sorted_set_find_entry(hk->top_K_heap, key, key_len);
     if (entry == NULL || sorted_set_entry_dying(entry)) {
         return NULL;
     }
@@ -673,10 +689,12 @@ void heavy_keeper_list(const struct heavy_keeper *hk, void ***exdatas, size_t *n
     void **exdatas_ret = (void **)malloc(sizeof(void *) * (*n_exdatas));
     *exdatas = exdatas_ret;
 
-    struct tag_hash_key **tags = (struct tag_hash_key **)malloc(sizeof(struct tag_hash_key *) * hk->K);
-    sorted_set_dump(hk->top_K_heap, tags, exdatas_ret);
+    char **keys_dummy = (char **)malloc(sizeof(char *) * (*n_exdatas));
+    size_t *key_lens_dummy = (size_t *)malloc(sizeof(size_t) * (*n_exdatas));
+    sorted_set_dump(hk->top_K_heap, keys_dummy, key_lens_dummy, exdatas_ret);
 
-    free(tags);
+    free(keys_dummy);
+    free(key_lens_dummy);
 }
 
 static void heavy_keeper_merge_sketch(struct heavy_keeper *dest, const struct heavy_keeper *src) {
@@ -700,17 +718,16 @@ static void heavy_keeper_merge_sketch(struct heavy_keeper *dest, const struct he
     }
 }
 
-
-unsigned long long find_maxv_in_sketch(struct heavy_keeper *hk, const struct tag_hash_key *tag) {
+unsigned long long find_maxv_in_sketch(struct heavy_keeper *hk, const char *key, size_t key_len) {
     struct Bucket *bucket;
-    unsigned fp = tag_hash_key_cal_hash_val(tag, FP_HASH_KEY);
+    unsigned fp = cal_hash_val_with_seed(key, key_len, FP_HASH_KEY);
 
     unsigned long long maxv = 0;
     for (int array_id = 0; array_id < hk->params.array_num; array_id++) {
-        bucket = map_flow_id_hash_to_bucket(hk, array_id, tag);  // hk->sketch is the merge of two. So just check one
+        bucket = find_bucket_by_key(hk, array_id, key, key_len);  // hk->sketch is the merge of two. So just check one
 
         if (bucket->finger_print == fp) {
-            maxv = my_max(maxv, bucket->count);
+            maxv = MAX(maxv, bucket->count);
         }
     }
 
@@ -721,7 +738,7 @@ int cmp_int(const void *a, const void *b) {
     return *(int *)a - *(int *)b;
 }
 
-void heavy_keeper_merge(struct heavy_keeper *dest, struct heavy_keeper *src) {
+void heavy_keeper_merge(struct heavy_keeper *dest, const struct heavy_keeper *src) {
     assert(dest->K == src->K);
 
     heavy_keeper_merge_sketch(dest, src);
@@ -734,25 +751,24 @@ void heavy_keeper_merge(struct heavy_keeper *dest, struct heavy_keeper *src) {
     int size_src = sorted_set_cardinality(ss_src);
     int max_size = size_dest > size_src ? size_dest : size_src;
 
-    struct tag_hash_key **tag_arr = (struct tag_hash_key **)calloc(max_size, sizeof(struct tag_hash_key *));
     void **exdatas_dst = (void **)calloc(size_dest, sizeof(void *));
-    sorted_set_dump(ss_dest, tag_arr, exdatas_dst);
+    char **key_arr = (char **)malloc(sizeof(char *) * max_size);
+    size_t *key_lens = (size_t *)malloc(sizeof(size_t) * max_size);
+    sorted_set_dump(ss_dest, key_arr, key_lens, exdatas_dst);
 
 
     /* ------------------------------ merge dest ------------------------------ */
     for (int i = 0; i < size_dest; i++) {
-        unsigned long long maxv = find_maxv_in_sketch(dest, tag_arr[i]);
-        sorted_set_insert_to_available_heap(new_rec, tag_arr[i], maxv, dest->copy_fn(exdatas_dst[i]));
+        unsigned long long maxv = find_maxv_in_sketch(dest, key_arr[i], key_lens[i]);
+        sorted_set_insert_to_available_heap(new_rec, key_arr[i], key_lens[i], maxv, dest->copy_fn(exdatas_dst[i]));
     }
 
     /* ------------------------------ merge src ------------------------------ */
     void **exdatas_src = (void **)calloc(size_src, sizeof(void *));
-    sorted_set_dump(ss_src, tag_arr, exdatas_src);
+    sorted_set_dump(ss_src, key_arr, key_lens, exdatas_src);
     
     for (int i = 0; i < size_src; i++) {
-        const struct tag_hash_key *tag_src = tag_arr[i];
-
-        const heap_entry *entry = sorted_set_find_entry(new_rec, tag_src);
+        const heap_entry *entry = sorted_set_find_entry(new_rec, key_arr[i], key_lens[i]);
         if (entry != NULL) { // the tag is in both dest and src, so has been processed in the previous loop. The reason why no need to sum up result is that merged sketch already keeps its summed up count
             // merge exdata
             void *exdata_new = sorted_set_entry_get_data(entry)->exdata;
@@ -762,20 +778,21 @@ void heavy_keeper_merge(struct heavy_keeper *dest, struct heavy_keeper *src) {
             continue;
         }
 
-        unsigned long long maxv = find_maxv_in_sketch(dest, tag_src);// the dest heavy keeper has been merged, so the maxv is the maxv in the merged sketch, instead of the one in the dest
+        unsigned long long maxv = find_maxv_in_sketch(dest, key_arr[i], key_lens[i]);// the dest heavy keeper has been merged, so the maxv is the maxv in the merged sketch, instead of the one in the dest
 
         if (sorted_set_check_is_full(new_rec)) {
             unsigned long long tmp_mincnt = sorted_set_get_min_count(new_rec);
             if (maxv > tmp_mincnt) {
                 sorted_set_pop(new_rec); // TODO:  如果dest 和 new 共用指针，这里pop 出来以后，dest 的内存好像会变得有点问题。先别纠结这么复杂的事，new 和 dest 使用copy后的data 先试试。
-                sorted_set_insert_to_available_heap(new_rec, tag_src, maxv, dest->copy_fn(exdatas_src[i]));
+                sorted_set_insert_to_available_heap(new_rec, key_arr[i], key_lens[i], maxv, dest->copy_fn(exdatas_src[i]));
             }
         } else {
-            sorted_set_insert_to_available_heap(new_rec, tag_src, maxv, dest->copy_fn(exdatas_src[i]));
+            sorted_set_insert_to_available_heap(new_rec, key_arr[i], key_lens[i], maxv, dest->copy_fn(exdatas_src[i]));
         }
     }
 
-    free(tag_arr);
+    free(key_arr);
+    free(key_lens);
     free(exdatas_dst);
     free(exdatas_src);
     // dest->top_K_heap->free_fn = default_free_fn; // do not free exdata in the original top_K_heap, because they are either moved to new_rec or freed when popped out when add source to dest.
@@ -803,11 +820,11 @@ struct heavy_keeper *heavy_keeper_copy(const struct heavy_keeper *src) {
     return ret;
 }
 
-void heavy_keeper_one_point_query(const struct heavy_keeper *hk, const struct tag_hash_key *tag, int *count_out, void **exdata_out) {
+void heavy_keeper_one_point_query(const struct heavy_keeper *hk, const char *key, size_t key_len, int *count_out, void **exdata_out) {
     *count_out = 0;
     *exdata_out = NULL;
 
-    const heap_entry *entry = sorted_set_find_entry(hk->top_K_heap, tag);
+    const heap_entry *entry = sorted_set_find_entry(hk->top_K_heap, key, key_len);
     if (entry == NULL) {
         return;
     }

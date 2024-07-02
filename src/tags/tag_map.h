@@ -19,10 +19,10 @@ int tag_map_merge(struct tag_map *dest, struct tag_map *src);
 struct tag_map *tag_map_copy(const struct tag_map *src);
 
 // int tag_map_add(struct tag_map *pthis, const char *key, size_t key_len, int count, void *arg);
-int tag_map_add(struct tag_map *pthis, const struct tag_hash_key *tag, void *arg);
+int tag_map_add(struct tag_map *pthis, const char *key, size_t key_len, void *arg);
 
 // void *tag_map_get0_exdata(struct tag_map *pthis, const char *key, size_t key_len);
-void *tag_map_get0_exdata(struct tag_map *pthis, const struct tag_hash_key *tag);
+void *tag_map_get0_exdata(struct tag_map *pthis, const char *key, size_t key_len);
 int tag_map_get_count(const struct tag_map *pthis);
 void tag_map_list(const struct tag_map *pthis, void ***exdatas, size_t *n_exdatas);
 
