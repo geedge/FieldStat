@@ -474,3 +474,37 @@ char *tag_hash_key_get_compound_key(const struct tag_hash_key *tag)
     build_dynamic_cell_key(tag->tags, tag->n_my_tag, &key, &key_size);
     return key;
 }
+
+void tag_hash_key_print(const struct tag_hash_key *tag)
+{
+    if (tag == NULL) {
+        printf("tag is NULL\n");
+        return;
+    }
+    if (tag->n_my_tag == 0) {
+        printf("no tags\n");
+        return;
+    }
+
+    printf("n_my_tag: %zu\n", tag->n_my_tag);
+
+    for (int i = 0; i < (int)tag->n_my_tag; i++) {
+        struct fieldstat_tag *tmp_tag = &tag->tags[i];
+        switch (tmp_tag->type)
+        {
+            case TAG_INTEGER:
+                printf("%s: %lld\n", tmp_tag->key, tmp_tag->value_longlong);
+                break;
+            case TAG_DOUBLE:
+                printf("%s: %f\n", tmp_tag->key, tmp_tag->value_double);
+                break;
+            case TAG_CSTRING:
+                printf("%s: %s\n", tmp_tag->key, tmp_tag->value_str);
+                break;
+            default:
+                assert(0);
+                break;
+        }
+    }
+    printf("============================\n");
+}

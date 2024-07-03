@@ -593,6 +593,11 @@ unsigned my_max(unsigned a, unsigned b) {
 */
 int heavy_keeper_add(struct heavy_keeper *heavy_keeper, const char *key, size_t key_len, int count, void *arg) {
     if (count == 0) {
+        const struct heap_entry *entry = sorted_set_find_entry(heavy_keeper->top_K_heap, key, key_len);
+        if (entry != NULL && !sorted_set_entry_dying(entry)) {
+            return 0;
+        }
+
         if (sorted_set_cardinality(heavy_keeper->top_K_heap) < heavy_keeper->K) {
             sorted_set_insert(heavy_keeper->top_K_heap, key, key_len, count, arg);
             return 1;

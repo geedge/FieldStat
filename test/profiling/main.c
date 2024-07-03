@@ -14,8 +14,6 @@
 const struct fieldstat_tag TEST_TAG_INT = {"INT key_", TAG_INTEGER, {.value_longlong = 100}};
 
 
-// todo: 问一下贺岚风，tag是什么样子的
-
 int main () {
     printf("Start profiling...\n");
     clock_t start, end;

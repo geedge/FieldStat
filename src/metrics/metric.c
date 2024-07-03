@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
-#include <stdarg.h>
 #include <limits.h>
 
 #include "histogram_encoder.h"
@@ -12,38 +11,16 @@
 #include "hdr/hdr_histogram.h"
 #include "hdr/hdr_histogram_log.h"
 #include "st_hyperloglog.h"
+#include "metric_manifest.h"
 
 struct metric_counter_or_gauge {
     long long value;
 };
 
-struct para_hdr{
-    long long lowest_trackable_value;
-    long long highest_trackable_value;
-    int significant_figures;
-};
-
-struct para_hll {
-    char precision;
-};
-
-struct metric_parameter {
-    union {
-        struct para_hdr hdr;
-        struct para_hll hll;
-    };
-};
-
-struct metric_manifest {
-    char *name;
-    struct metric_parameter *paras;
-    enum metric_type type;
-};
-
-typedef struct metric_data *(*metric_func_new)(const struct metric_parameter *);
+typedef struct metric_data *(*metric_func_new)(const union metric_parameter *);
 typedef void (*metric_func_free)(struct metric_data *);
 typedef int (*metric_func_merge)(struct metric_data *, const struct metric_data *);
-typedef int (*metric_func_copy)(struct metric_data *, const struct metric_data *);
+typedef struct metric_data * (*metric_func_copy)(const struct metric_data *);
 typedef void (*metric_func_serialize)(const struct metric_data *, char **/*blob*/, size_t */*blob_size*/);
 // typedef struct metric_data * (*metric_func_deserialize)(const char *, size_t );
 typedef void (*metric_func_reset)(struct metric_data *);
@@ -66,7 +43,7 @@ struct metric_data {
 };
 
 struct metric {
-    struct metric_manifest *info;
+    enum metric_type type;
     struct metric_data *data;
 };
 
@@ -76,7 +53,7 @@ struct metric {
 
 /* --------------------------------- counter -------------------------------- */
 
-struct metric_data *metric_scheme_counter_new(const struct metric_parameter *_para)
+struct metric_data *metric_scheme_counter_new(const union metric_parameter *_para)
 {
     struct metric_data *data = (struct metric_data *)malloc(sizeof(struct metric_data));
     struct metric_counter_or_gauge *counter = (struct metric_counter_or_gauge *)malloc(sizeof(struct metric_counter_or_gauge));
@@ -110,12 +87,14 @@ static int metric_scheme_counter_merge(struct metric_data *pthis, const struct m
     return 0;
 }
 
-static int metric_scheme_counter_copy(struct metric_data *pthis, const struct metric_data *from)
+static struct metric_data *metric_scheme_counter_copy(const struct metric_data *from)
 {
-    struct metric_counter_or_gauge *counter = pthis->counter;
-    const struct metric_counter_or_gauge *from_counter = from->counter;
-    counter->value = from_counter->value;
-    return 0;
+    struct metric_data *pthis = (struct metric_data *)malloc(sizeof(struct metric_data));
+    struct metric_counter_or_gauge *counter = (struct metric_counter_or_gauge *)malloc(sizeof(struct metric_counter_or_gauge));
+    pthis->counter = counter;
+
+    counter->value = from->counter->value;
+    return pthis;
 }
 
 struct metric_data *metric_scheme_counter_deserialize(const char *blob, size_t blob_size) 
@@ -138,7 +117,7 @@ void metric_scheme_counter_reset(struct metric_data *data)
 
 /* --------------------------------- hll -------------------------------- */
 
-struct metric_data *metric_scheme_hll_new(const struct metric_parameter *para)
+struct metric_data *metric_scheme_hll_new(const union metric_parameter *para)
 {
     struct metric_data *data = (struct metric_data *)malloc(sizeof(struct metric_data));
     struct ST_hyperloglog *hll = ST_hyperloglog_new(para->hll.precision);
@@ -162,9 +141,13 @@ static int metric_scheme_hll_merge(struct metric_data *pthis, const struct metri
     return ST_hyperloglog_merge(pthis->hll, from->hll);
 }
 
-static int metric_scheme_hll_copy(struct metric_data *pthis, const struct metric_data *from)
+struct metric_data *metric_scheme_hll_copy(const struct metric_data *from)
 {
-    return ST_hyperloglog_merge(pthis->hll, from->hll);
+    struct metric_data *pthis = (struct metric_data *)malloc(sizeof(struct metric_data));
+    struct ST_hyperloglog *hll = ST_hyperloglog_new(from->hll->cfg.precision);
+    pthis->hll = hll;
+    ST_hyperloglog_merge(hll, from->hll);
+    return pthis;
 }
 
 struct metric_data *metric_scheme_hll_deserialize(const char *blob, size_t blob_size) 
@@ -183,7 +166,7 @@ void metric_scheme_hll_reset(struct metric_data *data)
 
 /* --------------------------------- histogram -------------------------------- */
 
-struct metric_data *metric_scheme_histogram_new(const struct metric_parameter *para)
+struct metric_data *metric_scheme_histogram_new(const union metric_parameter *para)
 {
     struct hdr_histogram* tmp_p_hdr = NULL;
     int ret = hdr_init((int64_t)para->hdr.lowest_trackable_value, (int64_t)para->hdr.highest_trackable_value, para->hdr.significant_figures, &tmp_p_hdr);
@@ -213,10 +196,16 @@ static int metric_scheme_histogram_merge(struct metric_data *pthis, const struct
     return 0;
 }
 
-static int metric_scheme_histogram_copy(struct metric_data *pthis, const struct metric_data *from)
+static struct metric_data *metric_scheme_histogram_copy(const struct metric_data *from)
 {
-    (void)hdr_add(pthis->hdr, from->hdr);
-    return 0;
+    struct hdr_histogram* tmp_p_hdr = NULL;
+    hdr_init(from->hdr->lowest_discernible_value, from->hdr->highest_trackable_value, from->hdr->significant_figures, &tmp_p_hdr);
+
+    struct metric_data *data = (struct metric_data *)malloc(sizeof(struct metric_data));
+    data->hdr = tmp_p_hdr;
+
+    hdr_add(data->hdr, from->hdr);
+    return data;
 }
 
 struct metric_data *metric_scheme_histogram_deserialize(const char *blob, size_t blob_size) 
@@ -266,50 +255,13 @@ static const struct metric_scheme g_metric_scheme_table[] = {
 /* -------------------------------------------------------------------------- */
 /*                                   metric                                   */
 /* -------------------------------------------------------------------------- */
-struct metric_parameter *construct_parameters(enum metric_type type, ...)
-{
-    struct metric_parameter *paras = (struct metric_parameter *)malloc(sizeof(struct metric_parameter));
-    va_list ap;
-    va_start(ap, type);
-    switch (type) {
-        case METRIC_TYPE_COUNTER:
-            break;
-        case METRIC_TYPE_HLL:
-            paras->hll.precision = (char)va_arg(ap, int);
-            break;
-        case METRIC_TYPE_HISTOGRAM:
-            paras->hdr.lowest_trackable_value = va_arg(ap, long long);
-            paras->hdr.highest_trackable_value = va_arg(ap, long long);
-            paras->hdr.significant_figures = va_arg(ap, int);
-            break;
-        default:
-            assert(0);
-    }
-    va_end(ap);
-    return paras;
-}
 
-struct metric_manifest *metric_info_new(const char *name, enum metric_type type, struct metric_parameter *para)
-{
-    struct metric_manifest *info = (struct metric_manifest *)malloc(sizeof(struct metric_manifest));
-    info->name = strdup(name);
-    info->paras = para;
-    info->type = type;
-    return info;
-}
 
-void metric_info_free(struct metric_manifest *info)
-{
-    free(info->name);
-    free(info->paras);
-    free(info);
-}
-
-struct metric *metric_new(const char *name, enum metric_type type, struct metric_parameter *para)
+struct metric *metric_new(const struct metric_manifest *manifest)
 {
     struct metric *pthis = (struct metric *)calloc(1, sizeof(struct metric));
-    pthis->info = metric_info_new(name, type, para);
-    pthis->data = NULL;
+    pthis->data = g_metric_scheme_table[manifest->type].new(manifest->paras);
+    pthis->type = manifest->type;
 
     return pthis;
 }
@@ -320,55 +272,30 @@ void metric_free(struct metric *pthis)
         return;
     }
 
-    if (pthis->data) {
-        g_metric_scheme_table[pthis->info->type].free(pthis->data);
-    }
-    metric_info_free(pthis->info);
+    g_metric_scheme_table[pthis->type].free(pthis->data);
     free(pthis);
 }
 
 void metric_reset(struct metric *pthis) {
-    g_metric_scheme_table[pthis->info->type].reset(pthis->data);
-}
-
-void metric_info_copy(struct metric_manifest *dest, const struct metric_manifest *src)
-{
-    dest->name = strdup(src->name);
-    if (src->paras == NULL) {
-        dest->paras = NULL;
-    } else {
-        dest->paras = (struct metric_parameter *)malloc(sizeof(struct metric_parameter));
-        memcpy(dest->paras, src->paras, sizeof(struct metric_parameter));
-    }
-
-    dest->type = src->type;
-}
-
-struct metric *metric_fork(const struct metric *src) {
-    struct metric *dest = (struct metric *)malloc(sizeof(struct metric));
-    dest->info = (struct metric_manifest *)malloc(sizeof(struct metric_manifest));
-    metric_info_copy(dest->info, src->info);
-
-    dest->data = g_metric_scheme_table[dest->info->type].new(dest->info->paras);
-
-    return dest;
+    g_metric_scheme_table[pthis->type].reset(pthis->data);
 }
 
 struct metric *metric_copy(const struct metric *src) {
-    struct metric *dest = metric_fork(src);
-    g_metric_scheme_table[dest->info->type].copy(dest->data, src->data);
+    struct metric *dest = (struct metric *)malloc(sizeof(struct metric));
+    dest->type = src->type;
+    dest->data = g_metric_scheme_table[dest->type].copy(src->data);
 
     return dest;
 }
 
 //return -1 when merge error. 0 when success. 1 when src has no cell.
 int metric_merge(struct metric *dest, const struct metric *src) {
-    return g_metric_scheme_table[dest->info->type].merge(dest->data, src->data);
+    return g_metric_scheme_table[dest->type].merge(dest->data, src->data);
 }
 
 void metric_get_plain_blob(const struct metric *pthis, char **blob, size_t *blob_size) {
     struct metric_data *data = pthis->data;
-    enum metric_type type = pthis->info->type;
+    enum metric_type type = pthis->type;
     if (type == METRIC_TYPE_HLL) {
         ST_hyperloglog_serialize_for_networking(data->hll, blob, blob_size);
         return;
@@ -384,10 +311,6 @@ void metric_get_plain_blob(const struct metric *pthis, char **blob, size_t *blob
 /*                          specific metric operations                                */ 
 /* -------------------------------------------------------------------------- */
 
-struct metric *metric_counter_new(const char *name) {
-    return metric_new(name, METRIC_TYPE_COUNTER, NULL);
-}
-
 void metric_counter_incrby(struct metric *pthis, long long value) {
     struct metric_counter_or_gauge *counter = pthis->data->counter;
     counter->value += value;
@@ -402,11 +325,6 @@ long long metric_counter_get(const struct metric *pthis) {
     return pthis->data->counter->value;
 }
 
-struct metric *metric_hll_new(const char *name, unsigned char precision) {
-    struct metric_parameter *para = construct_parameters(METRIC_TYPE_HLL, precision);
-    return metric_new(name, METRIC_TYPE_HLL, para);
-}
-
 void metric_hll_add(struct metric *pthis, const char *key, size_t key_len) {
     ST_hyperloglog_add(pthis->data->hll, key, key_len);
 }
@@ -415,14 +333,9 @@ double metric_hll_get(const struct metric *pthis) {
     return ST_hyperloglog_count(pthis->data->hll);
 }
 
-struct metric *metric_histogram_new(const char *name, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures) {
-    struct metric_parameter *para = construct_parameters(METRIC_TYPE_HISTOGRAM, lowest_trackable_value, highest_trackable_value, significant_figures);
-    return metric_new(name, METRIC_TYPE_HISTOGRAM, para);
-}
-
 int metric_histogram_record(struct metric *pthis, long long value) {
-    if (value > pthis->info->paras->hdr.highest_trackable_value) {
-        value = pthis->info->paras->hdr.highest_trackable_value;
+    if (value > pthis->data->hdr->highest_trackable_value) {
+        value = pthis->data->hdr->highest_trackable_value;
     }
     bool ret = hdr_record_value(pthis->data->hdr, value);
     if (!ret) {
@@ -437,14 +350,4 @@ long long metric_histogram_value_at_percentile(const struct metric *pthis, doubl
 
 long long metric_histogram_count_le_value(const struct metric *pthis, long long value) {
     return hdr_count_le_value(pthis->data->hdr, value);
-}
-
-const char *metric_get_name(const struct metric *metrics)
-{
-    return metrics->info->name;
-}
-
-enum metric_type metric_get_type(const struct metric *metrics)
-{
-    return metrics->info->type;
 }

@@ -215,13 +215,6 @@ struct fieldstat_tag_list *fieldstat_get_shared_tags(const struct fieldstat *ins
 */
 int fieldstat_find_cube(const struct fieldstat *instance, const struct fieldstat_tag *shared_tags, size_t n_shared_tags);
 
-/*
-    return FS_ERR_NULL_HANDLER, FS_ERR_INVALID_CUBE_ID if fail.
-    When return OK, mode == COMPREHENSIVE, primary_metric_id == -1.
-    When return OK, mode == TOPK, primary_metric_id >= 0.
-*/
-int fieldstat_get_cube_mode(const struct fieldstat *instance, int cube_id, enum sampling_mode *mode, int *primary_metric_id);
-
 /* 
     get the cell numbers in a cube. Return FS_ERR_INVALID_CUBE_ID if cube_id is invalid.
 */
