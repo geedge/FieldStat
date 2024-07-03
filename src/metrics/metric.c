@@ -293,7 +293,7 @@ int metric_merge(struct metric *dest, const struct metric *src) {
     return g_metric_scheme_table[dest->type].merge(dest->data, src->data);
 }
 
-void metric_get_plain_blob(const struct metric *pthis, char **blob, size_t *blob_size) {
+void metric_serialize(const struct metric *pthis, char **blob, size_t *blob_size) {
     struct metric_data *data = pthis->data;
     enum metric_type type = pthis->type;
     if (type == METRIC_TYPE_HLL) {

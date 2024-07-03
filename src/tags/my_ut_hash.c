@@ -489,7 +489,7 @@ void tag_hash_key_print(const struct tag_hash_key *tag)
     printf("n_my_tag: %zu\n", tag->n_my_tag);
 
     for (int i = 0; i < (int)tag->n_my_tag; i++) {
-        struct fieldstat_tag *tmp_tag = &tag->tags[i];
+        const struct fieldstat_tag *tmp_tag = &tag->tags[i];
         switch (tmp_tag->type)
         {
             case TAG_INTEGER:

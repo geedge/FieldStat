@@ -680,7 +680,7 @@ int cube_get_serialization(const struct cube *cube, int metric_id, const struct 
         return FS_ERR_INVALID_METRIC_ID;
     }
 
-    metric_get_plain_blob(metric, blob, blob_size);
+    metric_serialize(metric, blob, blob_size);
     return FS_OK;
 }
 

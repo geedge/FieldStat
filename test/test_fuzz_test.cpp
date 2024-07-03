@@ -28,13 +28,13 @@ void fill_with_elephant_flows(Fieldstat_tag_list_wrapper *tags[], int tag_list_n
     for (int i = 0; i < tag_list_num; i++)
     {
         Fieldstat_tag_list_wrapper *tmp;
-        int rand_ret = rand() % 3;
-        if (rand_ret == 0) {
-            tmp = new Fieldstat_tag_list_wrapper("mouse", rand() % 1000);
-        } else if (rand_ret == 1) {
-            tmp = new Fieldstat_tag_list_wrapper("elephant", rand() % 200);
-        } else {
+        int rand_ret = rand() % 10;
+        if (rand_ret < 5) {
             tmp = new Fieldstat_tag_list_wrapper("elephant", rand() % 50); // most hit
+        } else if (rand_ret == 6 || rand_ret == 7) {
+            tmp = new Fieldstat_tag_list_wrapper("mid", rand() % 200);
+        } else {
+            tmp = new Fieldstat_tag_list_wrapper("mouse", rand() % 10000);
         }
         tags[i] = tmp;
     }
