@@ -143,7 +143,7 @@ struct entry_data *sorted_set_entry_get_data(const heap_entry *entry)
 /*
     dying: To reduce the time of HASH_ADD, and to support merely recording a key without any value, give a dying status.
 */
-bool sorted_set_entry_dying(const heap_entry *entry)
+static inline bool sorted_set_entry_dying(const heap_entry *entry)
 {
     unsigned long long count = *(unsigned long long *)entry->key;
     return count == 0;    
@@ -283,7 +283,7 @@ int sorted_set_pop(struct sorted_set *ss)
     return ret;
 }
 
-bool sorted_set_check_is_full(const struct sorted_set *ss)
+static inline bool sorted_set_check_is_full(const struct sorted_set *ss)
 {
     return ss->heap->cur_size >= ss->heap->max_size;
 }
@@ -530,17 +530,11 @@ void heavy_keeper_reset(struct heavy_keeper *hk) {
     memset(hk->sketch, 0, sizeof(struct Bucket) * (size_t)hk->params.array_num * (size_t)hk->params.max_bucket_num);
 }
 
-const double DECAY_POW_TABLE[128] = { // 1.17 ^ exp, exp is in [0,127]
-    1.0,0.8547008547009,0.7305135510264,0.6243705564328,0.5336500482332,0.456111152336,0.3898385917402,0.3331953775557,0.2847823739793,0.2434037384438,0.2080373832853,0.1778097293037,0.15197412761,
-    0.1298924167607,0.1110191596245,0.0948881706192,0.0811010005293,0.0693170944695,0.0592453798884,0.0506370768277,0.0432795528442,0.036991070807,0.031616299835,0.0270224784915,0.0230961354628,0.0197402867204,
-    0.0168720399319,0.0144205469504,0.0123252538037,0.0105344049605,0.0090037649235,0.0076955255756,0.0065773722868,0.0056216857153,0.0048048595857,0.0041067175946,0.0035100150381,0.0030000128531,0.0025641135497,
-    0.0021915500424,0.0018731196944,0.0016009570038,0.0013683393194,0.0011695207859,0.0009995904153,0.0008543507823,0.0007302143438,0.0006241148238,0.0005334314733,0.0004559243362,0.0003896789198,0.0003330589058,
-    0.0002846657315,0.000243304044,0.0002079521743,0.0001777369012,0.0001519118813,0.0001298392148,0.0001109736879,0.0000948493059,0.0000810677828,0.0000692887032,0.0000592211139,0.0000506163367,0.0000432618262,
-    0.0000369759198,0.0000316033503,0.0000270114105,0.0000230866756,0.0000197322014,0.0000168651294,0.0000144146405,0.0000123202056,0.0000105300902,0.0000090000771,0.0000076923736,0.0000065746783,0.0000056193832,
-    0.0000048028916,0.0000041050355,0.0000035085774,0.0000029987841,0.0000025630633,0.0000021906524,0.0000018723525,0.0000016003013,0.0000013677789,0.0000011690418,0.000000999181,0.0000008540009,0.0000007299153,
-    0.0000006238592,0.000000533213,0.0000004557376,0.0000003895193,0.0000003329225,0.0000002845491,0.0000002432044,0.000000207867,0.0000001776641,0.0000001518497,0.000000129786,0.0000001109282,0.0000000948105,
-    0.0000000810346,0.0000000692603,0.0000000591969,0.0000000505956,0.0000000432441,0.0000000369608,0.0000000315904,0.0000000270003,0.0000000230772,0.0000000197241,0.0000000168582,0.0000000144087,0.0000000123152,
-    0.0000000105258,0.0000000089964,0.0000000076892,0.000000006572,0.0000000056171,0.0000000048009,0.0000000041034,0.0000000035071,0.0000000029976,0.000000002562,0.0000000021898,
+const int DECAY_POW_TABLE[128] = { // 1.17 ^ exp * RAND_MAX, exp is in [0,127]
+2147483647,1835456109,1568765905,1340825560,1146004752,979491241,837172001,715531625,611565491,522705548,446756879,381843486,326361954,278941841,238411830,203770795,174163072,148857327,127228484,108742294,92942132,
+79437720,67895487,58030331,49598573,42391943,36232430,30967889,26468281,22622462,19335438,16526015,14124799,12072478,10318357,8819109,7537700,6442479,5506392,4706318,4022494,3438029,2938486,2511527,2146604,
+1834704,1568123,1340276,1145535,979090,836829,715239,611315,522491,446574,381687,326228,278828,238314,203687,174092,148796,127176,108698,92904,79405,67868,58007,49578,42375,36218,30955,26457,22613,19328,16519,
+14119,12068,10314,8815,7535,6440,5504,4704,4021,3437,2937,2510,2146,1834,1567,1340,1145,979,836,715,611,522,446,382,326,279,238,204,174,149,127,109,93,79,68,58,50,42,36,31,26,23,19,17,14,12,10,9,8,6,6,5,
 };
 bool if_need_to_decay(struct heavy_keeper *hk, const struct Bucket *bucket, unsigned long long count) {
     if (count == 0) {
@@ -555,13 +549,11 @@ bool if_need_to_decay(struct heavy_keeper *hk, const struct Bucket *bucket, unsi
         return false;
     }
 
-    double r = (double)rand_r(&(hk->rand_state)) / (double)RAND_MAX;
-
     // double decay_rate = pow(hk->params.decay_exp_rate, -exp);
     // p->decay_exp_rate = 1.17 is fixed, search table to get result directly.
-    double decay_rate = DECAY_POW_TABLE[exp];
+    int decay_rate = DECAY_POW_TABLE[exp];
 
-    if (r < decay_rate) {
+    if (rand_r(&(hk->rand_state)) < decay_rate) {
         return true;
     }
     return false;
@@ -606,10 +598,7 @@ int heavy_keeper_add(struct heavy_keeper *heavy_keeper, const char *key, size_t 
     }
 
     struct sorted_set *summary = heavy_keeper->top_K_heap;
-    unsigned nMin = sorted_set_get_min_count(summary);
-    if (nMin == INVALID_COUNT) {
-        nMin = 0;
-    }
+    
     unsigned long long int old_cnt = sorted_set_get_count(summary, key, key_len);
     bool not_in_sorted_set = (old_cnt == INVALID_COUNT);
     unsigned long long maxv = 0;
@@ -625,8 +614,11 @@ int heavy_keeper_add(struct heavy_keeper *heavy_keeper, const char *key, size_t 
             // The flows whose counts are both larger than nmin and not in min-heap must have the same xxhash value, and its FP stored in bucket represents another tag,
             // In this case, the sketch won't be updated. This flow is expected to be taken into account in another array,
             //  where its FP is different from the one it should collided with, so that element flows won't be missed.
-            if (bucket->count > nMin && not_in_sorted_set) {
-                continue;
+            if (not_in_sorted_set) {
+                unsigned nMin = sorted_set_get_min_count(summary);
+                if (bucket->count > nMin) {
+                    continue;
+                }
             }
             bucket->count = safe_add(bucket->count, count);
             maxv = MAX(maxv, bucket->count);
@@ -647,7 +639,12 @@ int heavy_keeper_add(struct heavy_keeper *heavy_keeper, const char *key, size_t 
     }
 
     if (not_in_sorted_set) {
-        if ((maxv - nMin <= count && maxv != nMin) || sorted_set_cardinality(summary) != heavy_keeper->K) {
+        if (sorted_set_cardinality(summary) != heavy_keeper->K) {
+            sorted_set_insert(summary, key, key_len, maxv, arg);
+            return 1;
+        }
+        unsigned nMin = sorted_set_get_min_count(summary);
+        if (nMin == INVALID_COUNT || maxv > nMin) {
             sorted_set_insert(summary, key, key_len, maxv, arg);
             return 1;
         }
