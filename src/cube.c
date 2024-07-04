@@ -36,6 +36,7 @@ struct cube_manager {
 
 struct cell {
     struct metric **metrics;
+    size_t metrics_len;
     size_t max_n_metric;
     struct fieldstat_tag_list tags; // cell identifier
 };
@@ -306,7 +307,7 @@ void cube_manager_reset(struct cube_manager *pthis)
 
 struct metric *find_metric_in_cell(const struct cell *cell, int metric_id)
 {
-    if (metric_id >= cell->max_n_metric) {
+    if (metric_id >= cell->metrics_len) {
         return NULL;
     }
     return cell->metrics[metric_id];
@@ -321,6 +322,10 @@ void add_metric_to_cell(struct cell *cell, struct metric *metric, int metric_id)
     }
 
     cell->metrics[metric_id] = metric;
+
+    if (metric_id >= cell->metrics_len) {
+        cell->metrics_len = metric_id + 1;
+    }
 }
 
 struct metric *add_or_find_metric_in_cell(const struct metric_manifest *manifest, struct cell *cell)
@@ -339,6 +344,7 @@ struct cell *cell_new(const struct exdata_new_args *args) {
     struct cell *pthis = malloc(sizeof(struct cell));
     pthis->metrics = calloc(DEFAULT_N_METRIC, sizeof(struct metric *));
     pthis->max_n_metric = DEFAULT_N_METRIC;
+    pthis->metrics_len = 0;
 
     pthis->tags.n_tag = args->n_tags;
     pthis->tags.tag = malloc(sizeof(struct fieldstat_tag) * args->n_tags);
@@ -347,7 +353,7 @@ struct cell *cell_new(const struct exdata_new_args *args) {
 }
 
 void cell_free(struct cell *pthis) {
-    for (size_t i = 0; i < pthis->max_n_metric; i++) {
+    for (size_t i = 0; i < pthis->metrics_len; i++) {
         metric_free(pthis->metrics[i]);
     }
     free(pthis->metrics);
@@ -365,7 +371,8 @@ struct cell *cell_copy(const struct cell *src) {
     struct cell *pthis = malloc(sizeof(struct cell));
     pthis->metrics = calloc(src->max_n_metric, sizeof(struct metric *));
     pthis->max_n_metric = src->max_n_metric;
-    for (size_t i = 0; i < src->max_n_metric; i++) {
+    pthis->metrics_len = src->metrics_len;
+    for (size_t i = 0; i < src->metrics_len; i++) {
         if (src->metrics[i] == NULL) {
             continue;
         }
@@ -381,7 +388,7 @@ struct cell *cell_copy(const struct cell *src) {
 }
 
 void cell_reset(struct cell *pthis) {
-    for (size_t i = 0; i < pthis->max_n_metric; i++) {
+    for (size_t i = 0; i < pthis->metrics_len; i++) {
         if (pthis->metrics[i] == NULL) {
             continue;
         }
@@ -390,7 +397,7 @@ void cell_reset(struct cell *pthis) {
 }
 
 void cell_merge(struct cell *dest, const struct cell *src) {
-    for (size_t i = 0; i < src->max_n_metric; i++) {
+    for (size_t i = 0; i < src->metrics_len; i++) {
         const struct metric *metric_src = src->metrics[i];
         if (metric_src == NULL) {
             continue;
@@ -833,7 +840,7 @@ const struct metric *get_metric_by_tag_list(const struct cube *cube, const struc
         return NULL;
     }
 
-    if (metric_id < 0 || metric_id >= data->max_n_metric) {
+    if (metric_id < 0 || metric_id >= data->metrics_len) {
         *ret = FS_ERR_INVALID_METRIC_ID;
         return NULL;
     }
@@ -934,9 +941,9 @@ void cube_get_cells_used_by_metric(const struct cube *cube, const struct fieldst
         return;
     }
 
-    *metric_id_out = (int *)malloc(sizeof(int) * cell_data->max_n_metric);
+    *metric_id_out = (int *)malloc(sizeof(int) * cell_data->metrics_len);
     int n_metric = 0;
-    for (int i = 0; i < cell_data->max_n_metric; i++) {
+    for (int i = 0; i < cell_data->metrics_len; i++) {
         if (cell_data->metrics[i] != NULL) {
             (*metric_id_out)[n_metric] = i;
             n_metric++;

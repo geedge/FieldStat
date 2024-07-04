@@ -20,8 +20,8 @@
 
 struct fieldstat {
     struct metric_manifest **manifests; // TODO: 把那个哈希表再加回去
-    size_t max_n_manifests;
-    // TODO: 就三个吧，还有一个count
+    size_t manifest_size;
+    size_t manifest_cnt;
 
     struct cube_manager *cube_manager;
 };
@@ -130,10 +130,7 @@ bool is_tag_array_same(const struct fieldstat_tag *tags1, const struct fieldstat
 
 bool is_metric_name_duplicate(const struct fieldstat *instance, const char *name)
 {
-    for (size_t i = 0; i < instance->max_n_manifests; i++) {
-        if (instance->manifests[i] == NULL) {
-            continue;
-        }
+    for (size_t i = 0; i < instance->manifest_cnt; i++) {
         if (strcmp(instance->manifests[i]->name, name) == 0) {
             return true;
         }
@@ -148,15 +145,15 @@ struct fieldstat *fieldstat_new()
 {
     struct fieldstat *instance = calloc(1, sizeof(struct fieldstat));
 
-    instance->max_n_manifests = DEFAULT_N_METRIC;
-    instance->manifests = calloc(instance->max_n_manifests, sizeof(struct metric_manifest *));
+    instance->manifest_size = DEFAULT_N_METRIC;
+    instance->manifests = calloc(instance->manifest_size, sizeof(struct metric_manifest *));
+    instance->manifest_cnt = 0;
 
     instance->cube_manager = cube_manager_new();
 
     return instance;
 }
 
-void fieldstat_cube_free(struct fieldstat *instance, int cube_id);
 void fieldstat_free(struct fieldstat *instance)
 {
     if (instance == NULL) {
@@ -165,10 +162,8 @@ void fieldstat_free(struct fieldstat *instance)
 
     cube_manager_free(instance->cube_manager);
 
-    for (size_t i = 0; i < instance->max_n_manifests; i++) {
-        if (instance->manifests[i] != NULL) {
-            metric_manifest_free(instance->manifests[i]);
-        }
+    for (size_t i = 0; i < instance->manifest_cnt; i++) {
+        metric_manifest_free(instance->manifests[i]);
     }
     free(instance->manifests);
 
@@ -248,7 +243,7 @@ int fieldstat_cube_set_primary_metric(struct fieldstat *instance, int cube_id, i
     if (cube == NULL) {
         return FS_ERR_INVALID_CUBE_ID;
     }
-    if (metric_id < 0 || metric_id >= instance->max_n_manifests) {
+    if (metric_id < 0 || metric_id >= instance->manifest_cnt) {
         return FS_ERR_INVALID_METRIC_ID;
     }
     if (instance->manifests[metric_id] == NULL) {
@@ -269,24 +264,21 @@ int fieldstat_cube_set_primary_metric(struct fieldstat *instance, int cube_id, i
 
 void add_manifest_to_instance(struct fieldstat *instance, const struct metric_manifest *manifest, int metric_id)
 {
-    if (metric_id >= instance->max_n_manifests) {
-        instance->manifests = realloc(instance->manifests, sizeof(struct metric_manifest *) * instance->max_n_manifests * 2);
-        memset(instance->manifests + instance->max_n_manifests, 0, sizeof(struct metric_manifest *) * (instance->max_n_manifests));
-        instance->max_n_manifests *= 2;
+    if (metric_id >= instance->manifest_size) {
+        instance->manifests = realloc(instance->manifests, sizeof(struct metric_manifest *) * instance->manifest_size * 2);
+        memset(instance->manifests + instance->manifest_size, 0, sizeof(struct metric_manifest *) * (instance->manifest_size));
+        instance->manifest_size *= 2;
     }
 
     instance->manifests[metric_id] = (struct metric_manifest *)manifest;
+    if (metric_id >= instance->manifest_cnt) {
+        instance->manifest_cnt = metric_id + 1;
+    }
 }
 
 static int append_manifest_to_instance(struct fieldstat *instance, const struct metric_manifest *metric)
 {
-    int metric_id = 0;
-    for ( ;metric_id < instance->max_n_manifests; metric_id++) {
-        if (instance->manifests[metric_id] == NULL) {
-            break;
-        }
-    }
-
+    int metric_id = instance->manifest_cnt;
     add_manifest_to_instance(instance, metric, metric_id);
 
     return metric_id;
@@ -386,7 +378,7 @@ int check_before_add(const struct fieldstat *instance, int cube_id, int metric_i
         return FS_ERR_INVALID_CUBE_ID;
     }
 
-    if (metric_id < 0 || metric_id >= instance->max_n_manifests) {
+    if (metric_id < 0 || metric_id >= instance->manifest_cnt) {
         return FS_ERR_INVALID_METRIC_ID;
     }
     const struct metric_manifest *metric = instance->manifests[metric_id];
@@ -461,7 +453,7 @@ int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
         return FS_ERR_NULL_HANDLER;
     }
 
-    int metric_len_src = src->max_n_manifests;
+    int metric_len_src = src->manifest_cnt;
     for (int i = 0; i < metric_len_src; i++) {
         const struct metric_manifest *metric_src = src->manifests[i];
         const struct metric_manifest *metric_dst = instance->manifests[i];
@@ -496,12 +488,11 @@ struct fieldstat *fieldstat_fork(const struct fieldstat *instance)
     struct fieldstat *new_instance = calloc(1, sizeof(struct fieldstat));
     new_instance->cube_manager = cube_manager_fork(instance->cube_manager);
 
-    new_instance->manifests = calloc(instance->max_n_manifests, sizeof(struct metric_manifest *));
-    new_instance->max_n_manifests = instance->max_n_manifests;
-    for (size_t i = 0; i < instance->max_n_manifests; i++) {
-        if (instance->manifests[i] != NULL) {
-            new_instance->manifests[i] = metric_manifest_copy(instance->manifests[i]);
-        }
+    new_instance->manifests = calloc(instance->manifest_size, sizeof(struct metric_manifest *));
+    new_instance->manifest_size = instance->manifest_size;
+    new_instance->manifest_cnt = instance->manifest_cnt;
+    for (size_t i = 0; i < instance->manifest_cnt; i++) {
+        new_instance->manifests[i] = metric_manifest_copy(instance->manifests[i]);
     }
 
     return new_instance;
@@ -509,16 +500,16 @@ struct fieldstat *fieldstat_fork(const struct fieldstat *instance)
 
 void calibrate_metrics_in_instance(const struct fieldstat *master, struct fieldstat *replica)
 {
-    if (replica->max_n_manifests < master->max_n_manifests) {
-        replica->manifests = (struct metric_manifest **)realloc(replica->manifests, sizeof(struct metric_manifest *) * master->max_n_manifests);
-        memset(replica->manifests + replica->max_n_manifests, 0, sizeof(struct metric_manifest *) * (master->max_n_manifests - replica->max_n_manifests));
-        replica->max_n_manifests = master->max_n_manifests;
+    if (replica->manifest_size < master->manifest_size) {
+        replica->manifests = (struct metric_manifest **)realloc(replica->manifests, sizeof(struct metric_manifest *) * master->manifest_size);
+        memset(replica->manifests + replica->manifest_size, 0, sizeof(struct metric_manifest *) * (master->manifest_size - replica->manifest_size));
+        replica->manifest_size = master->manifest_size;
     }
 
-    size_t longer_arr_len = master->max_n_manifests > replica->max_n_manifests ? master->max_n_manifests : replica->max_n_manifests;
+    size_t longer_arr_len = master->manifest_cnt > replica->manifest_cnt ? master->manifest_cnt : replica->manifest_cnt;
     for (size_t i = 0; i < longer_arr_len; i++) {
-        const struct metric_manifest *metric_master = i >= master->max_n_manifests ? NULL : master->manifests[i];
-        struct metric_manifest *metric_target = i >= replica->max_n_manifests ? NULL : replica->manifests[i];
+        const struct metric_manifest *metric_master = i >= master->manifest_cnt ? NULL : master->manifests[i];
+        struct metric_manifest *metric_target = i >= replica->manifest_cnt ? NULL : replica->manifests[i];
         if (metric_master == NULL && metric_target == NULL) {
             continue;
         }
@@ -542,6 +533,8 @@ void calibrate_metrics_in_instance(const struct fieldstat *master, struct fields
 
         // metric same, no need to do anything
     }
+
+    replica->manifest_cnt = master->manifest_cnt;
 }
 
 int fieldstat_calibrate(const struct fieldstat *master, struct fieldstat *replica)
@@ -562,10 +555,10 @@ void fieldstat_get_cubes(const struct fieldstat *instance, int **cube_ids, int *
 
 void fieldstat_get_metrics(const struct fieldstat *instance, int **metric_id_out, size_t *n_metric)
 {
-    int *tmp_ids = (int *)malloc(sizeof(int) * instance->max_n_manifests);
+    int *tmp_ids = (int *)malloc(sizeof(int) * instance->manifest_cnt);
     *metric_id_out = tmp_ids;
     int cnt = 0;
-    for (int i = 0; i < instance->max_n_manifests; i++) {
+    for (int i = 0; i < instance->manifest_cnt; i++) {
         if (instance->manifests[i] != NULL) {
             tmp_ids[cnt] = i;
             cnt ++;
@@ -664,7 +657,7 @@ void fieldstat_tag_list_arr_free(struct fieldstat_tag_list *tag_list, size_t n_c
 
 const char *fieldstat_get_metric_name(const struct fieldstat *instance, int metric_id)
 {
-    if (metric_id < 0 || metric_id >= instance->max_n_manifests) {
+    if (metric_id < 0 || metric_id >= instance->manifest_cnt) {
         return NULL;
     }
     const struct metric_manifest *metric = instance->manifests[metric_id];
@@ -677,7 +670,7 @@ const char *fieldstat_get_metric_name(const struct fieldstat *instance, int metr
 
 enum metric_type fieldstat_get_metric_type(const struct fieldstat *instance, int metric_id)
 {
-    if (instance == NULL || metric_id < 0 || metric_id >= instance->max_n_manifests) {
+    if (instance == NULL || metric_id < 0 || metric_id >= instance->manifest_cnt) {
         return (enum metric_type)(-1);
     }
     const struct metric_manifest *metric = instance->manifests[metric_id];

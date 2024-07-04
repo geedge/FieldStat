@@ -609,12 +609,12 @@ int heavy_keeper_add(struct heavy_keeper *heavy_keeper, const char *key, size_t 
         struct Bucket *bucket = find_bucket_by_key(heavy_keeper, j, key, key_len);
 
         if (bucket->finger_print == FP) {
-            // If a flow is not in the min-heap, then the estimated flow size should be no larger than nmin.
-            // or if the min-heap is not full(nmin == 0), every flow should be taken into account, so of course it should be added.
+            // If a key is not in the min-heap, then the estimated key size should be no larger than nmin.
+            // or if the min-heap is not full(nmin == 0), every key should be taken into account, so of course it should be added.
             // in neither case, bucket->count > nMin && not_in_sorted_set happen.
-            // The flows whose counts are both larger than nmin and not in min-heap must have the same xxhash value, and its FP stored in bucket represents another tag,
-            // In this case, the sketch won't be updated. This flow is expected to be taken into account in another array,
-            //  where its FP is different from the one it should collided with, so that element flows won't be missed.
+            // The keys whose counts are both larger than nmin and not in min-heap must have the same xxhash value, and its FP stored in bucket represents another tag,
+            // In this case, the sketch won't be updated. This key is expected to be taken into account in another array,
+            //  where its FP is different from the one it should collided with, so that element keys won't be missed.
             if (not_in_sorted_set) {
                 unsigned tmp_min = sorted_set_get_min_count(summary);
                 if (bucket->count > tmp_min) {
@@ -716,7 +716,7 @@ static void heavy_keeper_merge_sketch(struct heavy_keeper *dest, const struct he
             if (bucket_dest->finger_print == bucket_src->finger_print) {
                 bucket_dest->count = safe_add(bucket_dest->count, bucket_src->count);
             } else {
-                if (bucket_dest->count < bucket_src->count) {  // bucket_src stores the elephant flow.
+                if (bucket_dest->count < bucket_src->count) {
                     bucket_dest->count = bucket_src->count;
                     bucket_dest->finger_print = bucket_src->finger_print;
                 }
