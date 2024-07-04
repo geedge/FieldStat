@@ -9,7 +9,7 @@ extern "C"{
 #include "exdata.h"
 #include "my_ut_hash.h"
 
-struct tag_map;
+struct tag_map; // TODO: 重命名成hash table
 
 struct tag_map *tag_map_new(int max_query_num);
 void tag_map_set_exdata_schema(struct tag_map *pthis, exdata_new_cb new_fn, exdata_free_cb free_fn, exdata_merge_cb merge_fn, exdata_reset_cb reset_fn, exdata_copy_cb copy_fn);

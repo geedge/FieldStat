@@ -100,10 +100,6 @@ struct counter_history {
     struct tag_metric_map *rec;
     long long ts;
 
-    unsigned long cell_version;
-    unsigned long *cube_version;
-    size_t n_cube;
-
     char *exporter_name;
     struct fieldstat_tag_list *global_tag_list;
 };
@@ -209,8 +205,6 @@ void counter_history_free(struct counter_history *history)
         free(tag_node);
     }
 
-    free(history->cube_version);
-
     free(history->exporter_name);
 
     if (history->global_tag_list != NULL) {
@@ -287,21 +281,16 @@ struct fieldstat_tag_list *my_copy_fs_tag_list(const struct fieldstat_tag_list *
 
 bool counter_history_check_if_need_to_update(const struct fieldstat_json_exporter *exporter, const struct fieldstat *instance)
 {
-    struct counter_history *history = exporter->history;
+    const struct counter_history *history = exporter->history;
     if (history == NULL) {
         return false; // delta export disabled
     }
-    if (history->cube_version == NULL) { // first time
+    if (history->exporter_name == NULL) { // first time
         return true;
     }
 
-    unsigned long cur_cell_version = fieldstat_get_version(instance);
     const char *cur_exporter_name = exporter->name ? exporter->name : DEFAULT_EXPORTER_NAME;
     const struct fieldstat_tag_list *cur_global_tag_list = exporter->global_tag_list;
-
-    if (history->cell_version != cur_cell_version) {
-        return true;
-    }
 
     if (strcmp(history->exporter_name, cur_exporter_name) != 0) {
         return true;
@@ -318,26 +307,11 @@ bool counter_history_check_if_need_to_update(const struct fieldstat_json_exporte
         return true;
     }
 
-    int *cube_ids = NULL;
-    int n_cube = 0;
-    fieldstat_get_cubes(instance, &cube_ids, &n_cube);
-    if (n_cube != history->n_cube) {
-        return true;
-    }
-    for (int i = 0; i < n_cube; i++) {
-        unsigned long cube_version = fieldstat_get_cube_version(instance, cube_ids[i]);
-        if (cube_version != history->cube_version[i]) {
-            return true;
-        }
-    }
-    free(cube_ids);
-
     return false;
 }
 
 void counter_history_fill_version_info(struct counter_history *history, struct fieldstat_json_exporter *exporter, const struct fieldstat *instance)
 {
-    unsigned long cur_cell_version = fieldstat_get_version(instance);
     const char *cur_exporter_name = exporter->name ? exporter->name : DEFAULT_EXPORTER_NAME;
     const struct fieldstat_tag_list *cur_global_tag_list = exporter->global_tag_list;
 
@@ -346,18 +320,6 @@ void counter_history_fill_version_info(struct counter_history *history, struct f
     if (cur_global_tag_list != NULL) {
         history->global_tag_list = my_copy_fs_tag_list(cur_global_tag_list);
     }
-
-    history->cell_version = cur_cell_version;
-
-    int *cube_ids = NULL;
-    int n_cube = 0;
-    fieldstat_get_cubes(instance, &cube_ids, &n_cube);
-    history->n_cube = n_cube;
-    history->cube_version = malloc(sizeof(unsigned long) * n_cube);
-    for (int i = 0; i < n_cube; i++) {
-        history->cube_version[i] = fieldstat_get_cube_version(instance, cube_ids[i]);
-    }
-    free(cube_ids);
 }
 
 void fieldstat_json_exporter_update_history(struct fieldstat_json_exporter *exporter, const struct fieldstat *instance)

@@ -813,14 +813,6 @@ TEST(export_test, enable_delta_and_reset_on_change_exporter_tag) {
     test_reset_one_round(trigger);
 }
 
-TEST(export_test, enable_delta_and_reset_on_reset_instance) {
-    auto trigger = [](struct fieldstat *instance, struct fieldstat_json_exporter *fieldstat_json_exporter) {
-        fieldstat_reset(instance);
-    };
-
-    test_reset_one_round(trigger);
-}
-
 TEST(export_test, enable_delta_and_reset_on_delete_cube) {
     auto trigger = [](struct fieldstat *instance, struct fieldstat_json_exporter *fieldstat_json_exporter) {
         fieldstat_destroy_cube(instance, 0);

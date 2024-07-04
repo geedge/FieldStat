@@ -85,11 +85,6 @@ int fieldstat_cube_set_primary_metric(struct fieldstat *instance, int cube_id, i
 int fieldstat_destroy_cube(struct fieldstat *instance, int cube_id);
 
 /*
-    * @brief get the cube_version of the cube of cube_id.
-    * @return cube_version if success. FS_ERR_NULL_HANDLER or FS_ERR_INVALID_CUBE_ID if fail.
-*/
-long long fieldstat_get_cube_version(const struct fieldstat *instance, int cube_id);
-/*
     * @brief add a metric to the cube of cube_id. One metric may be associated with different cells.
     * @param metric_name: name of the metric. Cannot be NULL. Must be unique.
     * @return metric id>=0 if success. If failed, return FS_ERR_NULL_HANDLER, FS_ERR_INVALID_KEY(when metric_name is not unique in this cube)
@@ -158,10 +153,6 @@ int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id
              Note that the cell record won't be deleted at once, they just seem to be deleted. The cell record will be deleted when they are not used since the last reset and until the next reset.
 */
 void fieldstat_reset(struct fieldstat *instance);
-/*
-    version is increased by 1 when we call fieldstat_reset.
-*/
-unsigned long fieldstat_get_version(const struct fieldstat *instance);
 
 /*
  @brief Merge the instance. The registered cubes and metrics are merged even if there are no cells added.

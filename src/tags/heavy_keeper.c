@@ -585,12 +585,13 @@ unsigned my_max(unsigned a, unsigned b) {
 */
 int heavy_keeper_add(struct heavy_keeper *heavy_keeper, const char *key, size_t key_len, int count, void *arg) {
     if (count == 0) {
-        const struct heap_entry *entry = sorted_set_find_entry(heavy_keeper->top_K_heap, key, key_len);
-        if (entry != NULL && !sorted_set_entry_dying(entry)) {
-            return 0;
-        }
-
         if (sorted_set_cardinality(heavy_keeper->top_K_heap) < heavy_keeper->K) {
+            const struct heap_entry *entry = sorted_set_find_entry(heavy_keeper->top_K_heap, key, key_len);
+
+            if (entry != NULL && !sorted_set_entry_dying(entry)) {
+                return 0;
+            }
+
             sorted_set_insert(heavy_keeper->top_K_heap, key, key_len, count, arg);
             return 1;
         }
@@ -610,13 +611,13 @@ int heavy_keeper_add(struct heavy_keeper *heavy_keeper, const char *key, size_t 
         if (bucket->finger_print == FP) {
             // If a flow is not in the min-heap, then the estimated flow size should be no larger than nmin.
             // or if the min-heap is not full(nmin == 0), every flow should be taken into account, so of course it should be added.
-            // in neither case, bucket->count > nMin && not_in_sorted_set should happen.
+            // in neither case, bucket->count > nMin && not_in_sorted_set happen.
             // The flows whose counts are both larger than nmin and not in min-heap must have the same xxhash value, and its FP stored in bucket represents another tag,
             // In this case, the sketch won't be updated. This flow is expected to be taken into account in another array,
             //  where its FP is different from the one it should collided with, so that element flows won't be missed.
             if (not_in_sorted_set) {
-                unsigned nMin = sorted_set_get_min_count(summary);
-                if (bucket->count > nMin) {
+                unsigned tmp_min = sorted_set_get_min_count(summary);
+                if (bucket->count > tmp_min) {
                     continue;
                 }
             }
