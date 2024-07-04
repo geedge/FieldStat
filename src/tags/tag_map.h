@@ -9,22 +9,22 @@ extern "C"{
 #include "exdata.h"
 #include "my_ut_hash.h"
 
-struct tag_map; // TODO: 重命名成hash table
+struct hash_table;
 
-struct tag_map *tag_map_new(int max_query_num);
-void tag_map_set_exdata_schema(struct tag_map *pthis, exdata_new_cb new_fn, exdata_free_cb free_fn, exdata_merge_cb merge_fn, exdata_reset_cb reset_fn, exdata_copy_cb copy_fn);
-void tag_map_free(struct tag_map *pthis);
-void tag_map_reset(struct tag_map *pthis);
-int tag_map_merge(struct tag_map *dest, struct tag_map *src);
-struct tag_map *tag_map_copy(const struct tag_map *src);
+struct hash_table *hash_table_new(int max_query_num);
+void hash_table_set_exdata_schema(struct hash_table *pthis, exdata_new_cb new_fn, exdata_free_cb free_fn, exdata_merge_cb merge_fn, exdata_reset_cb reset_fn, exdata_copy_cb copy_fn);
+void hash_table_free(struct hash_table *pthis);
+void hash_table_reset(struct hash_table *pthis);
+int hash_table_merge(struct hash_table *dest, struct hash_table *src);
+struct hash_table *hash_table_copy(const struct hash_table *src);
 
-// int tag_map_add(struct tag_map *pthis, const char *key, size_t key_len, int count, void *arg);
-int tag_map_add(struct tag_map *pthis, const char *key, size_t key_len, void *arg);
+// int hash_table_add(struct hash_table *pthis, const char *key, size_t key_len, int count, void *arg);
+int hash_table_add(struct hash_table *pthis, const char *key, size_t key_len, void *arg);
 
-// void *tag_map_get0_exdata(struct tag_map *pthis, const char *key, size_t key_len);
-void *tag_map_get0_exdata(struct tag_map *pthis, const char *key, size_t key_len);
-int tag_map_get_count(const struct tag_map *pthis);
-size_t tag_map_list(const struct tag_map *pthis, void **exdatas, size_t n_exdatas);
+// void *hash_table_get0_exdata(struct hash_table *pthis, const char *key, size_t key_len);
+void *hash_table_get0_exdata(struct hash_table *pthis, const char *key, size_t key_len);
+int hash_table_get_count(const struct hash_table *pthis);
+size_t hash_table_list(const struct hash_table *pthis, void **exdatas, size_t n_exdatas);
 
 #ifdef __cplusplus
 }

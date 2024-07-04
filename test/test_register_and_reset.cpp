@@ -568,7 +568,7 @@ TEST(unit_test_tag_map, add_after_reset_and_ensure_performance_improvement) {
     clock_t start, end;
     const int TEST_ROUND = 100000;
     // struct cell_manager *hk = cell_manager_new(SAMPLING_MODE_COMPREHENSIVE, TEST_ROUND);
-    struct tag_map *hk = tag_map_new(TEST_ROUND);
+    struct hash_table *hk = hash_table_new(TEST_ROUND);
     vector<struct tag_hash_key *> keys;
     for (int i = 0; i < TEST_ROUND; i++)
     {
@@ -577,32 +577,32 @@ TEST(unit_test_tag_map, add_after_reset_and_ensure_performance_improvement) {
     }
 
     for (int i = 0; i < TEST_ROUND; i++) {
-        tag_map_add(hk, keys[i], NULL);
+        hash_table_add(hk, keys[i], NULL);
     }
 
-    tag_map_reset(hk);
+    hash_table_reset(hk);
     start = clock();
     for (int i = 0; i < TEST_ROUND; i++)
     {
-        tag_map_add(hk, keys[i], NULL);
+        hash_table_add(hk, keys[i], NULL);
     }
     end = clock();
     clock_t time_reset_once = end - start;
 
 
-    tag_map_reset(hk);
-    tag_map_reset(hk);
+    hash_table_reset(hk);
+    hash_table_reset(hk);
     start = clock();
     for (int i = 0; i < TEST_ROUND; i++)
     {
-        tag_map_add(hk, keys[i], NULL);
+        hash_table_add(hk, keys[i], NULL);
     }
     end = clock();
     clock_t time_reset_twice = end - start;
 
     EXPECT_GE(time_reset_twice, time_reset_once);
 
-    tag_map_free(hk);
+    hash_table_free(hk);
     for (int i = 0; i < TEST_ROUND; i++) {
         tag_hash_key_free(keys[i]);
     }

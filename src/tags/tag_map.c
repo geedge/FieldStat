@@ -19,7 +19,7 @@ struct tag_exdata_item {
     UT_hash_handle hh;
 };
 
-struct tag_map {
+struct hash_table {
     struct tag_exdata_item *tag_id_map;
     int current_cell_num;
     int max_cell_num;
@@ -51,8 +51,8 @@ static void *default_copy_fn(void *exdata) {
 }
 
 
-struct tag_map *tag_map_new(int max_query_num) {
-    struct tag_map *pthis = calloc(1, sizeof(struct tag_map));
+struct hash_table *hash_table_new(int max_query_num) {
+    struct hash_table *pthis = calloc(1, sizeof(struct hash_table));
 
     pthis->max_cell_num = max_query_num;
 
@@ -64,7 +64,7 @@ struct tag_map *tag_map_new(int max_query_num) {
     return pthis;
 }
 
-void tag_map_free(struct tag_map *pthis) {
+void hash_table_free(struct hash_table *pthis) {
     struct tag_exdata_item *item, *tmp;
     HASH_ITER(hh, pthis->tag_id_map, item, tmp) {
         HASH_DEL(pthis->tag_id_map, item);
@@ -75,7 +75,7 @@ void tag_map_free(struct tag_map *pthis) {
     free(pthis);
 }
 
-void tag_map_reset(struct tag_map *pthis) {
+void hash_table_reset(struct hash_table *pthis) {
     struct tag_exdata_item *node, *tmp;
     HASH_ITER(hh, pthis->tag_id_map, node, tmp) {
         if (!node->dying) {
@@ -98,7 +98,7 @@ static char *my_keydup(const char *key, size_t key_len) {
     return ret;
 }
 
-int tag_map_add(struct tag_map *pthis, const char *key, size_t key_len, void *arg) {
+int hash_table_add(struct hash_table *pthis, const char *key, size_t key_len, void *arg) {
     struct tag_exdata_item *item;
     HASH_FIND(hh, pthis->tag_id_map, key, key_len, item);
     if (item != NULL && !item->dying) {
@@ -127,7 +127,7 @@ int tag_map_add(struct tag_map *pthis, const char *key, size_t key_len, void *ar
     return 1;
 }
 
-void tag_map_set_exdata_schema(struct tag_map *pthis, exdata_new_cb new_fn, exdata_free_cb free_fn, exdata_merge_cb merge_fn, exdata_reset_cb reset_fn, exdata_copy_cb copy_fn) {
+void hash_table_set_exdata_schema(struct hash_table *pthis, exdata_new_cb new_fn, exdata_free_cb free_fn, exdata_merge_cb merge_fn, exdata_reset_cb reset_fn, exdata_copy_cb copy_fn) {
     pthis->new_fn = new_fn;
     pthis->free_fn = free_fn;
     pthis->merge_fn = merge_fn;
@@ -135,7 +135,7 @@ void tag_map_set_exdata_schema(struct tag_map *pthis, exdata_new_cb new_fn, exda
     pthis->copy_fn = copy_fn;
 }
 
-void *tag_map_get0_exdata(struct tag_map *pthis, const char *key, size_t key_len) {
+void *hash_table_get0_exdata(struct hash_table *pthis, const char *key, size_t key_len) {
     struct tag_exdata_item *item;
     HASH_FIND(hh, pthis->tag_id_map, key, key_len, item);
     if (item == NULL || item->dying) {
@@ -144,11 +144,11 @@ void *tag_map_get0_exdata(struct tag_map *pthis, const char *key, size_t key_len
     return item->exdata;
 }
 
-int tag_map_get_count(const struct tag_map *pthis) {
+int hash_table_get_count(const struct hash_table *pthis) {
     return pthis->current_cell_num;
 }
 
-size_t tag_map_list(const struct tag_map *pthis, void **exdatas, size_t n_exdatas) {
+size_t hash_table_list(const struct hash_table *pthis, void **exdatas, size_t n_exdatas) {
     size_t actual_len = pthis->current_cell_num;
     if (actual_len == 0) {
         return 0;
@@ -169,7 +169,7 @@ size_t tag_map_list(const struct tag_map *pthis, void **exdatas, size_t n_exdata
     return actual_len < n_exdatas ? actual_len : n_exdatas;
 }
 
-int tag_map_merge(struct tag_map *dest, struct tag_map *src) {
+int hash_table_merge(struct hash_table *dest, struct hash_table *src) {
     struct tag_exdata_item *item_src, *tmp;
     struct tag_exdata_item *item_dst;
     HASH_ITER(hh, src->tag_id_map, item_src, tmp) {
@@ -205,8 +205,8 @@ int tag_map_merge(struct tag_map *dest, struct tag_map *src) {
     return 0;
 }
 
-struct tag_map *tag_map_copy(const struct tag_map *src) {
-    struct tag_map *pthis = calloc(1, sizeof(struct tag_map));
+struct hash_table *hash_table_copy(const struct hash_table *src) {
+    struct hash_table *pthis = calloc(1, sizeof(struct hash_table));
     pthis->max_cell_num = src->max_cell_num;
     pthis->current_cell_num = src->current_cell_num;
     pthis->new_fn = src->new_fn;

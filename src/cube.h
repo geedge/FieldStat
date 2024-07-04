@@ -11,7 +11,7 @@ extern "C"
 #include "metric_manifest.h"
 
 struct cube;
-struct cube_manager; // TODO 这个应该从fieldstat 移进来
+struct cube_manager;
 
 struct cube *cube_new(const struct fieldstat_tag *shared_tags, size_t n_tag, enum sampling_mode mode, size_t max_n_cell);
 void cube_free(struct cube *cube);

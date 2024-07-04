@@ -2387,7 +2387,7 @@ MPACK_INLINE uint32_t mpack_tag_array_count(mpack_tag_t* tag) {
  *
  * @see mpack_type_map
  */
-MPACK_INLINE uint32_t mpack_tag_map_count(mpack_tag_t* tag) {
+MPACK_INLINE uint32_t mpack_hash_table_count(mpack_tag_t* tag) {
     mpack_assert(tag->type == mpack_type_map, "tag is not a map!");
     return tag->v.n;
 }

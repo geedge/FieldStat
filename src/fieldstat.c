@@ -16,12 +16,16 @@
 
 #define DEFAULT_N_METRIC 32
 
-
+struct name_set {
+    char *name;
+    UT_hash_handle hh;
+};
 
 struct fieldstat {
-    struct metric_manifest **manifests; // TODO: 把那个哈希表再加回去
+    struct metric_manifest **manifests;
     size_t manifest_size;
     size_t manifest_cnt;
+    struct name_set *metric_name_set;
 
     struct cube_manager *cube_manager;
 };
@@ -167,6 +171,13 @@ void fieldstat_free(struct fieldstat *instance)
     }
     free(instance->manifests);
 
+    struct name_set *name_set, *tmp;
+    HASH_ITER(hh, instance->metric_name_set, name_set, tmp) {
+        HASH_DEL(instance->metric_name_set, name_set);
+        free(name_set->name);
+        free(name_set);
+    }
+
     free(instance);
 }
 
@@ -274,6 +285,10 @@ void add_manifest_to_instance(struct fieldstat *instance, const struct metric_ma
     if (metric_id >= instance->manifest_cnt) {
         instance->manifest_cnt = metric_id + 1;
     }
+
+    struct name_set *name_set = (struct name_set *)malloc(sizeof(struct name_set));
+    name_set->name = strdup(manifest->name);
+    HASH_ADD_KEYPTR(hh, instance->metric_name_set, name_set->name, strlen(name_set->name), name_set);
 }
 
 static int append_manifest_to_instance(struct fieldstat *instance, const struct metric_manifest *metric)
@@ -284,24 +299,20 @@ static int append_manifest_to_instance(struct fieldstat *instance, const struct 
     return metric_id;
 }
 
-int check_before_register_metric(const struct fieldstat *instance, const char *metric_name)
+bool find_metric(const struct fieldstat *instance, const char *metric_name)
 {
-    if (instance == NULL) {
-        return FS_ERR_NULL_HANDLER;
+    struct name_set *name_set;
+    HASH_FIND_STR(instance->metric_name_set, metric_name, name_set);
+    if (name_set != NULL) {
+        return true;
     }
-
-    if (is_metric_name_duplicate(instance, metric_name)) {
-        return FS_ERR_INVALID_KEY;
-    }
-
-    return FS_OK;
+    return false;
 }
 
 int fieldstat_register_counter(struct fieldstat *instance, const char *metric_name)
 {
-    int ret = check_before_register_metric(instance, metric_name);
-    if (ret != FS_OK) {
-        return ret;
+    if (find_metric(instance, metric_name)) {
+        return FS_ERR_INVALID_KEY;
     }
 
     struct metric_manifest *metric = malloc(sizeof(struct metric_manifest));
@@ -317,12 +328,11 @@ int fieldstat_register_counter(struct fieldstat *instance, const char *metric_na
 
 int fieldstat_register_hll(struct fieldstat *instance, const char *metric_name, unsigned char precision)
 {
-    int ret = check_before_register_metric(instance, metric_name);
-    if (ret != FS_OK) {
-        return ret;
-    }
     if (precision < 4 || precision > 18) {
         return FS_ERR_INVALID_PARAM;
+    }
+    if (find_metric(instance, metric_name)) {
+        return FS_ERR_INVALID_KEY;
     }
 
     struct metric_manifest *metric = malloc(sizeof(struct metric_manifest));
@@ -338,10 +348,6 @@ int fieldstat_register_hll(struct fieldstat *instance, const char *metric_name, 
 
 int fieldstat_register_hist(struct fieldstat *instance, const char *metric_name, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures)
 {
-    int ret = check_before_register_metric(instance, metric_name);
-    if (ret != FS_OK) {
-        return ret;
-    }
     // refer to hdr_histogram.h for the rules of parameters. Just copy them here
     if (lowest_trackable_value < 1) {
         return FS_ERR_INVALID_PARAM;
@@ -353,6 +359,9 @@ int fieldstat_register_hist(struct fieldstat *instance, const char *metric_name,
 	{
 		return FS_ERR_INVALID_PARAM;
 	}
+    if (find_metric(instance, metric_name)) {
+        return FS_ERR_INVALID_KEY;
+    }
 
     struct metric_manifest *metric = malloc(sizeof(struct metric_manifest));
     metric->name = strdup(metric_name);
@@ -441,12 +450,6 @@ int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id
     return cube_histogram_record(cube, manifest, tags, n_tag, value);
 }
 
-/* -------------------------------------------------------------------------- */
-/*                                    merge                                   */
-/* -------------------------------------------------------------------------- */
-
-
-
 int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
 {
     if (instance == NULL || src == NULL) {
@@ -454,12 +457,11 @@ int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
     }
 
     int metric_len_src = src->manifest_cnt;
-    for (int i = 0; i < metric_len_src; i++) {
+    int metric_len_dst = instance->manifest_cnt;
+    int len_min = metric_len_src < metric_len_dst ? metric_len_src : metric_len_dst;
+    for (int i = 0; i < len_min; i++) {
         const struct metric_manifest *metric_src = src->manifests[i];
         const struct metric_manifest *metric_dst = instance->manifests[i];
-        if (metric_src == NULL || metric_dst == NULL) {
-            break;
-        }
         if (metric_src->type != metric_dst->type ||
                 strcmp(metric_src->name, metric_dst->name) != 0
             ) {
@@ -467,10 +469,7 @@ int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
             return FS_ERR_INVALID_PARAM;
         }
     }
-    for (int i = 0; i < metric_len_src; i++) {
-        if (instance->manifests[i] != NULL || src->manifests[i] == NULL) {
-            continue;
-        }
+    for (int i = metric_len_dst; i < metric_len_src; i++) {
         const struct metric_manifest *metric_src = src->manifests[i];
         append_manifest_to_instance(instance, metric_manifest_copy(metric_src));
     }
@@ -478,6 +477,30 @@ int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src)
     cube_manager_merge(instance->cube_manager, src->cube_manager);
 
     return FS_OK;
+}
+
+void metric_name_set_callibrate(struct fieldstat *instance, const struct fieldstat *master)
+{
+    struct name_set *name_set_master, *tmp, *name_set_dest;
+    // name in dest but not in master
+    HASH_ITER(hh, instance->metric_name_set, name_set_dest, tmp) {
+        HASH_FIND_STR(master->metric_name_set, name_set_dest->name, name_set_master);
+        if (name_set_master == NULL) {
+            HASH_DEL(instance->metric_name_set, name_set_dest);
+            free(name_set_dest->name);
+            free(name_set_dest);
+        }
+    }
+
+    // name in master but not in dest
+    HASH_ITER(hh, master->metric_name_set, name_set_master, tmp) {
+        HASH_FIND_STR(instance->metric_name_set, name_set_master->name, name_set_dest);
+        if (name_set_dest == NULL) {
+            name_set_dest = (struct name_set *)malloc(sizeof(struct name_set));
+            name_set_dest->name = strdup(name_set_master->name);
+            HASH_ADD_KEYPTR(hh, instance->metric_name_set, name_set_dest->name, strlen(name_set_dest->name), name_set_dest);
+        }
+    }
 }
 
 struct fieldstat *fieldstat_fork(const struct fieldstat *instance)
@@ -491,9 +514,11 @@ struct fieldstat *fieldstat_fork(const struct fieldstat *instance)
     new_instance->manifests = calloc(instance->manifest_size, sizeof(struct metric_manifest *));
     new_instance->manifest_size = instance->manifest_size;
     new_instance->manifest_cnt = instance->manifest_cnt;
+
     for (size_t i = 0; i < instance->manifest_cnt; i++) {
         new_instance->manifests[i] = metric_manifest_copy(instance->manifests[i]);
     }
+    metric_name_set_callibrate(new_instance, instance);
 
     return new_instance;
 }
@@ -519,15 +544,13 @@ void calibrate_metrics_in_instance(const struct fieldstat *master, struct fields
             continue;
         }
         if (metric_master != NULL && metric_target == NULL) {
-            const struct metric_manifest *metric_dup = metric_manifest_copy(metric_master);
-            add_manifest_to_instance(replica, metric_dup, i);
+            replica->manifests[i] = metric_manifest_copy(metric_master);
             continue;
         }
 
         if (metric_master->type != metric_target->type || strcmp(metric_master->name, metric_target->name) != 0) {
             metric_manifest_free(metric_target);
-            const struct metric_manifest *metric_dup = metric_manifest_copy(metric_master);
-            add_manifest_to_instance(replica, metric_dup, i);
+            replica->manifests[i] = metric_manifest_copy(metric_master);
             continue;
         }
 
@@ -535,6 +558,7 @@ void calibrate_metrics_in_instance(const struct fieldstat *master, struct fields
     }
 
     replica->manifest_cnt = master->manifest_cnt;
+    metric_name_set_callibrate(replica, master);
 }
 
 int fieldstat_calibrate(const struct fieldstat *master, struct fieldstat *replica)

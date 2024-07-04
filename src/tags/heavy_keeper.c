@@ -790,7 +790,7 @@ void heavy_keeper_merge(struct heavy_keeper *dest, const struct heavy_keeper *sr
         if (sorted_set_check_is_full(new_rec)) {
             unsigned long long tmp_mincnt = sorted_set_get_min_count(new_rec);
             if (maxv > tmp_mincnt) {
-                sorted_set_pop(new_rec); // TODO:  如果dest 和 new 共用指针，这里pop 出来以后，dest 的内存好像会变得有点问题。先别纠结这么复杂的事，new 和 dest 使用copy后的data 先试试。
+                sorted_set_pop(new_rec);
                 sorted_set_insert_to_available_heap(new_rec, key_arr[i], key_lens[i], maxv, dest->copy_fn(exdatas_src[i]));
             }
         } else {
