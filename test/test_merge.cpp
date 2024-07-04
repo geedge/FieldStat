@@ -447,9 +447,9 @@ TEST(unit_test_merge, merge_accuracy_test_gen_dest_full_all_inserted_given_src_f
 TEST(unit_test_merge, merge_accuracy_test_gen_dest_full_some_inserted_and_some_merged_and_some_fail_to_add)
 {
     int K = 100;
-    vector<Fieldstat_tag_list_wrapper *> flows_in_src = test_gen_topk_flows(10000, K + 50); // let elephant flows in src and dest different
+    vector<Fieldstat_tag_list_wrapper *> flows_in_src = test_gen_topk_flows(30000, K + 50); // let elephant flows in src and dest different
     struct fieldstat *instance_src = test_push_flows(flows_in_src, K);
-    vector<Fieldstat_tag_list_wrapper *> flows_in_dest = test_gen_topk_flows(10000, K + 50);
+    vector<Fieldstat_tag_list_wrapper *> flows_in_dest = test_gen_topk_flows(30000, K + 50);
     struct fieldstat *instance_dest = test_push_flows(flows_in_dest, K);
     fieldstat_merge(instance_dest, instance_src);
 
@@ -463,7 +463,7 @@ TEST(unit_test_merge, merge_accuracy_test_gen_dest_full_some_inserted_and_some_m
     
     flows_in_dest.insert(flows_in_dest.end(), std::make_move_iterator(flows_in_src.begin()), std::make_move_iterator(flows_in_src.end()));
     double accuracy = test_cal_accuracy_given_expected_key(flows_in_dest, flows_in_merged);
-    EXPECT_GE(accuracy, 0.87); // by heavy keeper benchmark, with K = 100, merging result should be about 0.96, for adding the flows will also cause some inaccuracy, so here we set 0.93
+    EXPECT_GE(accuracy, 0.87);
     printf("merge_accuracy_test_gen_dest_full_some_inserted_and_some_merged_and_some_fail_to_add accuracy is %lf\n", accuracy);
 
     fieldstat_free(instance_src);

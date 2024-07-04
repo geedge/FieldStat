@@ -307,7 +307,9 @@ TEST(Fuzz_test, many_instance_random_flow_unregister_calibrate_reset_fork_merge_
             test_result.push_back(new Fieldstat_tag_list_wrapper(&tags[j]));
         }
 
-        EXPECT_GE(test_cal_topk_accuracy(test_result, count_map[Fieldstat_tag_list_wrapper(shared_tag_out).to_string()]), 0.9);
+        double accuracy = test_cal_topk_accuracy(test_result, count_map[Fieldstat_tag_list_wrapper(shared_tag_out).to_string()]);
+        EXPECT_GE(accuracy, 0.95);
+        // printf("topk accuracy: %lf\n", accuracy);
 
         for (size_t j = 0; j < cell_num; j++) {
             delete test_result[j];

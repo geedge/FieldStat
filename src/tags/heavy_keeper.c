@@ -479,8 +479,8 @@ struct Bucket *new_sketch(struct heavy_keeper_options *params) {
 }
 
 void params_set_to_default(struct heavy_keeper_options *p, int K) {
-    if (K > 1000) { // don't let the sketch too large when K gets insanely large
-        K = 1000;
+    if (K > 5000) { // don't let the sketch too large when K gets insanely large
+        K = 5000;
     }
     double log_ret = log((double)K) / 2.3;  // 2.3: log_e(10), log_ret = log_10(K)
 
@@ -563,16 +563,6 @@ unsigned int cal_hash_val_with_seed(const char *key, size_t key_len, unsigned in
     return XXH3_64bits_withSeed(key, key_len, seed);
 }
 
-struct Bucket *find_bucket_by_key(struct heavy_keeper *hk, int array_index, const char *key, size_t key_len) {
-    int w = hk->params.max_bucket_num;
-    unsigned int Hsh = cal_hash_val_with_seed(key, key_len, array_index + 1) % w; // +1: the let any row do not use FP as hashing key directly.
-
-    // Otherwise, when different key has the same FP(in 2^-64 probability), they will also in the same bucket in the row #0 and hash collision will happen more severely.
-
-    return &(hk->sketch[array_index * w + Hsh]);
-}
-
-
 unsigned my_max(unsigned a, unsigned b) {
     if (a > b) {
         return a;
@@ -606,7 +596,8 @@ int heavy_keeper_add(struct heavy_keeper *heavy_keeper, const char *key, size_t 
     unsigned int FP = cal_hash_val_with_seed(key, key_len, FP_HASH_KEY);
 
     for (int j = 0; j < heavy_keeper->params.array_num; j++) {
-        struct Bucket *bucket = find_bucket_by_key(heavy_keeper, j, key, key_len);
+        unsigned int Hsh = j == FP_HASH_KEY ? FP : cal_hash_val_with_seed(key, key_len, j);
+        struct Bucket *bucket = &(heavy_keeper->sketch[j * heavy_keeper->params.max_bucket_num + (Hsh% heavy_keeper->params.max_bucket_num)]);
 
         if (bucket->finger_print == FP) {
             // If a key is not in the min-heap, then the estimated key size should be no larger than nmin.
@@ -616,8 +607,7 @@ int heavy_keeper_add(struct heavy_keeper *heavy_keeper, const char *key, size_t 
             // In this case, the sketch won't be updated. This key is expected to be taken into account in another array,
             //  where its FP is different from the one it should collided with, so that element keys won't be missed.
             if (not_in_sorted_set) {
-                unsigned tmp_min = sorted_set_get_min_count(summary);
-                if (bucket->count > tmp_min) {
+                if (bucket->count > sorted_set_get_min_count(summary)) {
                     continue;
                 }
             }
@@ -731,7 +721,8 @@ unsigned long long find_maxv_in_sketch(struct heavy_keeper *hk, const char *key,
 
     unsigned long long maxv = 0;
     for (int array_id = 0; array_id < hk->params.array_num; array_id++) {
-        bucket = find_bucket_by_key(hk, array_id, key, key_len);  // hk->sketch is the merge of two. So just check one
+        unsigned int hash = array_id == FP_HASH_KEY ? fp : cal_hash_val_with_seed(key, key_len, array_id);
+        bucket = &(hk->sketch[array_id * hk->params.max_bucket_num + (hash % hk->params.max_bucket_num)]);
 
         if (bucket->finger_print == fp) {
             maxv = MAX(maxv, bucket->count);
