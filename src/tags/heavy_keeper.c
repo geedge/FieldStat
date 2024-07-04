@@ -12,8 +12,16 @@
 
 #include "minheap/heap.h"
 #include "mpack/mpack.h"
-#include "uthash.h"
 #include "xxhash/xxhash.h"
+
+
+// XXHASH is faster
+#define HASH_FUNCTION(keyptr, keylen, hashv) \
+        do { \
+            hashv = XXH3_64bits(keyptr, keylen); \
+        } while (0)
+
+#include "uthash.h"
 
 #include "exdata.h"
 
@@ -635,7 +643,7 @@ int heavy_keeper_add(struct heavy_keeper *heavy_keeper, const char *key, size_t 
             return 1;
         }
         unsigned nMin = sorted_set_get_min_count(summary);
-        if (nMin == INVALID_COUNT || maxv > nMin) {
+        if (maxv > nMin || nMin == INVALID_COUNT) {
             sorted_set_insert(summary, key, key_len, maxv, arg);
             return 1;
         }
