@@ -10,7 +10,6 @@
 
 #include "fieldstat.h"
 #include "metrics/metric.h"
-#include "my_ut_hash.h"
 #include "cube.h"
 #include "metric_manifest.h"
 

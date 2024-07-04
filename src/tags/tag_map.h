@@ -7,7 +7,6 @@ extern "C"{
 #endif
 
 #include "exdata.h"
-#include "my_ut_hash.h"
 
 struct hash_table;
 

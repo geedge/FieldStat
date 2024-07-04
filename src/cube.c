@@ -137,6 +137,90 @@ struct cube_manager *cube_manager_new() {
     return pthis;
 }
 
+
+static void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_tags, char **out_key, size_t *out_key_size)
+{
+    if (n_tags == 0) {
+        // use a default dummy key
+        *out_key = strdup("no tags");
+        *out_key_size = strlen(*out_key);
+        return;
+    }
+	int i = 0;
+	int used_len = 0;
+	struct fieldstat_tag *tag = NULL;
+
+    const size_t init_key_size = 1024;
+    size_t one_time_key_size = init_key_size;
+    char *one_time_key = (char *)malloc(init_key_size);
+    size_t remain_key_size = init_key_size;
+    size_t total_key_size = init_key_size;
+    char *dynamic_mem = (char *)malloc(remain_key_size);
+    size_t key_len;
+    size_t val_len;
+
+	for(i = 0; i < (int)n_tags; i++)
+	{
+		tag = (struct fieldstat_tag *)&tags[i];
+		switch(tag->type)
+		{
+			case 0:
+                key_len = strlen(tag->key);
+                val_len = sizeof(long long);
+                used_len = key_len + val_len;
+                while (used_len >= one_time_key_size) {
+                    one_time_key_size += init_key_size;
+                    one_time_key = (char *)realloc(one_time_key, one_time_key_size);
+                }
+                memcpy(one_time_key, tag->key, key_len);
+                memcpy(one_time_key + key_len, &tag->value_longlong, val_len);
+				break;
+			case 1:
+                key_len = strlen(tag->key);
+                val_len = sizeof(double);
+                used_len = key_len + val_len;
+                while (used_len >= one_time_key_size) {
+                    one_time_key_size += init_key_size;
+                    one_time_key = (char *)realloc(one_time_key, one_time_key_size);
+                }
+                memcpy(one_time_key, tag->key, key_len);
+                memcpy(one_time_key + key_len, &tag->value_double, val_len);
+				break;
+			case 2:
+                key_len = strlen(tag->key);
+                val_len = strlen(tag->value_str);
+                used_len = key_len + val_len;
+                while (used_len >= one_time_key_size) {
+                    one_time_key_size += init_key_size;
+                    one_time_key = (char *)realloc(one_time_key, one_time_key_size);
+                }
+                memcpy(one_time_key, tag->key, key_len);
+                memcpy(one_time_key + key_len, tag->value_str, val_len);
+				break;
+			default:
+				assert(0);
+				break;
+		}
+        
+        while (used_len >= remain_key_size) {
+            total_key_size += init_key_size;
+            dynamic_mem = (char *)realloc(dynamic_mem, total_key_size);
+            remain_key_size += init_key_size;
+        }
+
+        memcpy(dynamic_mem + total_key_size - remain_key_size, one_time_key, used_len);
+        remain_key_size -= used_len;
+	}
+
+    *out_key = (char *)malloc(total_key_size - remain_key_size + 1);
+    memcpy(*out_key, dynamic_mem, total_key_size - remain_key_size);
+    (*out_key)[total_key_size - remain_key_size] = '\0';
+    *out_key_size = total_key_size - remain_key_size; // not include '\0'
+
+    free(dynamic_mem);
+    free(one_time_key);
+}
+
 int cube_manager_add(struct cube_manager *pthis, struct cube *cube)
 {
     char *key;
@@ -549,7 +633,7 @@ struct cell *get_cell(struct cube *cube, const struct fieldstat_tag *tags, size_
 }
 
 int cube_histogram_record(struct cube *cube, const struct metric_manifest *manifest, const struct fieldstat_tag *tags, size_t n_tag, long long value) {
-    assert(manifest->type == METRIC_HISTOGRAM);
+    assert(manifest->type == METRIC_TYPE_HISTOGRAM);
     assert(manifest->id != cube->primary_metric_id);
 
     struct cell *cell_data = get_cell(cube, tags, n_tag, 0, manifest->id);
@@ -566,7 +650,7 @@ int cube_histogram_record(struct cube *cube, const struct metric_manifest *manif
 }
 
 int cube_hll_add(struct cube *cube, const struct metric_manifest *manifest, const struct fieldstat_tag *tags, size_t n_tag, const char *key, size_t key_len) {
-    assert(manifest->type == METRIC_HLL);
+    assert(manifest->type == METRIC_TYPE_HLL);
     assert(manifest->id != cube->primary_metric_id);
 
     struct cell *cell_data = get_cell(cube, tags, n_tag, 0, manifest->id);
@@ -580,7 +664,7 @@ int cube_hll_add(struct cube *cube, const struct metric_manifest *manifest, cons
 }
 
 int cube_counter_incrby(struct cube *cube, const struct metric_manifest *manifest, const struct fieldstat_tag *tags, size_t n_tag, long long increment) {
-    assert(manifest->type == METRIC_COUNTER);
+    assert(manifest->type == METRIC_TYPE_COUNTER);
     assert(cube->primary_metric_id != manifest->id || increment >= 0);
 
     struct cell *cell_data = get_cell(cube, tags, n_tag, increment, manifest->id);
@@ -595,7 +679,7 @@ int cube_counter_incrby(struct cube *cube, const struct metric_manifest *manifes
 }
 
 int cube_counter_set(struct cube *cube, const struct metric_manifest *manifest, const struct fieldstat_tag *tags, size_t n_tag, long long value) {
-    assert(manifest->type == METRIC_COUNTER);
+    assert(manifest->type == METRIC_TYPE_COUNTER);
     assert(cube->primary_metric_id != manifest->id);
     struct cell *cell_data = get_cell(cube, tags, n_tag, 0, manifest->id);
     if (cell_data == NULL) {

@@ -8,7 +8,6 @@
 #include "uthash.h"
 
 #include "fieldstat.h"
-#include "my_ut_hash.h"
 #include "exdata.h"
 
 struct tag_exdata_item {
