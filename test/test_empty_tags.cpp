@@ -10,12 +10,12 @@ void assert_cell_null(const struct fieldstat *instance, int cube_id, long long e
 {
     struct fieldstat_tag_list *tag_list = NULL;
     size_t n_cell = 0;
-    fieldstat_get_cells_used_by_cube(instance, cube_id, &tag_list, &n_cell);
+    fieldstat_cube_get_cells(instance, cube_id, &tag_list, &n_cell);
     EXPECT_EQ(n_cell, 1);
     EXPECT_EQ(tag_list[0].n_tag, 0);
     EXPECT_TRUE(tag_list[0].tag == NULL);
     long long value;
-    fieldstat_counter_get(instance, cube_id, 0, &tag_list[0], &value);
+    fieldstat_counter_get(instance, cube_id, &tag_list[0], 0, &value);
     EXPECT_EQ(value, expected_count);
     fieldstat_tag_list_arr_free(tag_list, n_cell);
 }
@@ -57,7 +57,7 @@ TEST(test_empty_tag, merge)
     int n_cube = 0;
     fieldstat_get_cubes(instance_dst, &ret_cube_id_arr, &n_cube);
     int ret_cell_id = ret_cube_id_arr[0];
-    struct fieldstat_tag_list *shared_tag = fieldstat_get_shared_tags(instance_dst, ret_cell_id);
+    struct fieldstat_tag_list *shared_tag = fieldstat_cube_get_tags(instance_dst, ret_cell_id);
     EXPECT_EQ(shared_tag->n_tag, 0);
     EXPECT_TRUE(shared_tag->tag == NULL);
     fieldstat_tag_list_arr_free(shared_tag, 1);
@@ -81,7 +81,7 @@ TEST(test_empty_tag, merge_topk)
     int n_cube = 0;
     fieldstat_get_cubes(instance_dst, &ret_cube_id_arr, &n_cube);
     int ret_cell_id = ret_cube_id_arr[0];
-    struct fieldstat_tag_list *shared_tag = fieldstat_get_shared_tags(instance_dst, ret_cell_id);
+    struct fieldstat_tag_list *shared_tag = fieldstat_cube_get_tags(instance_dst, ret_cell_id);
     EXPECT_EQ(shared_tag->n_tag, 0);
     EXPECT_TRUE(shared_tag->tag == NULL);
     fieldstat_tag_list_arr_free(shared_tag, 1);

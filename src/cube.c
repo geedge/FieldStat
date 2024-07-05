@@ -53,8 +53,10 @@ struct cube {
     UT_hash_handle hh;
 };
 
-static void tag_array_copy(struct fieldstat_tag *tags_dst, const struct fieldstat_tag *tags_src, size_t n_tag) // TODO: 改成clone吧, 
+static struct fieldstat_tag *tag_array_duplicate(const struct fieldstat_tag *tags_src, size_t n_tag)
 {
+    struct fieldstat_tag *tags_dst = malloc(sizeof(struct fieldstat_tag) * n_tag);
+
     for (size_t i = 0; i < n_tag; i++) {
         tags_dst[i].key = strdup(tags_src[i].key);
         tags_dst[i].type = tags_src[i].type;
@@ -73,6 +75,8 @@ static void tag_array_copy(struct fieldstat_tag *tags_dst, const struct fieldsta
             break;
         }
     }
+
+    return tags_dst;
 }
 
 static void fieldstat_free_tag_array(struct fieldstat_tag *tags, size_t n_tags)
@@ -143,7 +147,7 @@ static void tag2key(const struct fieldstat_tag tags[], size_t n_tags, char **out
     size_t remain_key_size = alloced_every_time;
     size_t total_key_size = alloced_every_time;
     char *dynamic_mem = (char *)malloc(total_key_size);
-    void *val_position;
+    void *val_position = NULL;
 
     size_t key_len = 0;
     size_t val_len = 0;
@@ -156,11 +160,11 @@ static void tag2key(const struct fieldstat_tag tags[], size_t n_tags, char **out
 		{
 			case TAG_INTEGER:
                 val_len = sizeof(long long);
-                val_position = &tag->value_longlong;
+                val_position = (void *)&tag->value_longlong;
 				break;
 			case TAG_DOUBLE:
                 val_len = sizeof(double);
-                val_position = &tag->value_double;
+                val_position = (void *)&tag->value_double;
 
 				break;
 			case TAG_CSTRING:
@@ -378,8 +382,7 @@ struct cell *cell_new(const struct exdata_new_args *args) {
     pthis->metrics_len = 0;
 
     pthis->tags.n_tag = args->n_tags;
-    pthis->tags.tag = malloc(sizeof(struct fieldstat_tag) * args->n_tags);
-    tag_array_copy(pthis->tags.tag, args->tags, args->n_tags);
+    pthis->tags.tag = tag_array_duplicate(args->tags, args->n_tags);
     return pthis;
 }
 
@@ -412,8 +415,7 @@ struct cell *cell_copy(const struct cell *src) {
     }
     
     pthis->tags.n_tag = src->tags.n_tag;
-    pthis->tags.tag = malloc(sizeof(struct fieldstat_tag) * src->tags.n_tag);
-    tag_array_copy(pthis->tags.tag, src->tags.tag, src->tags.n_tag);
+    pthis->tags.tag = tag_array_duplicate(src->tags.tag, src->tags.n_tag);
 
     return pthis;
 }
@@ -472,8 +474,7 @@ struct cube *cube_info_new(const struct fieldstat_tag *shared_tags, size_t n_tag
     if (n_tag == 0) {
         cube->cube_identifier = NULL;
     } else {
-        cube->cube_identifier = malloc(sizeof(struct fieldstat_tag) * n_tag);
-        tag_array_copy(cube->cube_identifier, shared_tags, n_tag);
+        cube->cube_identifier = tag_array_duplicate(shared_tags, n_tag);
     }
 
     cube->n_shared_tags = n_tag;
@@ -732,8 +733,7 @@ void cube_get_cells(const struct cube *cube, struct fieldstat_tag_list **tag_lis
             tag_list_tmp->tag = NULL;
             continue;
         }
-        tag_list_tmp->tag = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * tag_list_tmp->n_tag);
-        tag_array_copy(tag_list_tmp->tag, cell_data->tags.tag, tag_list_tmp->n_tag);
+        tag_list_tmp->tag = tag_array_duplicate(cell_data->tags.tag, tag_list_tmp->n_tag);
     }
 
     free(cell_datas);
@@ -893,9 +893,9 @@ struct fieldstat_tag_list *cube_get_identifier(const struct cube *cube) {
         return tag_list;
     }
 
-    tag_list->tag = (struct fieldstat_tag *)malloc(sizeof(struct fieldstat_tag) * cube->n_shared_tags);
+    tag_list->tag = tag_array_duplicate(cube->cube_identifier, cube->n_shared_tags);
     tag_list->n_tag = cube->n_shared_tags;
-    tag_array_copy(tag_list->tag, cube->cube_identifier, cube->n_shared_tags);
+    
 
     return tag_list;
 }

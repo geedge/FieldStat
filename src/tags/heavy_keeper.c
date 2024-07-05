@@ -644,8 +644,8 @@ int heavy_keeper_add(struct heavy_keeper *heavy_keeper, const char *key, size_t 
             sorted_set_insert(summary, key, key_len, maxv, arg);
             return 1;
         }
-        unsigned nMin = sorted_set_get_min_count(summary);
-        if (maxv > nMin || nMin == INVALID_COUNT) {
+        unsigned min_value = sorted_set_get_min_count(summary);
+        if (maxv > min_value || min_value == INVALID_COUNT) {
             sorted_set_insert(summary, key, key_len, maxv, arg);
             return 1;
         }

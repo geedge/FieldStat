@@ -162,14 +162,14 @@ void fieldstat_free_tag_array(struct fieldstat_tag *tags, size_t n_tags)
     free(tags);
 }
 
-int fieldstat_create_cube(struct fieldstat *instance, const struct fieldstat_tag *shared_tags, size_t n_tag, enum sampling_mode mode, size_t max_n_cell)
+int fieldstat_create_cube(struct fieldstat *instance, const struct fieldstat_tag *cube_identifier, size_t n_tag, enum sampling_mode mode, size_t max_n_cell)
 {
     if (instance == NULL) {
         return  FS_ERR_NULL_HANDLER;
     }
 
-    if (n_tag == 0 || shared_tags == NULL) {
-        shared_tags = NULL;
+    if (n_tag == 0 || cube_identifier == NULL) {
+        cube_identifier = NULL;
         n_tag = 0;
     }
     if (mode == SAMPLING_MODE_TOPK && max_n_cell == 0) {
@@ -179,7 +179,7 @@ int fieldstat_create_cube(struct fieldstat *instance, const struct fieldstat_tag
         max_n_cell = INT32_MAX;
     }
     
-    struct cube *cube = cube_new(shared_tags, n_tag, mode, max_n_cell);
+    struct cube *cube = cube_new(cube_identifier, n_tag, mode, max_n_cell);
     int ret = cube_manager_add(instance->cube_manager, cube);
     if (ret < 0) {
         cube_free(cube);
@@ -429,7 +429,7 @@ void fieldstat_get_metrics(const struct fieldstat *instance, int **metric_id_out
     }
 }
 
-struct fieldstat_tag_list *fieldstat_get_shared_tags(const struct fieldstat *instance, int cube_id)
+struct fieldstat_tag_list *fieldstat_cube_get_tags(const struct fieldstat *instance, int cube_id)
 {
     const struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
     if (cube == NULL) {
@@ -439,7 +439,7 @@ struct fieldstat_tag_list *fieldstat_get_shared_tags(const struct fieldstat *ins
     return cube_get_identifier(cube);
 }
 
-int fieldstat_counter_get(const struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag_list *tags, long long *value)
+int fieldstat_counter_get(const struct fieldstat *instance, int cube_id, const struct fieldstat_tag_list *tags, int metric_id, long long *value)
 {
     const struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
     if (cube == NULL) {
@@ -449,7 +449,7 @@ int fieldstat_counter_get(const struct fieldstat *instance, int cube_id, int met
     return cube_counter_get(cube, metric_id, tags, value);
 }
 
-int fieldstat_hll_get(const struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag_list *tags, double *value)
+int fieldstat_hll_get(const struct fieldstat *instance, int cube_id, const struct fieldstat_tag_list *tags, int metric_id, double *value)
 {
     const struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
     if (cube == NULL) {
@@ -461,7 +461,7 @@ int fieldstat_hll_get(const struct fieldstat *instance, int cube_id, int metric_
     return ret;
 }
 
-long long fieldstat_hist_value_at_percentile(const struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag_list *tags, double percentile)
+long long fieldstat_hist_value_at_percentile(const struct fieldstat *instance, int cube_id, const struct fieldstat_tag_list *tags, int metric_id, double percentile)
 {
     const struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
     if (cube == NULL) {
@@ -476,7 +476,7 @@ long long fieldstat_hist_value_at_percentile(const struct fieldstat *instance, i
     return value;
 }
 
-long long fieldstat_hist_count_le_value(const struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag_list *tags, long long value)
+long long fieldstat_hist_count_le_value(const struct fieldstat *instance, int cube_id, const struct fieldstat_tag_list *tags, int metric_id, long long value)
 {
     const struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
     if (cube == NULL) {
@@ -533,7 +533,7 @@ enum metric_type fieldstat_get_metric_type(const struct fieldstat *instance, int
     return metric->type;
 }
 
-void fieldstat_get_cells_used_by_cube(const struct fieldstat *instance, int cube_id, struct fieldstat_tag_list **tag_list, size_t *n_cell)
+void fieldstat_cube_get_cells(const struct fieldstat *instance, int cube_id, struct fieldstat_tag_list **tag_list, size_t *n_cell)
 {
     const struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
     if (cube == NULL) {

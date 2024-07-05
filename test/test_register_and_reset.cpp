@@ -56,7 +56,7 @@ TEST(test_register, reset_and_try_to_query_cell)
     fieldstat_reset(instance);
     EXPECT_EQ(test_get_max_metric_id(instance), 0);
     long long value;
-    EXPECT_EQ(fieldstat_counter_get(instance, cube_id, metric_id, &TEST_TAG_LIST_INT, &value), FS_ERR_INVALID_TAG);
+    EXPECT_EQ(fieldstat_counter_get(instance, cube_id, &TEST_TAG_LIST_INT, metric_id, &value), FS_ERR_INVALID_TAG);
 
     fieldstat_free(instance);
 }
@@ -96,7 +96,7 @@ TEST(test_register, register_many_cubes)
 
     for (int i = 0; i < registered_cube; i++) {
         long long result;
-        fieldstat_counter_get(instance, i, 0, &TEST_TAG_LIST_INT, &result);
+        fieldstat_counter_get(instance, i, &TEST_TAG_LIST_INT, 0,  &result);
         EXPECT_EQ(result, i);
     }
 
@@ -117,7 +117,7 @@ TEST(test_register, add_many_tagged_cells)
 
     long long result;
     struct fieldstat_tag_list tag_list = {test_tag_long, 100};
-    fieldstat_counter_get(instance, cube_id, metric_id, &tag_list, &result);
+    fieldstat_counter_get(instance, cube_id, &tag_list, metric_id,  &result);
     EXPECT_EQ(result, 10086);
 
     fieldstat_free(instance);
@@ -138,7 +138,7 @@ TEST(test_register, add_long_tagged_cells)
 
     long long result;
     struct fieldstat_tag_list tag_list = {&test_tag_long, 1};
-    fieldstat_counter_get(instance, cube_id, metric_id, &tag_list, &result);
+    fieldstat_counter_get(instance, cube_id, &tag_list, metric_id, &result);
     EXPECT_EQ(result, 10086);
 
     fieldstat_free(instance);
@@ -196,14 +196,14 @@ TEST(test_register, fork_registered_info_with_cube_and_metric)
     EXPECT_EQ(cube_num, 2);
     struct fieldstat_tag_list *tag_list = NULL;
     
-    tag_list = fieldstat_get_shared_tags(dup, cube_ids[0]);
+    tag_list = fieldstat_cube_get_tags(dup, cube_ids[0]);
     EXPECT_STREQ(tag_list->tag[0].key, TEST_SHARED_TAG.key);
     fieldstat_tag_list_arr_free(tag_list, 1);
     size_t n_cell = 0;
-    fieldstat_get_cells_used_by_cube(dup, cube_ids[0], &tag_list, &n_cell);
+    fieldstat_cube_get_cells(dup, cube_ids[0], &tag_list, &n_cell);
     EXPECT_EQ(n_cell, 0);
 
-    tag_list = fieldstat_get_shared_tags(dup, cube_ids[1]);
+    tag_list = fieldstat_cube_get_tags(dup, cube_ids[1]);
     EXPECT_STREQ(tag_list->tag[0].key, TEST_TAG_DOUBLE.key);
     free(cube_ids);
     fieldstat_tag_list_arr_free(tag_list, 1);
@@ -240,10 +240,10 @@ TEST(test_register, unregister_cube_on_wrong_instance)
     fieldstat_merge(instance_dst, instance);
 
     long long val_deleted_once;
-    fieldstat_counter_get(instance_dst, cube_id, metric_id, &TEST_TAG_LIST_INT, &val_deleted_once);
+    fieldstat_counter_get(instance_dst, cube_id, &TEST_TAG_LIST_INT,metric_id,  &val_deleted_once);
     EXPECT_EQ(val_deleted_once, 1);
     long long val_merged_twice;
-    fieldstat_counter_get(instance_dst, cube_id2, metric_id2, &TEST_TAG_LIST_INT, &val_merged_twice);
+    fieldstat_counter_get(instance_dst, cube_id2, &TEST_TAG_LIST_INT, metric_id2,  &val_merged_twice);
     EXPECT_EQ(val_merged_twice, 2);
 
     fieldstat_free(instance);
@@ -266,7 +266,7 @@ TEST(test_register, register_many_cells_on_unlimited_sized_cube)
         test_tag.value_longlong = i;
         struct fieldstat_tag_list tag_list = {&test_tag, 1};
         long long value;
-        fieldstat_counter_get(instance, cube_id, metric_id, &tag_list, &value);
+        fieldstat_counter_get(instance, cube_id, &tag_list, metric_id, &value);
         EXPECT_EQ(value, 1);
     }
 
@@ -313,7 +313,7 @@ TEST(calibrate, target_one_more_metric)
 
     EXPECT_EQ(test_get_max_metric_id(target), 0);
     EXPECT_STREQ(fieldstat_get_metric_name(target, 0), "counter");
-    struct fieldstat_tag_list *tag_list = fieldstat_get_shared_tags(target, cube_id);
+    struct fieldstat_tag_list *tag_list = fieldstat_cube_get_tags(target, cube_id);
     EXPECT_STREQ(tag_list->tag[0].key, TEST_SHARED_TAG.key);
 
     fieldstat_free(master);
@@ -334,7 +334,7 @@ TEST(calibrate, master_one_more_metric)
     EXPECT_EQ(test_get_max_metric_id(target), 1);
     EXPECT_STREQ(fieldstat_get_metric_name(target, 0), "counter");
     EXPECT_STREQ(fieldstat_get_metric_name(target, 1), "counter2");
-    struct fieldstat_tag_list *tag_list = fieldstat_get_shared_tags(target, cube_id);
+    struct fieldstat_tag_list *tag_list = fieldstat_cube_get_tags(target, cube_id);
     EXPECT_STREQ(tag_list->tag[0].key, TEST_SHARED_TAG.key);
 
     fieldstat_free(master);
@@ -357,7 +357,7 @@ TEST(calibrate, different_metric)
     EXPECT_EQ(test_get_max_metric_id(target), 1);
     EXPECT_STREQ(fieldstat_get_metric_name(target, 0), "counter");
     EXPECT_STREQ(fieldstat_get_metric_name(target, 1), "hi i am master new");
-    struct fieldstat_tag_list *tag_list = fieldstat_get_shared_tags(target, cube_id);
+    struct fieldstat_tag_list *tag_list = fieldstat_cube_get_tags(target, cube_id);
     EXPECT_STREQ(tag_list->tag[0].key, TEST_SHARED_TAG.key);
 
     fieldstat_free(master);
@@ -386,7 +386,7 @@ TEST(calibrate, target_more_cube)
 
     EXPECT_EQ(test_get_max_metric_id(target), 0);
     EXPECT_STREQ(fieldstat_get_metric_name(target, 0), "counter");
-    struct fieldstat_tag_list *tag_list = fieldstat_get_shared_tags(target, cube_id);
+    struct fieldstat_tag_list *tag_list = fieldstat_cube_get_tags(target, cube_id);
     EXPECT_STREQ(tag_list->tag[0].key, TEST_SHARED_TAG.key);
 
     EXPECT_EQ(fieldstat_find_cube(target, &TEST_SHARED_TAG, 1), 0);
@@ -414,9 +414,9 @@ TEST(calibrate, master_more_cube)
     EXPECT_EQ(cube_ids[1], cube_id2);
     free(cube_ids);
 
-    struct fieldstat_tag_list *tag_list = fieldstat_get_shared_tags(target, cube_id);
+    struct fieldstat_tag_list *tag_list = fieldstat_cube_get_tags(target, cube_id);
     EXPECT_STREQ(tag_list->tag[0].key, TEST_SHARED_TAG.key);
-    struct fieldstat_tag_list *tag_list2 = fieldstat_get_shared_tags(target, cube_id2);
+    struct fieldstat_tag_list *tag_list2 = fieldstat_cube_get_tags(target, cube_id2);
     EXPECT_STREQ(tag_list2->tag[0].key, TEST_TAG_STRING.key);
 
     EXPECT_EQ(fieldstat_find_cube(target, &TEST_TAG_STRING, 1), 1);
@@ -439,7 +439,7 @@ TEST(calibrate, master_change_cube)
 
     fieldstat_calibrate(master, target);
 
-    struct fieldstat_tag_list *tag_list = fieldstat_get_shared_tags(target, cube_id);
+    struct fieldstat_tag_list *tag_list = fieldstat_cube_get_tags(target, cube_id);
     EXPECT_STREQ(tag_list->tag[0].key, TEST_TAG_STRING.key);
 
     EXPECT_EQ(fieldstat_find_cube(target, &TEST_TAG_STRING, 1), 0);
@@ -521,7 +521,7 @@ TEST(calibrate, issue_calibrate_wrong)
     EXPECT_EQ(fieldstat_find_cube(target, tag_A, 1), FS_ERR_INVALID_KEY);
     EXPECT_EQ(fieldstat_find_cube(target, tag_B, 1), cubes_id_ret[0]);
 
-    struct fieldstat_tag_list *tag_list = fieldstat_get_shared_tags(target, cubes_id_ret[0]);
+    struct fieldstat_tag_list *tag_list = fieldstat_cube_get_tags(target, cubes_id_ret[0]);
     EXPECT_STREQ(tag_list->tag[0].key, tag_B->key);
     fieldstat_tag_list_arr_free(tag_list, 1);
 
@@ -553,7 +553,7 @@ TEST(calibrate, delete_first_cube)
     EXPECT_EQ(fieldstat_find_cube(target, tag_A, 1), FS_ERR_INVALID_KEY);
     EXPECT_EQ(fieldstat_find_cube(target, tag_B, 1), 1);
 
-    struct fieldstat_tag_list *tag_list = fieldstat_get_shared_tags(target, 1);
+    struct fieldstat_tag_list *tag_list = fieldstat_cube_get_tags(target, 1);
     EXPECT_STREQ(tag_list->tag[0].key, tag_B->key);
     fieldstat_tag_list_arr_free(tag_list, 1);
 

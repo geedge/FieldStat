@@ -28,7 +28,7 @@ void test_assert_standard_instance(const struct fieldstat *instance)
 
     struct fieldstat_tag_list *tag_list = NULL;
     size_t n_cell = 0;
-    fieldstat_get_cells_used_by_cube(instance, 0, &tag_list, &n_cell);
+    fieldstat_cube_get_cells(instance, 0, &tag_list, &n_cell);
     EXPECT_EQ(n_cell, 1);
     EXPECT_EQ(tag_list->n_tag, 1);
     EXPECT_STREQ(tag_list->tag[0].key, TEST_TAG_INT.key);
@@ -46,7 +46,7 @@ void test_assert_standard_instance(const struct fieldstat *instance)
 double my_fieldstat_hll_get(const struct fieldstat *instance, int cube_id, int metric_id)
 {
     double ret = 0;
-    fieldstat_hll_get(instance, cube_id, metric_id, &TEST_TAG_LIST_INT, &ret);
+    fieldstat_hll_get(instance, cube_id, &TEST_TAG_LIST_INT, metric_id,  &ret);
     return ret;
 }
 

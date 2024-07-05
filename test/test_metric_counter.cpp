@@ -22,7 +22,7 @@ struct fieldstat *test_init_standard_instance()
 long long my_fieldstat_counter_get(const struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag_list *tag_list = &TEST_TAG_LIST_INT)
 {
     long long ret = 0;
-    fieldstat_counter_get(instance, cube_id, metric_id, tag_list, &ret);
+    fieldstat_counter_get(instance, cube_id, tag_list, metric_id,  &ret);
     return ret;
 }
 
@@ -40,7 +40,7 @@ void test_assert_standard_instance(const struct fieldstat *instance)
 
     struct fieldstat_tag_list *tag_list = NULL;
     size_t n_cell = 0;
-    fieldstat_get_cells_used_by_cube(instance, 0, &tag_list, &n_cell);
+    fieldstat_cube_get_cells(instance, 0, &tag_list, &n_cell);
     EXPECT_EQ(n_cell, 1);
     EXPECT_EQ(tag_list->n_tag, 1);
     EXPECT_STREQ(tag_list->tag[0].key, TEST_TAG_INT.key);
@@ -138,7 +138,7 @@ TEST(metric_test_counter, topk_add_and_test_accuracy)
 
     struct fieldstat_tag_list *tag_list = NULL;
     size_t n_cell = 0;
-    fieldstat_get_cells_used_by_cube(instance, 0, &tag_list, &n_cell);
+    fieldstat_cube_get_cells(instance, 0, &tag_list, &n_cell);
     EXPECT_EQ(n_cell, 10);
     long long error = 0;
     for (size_t i = 0; i < n_cell; i++) {

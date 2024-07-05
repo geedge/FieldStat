@@ -476,12 +476,12 @@ int cell_iter_next_cube(struct cell_iter *iter) {
     while (iter->curr_cube_idx < iter->n_cube - 1) {
         int cube_id_next = iter->cube_ids[++iter->curr_cube_idx];
 
-        fieldstat_get_cells_used_by_cube(instance, cube_id_next, &iter->tag_list, &iter->n_cell);
+        fieldstat_cube_get_cells(instance, cube_id_next, &iter->tag_list, &iter->n_cell);
         if (iter->n_cell == 0) {
             continue;
         }
 
-        iter->shared_tag = fieldstat_get_shared_tags(iter->instance, iter->cube_ids[iter->curr_cube_idx]);
+        iter->shared_tag = fieldstat_cube_get_tags(iter->instance, iter->cube_ids[iter->curr_cube_idx]);
         iter->curr_cell_idx = 0;
         return 1;
     }
@@ -528,7 +528,7 @@ struct export_kv_pair *cell_query_with_iter(const struct cell_iter *iter, int me
     struct export_kv_pair *ret = NULL;
     if (type == METRIC_TYPE_COUNTER) {
         long long value;
-        int tmp_ret = fieldstat_counter_get(iter->instance, iter->cube_ids[iter->curr_cube_idx], metric_id, &iter->tag_list[iter->curr_cell_idx], &value);
+        int tmp_ret = fieldstat_counter_get(iter->instance, iter->cube_ids[iter->curr_cube_idx], &iter->tag_list[iter->curr_cell_idx], metric_id, &value);
         if (tmp_ret < 0) {
             return NULL;
         }

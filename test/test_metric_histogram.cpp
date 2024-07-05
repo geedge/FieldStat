@@ -33,7 +33,7 @@ void test_assert_standard_instance(const struct fieldstat *instance)
 
     struct fieldstat_tag_list *tag_list = NULL;
     size_t n_cell = 0;
-    fieldstat_get_cells_used_by_cube(instance, 0, &tag_list, &n_cell);
+    fieldstat_cube_get_cells(instance, 0, &tag_list, &n_cell);
     EXPECT_EQ(n_cell, 1);
     EXPECT_EQ(tag_list->n_tag, 1);
     EXPECT_STREQ(tag_list->tag[0].key, TEST_TAG_STRING.key);
@@ -57,8 +57,8 @@ TEST(metric_test_histogram, simple_register_and_query)
     fieldstat_hist_record(instance, 0, 0, &TEST_TAG_STRING, 1, 123);
 
     test_assert_standard_instance(instance);
-    EXPECT_EQ(fieldstat_hist_value_at_percentile(instance, 0, 0, &TEST_TAG_LIST_STRING, 50.0), 1234);
-    EXPECT_EQ(fieldstat_hist_count_le_value(instance, 0, 0, &TEST_TAG_LIST_STRING, 1000), 1);
+    EXPECT_EQ(fieldstat_hist_value_at_percentile(instance, 0, &TEST_TAG_LIST_STRING, 0, 50.0), 1234);
+    EXPECT_EQ(fieldstat_hist_count_le_value(instance, 0, &TEST_TAG_LIST_STRING, 0, 1000), 1);
 
     fieldstat_free(instance);
 }
@@ -76,8 +76,8 @@ TEST(metric_test_histogram, merge)
     // query
     test_assert_standard_instance(instance_total);
 
-    EXPECT_EQ(fieldstat_hist_value_at_percentile(instance_total, 0, 0, &TEST_TAG_LIST_STRING, 50.0), 1234);
-    EXPECT_EQ(fieldstat_hist_count_le_value(instance, 0, 0, &TEST_TAG_LIST_STRING, 1000), 1);
+    EXPECT_EQ(fieldstat_hist_value_at_percentile(instance_total, 0, &TEST_TAG_LIST_STRING, 0, 50.0), 1234);
+    EXPECT_EQ(fieldstat_hist_count_le_value(instance, 0, &TEST_TAG_LIST_STRING, 0, 1000), 1);
 
     fieldstat_free(instance);
     fieldstat_free(instance_total);
@@ -97,8 +97,8 @@ TEST(metric_test_histogram, merge_twice_with_reset)
     fieldstat_merge(instance_total, instance);
 
     test_assert_standard_instance(instance_total);
-    EXPECT_EQ(fieldstat_hist_value_at_percentile(instance_total, 0, 0, &TEST_TAG_LIST_STRING, 50.0), 1234);
-    EXPECT_EQ(fieldstat_hist_count_le_value(instance_total, 0, 0, &TEST_TAG_LIST_STRING, 1000), 1);
+    EXPECT_EQ(fieldstat_hist_value_at_percentile(instance_total, 0, &TEST_TAG_LIST_STRING, 0, 50.0), 1234);
+    EXPECT_EQ(fieldstat_hist_count_le_value(instance_total, 0, &TEST_TAG_LIST_STRING, 0, 1000), 1);
 
     fieldstat_free(instance);
     fieldstat_free(instance_total);
@@ -178,7 +178,7 @@ TEST(metric_test_histogram, can_add_0value) // histogram only allow min_val > 0,
     EXPECT_EQ(ret, 0);
     ret = fieldstat_hist_record(instance, cube_id, metric_id, &TEST_TAG_INT, 1, 500);
 
-    EXPECT_EQ(fieldstat_hist_value_at_percentile(instance, cube_id, metric_id, &TEST_TAG_LIST_INT, 60.0), 0);
+    EXPECT_EQ(fieldstat_hist_value_at_percentile(instance, cube_id, &TEST_TAG_LIST_INT, metric_id,  60.0), 0);
 
     fieldstat_free(instance);
 }
