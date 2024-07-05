@@ -64,12 +64,12 @@ struct Bucket {
 
 // Parameters used in algorithm
 struct heavy_keeper_options{
-    int array_num;  // the size of the array. Default value: 4
+    int r;  // the size of the array. Default value: 4
                     // Set it by how accurate you want. Value of 4 guarantees an accuracy more than 90% and around 97% in all tests.
                     // Not too big because it have an impact on both time and memory efficiency.
-    int max_bucket_num; // M2, the maximum number of buckets every array keeps. Default value: k*log(k) and no less than 100. 
+    int w; // M2, the maximum number of buckets every array keeps. Default value: k*log(k) and no less than 100. 
                         // Basically, as long as big enough, it won't affect the accuracy significantly.
-    double decay_exp_rate; // b, bigger variance of flow size is(elephant flows take more ratio), smaller it should be.
+    double b; // b, bigger variance of flow size is(elephant flows take more ratio), smaller it should be.
                            //  Must bigger than 1. Better not bigger than 1.3, otherwise some elephant flow will be missed.
 };
 
@@ -479,7 +479,7 @@ void sorted_set_reset(struct sorted_set *ss)
 /* -------------------------------------------------------------------------- */
 
 struct Bucket *new_sketch(struct heavy_keeper_options *params) {
-    size_t array_len = (size_t)params->array_num * (size_t)params->max_bucket_num;
+    size_t array_len = (size_t)params->r * (size_t)params->w;
 
     struct Bucket *ret = (struct Bucket *)calloc(array_len, sizeof(struct Bucket));
 
@@ -493,16 +493,16 @@ void params_set_to_default(struct heavy_keeper_options *p, int K) {
     double log_ret = log((double)K) / 2.3;  // 2.3: log_e(10), log_ret = log_10(K)
 
     if (log_ret < 3) {
-        p->array_num = 3;
+        p->r = 3;
     } else {
-        p->array_num = (int)(log_ret);
+        p->r = (int)(log_ret);
     }
-    p->decay_exp_rate = 1.17; // by test, 1.17 is the best
-    p->max_bucket_num = (int)(log_ret * K * 2);
-    if (p->max_bucket_num < 150) {
-        p->max_bucket_num = 150;  // determined through test, too small max_bucket_num will let accuracy decrease severely.
-    } else if (p->max_bucket_num > 600) {
-        p->max_bucket_num = p->max_bucket_num / 4 + 450;
+    p->b = 1.17; // by test, 1.17 is the best
+    p->w = (int)(log_ret * K * 2);
+    if (p->w < 150) {
+        p->w = 150;  // determined through test, too small max_bucket_num will let accuracy decrease severely.
+    } else if (p->w > 600) {
+        p->w = p->w / 4 + 450;
     }
 }
 
@@ -535,7 +535,7 @@ void heavy_keeper_free(struct heavy_keeper *hk) {
 
 void heavy_keeper_reset(struct heavy_keeper *hk) {
     sorted_set_reset(hk->top_K_heap);
-    memset(hk->sketch, 0, sizeof(struct Bucket) * (size_t)hk->params.array_num * (size_t)hk->params.max_bucket_num);
+    memset(hk->sketch, 0, sizeof(struct Bucket) * (size_t)hk->params.r * (size_t)hk->params.w);
 }
 
 const int DECAY_POW_TABLE[128] = { // 1.17 ^ exp * RAND_MAX, exp is in [0,127]
@@ -557,8 +557,8 @@ bool if_need_to_decay(struct heavy_keeper *hk, const struct Bucket *bucket, unsi
         return false;
     }
 
-    // double decay_rate = pow(hk->params.decay_exp_rate, -exp);
-    // p->decay_exp_rate = 1.17 is fixed, search table to get result directly.
+    // double decay_rate = pow(hk->params.b, -exp);
+    // p->b = 1.17 is fixed, search table to get result directly.
     int decay_rate = DECAY_POW_TABLE[exp];
 
     if (rand_r(&(hk->rand_state)) < decay_rate) {
@@ -601,13 +601,15 @@ int heavy_keeper_add(struct heavy_keeper *heavy_keeper, const char *key, size_t 
     unsigned long long int old_cnt = sorted_set_get_count(summary, key, key_len);
     bool not_in_sorted_set = (old_cnt == INVALID_COUNT);
     unsigned long long maxv = 0;
-    unsigned int FP = cal_hash_val_with_seed(key, key_len, FP_HASH_KEY);
+    unsigned int fp = cal_hash_val_with_seed(key, key_len, FP_HASH_KEY);
+    unsigned int h1 = fp;
+    unsigned int h2 = cal_hash_val_with_seed(key, key_len, FP_HASH_KEY+1);
 
-    for (int j = 0; j < heavy_keeper->params.array_num; j++) {
-        unsigned int Hsh = j == FP_HASH_KEY ? FP : cal_hash_val_with_seed(key, key_len, j);
-        struct Bucket *bucket = &(heavy_keeper->sketch[j * heavy_keeper->params.max_bucket_num + (Hsh% heavy_keeper->params.max_bucket_num)]);
+    for (int j = 0; j < heavy_keeper->params.r; j++) {
+        unsigned int hashv = h1 + j * h2; // use `double hashing` strategy
+        struct Bucket *bucket = &(heavy_keeper->sketch[j * heavy_keeper->params.w + (hashv % heavy_keeper->params.w)]);
 
-        if (bucket->finger_print == FP) {
+        if (bucket->finger_print == fp) {
             // If a key is not in the min-heap, then the estimated key size should be no larger than nmin.
             // or if the min-heap is not full(nmin == 0), every key should be taken into account, so of course it should be added.
             // in neither case, bucket->count > nMin && not_in_sorted_set happen.
@@ -627,7 +629,7 @@ int heavy_keeper_add(struct heavy_keeper *heavy_keeper, const char *key, size_t 
             }
 
             if (bucket->count < count) {
-                bucket->finger_print = FP;
+                bucket->finger_print = fp;
                 bucket->count = count;
 
                 maxv = MAX(maxv, count);
@@ -703,8 +705,8 @@ size_t heavy_keeper_list(const struct heavy_keeper *hk, void **exdatas, size_t n
 }
 
 static void heavy_keeper_merge_sketch(struct heavy_keeper *dest, const struct heavy_keeper *src) {
-    int w = dest->params.max_bucket_num;
-    int d = dest->params.array_num;
+    int w = dest->params.w;
+    int d = dest->params.r;
     //idx
     for (int array_id = 0; array_id < d; array_id++) {
         for (int bucket_id = 0; bucket_id < w; bucket_id++) {
@@ -726,11 +728,13 @@ static void heavy_keeper_merge_sketch(struct heavy_keeper *dest, const struct he
 unsigned long long find_maxv_in_sketch(struct heavy_keeper *hk, const char *key, size_t key_len) {
     struct Bucket *bucket;
     unsigned fp = cal_hash_val_with_seed(key, key_len, FP_HASH_KEY);
+    unsigned h1 = fp;
+    unsigned h2 = cal_hash_val_with_seed(key, key_len, FP_HASH_KEY+1);
 
     unsigned long long maxv = 0;
-    for (int array_id = 0; array_id < hk->params.array_num; array_id++) {
-        unsigned int hash = array_id == FP_HASH_KEY ? fp : cal_hash_val_with_seed(key, key_len, array_id);
-        bucket = &(hk->sketch[array_id * hk->params.max_bucket_num + (hash % hk->params.max_bucket_num)]);
+    for (int array_id = 0; array_id < hk->params.r; array_id++) {
+        unsigned int hash = h1 + array_id * h2;
+        bucket = &(hk->sketch[array_id * hk->params.w + (hash % hk->params.w)]);
 
         if (bucket->finger_print == fp) {
             maxv = MAX(maxv, bucket->count);
@@ -814,8 +818,8 @@ struct heavy_keeper *heavy_keeper_copy(const struct heavy_keeper *src) {
     ret->top_K_heap = sorted_set_copy(src->top_K_heap);
 
     ret->params = src->params;
-    ret->sketch = (struct Bucket *)malloc(sizeof(struct Bucket) * (size_t)ret->params.array_num * (size_t)ret->params.max_bucket_num);
-    memcpy(ret->sketch, src->sketch, sizeof(struct Bucket) * (size_t)ret->params.array_num * (size_t)ret->params.max_bucket_num);
+    ret->sketch = (struct Bucket *)malloc(sizeof(struct Bucket) * (size_t)ret->params.r * (size_t)ret->params.w);
+    memcpy(ret->sketch, src->sketch, sizeof(struct Bucket) * (size_t)ret->params.r * (size_t)ret->params.w);
 
     ret->new_fn = src->new_fn;
     ret->free_fn = src->free_fn;
