@@ -127,7 +127,6 @@ struct cube_manager *cube_manager_new() {
     return pthis;
 }
 
-
 static void tag2key(const struct fieldstat_tag tags[], size_t n_tags, char **out_key, size_t *out_key_size)
 {
     if (n_tags == 0) {
@@ -137,78 +136,55 @@ static void tag2key(const struct fieldstat_tag tags[], size_t n_tags, char **out
         return;
     }
 	int i = 0;
-	int used_len = 0;
+	size_t used_len = 0;
 	struct fieldstat_tag *tag = NULL;
 
-    const size_t init_key_size = 1024;
-    size_t one_time_key_size = init_key_size;
-    char *one_time_key = (char *)malloc(init_key_size);
-    size_t remain_key_size = init_key_size;
-    size_t total_key_size = init_key_size;
-    char *dynamic_mem = (char *)malloc(remain_key_size);
-    size_t key_len;
-    size_t val_len;
+    size_t alloced_every_time = 1024;
+    size_t remain_key_size = alloced_every_time;
+    size_t total_key_size = alloced_every_time;
+    char *dynamic_mem = (char *)malloc(total_key_size);
+    void *val_position;
+
+    size_t key_len = 0;
+    size_t val_len = 0;
 
 	for(i = 0; i < (int)n_tags; i++)
 	{
 		tag = (struct fieldstat_tag *)&tags[i];
+        key_len = strlen(tag->key);
 		switch(tag->type)
 		{
-			case 0:
-                key_len = strlen(tag->key);
+			case TAG_INTEGER:
                 val_len = sizeof(long long);
-                used_len = key_len + val_len;
-                while (used_len >= one_time_key_size) {
-                    one_time_key_size += init_key_size;
-                    one_time_key = (char *)realloc(one_time_key, one_time_key_size);
-                }
-                memcpy(one_time_key, tag->key, key_len);
-                memcpy(one_time_key + key_len, &tag->value_longlong, val_len);
+                val_position = &tag->value_longlong;
 				break;
-			case 1:
-                key_len = strlen(tag->key);
+			case TAG_DOUBLE:
                 val_len = sizeof(double);
-                used_len = key_len + val_len;
-                while (used_len >= one_time_key_size) {
-                    one_time_key_size += init_key_size;
-                    one_time_key = (char *)realloc(one_time_key, one_time_key_size);
-                }
-                memcpy(one_time_key, tag->key, key_len);
-                memcpy(one_time_key + key_len, &tag->value_double, val_len);
+                val_position = &tag->value_double;
+
 				break;
-			case 2:
-                key_len = strlen(tag->key);
+			case TAG_CSTRING:
                 val_len = strlen(tag->value_str);
-                used_len = key_len + val_len;
-                while (used_len >= one_time_key_size) {
-                    one_time_key_size += init_key_size;
-                    one_time_key = (char *)realloc(one_time_key, one_time_key_size);
-                }
-                memcpy(one_time_key, tag->key, key_len);
-                memcpy(one_time_key + key_len, tag->value_str, val_len);
+                val_position = (void *)tag->value_str;
 				break;
 			default:
 				assert(0);
 				break;
 		}
         
+        used_len = key_len + val_len;
         while (used_len >= remain_key_size) {
-            total_key_size += init_key_size;
+            total_key_size += alloced_every_time;
+            remain_key_size += alloced_every_time;
             dynamic_mem = (char *)realloc(dynamic_mem, total_key_size);
-            remain_key_size += init_key_size;
         }
-
-        memcpy(dynamic_mem + total_key_size - remain_key_size, one_time_key, used_len);
+        memcpy(dynamic_mem + total_key_size - remain_key_size, tag->key, key_len);
+        memcpy(dynamic_mem + total_key_size - remain_key_size + key_len, val_position, val_len);
         remain_key_size -= used_len;
 	}
 
-    *out_key = (char *)malloc(total_key_size - remain_key_size + 1);
-    memcpy(*out_key, dynamic_mem, total_key_size - remain_key_size);
-    (*out_key)[total_key_size - remain_key_size] = '\0';
-    *out_key_size = total_key_size - remain_key_size; // not include '\0'
-
-    free(dynamic_mem);
-    free(one_time_key);
+    *out_key = dynamic_mem;
+    *out_key_size = total_key_size - remain_key_size;
 }
 
 int cube_manager_add(struct cube_manager *pthis, struct cube *cube)
