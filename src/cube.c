@@ -19,15 +19,8 @@ struct exdata_new_args {
     size_t n_tags;
 };
 
-struct cube_manager_item {
-    char *key;
-    size_t key_len;
-    int id;
-    UT_hash_handle hh;
-};
-
 struct cube_manager {
-    struct cube_manager_item *head;
+    struct cube *hash_table;
     
     struct cube **cube;
     size_t cube_cnt;
@@ -54,9 +47,13 @@ struct cube {
     size_t n_shared_tags;
 
     int primary_metric_id;
+    char *key;
+    size_t key_len;
+    int id;
+    UT_hash_handle hh;
 };
 
-static void tag_array_copy(struct fieldstat_tag *tags_dst, const struct fieldstat_tag *tags_src, size_t n_tag)
+static void tag_array_copy(struct fieldstat_tag *tags_dst, const struct fieldstat_tag *tags_src, size_t n_tag) // TODO: 改成clone吧, 
 {
     for (size_t i = 0; i < n_tag; i++) {
         tags_dst[i].key = strdup(tags_src[i].key);
@@ -108,28 +105,21 @@ void add_cube_to_position(struct cube_manager *instance, struct cube *cube, int 
 }
 
 void cube_manager_free(struct cube_manager *pthis) {
-    struct cube_manager_item *node = NULL;
-    struct cube_manager_item *tmp = NULL;
-    struct cube_manager_item *head = pthis->head;
+    struct cube *node = NULL;
+    struct cube *tmp = NULL;
+    struct cube *head = pthis->hash_table;
     HASH_ITER(hh, head, node, tmp) {
         HASH_DEL(head, node);
-        free(node->key);
-        free(node);
+        cube_free(node);
     }
     
-    for (int i = 0; i < pthis->cube_cnt; i++) {
-        if (pthis->cube[i] != NULL) {
-            cube_free(pthis->cube[i]);
-        }
-    }
-
     free(pthis->cube);
     free(pthis);
 }
 
 struct cube_manager *cube_manager_new() {
     struct cube_manager *pthis = (struct cube_manager *)malloc(sizeof(struct cube_manager));
-    pthis->head = NULL;
+    pthis->hash_table = NULL;
 
     pthis->cube = (struct cube **)calloc(DEFAULT_N_CUBE, sizeof(struct cube *));
     pthis->cube_cnt = 0;
@@ -138,7 +128,7 @@ struct cube_manager *cube_manager_new() {
 }
 
 
-static void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_tags, char **out_key, size_t *out_key_size)
+static void tag2key(const struct fieldstat_tag tags[], size_t n_tags, char **out_key, size_t *out_key_size)
 {
     if (n_tags == 0) {
         // use a default dummy key
@@ -223,14 +213,12 @@ static void build_dynamic_cell_key(const struct fieldstat_tag tags[], size_t n_t
 
 int cube_manager_add(struct cube_manager *pthis, struct cube *cube)
 {
-    char *key;
-    size_t key_len;
-    build_dynamic_cell_key(cube->cube_identifier, cube->n_shared_tags, &key, &key_len);
+    char *key = cube->key;
+    size_t key_len = cube->key_len;
 
-    struct cube_manager_item *node = NULL;
-    HASH_FIND(hh, pthis->head, key, key_len, node);
-    if (node != NULL) {
-        free(key);
+    struct cube *old_cube = NULL;
+    HASH_FIND(hh, pthis->hash_table, key, key_len, old_cube);
+    if (old_cube != NULL) {
         return -1;
     }
 
@@ -241,55 +229,42 @@ int cube_manager_add(struct cube_manager *pthis, struct cube *cube)
         }
     }
 
-    node = (struct cube_manager_item *)malloc(sizeof(struct cube_manager_item));
-    node->key = key;
-    node->key_len = key_len;
-    node->id = id;
-    HASH_ADD_KEYPTR(hh, pthis->head, node->key, key_len, node);
+    cube->id = id;
+    HASH_ADD_KEYPTR(hh, pthis->hash_table, cube->key, key_len, cube);
 
     add_cube_to_position(pthis, cube, id);
 
     return id;
 }
 
-void cube_manager_delete_by_key(struct cube_manager *pthis, const char *key, size_t key_len)
+void cube_manager_delete(struct cube_manager *pthis, struct cube *cube)
 {
-    struct cube_manager_item *node = NULL;
-    HASH_FIND(hh, pthis->head, key, key_len, node);
-    if (node == NULL) {
-        return;
-    }
+    // char *key = cube->key;
+    // size_t key_len = cube->key_len;
+    // struct cube *node = NULL;
+    // HASH_FIND(hh, pthis->head, key, key_len, node);
+    // if (node == NULL) {
+    //     return;
+    // }
 
-    int id = node->id;
-    cube_free(pthis->cube[id]);
+    int id = cube->id;
+    HASH_DEL(pthis->hash_table, cube);
+
+    cube_free(cube);
     pthis->cube[id] = NULL;
     if (id == pthis->cube_cnt - 1) {
         pthis->cube_cnt--;
     }
-
-    HASH_DEL(pthis->head, node);
-    free(node->key);
-    free(node);
-}
-
-void cube_manager_delete(struct cube_manager *pthis, struct cube *cube)
-{
-    char *key;
-    size_t key_len;
-    build_dynamic_cell_key(cube->cube_identifier, cube->n_shared_tags, &key, &key_len);
-
-    cube_manager_delete_by_key(pthis, key, key_len);
-    free(key);
 }
 
 int cube_manager_find(const struct cube_manager *pthis, const struct fieldstat_tag *identifier, size_t n_tag)
 {
     char *key;
     size_t key_len;
-    build_dynamic_cell_key(identifier, n_tag, &key, &key_len);
+    tag2key(identifier, n_tag, &key, &key_len);
 
-    struct cube_manager_item *node = NULL;
-    HASH_FIND(hh, pthis->head, key, key_len, node);
+    struct cube *node = NULL;
+    HASH_FIND(hh, pthis->hash_table, key, key_len, node);
     free(key);
     if (node == NULL) {
         return -1;
@@ -327,27 +302,23 @@ void cube_manager_list(const struct cube_manager *pthis, int **cube_ids, int *n_
 
 void cube_manager_calibrate(struct cube_manager *pthis, const struct cube_manager *master)
 {
-    struct cube_manager_item *node = NULL;
-    struct cube_manager_item *tmp = NULL;
+    struct cube *node_in_master, *node_in_dest, *tmp;
 
     // exist in self but not in master
-    HASH_ITER(hh, pthis->head, node, tmp) {
-        struct cube_manager_item *node_in_master = NULL;
-        HASH_FIND(hh, master->head, node->key, node->key_len, node_in_master);
+    HASH_ITER(hh, pthis->hash_table, node_in_dest, tmp) {
+        HASH_FIND(hh, master->hash_table, node_in_dest->key, node_in_dest->key_len, node_in_master);
 
         if (node_in_master == NULL) {
-            cube_manager_delete_by_key(pthis, node->key, node->key_len);
+            cube_manager_delete(pthis, node_in_dest);
         }
     }
 
     // exist in master but not in self
-    HASH_ITER(hh, master->head, node, tmp) {
-        struct cube_manager_item *node_in_self = NULL;
-        HASH_FIND(hh, pthis->head, node->key, node->key_len, node_in_self);
+    HASH_ITER(hh, master->hash_table, node_in_master, tmp) {
+        HASH_FIND(hh, pthis->hash_table, node_in_master->key, node_in_master->key_len, node_in_dest);
 
-        if (node_in_self == NULL) {
-            int cube_id = node->id;
-            cube_manager_add(pthis, cube_fork(master->cube[cube_id]));
+        if (node_in_dest == NULL) {
+            cube_manager_add(pthis, cube_fork(node_in_master));
         }
     }
 }
@@ -355,26 +326,26 @@ void cube_manager_calibrate(struct cube_manager *pthis, const struct cube_manage
 struct cube_manager *cube_manager_fork(const struct cube_manager *src)
 {
     struct cube_manager *pthis = cube_manager_new();
-    struct cube_manager_item *node = NULL;
-    struct cube_manager_item *tmp = NULL;
-    HASH_ITER(hh, src->head, node, tmp) {
-        cube_manager_add(pthis, cube_fork(src->cube[node->id]));
+    struct cube *node = NULL;
+    struct cube *tmp = NULL;
+    HASH_ITER(hh, src->hash_table, node, tmp) {
+        cube_manager_add(pthis, cube_fork(node));
     }
     return pthis;
 }
 
 void cube_manager_merge(struct cube_manager *dest, const struct cube_manager *src)
 {
-    struct cube_manager_item *node = NULL;
-    struct cube_manager_item *tmp = NULL;
-    HASH_ITER(hh, src->head, node, tmp) {
-        struct cube_manager_item *node_in_dest = NULL;
-        HASH_FIND(hh, dest->head, node->key, node->key_len, node_in_dest);
+    struct cube *node = NULL;
+    struct cube *tmp = NULL;
+    HASH_ITER(hh, src->hash_table, node, tmp) {
+        struct cube *node_in_dest = NULL;
+        HASH_FIND(hh, dest->hash_table, node->key, node->key_len, node_in_dest);
 
         if (node_in_dest == NULL) {
-            cube_manager_add(dest, cube_copy(src->cube[node->id]));
+            cube_manager_add(dest, cube_copy(node));
         } else {
-            cube_merge(dest->cube[node_in_dest->id], src->cube[node->id]);
+            cube_merge(node_in_dest, node);
         }
     }
 }
@@ -530,8 +501,10 @@ struct cube *cube_info_new(const struct fieldstat_tag *shared_tags, size_t n_tag
     }
 
     cube->n_shared_tags = n_tag;
-
     cube->max_n_cell = max_n_cell;
+    tag2key(shared_tags, n_tag, &cube->key, &cube->key_len);
+
+    cube->id = -1;
 
     return cube;
 }
@@ -573,6 +546,7 @@ void cube_free(struct cube *cube) {
     }
 
     fieldstat_free_tag_array(cube->cube_identifier, cube->n_shared_tags);
+    free(cube->key);
 
     free(cube);
 }
@@ -592,7 +566,7 @@ void cube_set_primary_metric(struct cube *cube, int metric_id) {
 struct cell *get_cell(struct cube *cube, const struct fieldstat_tag *tags, size_t n_tag,long long increment, int metric_id) {
     char *tag_in_string;
     size_t tag_len;
-    build_dynamic_cell_key(tags, n_tag, &tag_in_string, &tag_len);
+    tag2key(tags, n_tag, &tag_in_string, &tag_len);
     struct exdata_new_args args;
     args.tags = tags;
     args.n_tags = n_tag;
@@ -634,7 +608,7 @@ struct cell *get_cell(struct cube *cube, const struct fieldstat_tag *tags, size_
 
 int cube_histogram_record(struct cube *cube, const struct metric_manifest *manifest, const struct fieldstat_tag *tags, size_t n_tag, long long value) {
     assert(manifest->type == METRIC_TYPE_HISTOGRAM);
-    assert(manifest->id != cube->primary_metric_id);
+    assert(cube->sampling_mode == SAMPLING_MODE_COMPREHENSIVE || (cube->primary_metric_id != manifest->id));
 
     struct cell *cell_data = get_cell(cube, tags, n_tag, 0, manifest->id);
     if (cell_data == NULL) {
@@ -651,7 +625,7 @@ int cube_histogram_record(struct cube *cube, const struct metric_manifest *manif
 
 int cube_hll_add(struct cube *cube, const struct metric_manifest *manifest, const struct fieldstat_tag *tags, size_t n_tag, const char *key, size_t key_len) {
     assert(manifest->type == METRIC_TYPE_HLL);
-    assert(manifest->id != cube->primary_metric_id);
+    assert(cube->sampling_mode == SAMPLING_MODE_COMPREHENSIVE || (cube->primary_metric_id != manifest->id));
 
     struct cell *cell_data = get_cell(cube, tags, n_tag, 0, manifest->id);
     if (cell_data == NULL) {
@@ -665,7 +639,7 @@ int cube_hll_add(struct cube *cube, const struct metric_manifest *manifest, cons
 
 int cube_counter_incrby(struct cube *cube, const struct metric_manifest *manifest, const struct fieldstat_tag *tags, size_t n_tag, long long increment) {
     assert(manifest->type == METRIC_TYPE_COUNTER);
-    assert(cube->primary_metric_id != manifest->id || increment >= 0);
+    assert(cube->sampling_mode == SAMPLING_MODE_COMPREHENSIVE || (cube->primary_metric_id != manifest->id || increment >= 0));
 
     struct cell *cell_data = get_cell(cube, tags, n_tag, increment, manifest->id);
     if (cell_data == NULL) {
@@ -680,7 +654,8 @@ int cube_counter_incrby(struct cube *cube, const struct metric_manifest *manifes
 
 int cube_counter_set(struct cube *cube, const struct metric_manifest *manifest, const struct fieldstat_tag *tags, size_t n_tag, long long value) {
     assert(manifest->type == METRIC_TYPE_COUNTER);
-    assert(cube->primary_metric_id != manifest->id);
+    assert(cube->sampling_mode == SAMPLING_MODE_COMPREHENSIVE || (cube->primary_metric_id != manifest->id));
+
     struct cell *cell_data = get_cell(cube, tags, n_tag, 0, manifest->id);
     if (cell_data == NULL) {
         return FS_ERR_TOO_MANY_CELLS;
@@ -793,7 +768,7 @@ const struct cell *get_cell_by_tag_list(const struct cube *cube, const struct fi
     const struct cell *ret = NULL;
     char *tag_in_string;
     size_t tag_len;
-    build_dynamic_cell_key(tags->tag, tags->n_tag, &tag_in_string, &tag_len);
+    tag2key(tags->tag, tags->n_tag, &tag_in_string, &tag_len);
 
     switch (cube->sampling_mode)
     {

@@ -158,7 +158,7 @@ void fieldstat_reset(struct fieldstat *instance);
  @brief Merge the instance. The registered cubes and metrics are merged even if there are no cells added.
  @return 0 if success. return FS_ERR_INVALID_PARAM when the registered cubes or metrics between dest and src of the same keys has different types or configurations(like different primary metric).
 */
-int fieldstat_merge(struct fieldstat *instance, struct fieldstat *src);
+int fieldstat_merge(struct fieldstat *instance, const struct fieldstat *src);
 
 /* -------------------------------------------------------------------------- */
 /*                                    query                                   */

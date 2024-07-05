@@ -260,7 +260,7 @@ static const struct metric_scheme g_metric_scheme_table[] = {
 struct metric *metric_new(const struct metric_manifest *manifest)
 {
     struct metric *pthis = (struct metric *)calloc(1, sizeof(struct metric));
-    pthis->data = g_metric_scheme_table[manifest->type].new(manifest->paras);
+    pthis->data = g_metric_scheme_table[manifest->type].new(manifest->parameters);
     pthis->type = manifest->type;
 
     return pthis;
