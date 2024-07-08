@@ -13,8 +13,6 @@
 #include "minheap/heap.h"
 #include "mpack/mpack.h"
 #include "xxhash/xxhash.h"
-
-
 // XXHASH is faster
 #define HASH_FUNCTION(keyptr, keylen, hashv) \
         do { \
@@ -108,17 +106,12 @@ static void *default_copy_fn(void *exdata) {
     return exdata;
 }
 
-static char *my_key_dup(const char *key, size_t key_len) {
-    char *ret = (char *)malloc(key_len);
-    memcpy(ret, key, key_len);
-    return ret;
-}
-
 struct entry_data *entry_data_construct(const char *key, size_t key_len, void *exdata)
 {
     struct entry_data *entry_data = (struct entry_data *)malloc(sizeof(struct entry_data));
 
-    entry_data->key = my_key_dup(key, key_len);
+    entry_data->key = (char *)malloc(key_len);
+    memcpy(entry_data->key, key, key_len);
     entry_data->key_len = key_len;
     entry_data->exdata = exdata;
     return entry_data;
@@ -134,7 +127,7 @@ void entry_data_destroy(struct entry_data *entry_data, exdata_free_cb free_fn)
     free(entry_data);
 }
 
-unsigned long long sorted_set_entry_get_count(const heap_entry *entry)
+static inline unsigned long long sorted_set_entry_get_count(const heap_entry *entry)
 {
     unsigned long long count = *(unsigned long long *)entry->key;
     if (count == 0) {
@@ -157,8 +150,16 @@ static inline bool sorted_set_entry_dying(const heap_entry *entry)
     return count == 0;    
 }
 
+static inline unsigned long long safe_add(unsigned long long a, unsigned long long b)
+{
+    if (UINT64_MAX - a < b) {
+        return UINT64_MAX;
+    }
+    return a + b;
+}
+
 // cppcheck-suppress [constParameterCallback, unmatchedSuppression]
-static bool cmp_entry_by_count(void *aa, void *bb)
+static bool cmp_entry_cb(void *aa, void *bb)
 {
     heap_entry *a = (heap_entry *)aa;
     heap_entry *b = (heap_entry *)bb;
@@ -171,20 +172,12 @@ static bool cmp_entry_by_count(void *aa, void *bb)
     return false;
 }
 
-static inline unsigned long long safe_add(unsigned long long a, unsigned long long b)
-{
-    if (UINT64_MAX - a < b) {
-        return UINT64_MAX;
-    }
-    return a + b;
-}
-
-static int my_entry_get_index(void *a)
+static int entry_get_index_cb(void *a)
 {
     return ((heap_entry *)a)->index;
 }
 
-void my_entry_set_index(int index, void *a)
+void entry_set_index_cb(int index, void *a)
 {
     ((heap_entry *)a)->index = index;
 }
@@ -195,7 +188,7 @@ struct sorted_set *sorted_set_new(int set_size)
     ret->hash_tbl = NULL;
     ret->n_living_entry = 0;
     heap *h = (heap *)malloc(sizeof(heap));
-    init_heap(h, set_size, cmp_entry_by_count, my_entry_get_index, my_entry_set_index);
+    init_heap(h, set_size, cmp_entry_cb, entry_get_index_cb, entry_set_index_cb);
 
     ret->heap = h;
 
@@ -252,7 +245,7 @@ heap_entry *sorted_set_find_entry(const struct sorted_set *ss, const char *key, 
     return (heap_entry *)s->val;
 }
 
-void sorted_set_entry_set_key(struct sorted_set *ss, heap_entry *entry, unsigned long long count)
+static inline void sorted_set_entry_set_count(struct sorted_set *ss, heap_entry *entry, unsigned long long count)
 {
     *(unsigned long long *)(entry->key) = count;
 
@@ -343,7 +336,7 @@ int sorted_set_insert(struct sorted_set *ss, const char *key, size_t key_len, un
             assert(0);
             return -1;
         }
-        sorted_set_entry_set_key(ss, entry, safe_add(cnt, 1)); // sorted set will let the count start from 1, 0 for dying entry.
+        sorted_set_entry_set_count(ss, entry, safe_add(cnt, 1)); // sorted set will let the count start from 1, 0 for dying entry.
 
         ss->n_living_entry++;
         return 1;
@@ -360,7 +353,7 @@ int sorted_set_insert(struct sorted_set *ss, const char *key, size_t key_len, un
     return 1;
 }
 
-int sorted_set_cardinality(const struct sorted_set *ss)
+static inline int sorted_set_cardinality(const struct sorted_set *ss)
 {
     return ss->n_living_entry;
 }
@@ -381,7 +374,7 @@ unsigned long long sorted_set_get_count(const struct sorted_set *ss, const char 
     return sorted_set_entry_get_count(entry);
 }
 
-int sorted_set_incrby(struct sorted_set *ss, const char *key, size_t key_len, unsigned long long count)
+int sorted_set_incrby_count(struct sorted_set *ss, const char *key, size_t key_len, unsigned long long count)
 {
     heap_entry *entry = sorted_set_find_entry(ss, key, key_len);
     if (entry == NULL) {
@@ -394,7 +387,7 @@ int sorted_set_incrby(struct sorted_set *ss, const char *key, size_t key_len, un
     } else {
         cnt_old = 0;
     }
-    sorted_set_entry_set_key(ss, entry, safe_add(count, cnt_old));
+    sorted_set_entry_set_count(ss, entry, safe_add(count, cnt_old));
     return 0;
 }
 
@@ -506,7 +499,6 @@ void params_set_to_default(struct heavy_keeper_options *p, int K) {
     }
 }
 
-
 struct heavy_keeper *heavy_keeper_new(int max_query_num) {
     struct heavy_keeper *hk = (struct heavy_keeper *)malloc(sizeof(struct heavy_keeper));
     hk->K = max_query_num;
@@ -567,15 +559,8 @@ bool if_need_to_decay(struct heavy_keeper *hk, const struct Bucket *bucket, unsi
     return false;
 }
 
-unsigned int cal_hash_val_with_seed(const char *key, size_t key_len, unsigned int seed) {
+static inline unsigned int cal_hash_val_with_seed(const char *key, size_t key_len, unsigned int seed) {
     return XXH3_64bits_withSeed(key, key_len, seed);
-}
-
-unsigned my_max(unsigned a, unsigned b) {
-    if (a > b) {
-        return a;
-    }
-    return b;
 }
 
 /*
@@ -652,7 +637,7 @@ int heavy_keeper_add(struct heavy_keeper *heavy_keeper, const char *key, size_t 
         return 0;
     } else {
         if (maxv > old_cnt) {
-            sorted_set_incrby(summary, key, key_len, maxv - old_cnt);
+            sorted_set_incrby_count(summary, key, key_len, maxv - old_cnt);
         }
         return 1; // no popped, but the tag definitely exists in the sorted set
     }
@@ -725,7 +710,7 @@ static void heavy_keeper_merge_sketch(struct heavy_keeper *dest, const struct he
     }
 }
 
-unsigned long long find_maxv_in_sketch(struct heavy_keeper *hk, const char *key, size_t key_len) {
+unsigned long long find_count_in_sketch(struct heavy_keeper *hk, const char *key, size_t key_len) {
     struct Bucket *bucket;
     unsigned fp = cal_hash_val_with_seed(key, key_len, FP_HASH_KEY);
     unsigned h1 = fp;
@@ -742,10 +727,6 @@ unsigned long long find_maxv_in_sketch(struct heavy_keeper *hk, const char *key,
     }
 
     return maxv;
-}
-
-int cmp_int(const void *a, const void *b) {
-    return *(int *)a - *(int *)b;
 }
 
 void heavy_keeper_merge(struct heavy_keeper *dest, const struct heavy_keeper *src) {
@@ -769,7 +750,7 @@ void heavy_keeper_merge(struct heavy_keeper *dest, const struct heavy_keeper *sr
 
     /* ------------------------------ merge dest ------------------------------ */
     for (int i = 0; i < size_dest; i++) {
-        unsigned long long maxv = find_maxv_in_sketch(dest, key_arr[i], key_lens[i]);
+        unsigned long long maxv = find_count_in_sketch(dest, key_arr[i], key_lens[i]);
         sorted_set_insert_to_available_heap(new_rec, key_arr[i], key_lens[i], maxv, dest->copy_fn(exdatas_dst[i]));
     }
 
@@ -780,7 +761,6 @@ void heavy_keeper_merge(struct heavy_keeper *dest, const struct heavy_keeper *sr
     for (int i = 0; i < size_src; i++) {
         const heap_entry *entry = sorted_set_find_entry(new_rec, key_arr[i], key_lens[i]);
         if (entry != NULL) { // the tag is in both dest and src, so has been processed in the previous loop. The reason why no need to sum up result is that merged sketch already keeps its summed up count
-            // merge exdata
             void *exdata_new = sorted_set_entry_get_data(entry)->exdata;
             void *exdata_src = exdatas_src[i];
             dest->merge_fn(exdata_new, exdata_src);
@@ -788,11 +768,10 @@ void heavy_keeper_merge(struct heavy_keeper *dest, const struct heavy_keeper *sr
             continue;
         }
 
-        unsigned long long maxv = find_maxv_in_sketch(dest, key_arr[i], key_lens[i]);// the dest heavy keeper has been merged, so the maxv is the maxv in the merged sketch, instead of the one in the dest
-
         if (sorted_set_check_is_full(new_rec)) {
-            unsigned long long tmp_mincnt = sorted_set_get_min_count(new_rec);
-            if (maxv > tmp_mincnt) {
+            unsigned long long mincnt_new = sorted_set_get_min_count(new_rec);
+            unsigned long long maxv = find_count_in_sketch(dest, key_arr[i], key_lens[i]);// the maxv is the max value in the merged sketch, since the dest heavy keeper has been merged
+            if (maxv > mincnt_new) {
                 sorted_set_pop(new_rec);
                 sorted_set_insert_to_available_heap(new_rec, key_arr[i], key_lens[i], maxv, dest->copy_fn(exdatas_src[i]));
             }
@@ -805,7 +784,6 @@ void heavy_keeper_merge(struct heavy_keeper *dest, const struct heavy_keeper *sr
     free(key_lens);
     free(exdatas_dst);
     free(exdatas_src);
-    // dest->top_K_heap->free_fn = default_free_fn; // do not free exdata in the original top_K_heap, because they are either moved to new_rec or freed when popped out when add source to dest.
     sorted_set_free(dest->top_K_heap);
     dest->top_K_heap = new_rec;
 }
