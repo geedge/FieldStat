@@ -54,9 +54,8 @@ struct hash_node {
     UT_hash_handle hh;
 };
 
-
 struct Bucket {
-    unsigned int finger_print;
+    uint64_t finger_print;
     unsigned long long count; // the actual count, sum of all uuid_hash_node->count
 };
 
@@ -559,7 +558,7 @@ bool if_need_to_decay(struct heavy_keeper *hk, const struct Bucket *bucket, unsi
     return false;
 }
 
-static inline unsigned long long cal_hash_val_with_seed(const char *key, size_t key_len, unsigned int seed) {
+static inline uint64_t cal_hash_val_with_seed(const char *key, size_t key_len, unsigned int seed) {
     return XXH3_64bits_withSeed(key, key_len, seed);
 }
 
@@ -586,12 +585,12 @@ int heavy_keeper_add(struct heavy_keeper *heavy_keeper, const char *key, size_t 
     unsigned long long int old_cnt = sorted_set_get_count(summary, key, key_len);
     bool not_in_sorted_set = (old_cnt == INVALID_COUNT);
     unsigned long long maxv = 0;
-    unsigned long long fp = cal_hash_val_with_seed(key, key_len, FP_HASH_KEY);
-    unsigned int h1 = fp;
-    unsigned long long h2 = cal_hash_val_with_seed(key, key_len, FP_HASH_KEY+1);
+    uint64_t fp = cal_hash_val_with_seed(key, key_len, FP_HASH_KEY);
+    uint64_t h1 = fp;
+    uint64_t h2 = cal_hash_val_with_seed(key, key_len, FP_HASH_KEY+1);
 
-    for (int j = 0; j < heavy_keeper->params.r; j++) {
-        unsigned long long hashv = h1 + j * h2; // use `double hashing` strategy
+    for (uint64_t j = 0; j < heavy_keeper->params.r; j++) {
+        uint64_t hashv = h1 + j * h2; // use `double hashing` strategy
         struct Bucket *bucket = &(heavy_keeper->sketch[j * heavy_keeper->params.w + (hashv % heavy_keeper->params.w)]);
 
         if (bucket->finger_print == fp) {
@@ -712,13 +711,13 @@ static void heavy_keeper_merge_sketch(struct heavy_keeper *dest, const struct he
 
 unsigned long long find_count_in_sketch(struct heavy_keeper *hk, const char *key, size_t key_len) {
     struct Bucket *bucket;
-    unsigned long long fp = cal_hash_val_with_seed(key, key_len, FP_HASH_KEY);
-    unsigned long long h1 = fp;
-    unsigned long long h2 = cal_hash_val_with_seed(key, key_len, FP_HASH_KEY+1);
+    uint64_t fp = cal_hash_val_with_seed(key, key_len, FP_HASH_KEY);
+    uint64_t h1 = fp;
+    uint64_t h2 = cal_hash_val_with_seed(key, key_len, FP_HASH_KEY+1);
 
     unsigned long long maxv = 0;
-    for (int array_id = 0; array_id < hk->params.r; array_id++) {
-        unsigned int hash = h1 + array_id * h2;
+    for (uint64_t array_id = 0; array_id < hk->params.r; array_id++) {
+        uint64_t hash = h1 + array_id * h2;
         bucket = &(hk->sketch[array_id * hk->params.w + (hash % hk->params.w)]);
 
         if (bucket->finger_print == fp) {
