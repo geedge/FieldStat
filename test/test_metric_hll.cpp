@@ -130,7 +130,7 @@ TEST(metric_test_hll, serialize_with_b64_and_query)
     memcpy(&precision, dec + sizeof(unsigned char), sizeof(unsigned char));
     EXPECT_EQ(precision, 10); // the one initialized in test_init_standard_instance_one_cube_one_metric_one_cell_hll
 
-    struct ST_hyperloglog *hll_from_blob = ST_hyperloglog_new(precision);
+    struct hyperloglog *hll_from_blob = hyperloglog_new(precision);
     int num_reg = NUM_REG(precision);
     int words = INT_CEIL(num_reg, REG_PER_WORD);
     size_t reg_size = words * sizeof(uint32_t);
@@ -143,11 +143,11 @@ TEST(metric_test_hll, serialize_with_b64_and_query)
     memcpy(hll_from_blob->registers, registers, reg_size);
     free(registers);
 
-    EXPECT_NEAR(ST_hyperloglog_count(hll_from_blob), 3, 0.5);
+    EXPECT_NEAR(hyperloglog_count(hll_from_blob), 3, 0.5);
     free(blob);
     free(dec);
     fieldstat_free(instance);
-    ST_hyperloglog_free(hll_from_blob);
+    hyperloglog_free(hll_from_blob);
 }
 
 
@@ -170,10 +170,10 @@ TEST(metric_test_hll, serialize_with_b64_and_query_with_python_api)
     EXPECT_EQ(flag, true);
 
     void *hll_from_blob = hll_base64_decode(blob);
-    EXPECT_NEAR(ST_hyperloglog_count((struct ST_hyperloglog *)hll_from_blob), 3, 0.5);
+    EXPECT_NEAR(hyperloglog_count((struct hyperloglog *)hll_from_blob), 3, 0.5);
     free(blob);
     fieldstat_free(instance);
-    ST_hyperloglog_free((struct ST_hyperloglog *)hll_from_blob);
+    hyperloglog_free((struct hyperloglog *)hll_from_blob);
 }
 
 TEST(metric_test_hll, add_with_wrong_cube_id_expecting_fail)

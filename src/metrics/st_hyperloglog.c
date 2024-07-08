@@ -14,16 +14,16 @@
 #include <stdlib.h>
 #include "base64/b64.h"
 
-const size_t BLOB_HDR_SIZE= offsetof(struct ST_hyperloglog, registers);
+const size_t BLOB_HDR_SIZE= offsetof(struct hyperloglog, registers);
 
 
-struct ST_hyperloglog *ST_hyperloglog_new(unsigned char precision)
+struct hyperloglog *hyperloglog_new(unsigned char precision)
 {
     // Ensure the precision is somewhat sane
     if (precision < HLL_MIN_PRECISION || precision > HLL_MAX_PRECISION)
         return NULL;
 
-    struct ST_hyperloglog *h=ALLOC(struct ST_hyperloglog, 1);
+    struct hyperloglog *h=ALLOC(struct hyperloglog, 1);
 
     h->cfg.precision = precision;
 
@@ -37,7 +37,7 @@ struct ST_hyperloglog *ST_hyperloglog_new(unsigned char precision)
     h->registers = ALLOC(uint32_t, words);
     return h;
 }
-void ST_hyperloglog_configure(struct ST_hyperloglog *h, unsigned char precision, int time_window_seconds, const struct timeval now)
+void hyperloglog_configure(struct hyperloglog *h, unsigned char precision, int time_window_seconds, const struct timeval now)
 {
     if(h->cfg.precision != precision)
     {
@@ -54,7 +54,7 @@ void ST_hyperloglog_configure(struct ST_hyperloglog *h, unsigned char precision,
     }
     return;
 }
-void ST_hyperloglog_free(struct ST_hyperloglog *h)
+void hyperloglog_free(struct hyperloglog *h)
 {
     free(h->registers);
     h->registers=NULL;
@@ -62,14 +62,14 @@ void ST_hyperloglog_free(struct ST_hyperloglog *h)
     return;
 }
 
-static int get_register(const struct ST_hyperloglog *h, int idx) {
+static int get_register(const struct hyperloglog *h, int idx) {
     uint32_t word = *(h->registers + (idx / REG_PER_WORD));
 
     word = word >> REG_WIDTH * (idx % REG_PER_WORD);
     return word & ((1 << REG_WIDTH) - 1);
 }
 
-static void set_register(const struct ST_hyperloglog *h, int idx, int val) {
+static void set_register(const struct hyperloglog *h, int idx, int val) {
     uint32_t *word = h->registers + (idx / REG_PER_WORD);
 
     // Shift the val into place
@@ -82,7 +82,7 @@ static void set_register(const struct ST_hyperloglog *h, int idx, int val) {
 
     return;
 }
-static void reset_register(const struct ST_hyperloglog *h, int idx)
+static void reset_register(const struct hyperloglog *h, int idx)
 {
     uint32_t *word = h->registers + (idx / REG_PER_WORD);
     unsigned shift = REG_WIDTH * (idx % REG_PER_WORD);
@@ -90,7 +90,7 @@ static void reset_register(const struct ST_hyperloglog *h, int idx)
     *word &= ~val_mask;
 }
 
-void ST_hyperloglog_reset(struct ST_hyperloglog *h)
+void hyperloglog_reset(struct hyperloglog *h)
 {
     int n_register=NUM_REG(h->cfg.precision);
 
@@ -100,7 +100,7 @@ void ST_hyperloglog_reset(struct ST_hyperloglog *h)
     return;
 }
 
-int hll_add_hash(struct ST_hyperloglog *h, uint64_t hash)
+int hyperloglog_add_hash(struct hyperloglog *h, uint64_t hash)
 {
     // Determine the index using the first p bits
     int idx = hash >> (64 - h->cfg.precision);
@@ -119,17 +119,17 @@ int hll_add_hash(struct ST_hyperloglog *h, uint64_t hash)
     return 0;
 }
 
-int ST_hyperloglog_add(struct ST_hyperloglog *h, const char *key, size_t keylen)
+int hyperloglog_add(struct hyperloglog *h, const char *key, size_t keylen)
 {
     uint64_t hash=0;
 
     hash=XXH3_64bits_withSeed(key, keylen, 171);
 
     // Add the hashed value
-   return hll_add_hash(h, hash);
+   return hyperloglog_add_hash(h, hash);
 }
 // https://djhworld.github.io/hyperloglog/merging/
-int ST_hyperloglog_merge(struct ST_hyperloglog *dest, const struct ST_hyperloglog *src)
+int hyperloglog_merge(struct hyperloglog *dest, const struct hyperloglog *src)
 {
     if(dest->cfg.precision != src->cfg.precision) return -1;
     int n_register=NUM_REG(dest->cfg.precision);
@@ -142,7 +142,7 @@ int ST_hyperloglog_merge(struct ST_hyperloglog *dest, const struct ST_hyperloglo
     }
     return 0;
 }
-size_t ST_hyperloglog_serialized_size(const struct ST_hyperloglog *h)
+size_t hyperloglog_serialized_size(const struct hyperloglog *h)
 {
     size_t sz=0;
     size_t num_reg = NUM_REG(h->cfg.precision);
@@ -153,13 +153,13 @@ size_t ST_hyperloglog_serialized_size(const struct ST_hyperloglog *h)
     return sz;
 }
 
-void ST_hyperloglog_serialize(const struct ST_hyperloglog *h, char **blob, size_t *blob_sz)
+void hyperloglog_serialize(const struct hyperloglog *h, char **blob, size_t *blob_sz)
 {
     size_t sz=0, offset=0;
     size_t num_reg = NUM_REG(h->cfg.precision);
     size_t words = INT_CEIL(num_reg, REG_PER_WORD);
 
-    sz = ST_hyperloglog_serialized_size(h);
+    sz = hyperloglog_serialized_size(h);
 
     char *buffer = ALLOC(char, sz);
     memcpy(buffer+offset, h, BLOB_HDR_SIZE);
@@ -172,9 +172,9 @@ void ST_hyperloglog_serialize(const struct ST_hyperloglog *h, char **blob, size_
     return;
 }
 
-struct ST_hyperloglog *ST_hyperloglog_deserialize(const char *blob, size_t blob_sz)
+struct hyperloglog *hyperloglog_deserialize(const char *blob, size_t blob_sz)
 {
-    struct ST_hyperloglog *h=ALLOC(struct ST_hyperloglog, 1);
+    struct hyperloglog *h=ALLOC(struct hyperloglog, 1);
     size_t offset=0;
     memcpy(h, blob, BLOB_HDR_SIZE);
     offset += BLOB_HDR_SIZE;
@@ -187,13 +187,13 @@ struct ST_hyperloglog *ST_hyperloglog_deserialize(const char *blob, size_t blob_
     return h;
 }
 
-void ST_hyperloglog_serialize_for_networking(const struct ST_hyperloglog *h, char **blob, size_t *blob_sz)
+void hyperloglog_serialize_for_networking(const struct hyperloglog *h, char **blob, size_t *blob_sz)
 {
     size_t sz=0, offset=0;
     size_t num_reg = NUM_REG(h->cfg.precision);
     size_t words = INT_CEIL(num_reg, REG_PER_WORD);
 
-    sz = ST_hyperloglog_serialized_size(h) + 1; // [precision][version][data...
+    sz = hyperloglog_serialized_size(h) + 1; // [precision][version][data...
     unsigned char *buffer = ALLOC(unsigned char, sz);
 
     const unsigned char version = 1;
@@ -219,11 +219,11 @@ void ST_hyperloglog_serialize_for_networking(const struct ST_hyperloglog *h, cha
     return;
 }
 
-void ST_hyperloglog_merge_blob(struct ST_hyperloglog *dest, const char *blob, size_t blob_sz)
+void hyperloglog_merge_blob(struct hyperloglog *dest, const char *blob, size_t blob_sz)
 {
-    struct ST_hyperloglog *src=ST_hyperloglog_deserialize(blob, blob_sz);
-    ST_hyperloglog_merge(dest, src);
-    ST_hyperloglog_free(src);
+    struct hyperloglog *src=hyperloglog_deserialize(blob, blob_sz);
+    hyperloglog_merge(dest, src);
+    hyperloglog_free(src);
     return;
 }
 double g_switchThreshold[15] = {10, 20, 40, 80, 220, 400, 900, 1800, 3100, 6500,
@@ -314,7 +314,7 @@ static double alpha(unsigned char precision) {
 /*
  * Computes the raw cardinality estimate
  */
-static double raw_estimate(const struct ST_hyperloglog *h, int *num_zero)
+static double raw_estimate(const struct hyperloglog *h, int *num_zero)
 {
     unsigned char precision = h->cfg.precision;
     int num_reg = NUM_REG(precision);
@@ -334,7 +334,7 @@ static double raw_estimate(const struct ST_hyperloglog *h, int *num_zero)
  * Estimates cardinality using a linear counting.
  * Used when some registers still have a zero value.
  */
-static double linear_count(const struct ST_hyperloglog *h, int num_zero)
+static double linear_count(const struct hyperloglog *h, int num_zero)
 {
     int registers = NUM_REG(h->cfg.precision);
     return registers *
@@ -364,7 +364,7 @@ static int binary_search(double val, int num, const double *array) {
  * empircal data collected by Google, from the
  * paper mentioned above.
  */
-static double bias_estimate(const struct ST_hyperloglog *h, double raw_est) {
+static double bias_estimate(const struct hyperloglog *h, double raw_est) {
     // Determine the samples available
     int samples;
     int precision = h->cfg.precision;
@@ -394,7 +394,7 @@ static double bias_estimate(const struct ST_hyperloglog *h, double raw_est) {
         return (biases[idx] + biases[idx-1]) / 2;
 }
 
-double ST_hyperloglog_count(const struct ST_hyperloglog *h){
+double hyperloglog_count(const struct hyperloglog *h){
     int num_zero = 0;
     int num_reg = NUM_REG(h->cfg.precision);
     double raw_est = raw_estimate(h, &num_zero);
@@ -428,7 +428,7 @@ double ST_hyperloglog_count(const struct ST_hyperloglog *h){
  * @return The expected variance in the count,
  * or zero on error.
  */
-double ST_hyperloglog_error_for_precision(unsigned char precision)
+double hyperloglog_error_for_precision(unsigned char precision)
 {
     // Check that the error bound is sane
     if (precision < HLL_MIN_PRECISION || precision > HLL_MAX_PRECISION)

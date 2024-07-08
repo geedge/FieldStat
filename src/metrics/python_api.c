@@ -75,9 +75,9 @@ void fieldstat_histogram_free(void *h)
 void *hll_base64_decode(char *buf);
 double fieldstat_hll_base64_to_count(char *buf)
 {
-    struct ST_hyperloglog *hll = hll_base64_decode(buf);
-    double count = ST_hyperloglog_count(hll);
-    ST_hyperloglog_free(hll);
+    struct hyperloglog *hll = hll_base64_decode(buf);
+    double count = hyperloglog_count(hll);
+    hyperloglog_free(hll);
     return count;
 }
 
@@ -101,7 +101,7 @@ void *hll_base64_decode(char *buf)
     unsigned char precision;
     memcpy(&precision, dec + sizeof(unsigned char), sizeof(unsigned char));
 
-    struct ST_hyperloglog *hll_from_blob = ST_hyperloglog_new(precision);
+    struct hyperloglog *hll_from_blob = hyperloglog_new(precision);
 
     int num_reg = NUM_REG(precision);
     int words = INT_CEIL(num_reg, REG_PER_WORD);
@@ -120,7 +120,7 @@ void *hll_base64_decode(char *buf)
 
 void fieldstat_hll_free(void *hll)
 {
-    ST_hyperloglog_free((struct ST_hyperloglog *)hll);
+    hyperloglog_free((struct hyperloglog *)hll);
 }
 
 // cppcheck-suppress [constParameterPointer, unmatchedSuppression]

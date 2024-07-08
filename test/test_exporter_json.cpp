@@ -18,7 +18,7 @@
 const size_t OPER_NUM = 10000;
 std::string g_hll_standard_oper[OPER_NUM];
 long long g_histogram_standard_oper[OPER_NUM];
-struct ST_hyperloglog *g_hll_standard;
+struct hyperloglog *g_hll_standard;
 struct hdr_histogram *g_histogram_standard;
 #define TEST_TOPK_STANDARD_K 5
 #define TEST_METRIC_NUM 2
@@ -84,7 +84,7 @@ void test_check_if_metric_gauge_correct(cJSON *metric_obj, const char *name)
 {
     char *blob_gauge_benchmark = NULL;
     size_t size_dummy = 0;
-    ST_hyperloglog_serialize_for_networking(g_hll_standard, &blob_gauge_benchmark, &size_dummy);
+    hyperloglog_serialize_for_networking(g_hll_standard, &blob_gauge_benchmark, &size_dummy);
 
     cJSON *gauge_obj = cJSON_GetObjectItem(metric_obj, name);
     EXPECT_NE(gauge_obj, nullptr);
@@ -1057,11 +1057,11 @@ TEST(export_unit_test, json_writer_length_is_on_margin_4096_string)
 
 void init_hll_standard_oper()
 {
-    g_hll_standard = ST_hyperloglog_new(12);
+    g_hll_standard = hyperloglog_new(12);
     for (size_t i = 0; i < OPER_NUM; i++) {
         std::string added_tmp = std::to_string(i);
         g_hll_standard_oper[i] = added_tmp;
-        ST_hyperloglog_add(g_hll_standard, added_tmp.c_str(), added_tmp.size());
+        hyperloglog_add(g_hll_standard, added_tmp.c_str(), added_tmp.size());
     }
 }
 
@@ -1084,7 +1084,7 @@ int main(int argc, char *argv[])
     // testing::GTEST_FLAG(filter) = "export_test.cjson_export_on_one_cube_of_topk_sampling";
 	int ret = RUN_ALL_TESTS();
 
-    ST_hyperloglog_free(g_hll_standard);
+    hyperloglog_free(g_hll_standard);
     hdr_close(g_histogram_standard);
     return ret;
 }

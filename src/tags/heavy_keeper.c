@@ -768,15 +768,15 @@ void heavy_keeper_merge(struct heavy_keeper *dest, const struct heavy_keeper *sr
             continue;
         }
 
+        unsigned long long cnt = find_count_in_sketch(dest, key_arr[i], key_lens[i]);// the cnt is the estimated count in the merged sketch, since the dest heavy keeper has been merged
         if (sorted_set_check_is_full(new_rec)) {
             unsigned long long mincnt_new = sorted_set_get_min_count(new_rec);
-            unsigned long long maxv = find_count_in_sketch(dest, key_arr[i], key_lens[i]);// the maxv is the max value in the merged sketch, since the dest heavy keeper has been merged
-            if (maxv > mincnt_new) {
+            if (cnt > mincnt_new) {
                 sorted_set_pop(new_rec);
-                sorted_set_insert_to_available_heap(new_rec, key_arr[i], key_lens[i], maxv, dest->copy_fn(exdatas_src[i]));
+                sorted_set_insert_to_available_heap(new_rec, key_arr[i], key_lens[i], cnt, dest->copy_fn(exdatas_src[i]));
             }
         } else {
-            sorted_set_insert_to_available_heap(new_rec, key_arr[i], key_lens[i], maxv, dest->copy_fn(exdatas_src[i]));
+            sorted_set_insert_to_available_heap(new_rec, key_arr[i], key_lens[i], cnt, dest->copy_fn(exdatas_src[i]));
         }
     }
 

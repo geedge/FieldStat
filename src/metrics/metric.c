@@ -37,7 +37,7 @@ struct metric_scheme {
 struct metric_data {
     union {
         struct metric_counter_or_gauge *counter;
-        struct ST_hyperloglog *hll;
+        struct hyperloglog *hll;
         struct hdr_histogram *hdr;
     };
 };
@@ -120,40 +120,40 @@ void metric_scheme_counter_reset(struct metric_data *data)
 struct metric_data *metric_scheme_hll_new(const union metric_parameter *para)
 {
     struct metric_data *data = (struct metric_data *)malloc(sizeof(struct metric_data));
-    struct ST_hyperloglog *hll = ST_hyperloglog_new(para->hll.precision);
+    struct hyperloglog *hll = hyperloglog_new(para->hll.precision);
     data->hll = hll;
     return data;
 }
 
 static void metric_scheme_hll_free(struct metric_data *data)
 {
-    ST_hyperloglog_free(data->hll);
+    hyperloglog_free(data->hll);
     free(data);
 }
 
 static void metric_scheme_hll_serialize(const struct metric_data *data, char **blob, size_t *blob_size)
 {
-    ST_hyperloglog_serialize(data->hll, blob, blob_size);
+    hyperloglog_serialize(data->hll, blob, blob_size);
 }
 
 static int metric_scheme_hll_merge(struct metric_data *pthis, const struct metric_data *from)
 {
-    return ST_hyperloglog_merge(pthis->hll, from->hll);
+    return hyperloglog_merge(pthis->hll, from->hll);
 }
 
 struct metric_data *metric_scheme_hll_copy(const struct metric_data *from)
 {
     struct metric_data *pthis = (struct metric_data *)malloc(sizeof(struct metric_data));
-    struct ST_hyperloglog *hll = ST_hyperloglog_new(from->hll->cfg.precision);
+    struct hyperloglog *hll = hyperloglog_new(from->hll->cfg.precision);
     pthis->hll = hll;
-    ST_hyperloglog_merge(hll, from->hll);
+    hyperloglog_merge(hll, from->hll);
     return pthis;
 }
 
 struct metric_data *metric_scheme_hll_deserialize(const char *blob, size_t blob_size) 
 {
     struct metric_data *ret = (struct metric_data *)malloc(sizeof(struct metric_data));
-    struct ST_hyperloglog *hll = ST_hyperloglog_deserialize(blob, blob_size);
+    struct hyperloglog *hll = hyperloglog_deserialize(blob, blob_size);
     ret->hll = hll;
 
     return ret;
@@ -161,7 +161,7 @@ struct metric_data *metric_scheme_hll_deserialize(const char *blob, size_t blob_
 
 void metric_scheme_hll_reset(struct metric_data *data)
 {
-    ST_hyperloglog_reset(data->hll);
+    hyperloglog_reset(data->hll);
 }
 
 /* --------------------------------- histogram -------------------------------- */
@@ -297,7 +297,7 @@ void metric_serialize(const struct metric *pthis, char **blob, size_t *blob_size
     struct metric_data *data = pthis->data;
     enum metric_type type = pthis->type;
     if (type == METRIC_TYPE_HLL) {
-        ST_hyperloglog_serialize_for_networking(data->hll, blob, blob_size);
+        hyperloglog_serialize_for_networking(data->hll, blob, blob_size);
         return;
     }
     if (type == METRIC_TYPE_HISTOGRAM) {
@@ -326,11 +326,11 @@ long long metric_counter_get(const struct metric *pthis) {
 }
 
 void metric_hll_add(struct metric *pthis, const char *key, size_t key_len) {
-    ST_hyperloglog_add(pthis->data->hll, key, key_len);
+    hyperloglog_add(pthis->data->hll, key, key_len);
 }
 
 double metric_hll_get(const struct metric *pthis) {
-    return ST_hyperloglog_count(pthis->data->hll);
+    return hyperloglog_count(pthis->data->hll);
 }
 
 int metric_histogram_record(struct metric *pthis, long long value) {
