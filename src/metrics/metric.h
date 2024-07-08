@@ -19,6 +19,7 @@ void metric_counter_set(struct metric *pthis, long long value);
 long long metric_counter_get(const struct metric *pthis);
 
 void metric_hll_add(struct metric *pthis, const char *key, size_t key_len);
+void metric_hll_add_hash(struct metric *pthis, unsigned long long hash);
 double metric_hll_get(const struct metric *pthis);
 
 int metric_histogram_record(struct metric *pthis, long long value);

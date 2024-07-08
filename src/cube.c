@@ -4,12 +4,15 @@
 #include <assert.h>
 #include <string.h>
 
+#include "uthash.h"
+#define XXH_INLINE_ALL
+#include "xxhash/xxhash.h"
+
 #include "cube.h"
 #include "metric_manifest.h"
 #include "metric.h"
 #include "heavy_keeper.h"
 #include "tag_map.h"
-#include "uthash.h"
 
 #define DEFAULT_N_METRIC 32
 #define DEFAULT_N_CUBE 64
@@ -131,7 +134,7 @@ struct cube_manager *cube_manager_new() {
     return pthis;
 }
 
-static void tag2key(const struct fieldstat_tag tags[], size_t n_tags, char **out_key, size_t *out_key_size)
+static void tags2key(const struct fieldstat_tag tags[], size_t n_tags, char **out_key, size_t *out_key_size)
 {
     if (n_tags == 0) {
         // use a default dummy key
@@ -241,7 +244,7 @@ int cube_manager_find(const struct cube_manager *pthis, const struct fieldstat_t
 {
     char *key;
     size_t key_len;
-    tag2key(identifier, n_tag, &key, &key_len);
+    tags2key(identifier, n_tag, &key, &key_len);
 
     struct cube *node = NULL;
     HASH_FIND(hh, pthis->hash_table, key, key_len, node);
@@ -479,7 +482,7 @@ struct cube *cube_info_new(const struct fieldstat_tag *shared_tags, size_t n_tag
 
     cube->n_shared_tags = n_tag;
     cube->max_n_cell = max_n_cell;
-    tag2key(shared_tags, n_tag, &cube->key, &cube->key_len);
+    tags2key(shared_tags, n_tag, &cube->key, &cube->key_len);
 
     cube->id = -1;
 
@@ -543,7 +546,7 @@ void cube_set_primary_metric(struct cube *cube, int metric_id) {
 struct cell *get_cell(struct cube *cube, const struct fieldstat_tag *tags, size_t n_tag,long long increment, int metric_id) {
     char *tag_in_string;
     size_t tag_len;
-    tag2key(tags, n_tag, &tag_in_string, &tag_len);
+    tags2key(tags, n_tag, &tag_in_string, &tag_len);
     struct exdata_new_args args;
     args.tags = tags;
     args.n_tags = n_tag;
@@ -611,6 +614,38 @@ int cube_hll_add(struct cube *cube, const struct metric_manifest *manifest, cons
     struct metric *metric = add_or_find_metric_in_cell(manifest, cell_data);
 
     metric_hll_add(metric, key, key_len);
+    return FS_OK;
+}
+
+uint64_t tags2hash(const struct fieldstat_tag *tag, size_t n_tag) {
+    XXH3_state_t state = {0};
+    XXH3_64bits_reset(&state);
+
+    for (int i = 0; i < n_tag; i++) {
+        XXH3_64bits_update(&state, tag[i].key, strlen(tag[i].key));
+        if (tag[i].type != TAG_CSTRING) {
+            XXH3_64bits_update(&state, &tag[i].value_longlong, sizeof(long long));
+        } else {
+            XXH3_64bits_update(&state, tag[i].value_str, strlen(tag[i].value_str));
+        }
+    }
+
+    return XXH3_64bits_digest(&state);
+}
+
+int cube_hll_add_tag(struct cube *cube, const struct metric_manifest *manifest, const struct fieldstat_tag *tags, size_t n_tag, const struct fieldstat_tag *tags_key, size_t n_tag_key) 
+{
+    assert(manifest->type == METRIC_TYPE_HLL);
+    assert(cube->sampling_mode != SAMPLING_MODE_TOPK || (cube->primary_metric_id != manifest->id));
+
+    struct cell *cell_data = get_cell(cube, tags, n_tag, 0, manifest->id);
+    if (cell_data == NULL) {
+        return FS_ERR_TOO_MANY_CELLS;
+    }
+    struct metric *metric = add_or_find_metric_in_cell(manifest, cell_data);
+
+    uint64_t hash = tags2hash(tags_key, n_tag_key);
+    metric_hll_add_hash(metric, hash);
     return FS_OK;
 }
 
@@ -744,7 +779,7 @@ const struct cell *get_cell_by_tag_list(const struct cube *cube, const struct fi
     const struct cell *ret = NULL;
     char *tag_in_string;
     size_t tag_len;
-    tag2key(tags->tag, tags->n_tag, &tag_in_string, &tag_len);
+    tags2key(tags->tag, tags->n_tag, &tag_in_string, &tag_len);
 
     switch (cube->sampling_mode)
     {

@@ -340,6 +340,21 @@ int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, co
 }
 
 // cppcheck-suppress [constParameterPointer, unmatchedSuppression]
+int fieldstat_hll_add_tag(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, const struct fieldstat_tag *tags_key, size_t n_tag_key)
+{
+    struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
+    if (cube == NULL) {
+        return FS_ERR_INVALID_CUBE_ID;
+    }
+    const struct metric_manifest *manifest = metric_manifest_manager_get_by_id(instance->manifest_manager, metric_id);
+    if (manifest == NULL || manifest->type != METRIC_TYPE_HLL) {
+        return FS_ERR_INVALID_METRIC_ID;
+    }
+
+    return cube_hll_add_tag(cube, manifest, tags, n_tag, tags_key, n_tag_key);
+}
+
+// cppcheck-suppress [constParameterPointer, unmatchedSuppression]
 int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long value)
 {
     struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);

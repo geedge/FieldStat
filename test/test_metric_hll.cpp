@@ -64,6 +64,19 @@ TEST(metric_test_hll, simple_register_and_query)
     fieldstat_free(instance);
 }
 
+TEST(metric_test_hll, add_with_tags) {
+    struct fieldstat *instance = test_init_standard_instance_one_cube_one_metric_one_cell_hll();
+
+    fieldstat_hll_add_tag(instance, 0, 0, &TEST_TAG_INT, 1, &TEST_TAG_INT, 1);
+    fieldstat_hll_add_tag(instance, 0, 0, &TEST_TAG_INT, 1, &TEST_TAG_DOUBLE, 1);
+    fieldstat_hll_add_tag(instance, 0, 0, &TEST_TAG_INT, 1, &TEST_TAG_STRING, 1);
+    
+    test_assert_standard_instance(instance);
+    EXPECT_NEAR(my_fieldstat_hll_get(instance, 0, 0), 3, 0.5);
+
+    fieldstat_free(instance);
+}
+
 TEST(metric_test_hll, merge)
 {
     struct fieldstat *instance = test_init_standard_instance_one_cube_one_metric_one_cell_hll();

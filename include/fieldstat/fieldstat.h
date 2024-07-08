@@ -135,9 +135,8 @@ int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id
     *         Since topk only support counter, FS_ERR_INVALID_PARAM is returned when the cube is topk.
 */
 int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, const char *key, size_t key_len);
+int fieldstat_hll_add_tag(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, const struct fieldstat_tag *tags_key, size_t n_tag_key);
 
-// TODO: 增加：
-// int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, const struct fieldstat_tag *tags, size_t n_tag);
 
 /* 
     * @brief Add a value to the histogram metric of cell_id. Histogram will record the distribution of the values.

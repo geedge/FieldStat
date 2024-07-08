@@ -329,6 +329,10 @@ void metric_hll_add(struct metric *pthis, const char *key, size_t key_len) {
     hyperloglog_add(pthis->data->hll, key, key_len);
 }
 
+void metric_hll_add_hash(struct metric *pthis, unsigned long long hash) {
+    hyperloglog_add_hash(pthis->data->hll, hash);
+}
+
 double metric_hll_get(const struct metric *pthis) {
     return hyperloglog_count(pthis->data->hll);
 }
