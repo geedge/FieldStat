@@ -24,7 +24,7 @@
 #include "exdata.h"
 
 #define FP_HASH_KEY 0
-#define INVALID_COUNT UINT64_MAX // TODO：改名为 NOT FIND
+#define NOT_FIND (-1) 
 #define MAX(a, b)  	(((a) > (b)) ? (a) : (b))
 
 struct entry_data { // the value constitute of a sorted set entry
@@ -56,7 +56,7 @@ struct hash_node {
 
 struct Bucket {
     uint64_t finger_print;
-    unsigned long long count; // the actual count, sum of all uuid_hash_node->count
+    long long count; // the actual count, sum of all uuid_hash_node->count
 };
 
 // Parameters used in algorithm
@@ -126,13 +126,13 @@ void entry_data_destroy(struct entry_data *entry_data, exdata_free_cb free_fn)
     free(entry_data);
 }
 
-static inline unsigned long long sorted_set_entry_get_count(const heap_entry *entry)
+static inline long long sorted_set_entry_get_score(const heap_entry *entry)
 {
-    unsigned long long count = *(unsigned long long *)entry->key;
-    if (count == 0) {
+    long long score = *(long long *)entry->key;
+    if (score == 0) {
         return 0;
     }
-    return count - 1; // sorted set will let the count start from 1, 0 for dying entry.
+    return score - 1; // sorted set will let the count start from 1, 0 for dying entry.
 }
 
 struct entry_data *sorted_set_entry_get_data(const heap_entry *entry)
@@ -145,14 +145,14 @@ struct entry_data *sorted_set_entry_get_data(const heap_entry *entry)
 */
 static inline bool sorted_set_entry_dying(const heap_entry *entry)
 {
-    unsigned long long count = *(unsigned long long *)entry->key;
-    return count == 0;    
+    long long score = *(long long *)entry->key;
+    return score == 0;    
 }
 
-static inline unsigned long long safe_add(unsigned long long a, unsigned long long b)
+static inline long long safe_add(long long a, long long b)
 {
-    if (UINT64_MAX - a < b) {
-        return UINT64_MAX;
+    if (INT64_MAX - a < b) {
+        return INT64_MAX;
     }
     return a + b;
 }
@@ -162,10 +162,10 @@ static bool cmp_entry_cb(void *aa, void *bb)
 {
     heap_entry *a = (heap_entry *)aa;
     heap_entry *b = (heap_entry *)bb;
-    unsigned long long count_a = *(unsigned long long *)a->key;
-    unsigned long long count_b = *(unsigned long long *)b->key;
+    long long score_a = *(long long *)a->key;
+    long long score_b = *(long long *)b->key;
 
-    if (count_a < count_b) {
+    if (score_a < score_b) {
         return true;
     }
     return false;
@@ -244,9 +244,9 @@ heap_entry *sorted_set_find_entry(const struct sorted_set *ss, const char *key, 
     return (heap_entry *)s->val;
 }
 
-static inline void sorted_set_entry_set_count(struct sorted_set *ss, heap_entry *entry, unsigned long long count)
+static inline void sorted_set_entry_set_score(struct sorted_set *ss, heap_entry *entry, long long score)
 {
-    *(unsigned long long *)(entry->key) = count;
+    *(long long *)(entry->key) = score;
 
     adjust_heap_node(ss->heap, entry);
 }
@@ -287,26 +287,26 @@ static inline bool sorted_set_check_is_full(const struct sorted_set *ss)
 {
     return ss->heap->cur_size >= ss->heap->max_size;
 }
-// TODO: 所有count 都改成long long
-unsigned long long sorted_set_get_min_count(const struct sorted_set *ss)
+
+long long sorted_set_get_min_score(const struct sorted_set *ss)
 {   
     heap *heap = ss->heap;
     if (heap->cur_size == 0) {
-        return INVALID_COUNT; // TODO: -1
+        return NOT_FIND;
     }
     const heap_entry *ret = (heap_entry *)(heap->nodes[0]);
 
-    unsigned long long count = *(unsigned long long *)ret->key;
-    if (count == 0) {
-        return INVALID_COUNT;
+    long long score = *(long long *)ret->key;
+    if (score == 0) {
+        return NOT_FIND;
     }
-    return count - 1; // sorted set will let the count start from 1, 0 for dying entry.
+    return score - 1; // sorted set will let the score start from 1, 0 for dying entry.
 }
 
-void sorted_set_insert_to_available_heap(struct sorted_set *ss, const char *key, size_t key_len, unsigned long long cnt, void *exdata)
+void sorted_set_insert_to_available_heap(struct sorted_set *ss, const char *key, size_t key_len, long long cnt, void *exdata)
 {
-    cnt = safe_add(cnt, 1); // sorted set will let the count start from 1, 0 for dying entry.
-    unsigned long long *tmp_cnt = (unsigned long long*)malloc(sizeof(unsigned long long));
+    cnt = safe_add(cnt, 1); // sorted set will let the score start from 1, 0 for dying entry.
+    long long *tmp_cnt = (long long*)malloc(sizeof(long long));
     *tmp_cnt = cnt;
     struct entry_data *tmp_data = entry_data_construct(key, key_len, exdata);
     heap_entry *node = (heap_entry *)malloc(sizeof(heap_entry));
@@ -326,7 +326,7 @@ void sorted_set_insert_to_available_heap(struct sorted_set *ss, const char *key,
     ss->n_living_entry++;
 }
 
-int sorted_set_insert(struct sorted_set *ss, const char *key, size_t key_len, unsigned long long cnt, void *args)
+int sorted_set_insert(struct sorted_set *ss, const char *key, size_t key_len, long long cnt, void *args)
 {
     // if there is a dying record, reborn it to use.
     heap_entry *entry = sorted_set_find_entry(ss, key, key_len);
@@ -335,15 +335,15 @@ int sorted_set_insert(struct sorted_set *ss, const char *key, size_t key_len, un
             assert(0);
             return -1;
         }
-        sorted_set_entry_set_count(ss, entry, safe_add(cnt, 1)); // sorted set will let the count start from 1, 0 for dying entry.
+        sorted_set_entry_set_score(ss, entry, safe_add(cnt, 1)); // sorted set will let the score start from 1, 0 for dying entry.
 
         ss->n_living_entry++;
         return 1;
     }
 
     if (sorted_set_check_is_full(ss)) {
-        unsigned long long tmp_mincnt = sorted_set_get_min_count(ss);
-        if (tmp_mincnt != INVALID_COUNT && cnt <= tmp_mincnt) { // even if all cells in sorted set are dying, the sorted set can still be a full one, in which case, the min count is invalid.
+        long long tmp_mincnt = sorted_set_get_min_score(ss);
+        if (tmp_mincnt != NOT_FIND && cnt <= tmp_mincnt) { // even if all cells in sorted set are dying, the sorted set can still be a full one, in which case, the min score is invalid.
             return 0;
         }
         sorted_set_pop(ss);
@@ -357,41 +357,41 @@ static inline int sorted_set_cardinality(const struct sorted_set *ss)
     return ss->n_living_entry;
 }
 
-unsigned long long sorted_set_get_count(const struct sorted_set *ss, const char *key, size_t key_len)
+long long sorted_set_get_score(const struct sorted_set *ss, const char *key, size_t key_len)
 {
     if (sorted_set_cardinality(ss) == 0) {
-        return INVALID_COUNT;
+        return NOT_FIND;
     }
     const heap_entry *entry = sorted_set_find_entry(ss, key, key_len);
     if (entry == NULL) {
-        return INVALID_COUNT;
+        return NOT_FIND;
     }
     if (sorted_set_entry_dying(entry)) {
-        return INVALID_COUNT;
+        return NOT_FIND;
     }
 
-    return sorted_set_entry_get_count(entry);
+    return sorted_set_entry_get_score(entry);
 }
 
-int sorted_set_incrby_count(struct sorted_set *ss, const char *key, size_t key_len, unsigned long long count)
+int sorted_set_incrby(struct sorted_set *ss, const char *key, size_t key_len, long long score)
 {
     heap_entry *entry = sorted_set_find_entry(ss, key, key_len);
     if (entry == NULL) {
         return -1;
     }
-    unsigned long long cnt_old;
+    long long cnt_old;
     if (sorted_set_entry_dying(entry) == false) {
-        cnt_old = sorted_set_entry_get_count(entry);
-        cnt_old += 1; // sorted set will let the count start from 1, 0 for dying entry.
+        cnt_old = sorted_set_entry_get_score(entry);
+        cnt_old += 1; // sorted set will let the score start from 1, 0 for dying entry.
     } else {
         cnt_old = 0;
     }
-    sorted_set_entry_set_count(ss, entry, safe_add(count, cnt_old));
+    sorted_set_entry_set_score(ss, entry, safe_add(score, cnt_old));
     return 0;
 }
 
 typedef struct {
-    unsigned long long key;
+    long long key;
     struct entry_data *val;
 } tmp_heap_node;
 
@@ -419,7 +419,7 @@ void sorted_set_dump(const struct sorted_set *ss, char **key_out, size_t *key_le
         if (sorted_set_entry_dying(entry)) {
             continue;
         }
-        tmp_nodes[n_living_entry].key = sorted_set_entry_get_count(entry);
+        tmp_nodes[n_living_entry].key = sorted_set_entry_get_score(entry);
         tmp_nodes[n_living_entry].val = sorted_set_entry_get_data(entry);
         n_living_entry++;
     }
@@ -445,7 +445,7 @@ struct sorted_set *sorted_set_copy(const struct sorted_set *ss)
             continue;
         }
         const struct entry_data *data = sorted_set_entry_get_data(entry);
-        sorted_set_insert_to_available_heap(ret, data->key, data->key_len, sorted_set_entry_get_count(entry), ss->copy_fn(data->exdata));
+        sorted_set_insert_to_available_heap(ret, data->key, data->key_len, sorted_set_entry_get_score(entry), ss->copy_fn(data->exdata));
     }
 
     return ret;
@@ -458,7 +458,7 @@ void sorted_set_reset(struct sorted_set *ss)
     heap_entry *entry;
     for (int i = 0; i < heap->cur_size; i++) {
         entry = (heap_entry *)heap->nodes[i];
-        *(unsigned long long *)entry->key = 0;
+        *(long long *)entry->key = 0;
 
         ss->reset_fn(sorted_set_entry_get_data(entry)->exdata);
     }
@@ -535,7 +535,7 @@ const int DECAY_POW_TABLE[128] = { // 1.17 ^ exp * RAND_MAX, exp is in [0,127]
 1834704,1568123,1340276,1145535,979090,836829,715239,611315,522491,446574,381687,326228,278828,238314,203687,174092,148796,127176,108698,92904,79405,67868,58007,49578,42375,36218,30955,26457,22613,19328,16519,
 14119,12068,10314,8815,7535,6440,5504,4704,4021,3437,2937,2510,2146,1834,1567,1340,1145,979,836,715,611,522,446,382,326,279,238,204,174,149,127,109,93,79,68,58,50,42,36,31,26,23,19,17,14,12,10,9,8,6,6,5,
 };
-bool if_need_to_decay(struct heavy_keeper *hk, const struct Bucket *bucket, unsigned long long count) {
+bool if_need_to_decay(struct heavy_keeper *hk, const struct Bucket *bucket, long long count) {
     if (count == 0) {
         return false;
     }
@@ -543,8 +543,8 @@ bool if_need_to_decay(struct heavy_keeper *hk, const struct Bucket *bucket, unsi
         return true;
     }
 
-    unsigned long long exp = bucket->count / count;
-    if (exp > 127) {  // too small, almost no chance to decay 
+    long long exp = bucket->count / count;
+    if (exp > 127) {  // decay_rate too small, almost no chance to decay 
         return false;
     }
 
@@ -565,7 +565,8 @@ static inline uint64_t cal_hash_val_with_seed(const char *key, size_t key_len, u
 /*
 1 for newly add something. 0 for not add. -1 for unexpected cases.
 */
-int heavy_keeper_add(struct heavy_keeper *heavy_keeper, const char *key, size_t key_len, int count, void *arg) {
+int heavy_keeper_add(struct heavy_keeper *heavy_keeper, const char *key, size_t key_len, long long count, void *arg) {
+    assert(count >= 0);
     if (count == 0) {
         if (sorted_set_cardinality(heavy_keeper->top_K_heap) < heavy_keeper->K) {
             const struct heap_entry *entry = sorted_set_find_entry(heavy_keeper->top_K_heap, key, key_len);
@@ -582,9 +583,9 @@ int heavy_keeper_add(struct heavy_keeper *heavy_keeper, const char *key, size_t 
 
     struct sorted_set *summary = heavy_keeper->top_K_heap;
     
-    unsigned long long int old_cnt = sorted_set_get_count(summary, key, key_len); // todo: 改成 score
-    bool not_in_sorted_set = (old_cnt == INVALID_COUNT);
-    unsigned long long maxv = 0;
+    long long old_cnt = sorted_set_get_score(summary, key, key_len); // todo: 改成 score
+    bool not_in_sorted_set = (old_cnt == NOT_FIND);
+    long long maxv = 0;
     uint64_t fp = cal_hash_val_with_seed(key, key_len, FP_HASH_KEY);
     uint64_t h1 = fp;
     uint64_t h2 = cal_hash_val_with_seed(key, key_len, FP_HASH_KEY+1);
@@ -595,13 +596,14 @@ int heavy_keeper_add(struct heavy_keeper *heavy_keeper, const char *key, size_t 
 
         if (bucket->finger_print == fp) {
             // If a key is not in the min-heap, then the estimated key size should be no larger than nmin.
-            // or if the min-heap is not full(nmin == 0), every key should be taken into account, so of course it should be added.
+            // or if the min-heap is not full(min_value == NOT_FIND), every key should be taken into account, so of course it should be added.
             // in neither case, bucket->count > nMin && not_in_sorted_set happen.
             // The keys whose counts are both larger than nmin and not in min-heap must have the same xxhash value, and its FP stored in bucket represents another field,
             // In this case, the sketch won't be updated. This key is expected to be taken into account in another array,
             //  where its FP is different from the one it should collided with, so that element keys won't be missed.
             if (not_in_sorted_set) {
-                if (bucket->count > sorted_set_get_min_count(summary)) {
+                long long min_value = sorted_set_get_min_score(summary);
+                if (min_value != NOT_FIND && bucket->count > min_value) {
                     continue;
                 }
             }
@@ -628,15 +630,15 @@ int heavy_keeper_add(struct heavy_keeper *heavy_keeper, const char *key, size_t 
             sorted_set_insert(summary, key, key_len, maxv, arg);
             return 1;
         }
-        unsigned min_value = sorted_set_get_min_count(summary);
-        if (maxv > min_value || min_value == INVALID_COUNT) {
+        long long min_value = sorted_set_get_min_score(summary);
+        if (maxv > min_value || min_value == NOT_FIND) {
             sorted_set_insert(summary, key, key_len, maxv, arg);
             return 1;
         }
         return 0;
     } else {
         if (maxv > old_cnt) {
-            sorted_set_incrby_count(summary, key, key_len, maxv - old_cnt);
+            sorted_set_incrby(summary, key, key_len, maxv - old_cnt);
         }
         return 1; // no popped, but the exdata definitely exists in the sorted set
     }
@@ -709,13 +711,13 @@ static void heavy_keeper_merge_sketch(struct heavy_keeper *dest, const struct he
     }
 }
 
-unsigned long long find_count_in_sketch(struct heavy_keeper *hk, const char *key, size_t key_len) {
+long long find_count_in_sketch(struct heavy_keeper *hk, const char *key, size_t key_len) {
     struct Bucket *bucket;
     uint64_t fp = cal_hash_val_with_seed(key, key_len, FP_HASH_KEY);
     uint64_t h1 = fp;
     uint64_t h2 = cal_hash_val_with_seed(key, key_len, FP_HASH_KEY+1);
 
-    unsigned long long maxv = 0;
+    long long maxv = 0;
     for (uint64_t array_id = 0; array_id < hk->params.r; array_id++) {
         uint64_t hash = h1 + array_id * h2;
         bucket = &(hk->sketch[array_id * hk->params.w + (hash % hk->params.w)]);
@@ -749,7 +751,7 @@ void heavy_keeper_merge(struct heavy_keeper *dest, const struct heavy_keeper *sr
 
     /* ------------------------------ merge dest ------------------------------ */
     for (int i = 0; i < size_dest; i++) {
-        unsigned long long maxv = find_count_in_sketch(dest, key_arr[i], key_lens[i]);
+        long long maxv = find_count_in_sketch(dest, key_arr[i], key_lens[i]);
         sorted_set_insert_to_available_heap(new_rec, key_arr[i], key_lens[i], maxv, dest->copy_fn(exdatas_dst[i]));
     }
 
@@ -767,9 +769,9 @@ void heavy_keeper_merge(struct heavy_keeper *dest, const struct heavy_keeper *sr
             continue;
         }
 
-        unsigned long long cnt = find_count_in_sketch(dest, key_arr[i], key_lens[i]);// the cnt is the estimated count in the merged sketch, since the dest heavy keeper has been merged
+        long long cnt = find_count_in_sketch(dest, key_arr[i], key_lens[i]);// the cnt is the estimated count in the merged sketch, since the dest heavy keeper has been merged
         if (sorted_set_check_is_full(new_rec)) {
-            unsigned long long mincnt_new = sorted_set_get_min_count(new_rec);
+            long long mincnt_new = sorted_set_get_min_score(new_rec);
             if (cnt > mincnt_new) {
                 sorted_set_pop(new_rec);
                 sorted_set_insert_to_available_heap(new_rec, key_arr[i], key_lens[i], cnt, dest->copy_fn(exdatas_src[i]));
@@ -807,7 +809,7 @@ struct heavy_keeper *heavy_keeper_copy(const struct heavy_keeper *src) {
     return ret;
 }
 
-void heavy_keeper_one_point_query(const struct heavy_keeper *hk, const char *key, size_t key_len, int *count_out, void **exdata_out) {
+void heavy_keeper_one_point_query(const struct heavy_keeper *hk, const char *key, size_t key_len, long long *count_out, void **exdata_out) {
     *count_out = 0;
     *exdata_out = NULL;
 
@@ -815,6 +817,6 @@ void heavy_keeper_one_point_query(const struct heavy_keeper *hk, const char *key
     if (entry == NULL) {
         return;
     }
-    *count_out = sorted_set_entry_get_count(entry);
+    *count_out = sorted_set_entry_get_score(entry);
     *exdata_out = sorted_set_entry_get_data(entry)->exdata;
 }
