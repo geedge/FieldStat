@@ -18,8 +18,8 @@
 #define DEFAULT_N_CUBE 64
 
 struct exdata_new_args {
-    const struct field *fields;
-    size_t n_tags;
+    const struct field *cell_dimensions;
+    size_t n_dimensions;
 };
 
 struct cube_manager {
@@ -34,7 +34,7 @@ struct cell {
     struct metric **metrics;
     size_t metrics_len;
     size_t max_n_metric;
-    struct field_list fields; // cell identifier
+    struct field_list cell_dimensions;
 };
 
 struct cube {
@@ -45,41 +45,40 @@ struct cube {
     };
     size_t max_n_cell;
 
-    // the key of cube is the combination of shared fields
-    struct field *cube_identifier;
-    size_t n_shared_tags;
+    struct field *cube_dimensions;
+    size_t n_dimensions;
 
     int primary_metric_id;
-    char *key;
+    char *key;     // the key of cube is the combination of cube_dimensions
     size_t key_len;
     int id;
     UT_hash_handle hh;
 };
 
-static struct field *tag_array_duplicate(const struct field *tags_src, size_t n_field)
+static struct field *field_array_duplicate(const struct field *fields_src, size_t n_field)
 {
-    struct field *tags_dst = malloc(sizeof(struct field) * n_field);
+    struct field *ret = malloc(sizeof(struct field) * n_field);
 
     for (size_t i = 0; i < n_field; i++) {
-        tags_dst[i].key = strdup(tags_src[i].key);
-        tags_dst[i].type = tags_src[i].type;
-        switch (tags_src[i].type)
+        ret[i].key = strdup(fields_src[i].key);
+        ret[i].type = fields_src[i].type;
+        switch (fields_src[i].type)
         {
         case TAG_INTEGER:
-            tags_dst[i].value_longlong = tags_src[i].value_longlong;
+            ret[i].value_longlong = fields_src[i].value_longlong;
             break;
         case TAG_CSTRING:
-            tags_dst[i].value_str = strdup(tags_src[i].value_str);
+            ret[i].value_str = strdup(fields_src[i].value_str);
             break;
         case TAG_DOUBLE:
-            tags_dst[i].value_double = tags_src[i].value_double;
+            ret[i].value_double = fields_src[i].value_double;
             break;
         default:
             break;
         }
     }
 
-    return tags_dst;
+    return ret;
 }
 
 static void fieldstat_free_tag_array(struct field *fields, size_t n_tags)
@@ -134,7 +133,7 @@ struct cube_manager *cube_manager_new() {
     return pthis;
 }
 
-static int tags2key_safe(const struct field fields[], size_t n_tags, char *out_key, size_t out_key_size)
+static int field_array_to_key_safe(const struct field fields[], size_t n_tags, char *out_key, size_t out_key_size)
 {
     if (n_tags == 0) {
         const char dummy[] = "no fields";
@@ -191,7 +190,7 @@ static int tags2key_safe(const struct field fields[], size_t n_tags, char *out_k
     return out_key_size - remain_key_size;
 }
 
-static void tags2key_endeavor(const struct field fields[], size_t n_tags, char **out_key, size_t *out_key_size)
+static void field_array_to_key_endeavor(const struct field fields[], size_t n_tags, char **out_key, size_t *out_key_size)
 {
     if (n_tags == 0) {
         // use a default dummy key
@@ -297,16 +296,16 @@ void cube_manager_delete(struct cube_manager *pthis, struct cube *cube)
     }
 }
 
-int cube_manager_find(const struct cube_manager *pthis, const struct field *identifier, size_t n_field)
+int cube_manager_find(const struct cube_manager *pthis, const struct field *cube_dimensions, size_t n_dimension)
 {
     char key_stack[4096];
     char *key = key_stack;
-    int key_len = tags2key_safe(identifier, n_field, key, sizeof(key));
+    int key_len = field_array_to_key_safe(cube_dimensions, n_dimension, key, sizeof(key));
     bool free_key = false;
     if (key_len < 0) {  // very unlikely to happen
         char *key_heap;
         size_t key_len_tmp;
-        tags2key_endeavor(identifier, n_field, &key_heap, &key_len_tmp);
+        field_array_to_key_endeavor(cube_dimensions, n_dimension, &key_heap, &key_len_tmp);
         key = key_heap;
         key_len = key_len_tmp;
         free_key = true;
@@ -452,8 +451,8 @@ struct cell *cell_new(const struct exdata_new_args *args) {
     pthis->max_n_metric = DEFAULT_N_METRIC;
     pthis->metrics_len = 0;
 
-    pthis->fields.n_field = args->n_tags;
-    pthis->fields.field = tag_array_duplicate(args->fields, args->n_tags);
+    pthis->cell_dimensions.n_field = args->n_dimensions;
+    pthis->cell_dimensions.field = field_array_duplicate(args->cell_dimensions, args->n_dimensions);
     return pthis;
 }
 
@@ -462,13 +461,13 @@ void cell_free(struct cell *pthis) {
         metric_free(pthis->metrics[i]);
     }
     free(pthis->metrics);
-    for (size_t i = 0; i < pthis->fields.n_field; i++) {
-        free((char *)pthis->fields.field[i].key);
-        if (pthis->fields.field[i].type == TAG_CSTRING) {
-            free((char *)pthis->fields.field[i].value_str);
+    for (size_t i = 0; i < pthis->cell_dimensions.n_field; i++) {
+        free((char *)pthis->cell_dimensions.field[i].key);
+        if (pthis->cell_dimensions.field[i].type == TAG_CSTRING) {
+            free((char *)pthis->cell_dimensions.field[i].value_str);
         }
     }
-    free(pthis->fields.field);
+    free(pthis->cell_dimensions.field);
     free(pthis);
 }
 
@@ -485,8 +484,8 @@ struct cell *cell_copy(const struct cell *src) {
         pthis->metrics[i] = metric_copy(src->metrics[i]);
     }
     
-    pthis->fields.n_field = src->fields.n_field;
-    pthis->fields.field = tag_array_duplicate(src->fields.field, src->fields.n_field);
+    pthis->cell_dimensions.n_field = src->cell_dimensions.n_field;
+    pthis->cell_dimensions.field = field_array_duplicate(src->cell_dimensions.field, src->cell_dimensions.n_field);
 
     return pthis;
 }
@@ -537,29 +536,29 @@ void *exdata_copy_i(void *exdata) {
     return cell_copy((struct cell *)exdata);
 }
 
-struct cube *cube_info_new(const struct field *shared_tags, size_t n_field, enum sampling_mode mode, size_t max_n_cell)
+struct cube *cube_info_new(const struct field *dimensions, size_t n_dimensions, enum sampling_mode mode, size_t max_n_cell)
 {
     struct cube *cube = calloc(1, sizeof(struct cube));
     cube->sampling_mode = mode;
 
-    if (n_field == 0) {
-        cube->cube_identifier = NULL;
+    if (n_dimensions == 0) {
+        cube->cube_dimensions = NULL;
     } else {
-        cube->cube_identifier = tag_array_duplicate(shared_tags, n_field);
+        cube->cube_dimensions = field_array_duplicate(dimensions, n_dimensions);
     }
 
-    cube->n_shared_tags = n_field;
+    cube->n_dimensions = n_dimensions;
     cube->max_n_cell = max_n_cell;
-    tags2key_endeavor(shared_tags, n_field, &cube->key, &cube->key_len);
+    field_array_to_key_endeavor(dimensions, n_dimensions, &cube->key, &cube->key_len);
 
     cube->id = -1;
 
     return cube;
 }
 
-struct cube *cube_new(const struct field *shared_tags, size_t n_field, enum sampling_mode mode, size_t max_n_cell)
+struct cube *cube_new(const struct field *dimensions, size_t n_dimensions, enum sampling_mode mode, size_t max_n_cell)
 {
-    struct cube *cube = cube_info_new(shared_tags, n_field, mode, max_n_cell);
+    struct cube *cube = cube_info_new(dimensions, n_dimensions, mode, max_n_cell);
 
     switch (mode)
     {
@@ -593,7 +592,7 @@ void cube_free(struct cube *cube) {
         break;
     }
 
-    fieldstat_free_tag_array(cube->cube_identifier, cube->n_shared_tags);
+    fieldstat_free_tag_array(cube->cube_dimensions, cube->n_dimensions);
     free(cube->key);
 
     free(cube);
@@ -611,23 +610,23 @@ void cube_set_primary_metric(struct cube *cube, int metric_id) {
     cube->primary_metric_id = metric_id;
 }
 
-struct cell *get_cell(struct cube *cube, const struct field *fields, size_t n_field,long long increment, int metric_id) {
+struct cell *get_cell(struct cube *cube, const struct field *dimensions, size_t n_dimension, long long increment, int metric_id) {
     char key_stack[4096];
     char *key = key_stack;
-    int key_len = tags2key_safe(fields, n_field, key, sizeof(key));
+    int key_len = field_array_to_key_safe(dimensions, n_dimension, key, sizeof(key));
     bool free_key = false;
     if (key_len < 0) {  // very unlikely to happen
         char *key_heap;
         size_t key_len_tmp;
-        tags2key_endeavor(fields, n_field, &key_heap, &key_len_tmp);
+        field_array_to_key_endeavor(dimensions, n_dimension, &key_heap, &key_len_tmp);
         key = key_heap;
         key_len = key_len_tmp;
         free_key = true;
     }
 
     struct exdata_new_args args;
-    args.fields = fields;
-    args.n_tags = n_field;
+    args.cell_dimensions = dimensions;
+    args.n_dimensions = n_dimension;
 
     struct cell *cell_data = NULL;
     switch (cube->sampling_mode) {
@@ -665,11 +664,11 @@ struct cell *get_cell(struct cube *cube, const struct field *fields, size_t n_fi
     return cell_data;
 }
 
-int cube_histogram_record(struct cube *cube, const struct metric_manifest *manifest, const struct field *fields, size_t n_field, long long value) {
+int cube_histogram_record(struct cube *cube, const struct metric_manifest *manifest, const struct field *dimensions, size_t n_dimensions, long long value) {
     assert(manifest->type == METRIC_TYPE_HISTOGRAM);
     assert(cube->sampling_mode == SAMPLING_MODE_COMPREHENSIVE || (cube->primary_metric_id != manifest->id));
 
-    struct cell *cell_data = get_cell(cube, fields, n_field, 0, manifest->id);
+    struct cell *cell_data = get_cell(cube, dimensions, n_dimensions, 0, manifest->id);
     if (cell_data == NULL) {
         return FS_ERR_TOO_MANY_CELLS;
     }
@@ -682,11 +681,11 @@ int cube_histogram_record(struct cube *cube, const struct metric_manifest *manif
     return FS_OK;
 }
 
-int cube_hll_add(struct cube *cube, const struct metric_manifest *manifest, const struct field *fields, size_t n_field, const char *key, size_t key_len) {
+int cube_hll_add(struct cube *cube, const struct metric_manifest *manifest, const struct field *dimensions, size_t n_dimensions, const char *key, size_t key_len) {
     assert(manifest->type == METRIC_TYPE_HLL);
     assert(cube->sampling_mode == SAMPLING_MODE_COMPREHENSIVE || (cube->primary_metric_id != manifest->id));
 
-    struct cell *cell_data = get_cell(cube, fields, n_field, 0, manifest->id);
+    struct cell *cell_data = get_cell(cube, dimensions, n_dimensions, 0, manifest->id);
     if (cell_data == NULL) {
         return FS_ERR_TOO_MANY_CELLS;
     }
@@ -696,11 +695,11 @@ int cube_hll_add(struct cube *cube, const struct metric_manifest *manifest, cons
     return FS_OK;
 }
 
-uint64_t tags2hash(const struct field *field, size_t n_field) {
+uint64_t tags2hash(const struct field *field, size_t n_dimensions) {
     XXH3_state_t state = {0};
     XXH3_64bits_reset(&state);
 
-    for (int i = 0; i < n_field; i++) {
+    for (int i = 0; i < n_dimensions; i++) {
         XXH3_64bits_update(&state, field[i].key, strlen(field[i].key));
         if (field[i].type != TAG_CSTRING) {
             XXH3_64bits_update(&state, &field[i].value_longlong, sizeof(long long));
@@ -712,12 +711,12 @@ uint64_t tags2hash(const struct field *field, size_t n_field) {
     return XXH3_64bits_digest(&state);
 }
 
-int cube_hll_add_tag(struct cube *cube, const struct metric_manifest *manifest, const struct field *fields, size_t n_field, const struct field *tags_key, size_t n_tag_key) 
+int cube_hll_add_tag(struct cube *cube, const struct metric_manifest *manifest, const struct field *dimensions, size_t n_dimensions, const struct field *tags_key, size_t n_tag_key) 
 {
     assert(manifest->type == METRIC_TYPE_HLL);
     assert(cube->sampling_mode != SAMPLING_MODE_TOPK || (cube->primary_metric_id != manifest->id));
 
-    struct cell *cell_data = get_cell(cube, fields, n_field, 0, manifest->id);
+    struct cell *cell_data = get_cell(cube, dimensions, n_dimensions, 0, manifest->id);
     if (cell_data == NULL) {
         return FS_ERR_TOO_MANY_CELLS;
     }
@@ -728,11 +727,11 @@ int cube_hll_add_tag(struct cube *cube, const struct metric_manifest *manifest, 
     return FS_OK;
 }
 
-int cube_counter_incrby(struct cube *cube, const struct metric_manifest *manifest, const struct field *fields, size_t n_field, long long increment) {
+int cube_counter_incrby(struct cube *cube, const struct metric_manifest *manifest, const struct field *dimensions, size_t n_dimensions, long long increment) {
     assert(manifest->type == METRIC_TYPE_COUNTER);
     assert(cube->sampling_mode == SAMPLING_MODE_COMPREHENSIVE || (cube->primary_metric_id != manifest->id || increment >= 0));
 
-    struct cell *cell_data = get_cell(cube, fields, n_field, increment, manifest->id);
+    struct cell *cell_data = get_cell(cube, dimensions, n_dimensions, increment, manifest->id);
     if (cell_data == NULL) {
         return FS_ERR_TOO_MANY_CELLS;
     }
@@ -743,11 +742,11 @@ int cube_counter_incrby(struct cube *cube, const struct metric_manifest *manifes
     return FS_OK;
 }
 
-int cube_counter_set(struct cube *cube, const struct metric_manifest *manifest, const struct field *fields, size_t n_field, long long value) {
+int cube_counter_set(struct cube *cube, const struct metric_manifest *manifest, const struct field *dimensions, size_t n_dimensions, long long value) {
     assert(manifest->type == METRIC_TYPE_COUNTER);
     assert(cube->sampling_mode == SAMPLING_MODE_COMPREHENSIVE || (cube->primary_metric_id != manifest->id));
 
-    struct cell *cell_data = get_cell(cube, fields, n_field, 0, manifest->id);
+    struct cell *cell_data = get_cell(cube, dimensions, n_dimensions, 0, manifest->id);
     if (cell_data == NULL) {
         return FS_ERR_TOO_MANY_CELLS;
     }
@@ -759,7 +758,7 @@ int cube_counter_set(struct cube *cube, const struct metric_manifest *manifest, 
 
 struct cube *cube_copy(const struct cube *cube)
 {
-    struct cube *cube_dup = cube_info_new(cube->cube_identifier, cube->n_shared_tags, cube->sampling_mode, cube->max_n_cell);
+    struct cube *cube_dup = cube_info_new(cube->cube_dimensions, cube->n_dimensions, cube->sampling_mode, cube->max_n_cell);
     cube_dup->primary_metric_id = cube->primary_metric_id;
 
     switch (cube->sampling_mode)
@@ -797,13 +796,13 @@ void cube_merge(struct cube *dest, const struct cube *src)
 }
 
 struct cube *cube_fork(const struct cube *cube) {
-    struct cube *ret = cube_new(cube->cube_identifier, cube->n_shared_tags, cube->sampling_mode, cube->max_n_cell);
+    struct cube *ret = cube_new(cube->cube_dimensions, cube->n_dimensions, cube->sampling_mode, cube->max_n_cell);
     ret->primary_metric_id = cube->primary_metric_id;
 
     return ret;
 }
 
-void cube_get_cells(const struct cube *cube, struct field_list **tag_list, size_t *n_cell)
+void cube_get_cells(const struct cube *cube, struct field_list **cell_dimensions, size_t *n_cell)
 {
     size_t n_cell_tmp = 0;
     switch (cube->sampling_mode) {
@@ -818,7 +817,7 @@ void cube_get_cells(const struct cube *cube, struct field_list **tag_list, size_
     }
 
     if (n_cell_tmp == 0) {
-        *tag_list = NULL;
+        *cell_dimensions = NULL;
         *n_cell = 0;
         return;
     }
@@ -836,18 +835,18 @@ void cube_get_cells(const struct cube *cube, struct field_list **tag_list, size_
     }
 
     struct field_list *tag_list_ret = (struct field_list *)malloc(sizeof(struct field_list) * n_cell_tmp);
-    *tag_list = tag_list_ret;
+    *cell_dimensions = tag_list_ret;
     *n_cell = n_cell_tmp;
 
     for (int i = 0; i < n_cell_tmp; i++) {
         struct cell *cell_data = cell_datas[i];
         struct field_list *tag_list_tmp = &tag_list_ret[i];
-        tag_list_tmp->n_field = cell_data->fields.n_field;
+        tag_list_tmp->n_field = cell_data->cell_dimensions.n_field;
         if (tag_list_tmp->n_field == 0) {
             tag_list_tmp->field = NULL;
             continue;
         }
-        tag_list_tmp->field = tag_array_duplicate(cell_data->fields.field, tag_list_tmp->n_field);
+        tag_list_tmp->field = field_array_duplicate(cell_data->cell_dimensions.field, tag_list_tmp->n_field);
     }
 
     free(cell_datas);
@@ -858,7 +857,7 @@ const struct cell *get_cell_by_tag_list(const struct cube *cube, const struct fi
     const struct cell *ret = NULL;
     char *tag_in_string;
     size_t tag_len;
-    tags2key_endeavor(fields->field, fields->n_field, &tag_in_string, &tag_len);
+    field_array_to_key_endeavor(fields->field, fields->n_field, &tag_in_string, &tag_len);
 
     switch (cube->sampling_mode)
     {
@@ -1001,14 +1000,14 @@ void cube_get_cells_used_by_metric(const struct cube *cube, const struct field_l
 struct field_list *cube_get_identifier(const struct cube *cube) {
     struct field_list *tag_list = (struct field_list *)malloc(sizeof(struct field_list));
 
-    if (cube->n_shared_tags == 0) {
+    if (cube->n_dimensions == 0) {
         tag_list->field = NULL;
         tag_list->n_field = 0;
         return tag_list;
     }
 
-    tag_list->field = tag_array_duplicate(cube->cube_identifier, cube->n_shared_tags);
-    tag_list->n_field = cube->n_shared_tags;
+    tag_list->field = field_array_duplicate(cube->cube_dimensions, cube->n_dimensions);
+    tag_list->n_field = cube->n_dimensions;
     
 
     return tag_list;

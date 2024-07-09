@@ -34,7 +34,6 @@ void *heavy_keeper_get0_exdata(const struct heavy_keeper *hk, const char *key, s
 int heavy_keeper_get_count(const struct heavy_keeper *hk);
 
 size_t heavy_keeper_list(const struct heavy_keeper *hk, void **exdatas, size_t n_exdatas);
-// void heavy_keeper_list(const struct heavy_keeper *hk, void ***exdatas, size_t *n_exdatas); 
 
 void heavy_keeper_merge(struct heavy_keeper *dest, const struct heavy_keeper *src);
 
