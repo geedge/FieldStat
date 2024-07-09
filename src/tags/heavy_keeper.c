@@ -597,7 +597,7 @@ int heavy_keeper_add(struct heavy_keeper *heavy_keeper, const char *key, size_t 
             // If a key is not in the min-heap, then the estimated key size should be no larger than nmin.
             // or if the min-heap is not full(nmin == 0), every key should be taken into account, so of course it should be added.
             // in neither case, bucket->count > nMin && not_in_sorted_set happen.
-            // The keys whose counts are both larger than nmin and not in min-heap must have the same xxhash value, and its FP stored in bucket represents another tag,
+            // The keys whose counts are both larger than nmin and not in min-heap must have the same xxhash value, and its FP stored in bucket represents another field,
             // In this case, the sketch won't be updated. This key is expected to be taken into account in another array,
             //  where its FP is different from the one it should collided with, so that element keys won't be missed.
             if (not_in_sorted_set) {
@@ -638,7 +638,7 @@ int heavy_keeper_add(struct heavy_keeper *heavy_keeper, const char *key, size_t 
         if (maxv > old_cnt) {
             sorted_set_incrby_count(summary, key, key_len, maxv - old_cnt);
         }
-        return 1; // no popped, but the tag definitely exists in the sorted set
+        return 1; // no popped, but the exdata definitely exists in the sorted set
     }
 }
 
@@ -759,7 +759,7 @@ void heavy_keeper_merge(struct heavy_keeper *dest, const struct heavy_keeper *sr
     
     for (int i = 0; i < size_src; i++) {
         const heap_entry *entry = sorted_set_find_entry(new_rec, key_arr[i], key_lens[i]);
-        if (entry != NULL) { // the tag is in both dest and src, so has been processed in the previous loop. The reason why no need to sum up result is that merged sketch already keeps its summed up count
+        if (entry != NULL) { // the key is in both dest and src, so has been processed in the previous loop. The reason why no need to sum up result is that merged sketch already keeps its summed up count
             void *exdata_new = sorted_set_entry_get_data(entry)->exdata;
             void *exdata_src = exdatas_src[i];
             dest->merge_fn(exdata_new, exdata_src);

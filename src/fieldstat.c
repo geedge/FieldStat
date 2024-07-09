@@ -43,9 +43,9 @@ union metric_parameter *construct_parameters(enum metric_type type, ...)
     return paras;
 }
 
-void tag_array_copy(struct fieldstat_tag *tags_dst, const struct fieldstat_tag *tags_src, size_t n_tag)
+void tag_array_copy(struct field *tags_dst, const struct field *tags_src, size_t n_field)
 {
-    for (size_t i = 0; i < n_tag; i++) {
+    for (size_t i = 0; i < n_field; i++) {
         tags_dst[i].key = strdup(tags_src[i].key);
         tags_dst[i].type = tags_src[i].type;
         switch (tags_src[i].type)
@@ -65,9 +65,9 @@ void tag_array_copy(struct fieldstat_tag *tags_dst, const struct fieldstat_tag *
     }
 }
 
-bool is_tag_array_same(const struct fieldstat_tag *tags1, const struct fieldstat_tag *tags2, size_t n_tag)
+bool is_tag_array_same(const struct field *tags1, const struct field *tags2, size_t n_field)
 {
-    for (size_t i = 0; i < n_tag; i++) {
+    for (size_t i = 0; i < n_field; i++) {
         if (tags1[i].type != tags2[i].type) {
             return false;
         }
@@ -150,27 +150,27 @@ int fieldstat_destroy_cube(struct fieldstat *instance, int cube_id)
 /*                                    cube                                    */
 /* -------------------------------------------------------------------------- */
 
-void fieldstat_free_tag_array(struct fieldstat_tag *tags, size_t n_tags)
+void fieldstat_free_tag_array(struct field *fields, size_t n_tags)
 {
     for (size_t i = 0; i < n_tags; i++) {
-        struct fieldstat_tag *tag = &tags[i];
-        free((char *)tag->key);
-        if (tag->type == TAG_CSTRING) {
-            free((char *)tag->value_str);
+        struct field *field = &fields[i];
+        free((char *)field->key);
+        if (field->type == TAG_CSTRING) {
+            free((char *)field->value_str);
         }
     }
-    free(tags);
+    free(fields);
 }
 
-int fieldstat_create_cube(struct fieldstat *instance, const struct fieldstat_tag *cube_identifier, size_t n_tag, enum sampling_mode mode, size_t max_n_cell)
+int fieldstat_create_cube(struct fieldstat *instance, const struct field *cube_identifier, size_t cube_identifier_len, enum sampling_mode mode, size_t max_n_cell)
 {
     if (instance == NULL) {
         return  FS_ERR_NULL_HANDLER;
     }
 
-    if (n_tag == 0 || cube_identifier == NULL) {
+    if (cube_identifier_len == 0 || cube_identifier == NULL) {
         cube_identifier = NULL;
-        n_tag = 0;
+        cube_identifier_len = 0;
     }
     if (mode == SAMPLING_MODE_TOPK && max_n_cell == 0) {
         return FS_ERR_INVALID_PARAM;
@@ -179,7 +179,7 @@ int fieldstat_create_cube(struct fieldstat *instance, const struct fieldstat_tag
         max_n_cell = INT32_MAX;
     }
     
-    struct cube *cube = cube_new(cube_identifier, n_tag, mode, max_n_cell);
+    struct cube *cube = cube_new(cube_identifier, cube_identifier_len, mode, max_n_cell);
     int ret = cube_manager_add(instance->cube_manager, cube);
     if (ret < 0) {
         cube_free(cube);
@@ -295,7 +295,7 @@ int fieldstat_register_hist(struct fieldstat *instance, const char *metric_name,
 /* -------------------------------------------------------------------------- */
 
 // cppcheck-suppress [constParameterPointer, unmatchedSuppression]
-int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long increment)
+int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric_id, const struct field *fields, size_t n_fields, long long increment)
 {
     struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
     if (cube == NULL) {
@@ -306,11 +306,11 @@ int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric
         return FS_ERR_INVALID_METRIC_ID;
     }
     
-    return cube_counter_incrby(cube, manifest, tags, n_tag, increment);
+    return cube_counter_incrby(cube, manifest, fields, n_fields, increment);
 }
 
 // cppcheck-suppress [constParameterPointer, unmatchedSuppression]
-int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long value)
+int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id, const struct field *fields, size_t n_fields, long long value)
 {
     struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
     if (cube == NULL) {
@@ -321,11 +321,11 @@ int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id
         return FS_ERR_INVALID_METRIC_ID;
     }
 
-    return cube_counter_set(cube, manifest, tags, n_tag, value);
+    return cube_counter_set(cube, manifest, fields, n_fields, value);
 }
 
 // cppcheck-suppress [constParameterPointer, unmatchedSuppression]
-int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, const char *key, size_t key_len)
+int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, const struct field *fields, size_t n_fields, const char *key, size_t key_len)
 {
     struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
     if (cube == NULL) {
@@ -336,11 +336,11 @@ int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, co
         return FS_ERR_INVALID_METRIC_ID;
     }
 
-    return cube_hll_add(cube, manifest, tags, n_tag, key, key_len);
+    return cube_hll_add(cube, manifest, fields, n_fields, key, key_len);
 }
 
 // cppcheck-suppress [constParameterPointer, unmatchedSuppression]
-int fieldstat_hll_add_tag(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, const struct fieldstat_tag *tags_key, size_t n_tag_key)
+int fieldstat_hll_add_field(struct fieldstat *instance, int cube_id, int metric_id, const struct field *fields, size_t n_fields, const struct field *item, size_t item_len)
 {
     struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
     if (cube == NULL) {
@@ -351,11 +351,11 @@ int fieldstat_hll_add_tag(struct fieldstat *instance, int cube_id, int metric_id
         return FS_ERR_INVALID_METRIC_ID;
     }
 
-    return cube_hll_add_tag(cube, manifest, tags, n_tag, tags_key, n_tag_key);
+    return cube_hll_add_tag(cube, manifest, fields, n_fields, item, item_len);
 }
 
 // cppcheck-suppress [constParameterPointer, unmatchedSuppression]
-int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long value)
+int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id, const struct field *fields, size_t n_fields, long long value)
 {
     struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
     if (cube == NULL) {
@@ -366,7 +366,7 @@ int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id
         return FS_ERR_INVALID_METRIC_ID;
     }
 
-    return cube_histogram_record(cube, manifest, tags, n_tag, value);
+    return cube_histogram_record(cube, manifest, fields, n_fields, value);
 }
 
 int fieldstat_merge(struct fieldstat *instance, const struct fieldstat *src)
@@ -444,7 +444,7 @@ void fieldstat_get_metrics(const struct fieldstat *instance, int **metric_id_out
     }
 }
 
-struct fieldstat_tag_list *fieldstat_cube_get_tags(const struct fieldstat *instance, int cube_id)
+struct field_list *fieldstat_cube_get_tags(const struct fieldstat *instance, int cube_id)
 {
     const struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
     if (cube == NULL) {
@@ -454,36 +454,36 @@ struct fieldstat_tag_list *fieldstat_cube_get_tags(const struct fieldstat *insta
     return cube_get_identifier(cube);
 }
 
-int fieldstat_counter_get(const struct fieldstat *instance, int cube_id, const struct fieldstat_tag_list *tags, int metric_id, long long *value)
+int fieldstat_counter_get(const struct fieldstat *instance, int cube_id, const struct field_list *fields, int metric_id, long long *value)
 {
     const struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
     if (cube == NULL) {
         return FS_ERR_INVALID_CUBE_ID;
     }
     
-    return cube_counter_get(cube, metric_id, tags, value);
+    return cube_counter_get(cube, metric_id, fields, value);
 }
 
-int fieldstat_hll_get(const struct fieldstat *instance, int cube_id, const struct fieldstat_tag_list *tags, int metric_id, double *value)
+int fieldstat_hll_get(const struct fieldstat *instance, int cube_id, const struct field_list *fields, int metric_id, double *value)
 {
     const struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
     if (cube == NULL) {
         return FS_ERR_INVALID_CUBE_ID;
     }
     
-    int ret = cube_hll_get(cube, metric_id, tags, value);
+    int ret = cube_hll_get(cube, metric_id, fields, value);
 
     return ret;
 }
 
-long long fieldstat_hist_value_at_percentile(const struct fieldstat *instance, int cube_id, const struct fieldstat_tag_list *tags, int metric_id, double percentile)
+long long fieldstat_hist_value_at_percentile(const struct fieldstat *instance, int cube_id, const struct field_list *fields, int metric_id, double percentile)
 {
     const struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
     if (cube == NULL) {
         return FS_ERR_INVALID_CUBE_ID;
     }
     long long value;
-    int ret = cube_histogram_value_at_percentile(cube, metric_id, tags, percentile, &value);
+    int ret = cube_histogram_value_at_percentile(cube, metric_id, fields, percentile, &value);
     if (ret < 0) {
         return ret;
     }
@@ -491,21 +491,21 @@ long long fieldstat_hist_value_at_percentile(const struct fieldstat *instance, i
     return value;
 }
 
-long long fieldstat_hist_count_le_value(const struct fieldstat *instance, int cube_id, const struct fieldstat_tag_list *tags, int metric_id, long long value)
+long long fieldstat_hist_count_le_value(const struct fieldstat *instance, int cube_id, const struct field_list *fields, int metric_id, long long value)
 {
     const struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
     if (cube == NULL) {
         return FS_ERR_INVALID_CUBE_ID;
     }
     long long count;
-    int ret = cube_histogram_count_le_value(cube, metric_id, tags, value, &count);
+    int ret = cube_histogram_count_le_value(cube, metric_id, fields, value, &count);
     if (ret < 0) {
         return ret;
     }
     return count;
 }
 
-void fieldstat_get_serialized_blob(const struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag_list *tags, char **blob, size_t *blob_size)
+void fieldstat_get_serialized_blob(const struct fieldstat *instance, int cube_id, int metric_id, const struct field_list *fields, char **blob, size_t *blob_size)
 {
     const struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
     if (cube == NULL) {
@@ -514,16 +514,16 @@ void fieldstat_get_serialized_blob(const struct fieldstat *instance, int cube_id
         return;
     }
 
-    cube_get_serialization(cube, metric_id, tags, blob, blob_size);
+    cube_get_serialization(cube, metric_id, fields, blob, blob_size);
 }
 
-void fieldstat_tag_list_arr_free(struct fieldstat_tag_list *tag_list, size_t n_cell)
+void fieldstat_tag_list_arr_free(struct field_list *tag_list, size_t n_cell)
 {
     if (tag_list == NULL) {
         return;
     }
     for (int i = 0; i < n_cell; i++) {
-        fieldstat_free_tag_array(tag_list[i].tag, tag_list[i].n_tag);
+        fieldstat_free_tag_array(tag_list[i].field, tag_list[i].n_field);
     }
     free(tag_list);
 }
@@ -548,7 +548,7 @@ enum metric_type fieldstat_get_metric_type(const struct fieldstat *instance, int
     return metric->type;
 }
 
-void fieldstat_cube_get_cells(const struct fieldstat *instance, int cube_id, struct fieldstat_tag_list **tag_list, size_t *n_cell)
+void fieldstat_cube_get_cells(const struct fieldstat *instance, int cube_id, struct field_list **tag_list, size_t *n_cell)
 {
     const struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
     if (cube == NULL) {
@@ -572,7 +572,7 @@ int fieldstat_get_used_sampling(const struct fieldstat *instance, int cube_id)
     return cube_get_cell_count(cube);
 }
 
-int fieldstat_find_cube(const struct fieldstat *instance, const struct fieldstat_tag *shared_tags, size_t n_shared_tags)
+int fieldstat_find_cube(const struct fieldstat *instance, const struct field *shared_tags, size_t n_shared_tags)
 {
     if (instance == NULL) {
         return FS_ERR_NULL_HANDLER;
@@ -586,8 +586,8 @@ int fieldstat_find_cube(const struct fieldstat *instance, const struct fieldstat
     return cube_id;
 }
 
-void fieldstat_get_metric_in_cell(const struct fieldstat *instance, int cube_id, const struct fieldstat_tag_list *tags, int **metric_id_out, size_t *n_metric_out)
+void fieldstat_get_metric_in_cell(const struct fieldstat *instance, int cube_id, const struct field_list *fields, int **metric_id_out, size_t *n_metric_out)
 {
     const struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
-    return cube_get_cells_used_by_metric(cube, tags, metric_id_out, n_metric_out);
+    return cube_get_cells_used_by_metric(cube, fields, metric_id_out, n_metric_out);
 }

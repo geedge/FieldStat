@@ -82,7 +82,7 @@ TEST(test_register, register_many_cubes)
 {
     struct fieldstat *instance = fieldstat_new();
     int registered_cube = 10000; // will trigger realloc many times
-    struct fieldstat_tag shared_tag = TEST_SHARED_TAG;
+    struct field shared_tag = TEST_SHARED_TAG;
     for (int i = 0; i < registered_cube; i++) {
         shared_tag.value_longlong = i;
         int cube_id = fieldstat_create_cube(instance, &shared_tag, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
@@ -107,16 +107,17 @@ TEST(test_register, add_many_tagged_cells)
 {
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
-    struct fieldstat_tag test_tag_long[100];
-    for (int i = 0; i < 100; i++) {
+    size_t n_field = 1000;
+    struct field test_tag_long[n_field];
+    for (int i = 0; i < n_field; i++) {
         test_tag_long[i] = TEST_TAG_INT; // will trigger realloc 
     }
 
     int metric_id = fieldstat_register_counter(instance, "counter");
-    fieldstat_counter_incrby(instance, cube_id, metric_id, test_tag_long, 100, 10086);
+    fieldstat_counter_incrby(instance, cube_id, metric_id, test_tag_long, n_field, 10086);
 
     long long result;
-    struct fieldstat_tag_list tag_list = {test_tag_long, 100};
+    struct field_list tag_list = {test_tag_long, n_field};
     fieldstat_counter_get(instance, cube_id, &tag_list, metric_id,  &result);
     EXPECT_EQ(result, 10086);
 
@@ -127,7 +128,7 @@ TEST(test_register, add_long_tagged_cells)
 {
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
-    struct fieldstat_tag test_tag_long = TEST_TAG_STRING;
+    struct field test_tag_long = TEST_TAG_STRING;
     char *long_string = (char *)malloc(5001);
     memset(long_string, 'a', 5001);
     long_string[5000] = '\0';
@@ -137,7 +138,7 @@ TEST(test_register, add_long_tagged_cells)
     fieldstat_counter_incrby(instance, cube_id, metric_id, &test_tag_long, 1, 10086);
 
     long long result;
-    struct fieldstat_tag_list tag_list = {&test_tag_long, 1};
+    struct field_list tag_list = {&test_tag_long, 1};
     fieldstat_counter_get(instance, cube_id, &tag_list, metric_id, &result);
     EXPECT_EQ(result, 10086);
 
@@ -194,17 +195,17 @@ TEST(test_register, fork_registered_info_with_cube_and_metric)
     int cube_num;
     fieldstat_get_cubes(dup, &cube_ids, &cube_num);
     EXPECT_EQ(cube_num, 2);
-    struct fieldstat_tag_list *tag_list = NULL;
+    struct field_list *tag_list = NULL;
     
     tag_list = fieldstat_cube_get_tags(dup, cube_ids[0]);
-    EXPECT_STREQ(tag_list->tag[0].key, TEST_SHARED_TAG.key);
+    EXPECT_STREQ(tag_list->field[0].key, TEST_SHARED_TAG.key);
     fieldstat_tag_list_arr_free(tag_list, 1);
     size_t n_cell = 0;
     fieldstat_cube_get_cells(dup, cube_ids[0], &tag_list, &n_cell);
     EXPECT_EQ(n_cell, 0);
 
     tag_list = fieldstat_cube_get_tags(dup, cube_ids[1]);
-    EXPECT_STREQ(tag_list->tag[0].key, TEST_TAG_DOUBLE.key);
+    EXPECT_STREQ(tag_list->field[0].key, TEST_TAG_DOUBLE.key);
     free(cube_ids);
     fieldstat_tag_list_arr_free(tag_list, 1);
 
@@ -256,7 +257,7 @@ TEST(test_register, register_many_cells_on_unlimited_sized_cube)
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 0);
     int metric_id = fieldstat_register_counter(instance, "counter");
-    struct fieldstat_tag test_tag = {"abc", TAG_INTEGER, {.value_longlong = 0}};
+    struct field test_tag = {"abc", TAG_INTEGER, {.value_longlong = 0}};
     for (int i = 0; i < 10000; i++) {
         test_tag.value_longlong = i;
         fieldstat_counter_incrby(instance, cube_id, metric_id, &test_tag, 1, 1);
@@ -264,7 +265,7 @@ TEST(test_register, register_many_cells_on_unlimited_sized_cube)
 
     for (int i = 0; i < 10000; i++) {
         test_tag.value_longlong = i;
-        struct fieldstat_tag_list tag_list = {&test_tag, 1};
+        struct field_list tag_list = {&test_tag, 1};
         long long value;
         fieldstat_counter_get(instance, cube_id, &tag_list, metric_id, &value);
         EXPECT_EQ(value, 1);
@@ -313,8 +314,8 @@ TEST(calibrate, target_one_more_metric)
 
     EXPECT_EQ(test_get_max_metric_id(target), 0);
     EXPECT_STREQ(fieldstat_get_metric_name(target, 0), "counter");
-    struct fieldstat_tag_list *tag_list = fieldstat_cube_get_tags(target, cube_id);
-    EXPECT_STREQ(tag_list->tag[0].key, TEST_SHARED_TAG.key);
+    struct field_list *tag_list = fieldstat_cube_get_tags(target, cube_id);
+    EXPECT_STREQ(tag_list->field[0].key, TEST_SHARED_TAG.key);
 
     fieldstat_free(master);
     fieldstat_free(target);
@@ -334,8 +335,8 @@ TEST(calibrate, master_one_more_metric)
     EXPECT_EQ(test_get_max_metric_id(target), 1);
     EXPECT_STREQ(fieldstat_get_metric_name(target, 0), "counter");
     EXPECT_STREQ(fieldstat_get_metric_name(target, 1), "counter2");
-    struct fieldstat_tag_list *tag_list = fieldstat_cube_get_tags(target, cube_id);
-    EXPECT_STREQ(tag_list->tag[0].key, TEST_SHARED_TAG.key);
+    struct field_list *tag_list = fieldstat_cube_get_tags(target, cube_id);
+    EXPECT_STREQ(tag_list->field[0].key, TEST_SHARED_TAG.key);
 
     fieldstat_free(master);
     fieldstat_free(target);
@@ -357,8 +358,8 @@ TEST(calibrate, different_metric)
     EXPECT_EQ(test_get_max_metric_id(target), 1);
     EXPECT_STREQ(fieldstat_get_metric_name(target, 0), "counter");
     EXPECT_STREQ(fieldstat_get_metric_name(target, 1), "hi i am master new");
-    struct fieldstat_tag_list *tag_list = fieldstat_cube_get_tags(target, cube_id);
-    EXPECT_STREQ(tag_list->tag[0].key, TEST_SHARED_TAG.key);
+    struct field_list *tag_list = fieldstat_cube_get_tags(target, cube_id);
+    EXPECT_STREQ(tag_list->field[0].key, TEST_SHARED_TAG.key);
 
     fieldstat_free(master);
     fieldstat_free(target);
@@ -386,8 +387,8 @@ TEST(calibrate, target_more_cube)
 
     EXPECT_EQ(test_get_max_metric_id(target), 0);
     EXPECT_STREQ(fieldstat_get_metric_name(target, 0), "counter");
-    struct fieldstat_tag_list *tag_list = fieldstat_cube_get_tags(target, cube_id);
-    EXPECT_STREQ(tag_list->tag[0].key, TEST_SHARED_TAG.key);
+    struct field_list *tag_list = fieldstat_cube_get_tags(target, cube_id);
+    EXPECT_STREQ(tag_list->field[0].key, TEST_SHARED_TAG.key);
 
     EXPECT_EQ(fieldstat_find_cube(target, &TEST_SHARED_TAG, 1), 0);
     EXPECT_EQ(fieldstat_find_cube(target, &TEST_TAG_STRING, 1), FS_ERR_INVALID_KEY);
@@ -414,10 +415,10 @@ TEST(calibrate, master_more_cube)
     EXPECT_EQ(cube_ids[1], cube_id2);
     free(cube_ids);
 
-    struct fieldstat_tag_list *tag_list = fieldstat_cube_get_tags(target, cube_id);
-    EXPECT_STREQ(tag_list->tag[0].key, TEST_SHARED_TAG.key);
-    struct fieldstat_tag_list *tag_list2 = fieldstat_cube_get_tags(target, cube_id2);
-    EXPECT_STREQ(tag_list2->tag[0].key, TEST_TAG_STRING.key);
+    struct field_list *tag_list = fieldstat_cube_get_tags(target, cube_id);
+    EXPECT_STREQ(tag_list->field[0].key, TEST_SHARED_TAG.key);
+    struct field_list *tag_list2 = fieldstat_cube_get_tags(target, cube_id2);
+    EXPECT_STREQ(tag_list2->field[0].key, TEST_TAG_STRING.key);
 
     EXPECT_EQ(fieldstat_find_cube(target, &TEST_TAG_STRING, 1), 1);
     EXPECT_EQ(fieldstat_find_cube(target, &TEST_SHARED_TAG, 1), 0);
@@ -439,8 +440,8 @@ TEST(calibrate, master_change_cube)
 
     fieldstat_calibrate(master, target);
 
-    struct fieldstat_tag_list *tag_list = fieldstat_cube_get_tags(target, cube_id);
-    EXPECT_STREQ(tag_list->tag[0].key, TEST_TAG_STRING.key);
+    struct field_list *tag_list = fieldstat_cube_get_tags(target, cube_id);
+    EXPECT_STREQ(tag_list->field[0].key, TEST_TAG_STRING.key);
 
     EXPECT_EQ(fieldstat_find_cube(target, &TEST_TAG_STRING, 1), 0);
 
@@ -453,7 +454,7 @@ TEST(calibrate, master_many_cube)
 {
     struct fieldstat *master = fieldstat_new();
     int registered_cube = 3000; // will trigger realloc 1 times
-    struct fieldstat_tag shared_tag = TEST_SHARED_TAG;
+    struct field shared_tag = TEST_SHARED_TAG;
     for (int i = 0; i < registered_cube; i++) {
         shared_tag.value_longlong = i;
         int cube_id = fieldstat_create_cube(master, &shared_tag, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
@@ -493,7 +494,7 @@ TEST(calibrate, master_many_cube)
 // calibrate调用时，依次比较每个cube id，id:0时，将master[0] 同步,同步时，会先删除A,然后添加B'
     // replica:B' B        (B' B)
 
-// calibrate 继续，同步master[1]，replica[1]不存在，创建新的cube。此时，不仅从id->cube 的数组中删除掉B，且从cube tag->id 的字典中删除掉B。可能会错误的删除掉B'，导致两个map的对应不一致。
+// calibrate 继续，同步master[1]，replica[1]不存在，创建新的cube。此时，不仅从id->cube 的数组中删除掉B，且从cube field->id 的字典中删除掉B。可能会错误的删除掉B'，导致两个map的对应不一致。
     // replica:B' /        (B )
 
 // 例如：find_cube(B)-> 返回1。
@@ -501,8 +502,8 @@ TEST(calibrate, master_many_cube)
 TEST(calibrate, issue_calibrate_wrong)
 {
     struct fieldstat *master = fieldstat_new();
-    const struct fieldstat_tag *tag_A = &TEST_SHARED_TAG;
-    const struct fieldstat_tag *tag_B = &TEST_TAG_INT;
+    const struct field *tag_A = &TEST_SHARED_TAG;
+    const struct field *tag_B = &TEST_TAG_INT;
     int cube_idA = fieldstat_create_cube(master, tag_A, 1, SAMPLING_MODE_COMPREHENSIVE, 1);
     int cube_idB = fieldstat_create_cube(master, tag_B, 1, SAMPLING_MODE_COMPREHENSIVE, 1);
     struct fieldstat *target = fieldstat_fork(master);
@@ -521,8 +522,8 @@ TEST(calibrate, issue_calibrate_wrong)
     EXPECT_EQ(fieldstat_find_cube(target, tag_A, 1), FS_ERR_INVALID_KEY);
     EXPECT_EQ(fieldstat_find_cube(target, tag_B, 1), cubes_id_ret[0]);
 
-    struct fieldstat_tag_list *tag_list = fieldstat_cube_get_tags(target, cubes_id_ret[0]);
-    EXPECT_STREQ(tag_list->tag[0].key, tag_B->key);
+    struct field_list *tag_list = fieldstat_cube_get_tags(target, cubes_id_ret[0]);
+    EXPECT_STREQ(tag_list->field[0].key, tag_B->key);
     fieldstat_tag_list_arr_free(tag_list, 1);
 
     fieldstat_free(master);
@@ -533,8 +534,8 @@ TEST(calibrate, issue_calibrate_wrong)
 TEST(calibrate, delete_first_cube)
 {
     struct fieldstat *master = fieldstat_new();
-    const struct fieldstat_tag *tag_A = &TEST_SHARED_TAG;
-    const struct fieldstat_tag *tag_B = &TEST_TAG_INT;
+    const struct field *tag_A = &TEST_SHARED_TAG;
+    const struct field *tag_B = &TEST_TAG_INT;
     int cube_idA = fieldstat_create_cube(master, tag_A, 1, SAMPLING_MODE_COMPREHENSIVE, 1);
     int cube_idB = fieldstat_create_cube(master, tag_B, 1, SAMPLING_MODE_COMPREHENSIVE, 1);
     struct fieldstat *target = fieldstat_fork(master);
@@ -553,8 +554,8 @@ TEST(calibrate, delete_first_cube)
     EXPECT_EQ(fieldstat_find_cube(target, tag_A, 1), FS_ERR_INVALID_KEY);
     EXPECT_EQ(fieldstat_find_cube(target, tag_B, 1), 1);
 
-    struct fieldstat_tag_list *tag_list = fieldstat_cube_get_tags(target, 1);
-    EXPECT_STREQ(tag_list->tag[0].key, tag_B->key);
+    struct field_list *tag_list = fieldstat_cube_get_tags(target, 1);
+    EXPECT_STREQ(tag_list->field[0].key, tag_B->key);
     fieldstat_tag_list_arr_free(tag_list, 1);
 
     fieldstat_free(master);

@@ -24,8 +24,8 @@ extern "C" {
 
 [[gnu::unused]] static struct fieldstat_easy *get_hist_fieldstat_easy()
 {
-    struct fieldstat_tag global_tags[2];
-    struct fieldstat_tag cell_tags[2];
+    struct field global_tags[2];
+    struct field cell_tags[2];
 
     global_tags[0].key  = "rule_id";
     global_tags[0].type = TAG_INTEGER;
@@ -59,7 +59,7 @@ extern "C" {
 }
 
 static void write_hll(struct fieldstat *instance) {
-    struct fieldstat_tag shared_tags[1];
+    struct field shared_tags[1];
 
     shared_tags[0].key  = "rule_id";
     shared_tags[0].type = TAG_INTEGER;
@@ -85,8 +85,8 @@ static void write_hll(struct fieldstat *instance) {
 }
 
 void write_histogram(struct fieldstat *instance) {
-    struct fieldstat_tag shared_tags[2];
-    struct fieldstat_tag cell_tags[2];
+    struct field shared_tags[2];
+    struct field cell_tags[2];
 
     shared_tags[0].key  = "rule_id";
     shared_tags[0].type = TAG_INTEGER;
@@ -123,8 +123,8 @@ void write_histogram(struct fieldstat *instance) {
 
 // static struct fieldstat_easy *get_table_fieldstat_easy()
 // {
-//     struct fieldstat_tag global_tags[2];
-//     struct fieldstat_tag cell_tags;
+//     struct field global_tags[2];
+//     struct field cell_tags;
 
 //     global_tags[0].key  = "policy_id";
 //     global_tags[0].type = TAG_INTEGER;
@@ -166,7 +166,7 @@ void fieldstat_easy_to_file(struct fieldstat_easy *fse, const char *file_path)
 }
 
 void write_table(struct fieldstat *instance) {
-    struct fieldstat_tag shared_tags[2];   
+    struct field shared_tags[2];   
     shared_tags[0].key  = "policy_id";
     shared_tags[0].type = TAG_INTEGER;
     shared_tags[0].value_longlong = 1;
@@ -180,7 +180,7 @@ void write_table(struct fieldstat *instance) {
         "GTPC-RECORD", "BGP-RECORD", "PROXY-EVENT", "DOS-SKETCH-RECORD",
         "STATISTICS-RULE-METRIC", "OBJECT-STATISTICS-METRIC"};
 
-    struct fieldstat_tag cell_tags;
+    struct field cell_tags;
     cell_tags.key = "send_log";
     cell_tags.type = TAG_CSTRING;
     cell_tags.value_str = "true";

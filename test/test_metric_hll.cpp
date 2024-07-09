@@ -26,12 +26,12 @@ void test_assert_standard_instance(const struct fieldstat *instance)
     const char *name = fieldstat_get_metric_name(instance, 0);
     EXPECT_STREQ(name, "czz_test hll metric");
 
-    struct fieldstat_tag_list *tag_list = NULL;
+    struct field_list *tag_list = NULL;
     size_t n_cell = 0;
     fieldstat_cube_get_cells(instance, 0, &tag_list, &n_cell);
     EXPECT_EQ(n_cell, 1);
-    EXPECT_EQ(tag_list->n_tag, 1);
-    EXPECT_STREQ(tag_list->tag[0].key, TEST_TAG_INT.key);
+    EXPECT_EQ(tag_list->n_field, 1);
+    EXPECT_STREQ(tag_list->field[0].key, TEST_TAG_INT.key);
     
     int *metric_id = NULL;
     size_t n_metric = 0;
@@ -67,9 +67,9 @@ TEST(metric_test_hll, simple_register_and_query)
 TEST(metric_test_hll, add_with_tags) {
     struct fieldstat *instance = test_init_standard_instance_one_cube_one_metric_one_cell_hll();
 
-    fieldstat_hll_add_tag(instance, 0, 0, &TEST_TAG_INT, 1, &TEST_TAG_INT, 1);
-    fieldstat_hll_add_tag(instance, 0, 0, &TEST_TAG_INT, 1, &TEST_TAG_DOUBLE, 1);
-    fieldstat_hll_add_tag(instance, 0, 0, &TEST_TAG_INT, 1, &TEST_TAG_STRING, 1);
+    fieldstat_hll_add_field(instance, 0, 0, &TEST_TAG_INT, 1, &TEST_TAG_INT, 1);
+    fieldstat_hll_add_field(instance, 0, 0, &TEST_TAG_INT, 1, &TEST_TAG_DOUBLE, 1);
+    fieldstat_hll_add_field(instance, 0, 0, &TEST_TAG_INT, 1, &TEST_TAG_STRING, 1);
     
     test_assert_standard_instance(instance);
     EXPECT_NEAR(my_fieldstat_hll_get(instance, 0, 0), 3, 0.5);

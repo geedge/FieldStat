@@ -52,33 +52,33 @@ class TestPrometheusExporter(unittest.TestCase):
 
     def test__escape_metric_tags(self):
         json_obj = {'name': '-',
-                    'tags': {
+                    'fields': {
                         'send(){}/\\%*$-,;': 'sum', 
                         'policy_id': 1, 
                         'quanlity': 0.5
                     },
                     'fields': {'T_success_log': 1},
                     'timestamp': 1694657637836}
-        tags = self.prom._PrometheusExporter__escape_metric_tags(json_obj)
+        fields = self.prom._PrometheusExporter__escape_metric_tags(json_obj)
 
-        self.assertEqual(tags, "send____________=\"sum\",policy_id=\"1\",quanlity=\"0.5\",app_name=\"-\"")
+        self.assertEqual(fields, "send____________=\"sum\",policy_id=\"1\",quanlity=\"0.5\",app_name=\"-\"")
 
     def test__build_type_counter(self):
         name  = "tsg_master_log"
-        tags  = "send_log=\"sum\",policy_id=\"1\",app_name=\"-\""
+        fields  = "send_log=\"sum\",policy_id=\"1\",app_name=\"-\""
         value = 100 
 
-        metric = self.prom._PrometheusExporter__build_type_counter(name, tags, value)
+        metric = self.prom._PrometheusExporter__build_type_counter(name, fields, value)
         self.assertEqual(metric, "tsg_master_log{send_log=\"sum\",policy_id=\"1\",app_name=\"-\"} 100\n")
 
 
     def test__build_histogram_format(self):
         c_hist = FieldstatAPI.libfieldstat.fieldstat_histogram_base64_decode(self.hist_val.encode('utf-8'))
         name   = "tsg_master_log"
-        tags   = "policy_id=\"1\",app_name=\"-\""
+        fields   = "policy_id=\"1\",app_name=\"-\""
         self.prom.hist_bins = [10,20,50,80,90,95,99]
 
-        metrics = self.prom._PrometheusExporter__build_histogram_format(name, tags, c_hist)
+        metrics = self.prom._PrometheusExporter__build_histogram_format(name, fields, c_hist)
 
         desired = "tsg_master_log_bucket{policy_id=\"1\",app_name=\"-\",le=\"10.00\"} 10\n"\
                   "tsg_master_log_bucket{policy_id=\"1\",app_name=\"-\",le=\"20.00\"} 20\n"\
@@ -94,10 +94,10 @@ class TestPrometheusExporter(unittest.TestCase):
     def test__build_summary_format(self):
         c_hist = FieldstatAPI.libfieldstat.fieldstat_histogram_base64_decode(self.hist_val.encode('utf-8'))
         name   = "tsg_master_log"
-        tags   = "policy_id=\"1\",app_name=\"-\""
+        fields   = "policy_id=\"1\",app_name=\"-\""
         self.prom.hist_bins = [0.1,0.2,0.5,0.8,0.9,0.95,0.99]
 
-        metrics = self.prom._PrometheusExporter__build_summary_format(name, tags, c_hist)
+        metrics = self.prom._PrometheusExporter__build_summary_format(name, fields, c_hist)
 
         desired = "tsg_master_log{policy_id=\"1\",app_name=\"-\",quantile=\"10.00%\"} 9\n" \
                   "tsg_master_log{policy_id=\"1\",app_name=\"-\",quantile=\"20.00%\"} 19\n"\
@@ -111,13 +111,13 @@ class TestPrometheusExporter(unittest.TestCase):
 
     def test__build_type_histogram(self):
         name  = "tsg_master_log"
-        tags  = "policy_id=\"1\",app_name=\"-\""
+        fields  = "policy_id=\"1\",app_name=\"-\""
         value = self.hist_val
 
         self.prom.hist_bins   = [0.1,0.2,0.5,0.8,0.9,0.95,0.99]
         self.prom.hist_format = "summary"
         
-        metrics = self.prom._PrometheusExporter__build_type_histogram(name, tags, value)
+        metrics = self.prom._PrometheusExporter__build_type_histogram(name, fields, value)
         
         desired = "tsg_master_log{policy_id=\"1\",app_name=\"-\",quantile=\"10.00%\"} 9\n" \
                   "tsg_master_log{policy_id=\"1\",app_name=\"-\",quantile=\"20.00%\"} 19\n"\
@@ -133,7 +133,7 @@ class TestPrometheusExporter(unittest.TestCase):
         self.prom.hist_bins   = [10,20,50,80,90,95,99]
         self.prom.hist_format = "histogram"
         
-        metrics = self.prom._PrometheusExporter__build_type_histogram(name, tags, value)
+        metrics = self.prom._PrometheusExporter__build_type_histogram(name, fields, value)
 
         desired = "tsg_master_log_bucket{policy_id=\"1\",app_name=\"-\",le=\"10.00\"} 10\n"\
                   "tsg_master_log_bucket{policy_id=\"1\",app_name=\"-\",le=\"20.00\"} 20\n"\
@@ -149,10 +149,10 @@ class TestPrometheusExporter(unittest.TestCase):
 
     def test__build_type_hll(self):
         name  = "tsg_master_log"
-        tags  = "policy_id=\"1\",app_name=\"-\""
+        fields  = "policy_id=\"1\",app_name=\"-\""
         value = "AQUBDECDAQxAQQUIIEEJCDCFARgQRAUIMIMAAAECAAAAAAAAAA=="
         
-        metric = self.prom._PrometheusExporter__build_type_hll(name, tags, value)
+        metric = self.prom._PrometheusExporter__build_type_hll(name, fields, value)
 
         self.assertEqual(metric, "tsg_master_log{policy_id=\"1\",app_name=\"-\"} 93.61\n")
 
@@ -164,7 +164,7 @@ class TestPrometheusExporter(unittest.TestCase):
                             "policy_id": 1,
                             "quanlity": 0.50
                         },
-                        "fields": {
+                        "tags": {
                             "T_success_log": 1
                         },
                         "fields_delta": {
@@ -180,7 +180,7 @@ class TestPrometheusExporter(unittest.TestCase):
                     "tags": {
                         "rule_id": 1
                     },
-                    "fields": {
+                    "tags": {
                         "external_ip": "AQUBDECDAQxAQQUIIEEJCDCFARgQRAUIMIMAAAECAAAAAAAAAA==",
                     },
                     "timestamp_ms": 100010,
@@ -196,7 +196,7 @@ class TestPrometheusExporter(unittest.TestCase):
                          "rule_id": 1,
                          "action": "deny"
                      },
-                     "fields": {
+                     "tags": {
                          "list_num": "HISTEwAAAGQAAAAAAAAAAwAAAAAAAAABAAAAAAAJJ8A/8AAAAAAAAAEEAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAAAAAAAAA"
                      },
                      "timestamp_ms": 100010,
@@ -273,26 +273,26 @@ class TestCounterTable(unittest.TestCase):
     #     self.c_table.field_names = []
 
     #     table = self.c_table.create_row_table({"column0": 0, "column1": 1})
-    #     tags  = {"row": "0"}
+    #     fields  = {"row": "0"}
     #     field = {"column0": 0, "column1":1}
-    #     self.c_table.add_row_table_row(None,  tags, field)
+    #     self.c_table.add_row_table_row(None,  fields, field)
 
     #     table_str = table.get_string()
     #     row_count = len(table_str.split("\n")) - 1
     #     self.assertEqual(row_count, 0)
         
-    #     self.c_table.add_row_table_row(table, tags, field)
+    #     self.c_table.add_row_table_row(table, fields, field)
     #     row_count = len(table_str.split("\n")) - 1
     #     self.assertEqual(row_count, 0)
 
     def test_add_table_column(self):
         head    = "policy_hit"
-        tags    = "{\"thread_id\": 1,\"action\": \"deny\"}"
+        fields    = "{\"thread_id\": 1,\"action\": \"deny\"}"
         value   = 100
         speed_s = 1.1
         
         self.c_table.columns = []
-        self.c_table.add_table_column(tags, head, value, speed_s)
+        self.c_table.add_table_column(fields, head, value, speed_s)
 
         self.assertEqual(len(self.c_table.columns), 1)
         self.assertEqual(self.c_table.read_columns_num(), 1)
@@ -408,16 +408,16 @@ class TestHistogramTable(unittest.TestCase):
 
 
     def test_build_table(self):
-        tags = "{\"thread_id\": 1}"
+        fields = "{\"thread_id\": 1}"
         key  = "hit_policy"
-        self.h_table.build_table(tags, key, self.hist_val, self.hist_val, 1000)
+        self.h_table.build_table(fields, key, self.hist_val, self.hist_val, 1000)
         table_str = self.h_table.tables[-1].get_string()
         row_count = len(table_str.split("\n"))
         self.assertEqual(row_count, 7)
 
 
     def test_build_table(self):
-        tags  = "{\"thread_id\": 1,\"action\": \"deny\"}"
+        fields  = "{\"thread_id\": 1,\"action\": \"deny\"}"
         key   = "policy_hit"
         self.h_table.format = "summary"
 
@@ -426,7 +426,7 @@ class TestHistogramTable(unittest.TestCase):
             self.h_table.bins = []
             for i in range(1, n_bins + 1):
                 self.h_table.bins.append(i * 0.01)
-            self.h_table.build_table(tags, key, self.hist_val, self.hist_val, 1000)
+            self.h_table.build_table(fields, key, self.hist_val, self.hist_val, 1000)
             table = self.h_table.tables[-1]
             self.assertEqual(len(table.field_names), n_bins + 6)
             table_str = self.h_table.tables[-1].get_string()
@@ -435,7 +435,7 @@ class TestHistogramTable(unittest.TestCase):
 
 
     def test_print_tables(self):
-        tags  = "{\"thread_id\": 1,\"action\": \"deny\"}"
+        fields  = "{\"thread_id\": 1,\"action\": \"deny\"}"
         key   = "policy_hit"
         value = self.hist_val
 
@@ -443,7 +443,7 @@ class TestHistogramTable(unittest.TestCase):
             n_operate = random.randint(1, 100)
             self.h_table.tables = []
             for _ in range (n_operate):
-                self.h_table.build_table(tags, key, self.hist_val, None, 1000)
+                self.h_table.build_table(fields, key, self.hist_val, None, 1000)
             
             output     = StringIO()
             sys.stdout = output
@@ -463,7 +463,7 @@ class TestHistogramTable(unittest.TestCase):
 class TestLocalExporter(unittest.TestCase):
     def setUp(self):
         self.local    = LocalExporter()
-        self.tags     = "{\"thread_id\": 1,\"action\": \"deny\"}"
+        self.fields     = "{\"thread_id\": 1,\"action\": \"deny\"}"
         self.key      = "policy_hit"
 
 
@@ -471,7 +471,7 @@ class TestLocalExporter(unittest.TestCase):
                                      "tags": {
                                          "send_log": "sum"
                                      },
-                                     "fields": {
+                                     "tags": {
                                          "T_fail_log": 2
                                      },
                                      "fields_delta": {
@@ -485,7 +485,7 @@ class TestLocalExporter(unittest.TestCase):
                                      "tags": {
                                          "rule_id": 1
                                      },
-                                     "fields": {
+                                     "tags": {
                                          "acc_ip": "AQUFEGDCAhAwhAMMIQQBBBCDBRBggQMEMIcAAADCAAAAAAAAAA=="
                                      },
                                      "timestamp_ms": 100010,
@@ -497,7 +497,7 @@ class TestLocalExporter(unittest.TestCase):
                                      "tags": {
                                          "action": "deny"
                                      },
-                                     "fields": {
+                                     "tags": {
                                          "list_num": "HISTEwAAAGQAAAAAAAAAAwAAAAAAAAABAAAAAAAJJ8A/8AAAAAAA"\
                                                      "AAEEAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIC"\
                                                      "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIC"\
@@ -532,7 +532,7 @@ class TestLocalExporter(unittest.TestCase):
             val_delta  = random.randint(10, 20)
             tsms_delta = random.randint(1, 10) * 1000
             self.local.ctable = CounterTable()
-            self.local._LocalExporter__build_counter_type_exporter(self.tags, self.key, val, val_delta, tsms_delta)
+            self.local._LocalExporter__build_counter_type_exporter(self.fields, self.key, val, val_delta, tsms_delta)
             self.assertEqual(self.local.ctable.columns[-1][1][1], str(val))
             self.assertEqual(self.local.ctable.columns[-1][1][2],  "{:.2f}".format(val_delta*1000/tsms_delta))
 
@@ -544,7 +544,7 @@ class TestLocalExporter(unittest.TestCase):
                    "CAgICAgICAgICAgICAgICAgICAgIAAAAAAAAA"
         self.local.htable = HistogramTable()
         peradd   = len(self.local.htable.tables)
-        self.local._LocalExporter__build_histogram_type_exporter(self.tags, self.key, hist_val, None, 0)
+        self.local._LocalExporter__build_histogram_type_exporter(self.fields, self.key, hist_val, None, 0)
         postadd  = len(self.local.htable.tables)
         self.assertEqual(postadd - peradd, 1)
 
@@ -553,36 +553,36 @@ class TestLocalExporter(unittest.TestCase):
         value   = "AQUBDECDAQxAQQUIIEEJCDCFARgQRAUIMIMAAAECAAAAAAAAAA=="
         self.local.hlltable = CounterTable()
         peradd  = len(self.local.hlltable.columns)
-        self.local._LocalExporter__build_hll_type_exporter(self.tags, self.key, value)
+        self.local._LocalExporter__build_hll_type_exporter(self.fields, self.key, value)
         postadd = len(self.local.hlltable.columns)
         
         self.assertEqual(postadd - peradd, 1)
 
 
     def test__append_app_name_to_tags(self):
-        tags = self.local._LocalExporter__append_app_name_to_tags(self.counter_json_object)       
-        self.assertEqual(tags, "{\"send_log\": \"sum\", \"app_name\": \"-\"}")
+        fields = self.local._LocalExporter__append_app_name_to_tags(self.counter_json_object)       
+        self.assertEqual(fields, "{\"send_log\": \"sum\", \"app_name\": \"-\"}")
 
 
     def test__is_tags_matched(self):
         self.local.match_tags = {}
-        tags = {"action": "deny", "policy_id": 0, "hit_rate": 1.1}
-        ret = self.local._LocalExporter__is_tags_matched(tags)
+        fields = {"action": "deny", "policy_id": 0, "hit_rate": 1.1}
+        ret = self.local._LocalExporter__is_tags_matched(fields)
         self.assertEqual(ret, True)
 
         self.local.match_tags = {"action": "deny"}
-        tags = {}
-        ret = self.local._LocalExporter__is_tags_matched(tags)
+        fields = {}
+        ret = self.local._LocalExporter__is_tags_matched(fields)
         self.assertEqual(ret, False)
 
         self.local.match_tags = {"action": "deny", "policy_id": 0, "hit_rate": 1.1}
-        tags = {"action": "deny"}
-        ret = self.local._LocalExporter__is_tags_matched(tags)
+        fields = {"action": "deny"}
+        ret = self.local._LocalExporter__is_tags_matched(fields)
         self.assertEqual(ret, False)
 
         self.local.match_tags = {"action": "deny", "policy_id": 0, "hit_rate": 1.10}
-        tags = {"action": "deny", "policy_id": 0, "hit_rate": 1.1}
-        ret = self.local._LocalExporter__is_tags_matched(tags)
+        fields = {"action": "deny", "policy_id": 0, "hit_rate": 1.1}
+        ret = self.local._LocalExporter__is_tags_matched(fields)
         self.assertEqual(ret, True)
 
 
@@ -591,7 +591,7 @@ class TestLocalExporter(unittest.TestCase):
                         "tags": {
                             "send_log": "sum"
                         },
-                        "fields": {
+                        "tags": {
                             "T_fail_log": 2
                         },
                         "fields_delta": {
@@ -604,7 +604,7 @@ class TestLocalExporter(unittest.TestCase):
                         "tags": {
                             "send_log": "firewall"
                         },
-                        "fields": {
+                        "tags": {
                             "T_fail_log": 2
                         },
                         "fields_delta": {
@@ -684,7 +684,7 @@ class TestFieldstatExporter(unittest.TestCase):
         self.assertEqual(args.loop,         False)
         self.assertEqual(args.clear_screen, False)
 
-        args = parser.parse_args(["local", "--loop", "--clear-screen", "-i", "1000", "--display-hist", "--display-hll", "--display-counter", "--match-tags", "policy:1,rule:1"])
+        args = parser.parse_args(["local", "--loop", "--clear-screen", "-i", "1000", "--display-hist", "--display-hll", "--display-counter", "--match-fields", "policy:1,rule:1"])
         self.assertEqual(args.interval,        1000)
         self.assertEqual(args.loop,            True)
         self.assertEqual(args.clear_screen,    True)
@@ -701,8 +701,8 @@ class TestFieldstatExporter(unittest.TestCase):
         
     def test_parse_tags_str(self):
         tags_str = "policy:1,rule:intercept"
-        tags     = self.exporter._FieldstatExporter__parse_tags_str(tags_str)
-        self.assertEqual(tags, {'policy': 1, 'rule': 'intercept'})
+        fields     = self.exporter._FieldstatExporter__parse_tags_str(tags_str)
+        self.assertEqual(fields, {'policy': 1, 'rule': 'intercept'})
 
     def test_read_shared_args_value(self):
         parser = self.exporter._FieldstatExporter__build_shared_args_parser()

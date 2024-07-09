@@ -4,26 +4,26 @@
 #include <string.h>
 
 #include "fieldstat.h"
-#include "tags/my_ut_hash.h"
-#include "tags/my_ut_hash_inner.h"
+#include "fields/my_ut_hash.h"
+#include "fields/my_ut_hash_inner.h"
 
 #define ADD_OPER_NUM 5000000ULL
 // #define ADD_OPER_NUM 1
 #define MAX_STRING_KEY_LEN 10
 
-const struct fieldstat_tag TEST_TAG_INT = {"INT key_", TAG_INTEGER, {.value_longlong = 100}};
+const struct field TEST_TAG_INT = {"INT key_", TAG_INTEGER, {.value_longlong = 100}};
 
 
 int main () {
     printf("Start profiling...\n");
     clock_t start, end;
-    // struct fieldstat_tag TAG[4] = {
+    // struct field TAG[4] = {
     //     {"INT key_", TAG_INTEGER, {.value_longlong = 100}},
     //     {"STRING key_", TAG_CSTRING, {.value_str = "10012312312312"}},
     //     {"STRING key_", TAG_CSTRING, {.value_str = "100adsffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"}},
     //     {"FLOAT key_", TAG_INTEGER, {.value_double = 100.0}},
     // };
-    struct fieldstat_tag TAG[4] = {
+    struct field TAG[4] = {
         {"object_id", TAG_INTEGER, {.value_longlong = 20}},
         {"item_id", TAG_INTEGER, {.value_longlong = 16916397}},
         {"chart_id", TAG_INTEGER, {.value_longlong = 1}},

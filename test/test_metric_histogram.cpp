@@ -31,12 +31,12 @@ void test_assert_standard_instance(const struct fieldstat *instance)
     EXPECT_STREQ(name, "czz_test hdr metric");
 
 
-    struct fieldstat_tag_list *tag_list = NULL;
+    struct field_list *tag_list = NULL;
     size_t n_cell = 0;
     fieldstat_cube_get_cells(instance, 0, &tag_list, &n_cell);
     EXPECT_EQ(n_cell, 1);
-    EXPECT_EQ(tag_list->n_tag, 1);
-    EXPECT_STREQ(tag_list->tag[0].key, TEST_TAG_STRING.key);
+    EXPECT_EQ(tag_list->n_field, 1);
+    EXPECT_STREQ(tag_list->field[0].key, TEST_TAG_STRING.key);
 
     int *metric_id = NULL;
     size_t n_metric = 0;

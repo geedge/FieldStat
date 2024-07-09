@@ -169,15 +169,15 @@ All the metrics in fieldstat easy are dynamic, which means that the metrics has 
 #include "fieldstat_easy.h"
 
 const int N_THREADS = 3;
-struct fieldstat_tag global_tags[1];
-struct fieldstat_tag tmptag;
+struct field global_tags[1];
+struct field tmptag;
 tmptag.key = "app id";
 tmptag.type = TAG_INTEGER;
 tmptag.value_longlong = 1;
 global_tags[0] = tmptag;
 
-struct fieldstat_tag tag1 = {"direction", TAG_STRING, "incoming"};
-struct fieldstat_tag tag2 = {"direction", TAG_STRING, "outgoing"};
+struct field tag1 = {"direction", TAG_STRING, "incoming"};
+struct field tag2 = {"direction", TAG_STRING, "outgoing"};
 
 struct fieldstat_easy *fse = fieldstat_easy_new(N_THREADS, NULL, global_tags, 1);
 int counter_id = fieldstat_easy_register_counter(fse, "incoming bytes");

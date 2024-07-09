@@ -23,23 +23,23 @@ struct hdr_histogram *g_histogram_standard;
 #define TEST_TOPK_STANDARD_K 5
 #define TEST_METRIC_NUM 2
 
-const struct fieldstat_tag TEST_TAG_GLOBAL1 = {"test_tag_global 1", .type = TAG_INTEGER, {.value_longlong = 1}};
-const struct fieldstat_tag TEST_TAG_GLOBAL2 = {"test_tag_global 2", .type = TAG_DOUBLE, {.value_double = 2.2}};
-const struct fieldstat_tag TEST_TAG_GLOBAL3 = {"test_tag_global 3", .type = TAG_CSTRING, {.value_str = "string3"}};
-const struct fieldstat_tag TEST_TAG_GLOBAL[3] = {TEST_TAG_GLOBAL1, TEST_TAG_GLOBAL2, TEST_TAG_GLOBAL3};
+const struct field TEST_TAG_GLOBAL1 = {"test_tag_global 1", .type = TAG_INTEGER, {.value_longlong = 1}};
+const struct field TEST_TAG_GLOBAL2 = {"test_tag_global 2", .type = TAG_DOUBLE, {.value_double = 2.2}};
+const struct field TEST_TAG_GLOBAL3 = {"test_tag_global 3", .type = TAG_CSTRING, {.value_str = "string3"}};
+const struct field TEST_TAG_GLOBAL[3] = {TEST_TAG_GLOBAL1, TEST_TAG_GLOBAL2, TEST_TAG_GLOBAL3};
 
-const struct fieldstat_tag TEST_TAG_SHARED1_1 = {"test_tag_shared 1", .type = TAG_INTEGER, {.value_longlong = 3}};
-const struct fieldstat_tag TEST_TAG_SHARED1_2 = {"test_tag_shared 2", .type = TAG_DOUBLE, {.value_double = 0.2}};
-const struct fieldstat_tag TEST_TAG_SHARED1_3 = {"test_tag_shared 3", .type = TAG_CSTRING, {.value_str = "1string"}};
-const struct fieldstat_tag TEST_TAG_SHARED1[3] = {TEST_TAG_SHARED1_1, TEST_TAG_SHARED1_2, TEST_TAG_SHARED1_3};
+const struct field TEST_TAG_SHARED1_1 = {"test_tag_shared 1", .type = TAG_INTEGER, {.value_longlong = 3}};
+const struct field TEST_TAG_SHARED1_2 = {"test_tag_shared 2", .type = TAG_DOUBLE, {.value_double = 0.2}};
+const struct field TEST_TAG_SHARED1_3 = {"test_tag_shared 3", .type = TAG_CSTRING, {.value_str = "1string"}};
+const struct field TEST_TAG_SHARED1[3] = {TEST_TAG_SHARED1_1, TEST_TAG_SHARED1_2, TEST_TAG_SHARED1_3};
 
-const struct fieldstat_tag TEST_TAG_SHARED2_1 = {"test_tag_shared 11", .type = TAG_INTEGER, {.value_longlong = 4}};
-const struct fieldstat_tag TEST_TAG_SHARED2_2 = {"test_tag_shared 22", .type = TAG_DOUBLE, {.value_double = 0.3}};
-const struct fieldstat_tag TEST_TAG_SHARED2_3 = {"test_tag_shared 33", .type = TAG_CSTRING, {.value_str = "2string"}};
-const struct fieldstat_tag TEST_TAG_SHARED2[3] = {TEST_TAG_SHARED2_1, TEST_TAG_SHARED2_2, TEST_TAG_SHARED2_3};
+const struct field TEST_TAG_SHARED2_1 = {"test_tag_shared 11", .type = TAG_INTEGER, {.value_longlong = 4}};
+const struct field TEST_TAG_SHARED2_2 = {"test_tag_shared 22", .type = TAG_DOUBLE, {.value_double = 0.3}};
+const struct field TEST_TAG_SHARED2_3 = {"test_tag_shared 33", .type = TAG_CSTRING, {.value_str = "2string"}};
+const struct field TEST_TAG_SHARED2[3] = {TEST_TAG_SHARED2_1, TEST_TAG_SHARED2_2, TEST_TAG_SHARED2_3};
 
-const struct fieldstat_tag TEST_TAG_SHARED3_1 = {"test_tag_shared 3", .type = TAG_INTEGER, {.value_longlong = 5}};
-const struct fieldstat_tag TEST_TAG_SHARED3[1] = {TEST_TAG_SHARED3_1};
+const struct field TEST_TAG_SHARED3_1 = {"test_tag_shared 3", .type = TAG_INTEGER, {.value_longlong = 5}};
+const struct field TEST_TAG_SHARED3[1] = {TEST_TAG_SHARED3_1};
 
 void test_check_if_tag_list_is_in_json(cJSON *tag_obj, const Fieldstat_tag_list_wrapper *benchmark)
 {
@@ -60,7 +60,7 @@ void test_check_if_tag_list_is_in_json(cJSON *tag_obj, const Fieldstat_tag_list_
 
 void test_check_if_global_tag_is_in_json(cJSON *tag_obj)
 {
-    struct fieldstat_tag_list tag_list = {.tag = (struct fieldstat_tag *)TEST_TAG_GLOBAL, .n_tag = 3};
+    struct field_list tag_list = {.field = (struct field *)TEST_TAG_GLOBAL, .n_field = 3};
     const Fieldstat_tag_list_wrapper benchmark(&tag_list);
     test_check_if_tag_list_is_in_json(tag_obj, &benchmark);
 }
@@ -105,7 +105,7 @@ void test_check_if_metric_topk_correct(cJSON *metric_obj, const char **name, uns
     }
 }
 
-void fill_random_tag(Fieldstat_tag_list_wrapper *tags[], int tag_list_num)
+void fill_random_tag(Fieldstat_tag_list_wrapper *fields[], int tag_list_num)
 {
     std::uniform_int_distribution<int> dist(1,100);
     std::mt19937 rng();
@@ -113,7 +113,7 @@ void fill_random_tag(Fieldstat_tag_list_wrapper *tags[], int tag_list_num)
     for (int i = 0; i < tag_list_num; i++)
     {
         Fieldstat_tag_list_wrapper *tmp = new Fieldstat_tag_list_wrapper(dist, i + 1);
-        tags[i] = tmp;
+        fields[i] = tmp;
     }
 }
 
@@ -192,12 +192,12 @@ TEST(export_test, cjson_export_with_fixed_tag_and_many_metrics_on_one_cube_of_co
     int id_histogram = fieldstat_register_hist(instance, "histogram",
         g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
 
-    Fieldstat_tag_list_wrapper *tags[tag_list_num];
-    fill_random_tag(tags, tag_list_num);
+    Fieldstat_tag_list_wrapper *fields[tag_list_num];
+    fill_random_tag(fields, tag_list_num);
 
     for (int j = 0; j < tag_list_num; j++) {
-        const struct fieldstat_tag *tag_tmp = tags[j]->get_tag();
-        size_t tag_count = tags[j]->get_tag_count();
+        const struct field *tag_tmp = fields[j]->get_tag();
+        size_t tag_count = fields[j]->get_tag_count();
 
         fieldstat_counter_incrby(instance, cube_id, id_counter, tag_tmp, tag_count, 1);
         for (size_t i = 0; i < OPER_NUM; i++){
@@ -215,10 +215,10 @@ TEST(export_test, cjson_export_with_fixed_tag_and_many_metrics_on_one_cube_of_co
     {
         cJSON *root = cJSON_GetArrayItem(root_arr, i);
 
-        // check tag
-        cJSON *tag = cJSON_GetObjectItem(root, "tags");
-        EXPECT_NE(tag, nullptr);
-        test_check_if_tag_list_is_in_json(tag, tags[i]);
+        // check field
+        cJSON *field = cJSON_GetObjectItem(root, "tags");
+        EXPECT_NE(field, nullptr);
+        test_check_if_tag_list_is_in_json(field, fields[i]);
 
         // check metrics
         cJSON *metrics = cJSON_GetObjectItem(root, "fields");
@@ -230,7 +230,7 @@ TEST(export_test, cjson_export_with_fixed_tag_and_many_metrics_on_one_cube_of_co
     }
 
     for (int i = 0; i < 3; i++) {
-        delete tags[i];
+        delete fields[i];
     }
 
     fieldstat_free(instance);
@@ -262,7 +262,7 @@ TEST(export_test, cjson_export_on_one_cube_of_topk_sampling)
         EXPECT_EQ(tag_val->type, cJSON_Number);
         topk_tag_value_set.insert(tag_val->valueint);
 
-        struct fieldstat_tag_list tmp_tag = {(struct fieldstat_tag *)&TEST_TAG_SHARED1, 3};
+        struct field_list tmp_tag = {(struct field *)&TEST_TAG_SHARED1, 3};
         Fieldstat_tag_list_wrapper shared_wrapper = Fieldstat_tag_list_wrapper(&tmp_tag);
         test_check_if_tag_list_is_in_json(tag, &shared_wrapper);
 
@@ -300,7 +300,7 @@ TEST(export_test, only_registered_but_not_added_export_null_with_global_tag)
     fieldstat_register_hist(instance, "histogram",
         g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
 
-    // add global tag
+    // add global field
     cJSON *root_arr = test_exporter_extract_results_with_standard_global(instance);
     EXPECT_EQ(root_arr, nullptr);
 
@@ -319,9 +319,9 @@ TEST(export_test, skip_two_empty_cube_and_export_last_one_with_global_tag)
         g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
 
     const int tag_num = 1;
-    Fieldstat_tag_list_wrapper *tags[tag_num];
-    fill_random_tag(tags, tag_num);
-    const Fieldstat_tag_list_wrapper *the_tag = tags[0];
+    Fieldstat_tag_list_wrapper *fields[tag_num];
+    fill_random_tag(fields, tag_num);
+    const Fieldstat_tag_list_wrapper *the_tag = fields[0];
     for (size_t i = 0; i < OPER_NUM; i++){
         fieldstat_hist_record(instance, cube_id_3, id_histogram, the_tag->get_tag(), the_tag->get_tag_count(), g_histogram_standard_oper[i]);
     }
@@ -337,7 +337,7 @@ TEST(export_test, skip_two_empty_cube_and_export_last_one_with_global_tag)
 
         // check tag
         cJSON *tag = cJSON_GetObjectItem(root, "tags");
-        test_check_if_tag_list_is_in_json(tag, tags[0]);
+        test_check_if_tag_list_is_in_json(tag, fields[0]);
         test_check_if_global_tag_is_in_json(tag);
 
         cJSON *metrics = cJSON_GetObjectItem(root, "fields");
@@ -350,7 +350,7 @@ TEST(export_test, skip_two_empty_cube_and_export_last_one_with_global_tag)
         FAIL();
     }
 
-    delete tags[0];
+    delete fields[0];
 
     fieldstat_free(instance);
     cJSON_Delete(root_arr);
@@ -367,9 +367,9 @@ TEST(export_test, skip_empty_metrics_given_cube_deleted) {
     (void)fieldstat_register_counter(instance, "counter4");
 
     const int tag_num = 1;
-    Fieldstat_tag_list_wrapper *tags[tag_num];
-    fill_random_tag(tags, tag_num);
-    const Fieldstat_tag_list_wrapper *the_tag = tags[0];
+    Fieldstat_tag_list_wrapper *fields[tag_num];
+    fill_random_tag(fields, tag_num);
+    const Fieldstat_tag_list_wrapper *the_tag = fields[0];
 
     fieldstat_counter_incrby(instance, cube_id, metric_id, the_tag->get_tag(), the_tag->get_tag_count(), 1234);
 
@@ -380,13 +380,13 @@ TEST(export_test, skip_empty_metrics_given_cube_deleted) {
     for (int i = 0; i < arr_num; i++) {
         cJSON *root = cJSON_GetArrayItem(root_arr, i);
 
-        // check tag
-        cJSON *tag = cJSON_GetObjectItem(root, "tags");
-        test_check_if_tag_list_is_in_json(tag, tags[0]);
-        test_check_if_global_tag_is_in_json(tag);
-        struct fieldstat_tag_list tmp_tag = {(struct fieldstat_tag *)&TEST_TAG_SHARED2, 3};
+        // check field
+        cJSON *field = cJSON_GetObjectItem(root, "tags");
+        test_check_if_tag_list_is_in_json(field, fields[0]);
+        test_check_if_global_tag_is_in_json(field);
+        struct field_list tmp_tag = {(struct field *)&TEST_TAG_SHARED2, 3};
         Fieldstat_tag_list_wrapper shared_wrapper = Fieldstat_tag_list_wrapper(&tmp_tag);
-        test_check_if_tag_list_is_in_json(tag, &shared_wrapper);
+        test_check_if_tag_list_is_in_json(field, &shared_wrapper);
 
         cJSON *metrics = cJSON_GetObjectItem(root, "fields");
         EXPECT_NE(metrics, nullptr);
@@ -399,7 +399,7 @@ TEST(export_test, skip_empty_metrics_given_cube_deleted) {
         FAIL();
     }
 
-    delete tags[0];
+    delete fields[0];
     fieldstat_free(instance);
     cJSON_Delete(root_arr);
 }
@@ -645,15 +645,15 @@ TEST(export_test, enable_delta_and_export_three_times_skipping_cube_with_no_coun
     fieldstat_free(instance);
 }
 
-void test_check_delta_for_one_json(const struct fieldstat_tag_list *expect_cell_tag, const struct fieldstat_tag_list *expect_shared_tag, long long expect_value, long long expect_delta, cJSON *root)
+void test_check_delta_for_one_json(const struct field_list *expect_cell_tag, const struct field_list *expect_shared_tag, long long expect_value, long long expect_delta, cJSON *root)
 {
-    // check tag
-    cJSON *tag = cJSON_GetObjectItem(root, "tags");
+    // check field
+    cJSON *field = cJSON_GetObjectItem(root, "tags");
     Fieldstat_tag_list_wrapper cell_wrapper = Fieldstat_tag_list_wrapper(expect_cell_tag);
-    test_check_if_tag_list_is_in_json(tag, &cell_wrapper);
+    test_check_if_tag_list_is_in_json(field, &cell_wrapper);
     Fieldstat_tag_list_wrapper shared_wrapper = Fieldstat_tag_list_wrapper(expect_shared_tag);
-    test_check_if_tag_list_is_in_json(tag, &shared_wrapper);
-    test_check_if_global_tag_is_in_json(tag);
+    test_check_if_tag_list_is_in_json(field, &shared_wrapper);
+    test_check_if_global_tag_is_in_json(field);
 
     // check metrics
     cJSON *metrics = cJSON_GetObjectItem(root, "fields");
@@ -690,21 +690,21 @@ TEST(export_test, enable_delta_and_export_instance_with_many_cells_with_global_t
 
     /* ------------------------------ cube 0 cell 0 ----------------------------- */
     cJSON *root = cJSON_GetArrayItem(root_arr, 0);
-    struct fieldstat_tag_list tmp_tag_cell = {(struct fieldstat_tag *)&TEST_TAG_INT, 1};
-    struct fieldstat_tag_list tmp_tag_shared = {(struct fieldstat_tag *)&TEST_TAG_SHARED1, 3};
+    struct field_list tmp_tag_cell = {(struct field *)&TEST_TAG_INT, 1};
+    struct field_list tmp_tag_shared = {(struct field *)&TEST_TAG_SHARED1, 3};
     test_check_delta_for_one_json(&tmp_tag_cell, &tmp_tag_shared, 11, 11, root);
     /* ------------------------------ cube 0 cell 1 ----------------------------- */
     root = cJSON_GetArrayItem(root_arr, 1);
-    tmp_tag_cell = (struct fieldstat_tag_list){(struct fieldstat_tag *)&TEST_TAG_STRING, 1};
+    tmp_tag_cell = (struct field_list){(struct field *)&TEST_TAG_STRING, 1};
     test_check_delta_for_one_json(&tmp_tag_cell, &tmp_tag_shared, 12, 12, root);
     /* ------------------------------ cube 1 cell 0 ----------------------------- */
     root = cJSON_GetArrayItem(root_arr, 2);
-    tmp_tag_cell = (struct fieldstat_tag_list){(struct fieldstat_tag *)&TEST_TAG_INT, 1};
-    tmp_tag_shared = (struct fieldstat_tag_list){(struct fieldstat_tag *)&TEST_TAG_SHARED3, 1};
+    tmp_tag_cell = (struct field_list){(struct field *)&TEST_TAG_INT, 1};
+    tmp_tag_shared = (struct field_list){(struct field *)&TEST_TAG_SHARED3, 1};
     test_check_delta_for_one_json(&tmp_tag_cell, &tmp_tag_shared, 21, 21, root);
     /* ------------------------------ cube 1 cell 1 ----------------------------- */
     root = cJSON_GetArrayItem(root_arr, 3);
-    tmp_tag_cell = (struct fieldstat_tag_list){(struct fieldstat_tag *)&TEST_TAG_DOUBLE, 1};
+    tmp_tag_cell = (struct field_list){(struct field *)&TEST_TAG_DOUBLE, 1};
     test_check_delta_for_one_json(&tmp_tag_cell, &tmp_tag_shared, 22, 22, root);
 
     // new turn 
@@ -726,21 +726,21 @@ TEST(export_test, enable_delta_and_export_instance_with_many_cells_with_global_t
 
     /* ------------------------------ cube 0 cell 0 ----------------------------- */
     root = cJSON_GetArrayItem(root_arr, 0);
-    tmp_tag_cell = (struct fieldstat_tag_list){(struct fieldstat_tag *)&TEST_TAG_INT, 1};
-    tmp_tag_shared = (struct fieldstat_tag_list){(struct fieldstat_tag *)&TEST_TAG_SHARED1, 3};
+    tmp_tag_cell = (struct field_list){(struct field *)&TEST_TAG_INT, 1};
+    tmp_tag_shared = (struct field_list){(struct field *)&TEST_TAG_SHARED1, 3};
     test_check_delta_for_one_json(&tmp_tag_cell, &tmp_tag_shared, 111, 100, root);
     /* ------------------------------ cube 0 cell 1 ----------------------------- */
     root = cJSON_GetArrayItem(root_arr, 1);
-    tmp_tag_cell = (struct fieldstat_tag_list){(struct fieldstat_tag *)&TEST_TAG_STRING, 1};
+    tmp_tag_cell = (struct field_list){(struct field *)&TEST_TAG_STRING, 1};
     test_check_delta_for_one_json(&tmp_tag_cell, &tmp_tag_shared, 212, 200, root);
     /* ------------------------------ cube 1 cell 0 ----------------------------- */
     root = cJSON_GetArrayItem(root_arr, 2);
-    tmp_tag_cell = (struct fieldstat_tag_list){(struct fieldstat_tag *)&TEST_TAG_INT, 1};
-    tmp_tag_shared = (struct fieldstat_tag_list){(struct fieldstat_tag *)&TEST_TAG_SHARED3, 1};
+    tmp_tag_cell = (struct field_list){(struct field *)&TEST_TAG_INT, 1};
+    tmp_tag_shared = (struct field_list){(struct field *)&TEST_TAG_SHARED3, 1};
     test_check_delta_for_one_json(&tmp_tag_cell, &tmp_tag_shared, 321, 300, root);
     /* ------------------------------ cube 1 cell 1 ----------------------------- */
     root = cJSON_GetArrayItem(root_arr, 3);
-    tmp_tag_cell = (struct fieldstat_tag_list){(struct fieldstat_tag *)&TEST_TAG_DOUBLE, 1};
+    tmp_tag_cell = (struct field_list){(struct field *)&TEST_TAG_DOUBLE, 1};
     test_check_delta_for_one_json(&tmp_tag_cell, &tmp_tag_shared, 422, 400, root);
 
     cJSON_Delete(root_arr);
@@ -949,28 +949,6 @@ TEST(export_test, delta_with_two_instance_different_cell)
     fieldstat_free(instance);
     fieldstat_free(delta);
 }
-
-// TEST(export_test, sort_tag) {
-//     const struct fieldstat_tag tag1[3] = {TEST_TAG_INT, TEST_TAG_STRING, TEST_TAG_DOUBLE};
-//     const struct fieldstat_tag tag2[3] = {TEST_TAG_STRING, TEST_TAG_DOUBLE, TEST_TAG_INT};
-
-//     struct fieldstat *instance = fieldstat_new();
-//     fieldstat_create_cube(instance, NULL, 0, SAMPLING_MODE_COMPREHENSIVE, 0);
-//     int id_counter = fieldstat_register_counter(instance, "counter");
-//     fieldstat_counter_incrby(instance, 0, id_counter, tag1, 3, 1);
-//     fieldstat_counter_incrby(instance, 0, id_counter, tag2, 3, 10);
-
-//     // export test
-//     cJSON *root_arr = test_exporter_extract_results(instance);
-//     EXPECT_EQ(cJSON_GetArraySize(root_arr), 1);
-//     cJSON *root = cJSON_GetArrayItem(root_arr, 0);
-//     cJSON *metrics = cJSON_GetObjectItem(root, "fields");
-//     cJSON *counter = cJSON_GetObjectItem(metrics, "counter");
-//     EXPECT_EQ(counter->valueint, 11);
-
-//     cJSON_Delete(root_arr);
-//     fieldstat_free(instance);
-// }
 
 extern "C" {
 extern int add_object_to_json_array_start(char *buf, int buf_len);

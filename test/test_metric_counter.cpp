@@ -19,7 +19,7 @@ struct fieldstat *test_init_standard_instance()
     return instance;
 }
 
-long long my_fieldstat_counter_get(const struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag_list *tag_list = &TEST_TAG_LIST_INT)
+long long my_fieldstat_counter_get(const struct fieldstat *instance, int cube_id, int metric_id, const struct field_list *tag_list = &TEST_TAG_LIST_INT)
 {
     long long ret = 0;
     fieldstat_counter_get(instance, cube_id, tag_list, metric_id,  &ret);
@@ -38,12 +38,12 @@ void test_assert_standard_instance(const struct fieldstat *instance)
     const char *name = fieldstat_get_metric_name(instance, 0);
     EXPECT_STREQ(name, "czz_test counter metric");
 
-    struct fieldstat_tag_list *tag_list = NULL;
+    struct field_list *tag_list = NULL;
     size_t n_cell = 0;
     fieldstat_cube_get_cells(instance, 0, &tag_list, &n_cell);
     EXPECT_EQ(n_cell, 1);
-    EXPECT_EQ(tag_list->n_tag, 1);
-    EXPECT_STREQ(tag_list->tag[0].key, TEST_TAG_INT.key);
+    EXPECT_EQ(tag_list->n_field, 1);
+    EXPECT_STREQ(tag_list->field[0].key, TEST_TAG_INT.key);
 
     int *metric_id = NULL;
     size_t n_metric = 0;
@@ -114,7 +114,7 @@ TEST(metric_test_counter, topk_add_and_test_accuracy)
     fieldstat_register_counter(instance, "test");
 
     int tag_list_num = 10000;
-    Fieldstat_tag_list_wrapper *tags[tag_list_num];
+    Fieldstat_tag_list_wrapper *fields[tag_list_num];
     map<string, int> flow_cnt;
     for (int i = 0; i < tag_list_num; i++)
     {   
@@ -127,16 +127,16 @@ TEST(metric_test_counter, topk_add_and_test_accuracy)
             flow_k = "mouse";
             flow_v = std::to_string(rand() % 1000);
         }
-        tags[i] = new Fieldstat_tag_list_wrapper(flow_k, flow_v.c_str());
+        fields[i] = new Fieldstat_tag_list_wrapper(flow_k, flow_v.c_str());
 
         flow_cnt[flow_k + flow_v]++;
     }
 
     for (int i = 0; i < tag_list_num; i++) {
-        fieldstat_counter_incrby(instance, 0, 0, tags[i]->get_tag(), tags[i]->get_tag_count(), 1);
+        fieldstat_counter_incrby(instance, 0, 0, fields[i]->get_tag(), fields[i]->get_tag_count(), 1);
     }
 
-    struct fieldstat_tag_list *tag_list = NULL;
+    struct field_list *tag_list = NULL;
     size_t n_cell = 0;
     fieldstat_cube_get_cells(instance, 0, &tag_list, &n_cell);
     EXPECT_EQ(n_cell, 10);
@@ -159,7 +159,7 @@ TEST(metric_test_counter, topk_add_and_test_accuracy)
     fieldstat_free(instance);
 
     for (int i = 0; i < tag_list_num; i++)
-        delete tags[i];
+        delete fields[i];
 }
 
 TEST(metric_test_counter, add_with_wrong_cube_id_expecting_fail)
@@ -230,15 +230,15 @@ TEST(metric_test_counter, primary_counter_add_after_first)
     EXPECT_EQ(my_fieldstat_counter_get(instance, cube_id, metric_id2), 10);
 
     // TOPK functions well
-    struct fieldstat_tag tag = TEST_TAG_INT;
+    struct field field = TEST_TAG_INT;
     for (int i = 0; i < 9; i++) {
-        tag.value_longlong = i + 123;
-        ret = fieldstat_counter_incrby(instance, cube_id, metric_id_primary, &tag, 1, 1 + i);
+        field.value_longlong = i + 123;
+        ret = fieldstat_counter_incrby(instance, cube_id, metric_id_primary, &field, 1, 1 + i);
         EXPECT_EQ(ret, FS_OK);
     }
     // now the TOPK is full, add a new one
-    tag.value_longlong = 321;
-    ret = fieldstat_counter_incrby(instance, cube_id, metric_id_primary, &tag, 1, 1);
+    field.value_longlong = 321;
+    ret = fieldstat_counter_incrby(instance, cube_id, metric_id_primary, &field, 1, 1);
     EXPECT_EQ(ret, FS_ERR_TOO_MANY_CELLS);
 
     fieldstat_free(instance);

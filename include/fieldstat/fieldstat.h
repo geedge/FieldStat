@@ -24,7 +24,7 @@ enum metric_type
 	METRIC_TYPE_HISTOGRAM,
 };
 
-enum fs_tag_type
+enum field_type
 {
 	TAG_INTEGER,
 	TAG_DOUBLE,
@@ -60,13 +60,13 @@ struct fieldstat *fieldstat_fork(const struct fieldstat *instance);
 int fieldstat_calibrate(const struct fieldstat *master, struct fieldstat *replica);
 /*
     * @brief add an cube to this instance. Cube represents an template with a user-defined set of cells and metrics.
-    * @param cube_identifier: tags that are shared by all cells in this cube. This is the key of the cube. Can be NULL. Must be unique. Shared_tags are ordered, which means that {"TAG_KEY": "123", "TAG_KEY2": "456"} and {"TAG_KEY2": "456", "TAG_KEY": "123"} are map to different cube.
-    * @param n_tag: number of shared tags.
+    * @param cube_identifier: fields that are shared by all cells in this cube. This is the key of the cube. Can be NULL. Must be unique. Shared_tags are ordered, which means that {"TAG_KEY": "123", "TAG_KEY2": "456"} and {"TAG_KEY2": "456", "TAG_KEY": "123"} are map to different cube.
+    * @param n_field: number of shared fields.
     * @param mode: sampling mode. Refer to enum sampling_mode.
     * @param max_n_cell: max number of samplings(cells) in each cube. When mode is TOPK, max_n_cell > 0, while in COMPREHENSIVE mode, max_n_cell can be 0, meaning that there is no limit.
     * @return cube id, if success; otherwise, return FS_ERR_NULL_HANDLER, or FS_ERR_INVALID_PARAM when (max_n_cell == 0 && mode == TOPK). return FS_ERR_INVALID_KEY when the cube_identifier is not unique.
 */
-int fieldstat_create_cube(struct fieldstat *instance, const struct fieldstat_tag *cube_identifier, size_t n_tag, enum sampling_mode mode, size_t max_n_cell);
+int fieldstat_create_cube(struct fieldstat *instance, const struct field *cube_identifier, size_t cube_identifier_len, enum sampling_mode mode, size_t max_n_cell);
 
 /*
     @brief Change the topk cube primary metric id. When fieldstat_counter_add or fieldstat_counter_set are called on the primary metric, the topk record of such cell will be updated.
@@ -118,14 +118,14 @@ int fieldstat_register_hist(struct fieldstat *instance, const char *metric_name,
     *           In comprehensive mode, a full cube cannot be added any more cells.
     *           In topk mode, every increment matters, so even the cube is full, the cell can also replace the least frequent cell.
 */
-int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long increment);
+int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric_id, const struct field *fields, size_t n_fields, long long increment);
 
 /*
     * @brief let the value of counter metric equal to value. Other annotations refer to fieldstat_counter_incrby.
     * @return Refer to fieldstat_counter_incrby. What's more, be cautious to call this function if the metric is a primary metric of a topk cube,
     *   in such case, FS_ERR_INVALID_PARAM will be the output when the value is set to a smaller one(increment is negative).
 */
-int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long value);
+int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id, const struct field *fields, size_t n_fields, long long value);
 
 /*
     * @brief add a key to the hll metric of cell_id. HLL approximates the number of distinct elements in a set of `key`s.
@@ -134,8 +134,8 @@ int fieldstat_counter_set(struct fieldstat *instance, int cube_id, int metric_id
     * @return FS_OK if success. FS_ERR_NULL_HANDLER, FS_ERR_INVALID_CUBE_ID, FS_ERR_INVALID_METRIC_ID if fail. 
     *         Since topk only support counter, FS_ERR_INVALID_PARAM is returned when the cube is topk.
 */
-int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, const char *key, size_t key_len);
-int fieldstat_hll_add_tag(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, const struct fieldstat_tag *tags_key, size_t n_tag_key);
+int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, const struct field *fields, size_t n_fields, const char *key, size_t key_len);
+int fieldstat_hll_add_field(struct fieldstat *instance, int cube_id, int metric_id, const struct field *fields, size_t n_fields, const struct field *item, size_t item_len);
 
 
 /* 
@@ -145,7 +145,7 @@ int fieldstat_hll_add_tag(struct fieldstat *instance, int cube_id, int metric_id
     * @return FS_OK if success. FS_ERR_NULL_HANDLER, FS_ERR_INVALID_CUBE_ID, FS_ERR_INVALID_METRIC_ID if fail.
     *         FS_ERR_INVALID_PARAM when value is less than 0, or the cube is topk.
 */
-int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long value);
+int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id, const struct field *fields, size_t n_fields, long long value);
 
 /*
     * @brief Delete all the cells, also the content of every metrics. The cube and metrics are not deleted. Increase cell_version by 1.
@@ -165,8 +165,8 @@ int fieldstat_merge(struct fieldstat *instance, const struct fieldstat *src);
 
 struct field_list
 {
-    struct fieldstat_tag *tag;
-    size_t n_tag;
+    struct field *field;
+    size_t n_field;
 };
 
 /* 
@@ -181,7 +181,7 @@ void fieldstat_get_cubes(const struct fieldstat *instance, int **cube_ids, int *
 */
 void fieldstat_get_metrics(const struct fieldstat *instance, int **metric_id_out, size_t *n_metric);
 
-void fieldstat_get_metric_in_cell(const struct fieldstat *instance, int cube_id, const struct fieldstat_tag_list *tags, int **metric_id_out, size_t *n_metric_out);
+void fieldstat_get_metric_in_cell(const struct fieldstat *instance, int cube_id, const struct field_list *fields, int **metric_id_out, size_t *n_metric_out);
 
 // query the name of the metric, return NULL if metric_id is invalid.
 const char *fieldstat_get_metric_name(const struct fieldstat *instance, int metric_id);
@@ -190,20 +190,20 @@ const char *fieldstat_get_metric_name(const struct fieldstat *instance, int metr
 enum metric_type fieldstat_get_metric_type(const struct fieldstat *instance, int metric_id);
 
 /*
-    get the tags added to cube when calling fieldstat_counter_incrby, fieldstat_counter_set, fieldstat_hll_add, fieldstat_hist_record.
+    get the fields added to cube when calling fieldstat_counter_incrby, fieldstat_counter_set, fieldstat_hll_add, fieldstat_hist_record.
 */
-void fieldstat_cube_get_cells(const struct fieldstat *instance, int cube_id, struct fieldstat_tag_list **tag_list, size_t *n_cell);
+void fieldstat_cube_get_cells(const struct fieldstat *instance, int cube_id, struct field_list **tag_list, size_t *n_cell);
 
 /*
-    get the tag of fieldstat_create_cube. User free them by calling fieldstat_tag_list_arr_free(struct fieldstat_tag_list *, 1)
+    get the field of fieldstat_create_cube. User free them by calling fieldstat_tag_list_arr_free(struct field_list *, 1)
     return NULL when ID is invalid.
 */
-struct fieldstat_tag_list *fieldstat_cube_get_tags(const struct fieldstat *instance, int cube_id);
+struct field_list *fieldstat_cube_get_tags(const struct fieldstat *instance, int cube_id);
 
 /*
-    return a cube id corresponding to the shared tags. FS_ERR_INVALID_KEY is returned if the shared tags are not found.
+    return a cube id corresponding to the shared fields. FS_ERR_INVALID_KEY is returned if the shared fields are not found.
 */
-int fieldstat_find_cube(const struct fieldstat *instance, const struct fieldstat_tag *cube_identifier, size_t n_shared_tags);
+int fieldstat_find_cube(const struct fieldstat *instance, const struct field *cube_identifier, size_t n_shared_tags);
 
 /* 
     get the cell numbers in a cube. Return FS_ERR_INVALID_CUBE_ID if cube_id is invalid.
@@ -214,24 +214,24 @@ int fieldstat_get_used_sampling(const struct fieldstat *instance, int cube_id);
     * @brief Get the value of a metric of a cell.
     * @param cube_id: cube id, previously returned by fieldstat_get_cubes.
     * @param metric_id: metric id, previously returned by fieldstat_get_max_metric_id.
-    * @param tags: previously returned by fieldstat_get_cells_used_by_metric.
+    * @param fields: previously returned by fieldstat_get_cells_used_by_metric.
     * @param value_out: the value of the metric. If the cell is not found, *value_out is set to 0.
     * @return FS_OK if success. FS_ERR_NULL_HANDLER, FS_ERR_INVALID_CUBE_ID, FS_ERR_INVALID_METRIC_ID if fail.
 */
-int fieldstat_counter_get(const struct fieldstat *instance, int cube_id, const struct fieldstat_tag_list *tags, int metric_id, long long *value);
+int fieldstat_counter_get(const struct fieldstat *instance, int cube_id, const struct field_list *fields, int metric_id, long long *value);
 
 /*
     @brief Get an approximate count of the number of distinct elements in the cell. Other information refer to fieldstat_counter_get.
     @return >= 0 if success. FS_ERR_INVALID_PARAM if precision is invalid.
 */
-int fieldstat_hll_get(const struct fieldstat *instance, int cube_id, const struct fieldstat_tag_list *tags, int metric_id, double *value);
-long long fieldstat_hist_value_at_percentile(const struct fieldstat *instance, int cube_id, const struct fieldstat_tag_list *tags, int metric_id, double percentile);
-long long fieldstat_hist_count_le_value(const struct fieldstat *instance, int cube_id, const struct fieldstat_tag_list *tags, int metric_id, long long value);
+int fieldstat_hll_get(const struct fieldstat *instance, int cube_id, const struct field_list *fields, int metric_id, double *value);
+long long fieldstat_hist_value_at_percentile(const struct fieldstat *instance, int cube_id, const struct field_list *fields, int metric_id, double percentile);
+long long fieldstat_hist_count_le_value(const struct fieldstat *instance, int cube_id, const struct field_list *fields, int metric_id, long long value);
 
 // get the base 64 encoded string of the serialized blob of a cell
-void fieldstat_get_serialized_blob(const struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag_list *tags, char **blob, size_t *blob_size);
+void fieldstat_get_serialized_blob(const struct fieldstat *instance, int cube_id, int metric_id, const struct field_list *fields, char **blob, size_t *blob_size);
 
-void fieldstat_tag_list_arr_free(struct fieldstat_tag_list *tag_list, size_t n_cell);
+void fieldstat_tag_list_arr_free(struct field_list *tag_list, size_t n_cell);
 
 
 #ifdef __cplusplus
