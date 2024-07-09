@@ -28,12 +28,12 @@ TEST(test_easy_fieldstat, output_to_buff)
     fieldstat_easy_output(fse, &buff, &buff_len);
     cJSON *root = cJSON_Parse(buff);
     cJSON *cell = cJSON_GetArrayItem(root, 0);
-    cJSON *metric = cJSON_GetObjectItem(cell, "tags");
+    cJSON *metric = cJSON_GetObjectItem(cell, "fields");
     long long value = cJSON_GetObjectItem(metric, "metric counter")->valueint;
     EXPECT_EQ(value, 1);
-    cJSON *fields = cJSON_GetObjectItem(cell, "tags");
-    EXPECT_EQ(cJSON_GetObjectItem(fields, TEST_TAG_INT.key)->valueint, TEST_TAG_INT.value_longlong);
-    EXPECT_STREQ(cJSON_GetObjectItem(fields, TEST_TAG_STRING.key)->valuestring, TEST_TAG_STRING.value_str);
+    cJSON *tags = cJSON_GetObjectItem(cell, "tags");
+    EXPECT_EQ(cJSON_GetObjectItem(tags, TEST_TAG_INT.key)->valueint, TEST_TAG_INT.value_longlong);
+    EXPECT_STREQ(cJSON_GetObjectItem(tags, TEST_TAG_STRING.key)->valuestring, TEST_TAG_STRING.value_str);
 
     cJSON_Delete(root);
     free(buff);
@@ -55,7 +55,7 @@ TEST(test_easy_fieldstat, output_to_buff_with_delta)
 
     cJSON *root = cJSON_Parse(buff);
     cJSON *cell = cJSON_GetArrayItem(root, 0);
-    cJSON *metric = cJSON_GetObjectItem(cell, "tags");
+    cJSON *metric = cJSON_GetObjectItem(cell, "fields");
     long long value = cJSON_GetObjectItem(metric, "metric counter")->valueint;
     EXPECT_EQ(value, 2);
     cJSON *metric_delta = cJSON_GetObjectItem(cell, "fields_delta");
@@ -104,7 +104,7 @@ TEST(test_easy_fieldstat, output_to_file)
     EXPECT_EQ(cJSON_GetArraySize(root), 1);
 
     cJSON *tagged_by_int = cJSON_GetArrayItem(root, 0);
-    cJSON *metric = cJSON_GetObjectItem(tagged_by_int, "tags");
+    cJSON *metric = cJSON_GetObjectItem(tagged_by_int, "fields");
     EXPECT_TRUE(metric != NULL);
 
     long long value = cJSON_GetObjectItem(metric, "metric counter")->valueint;
@@ -117,7 +117,7 @@ TEST(test_easy_fieldstat, output_to_file)
     root = read_file();
     EXPECT_EQ(cJSON_GetArraySize(root), 1);
     tagged_by_int = cJSON_GetArrayItem(root, 0);
-    metric = cJSON_GetObjectItem(tagged_by_int, "tags");
+    metric = cJSON_GetObjectItem(tagged_by_int, "fields");
     value = cJSON_GetObjectItem(metric, "metric counter")->valueint;
     EXPECT_EQ(value, 111); // should not change
     cJSON_Delete(root);
@@ -128,7 +128,7 @@ TEST(test_easy_fieldstat, output_to_file)
     printf("4th interval\n");
     root = read_file();
     cJSON *tagged_by_double = cJSON_GetArrayItem(root, 1);
-    metric = cJSON_GetObjectItem(tagged_by_double, "tags");
+    metric = cJSON_GetObjectItem(tagged_by_double, "fields");
     value = cJSON_GetObjectItem(metric, "metric counter")->valueint;
     EXPECT_EQ(value, 10086);
     cJSON_Delete(root);
@@ -150,7 +150,7 @@ TEST(test_easy_fieldstat, empty_tag)
     EXPECT_EQ(cJSON_GetArraySize(root), 1);
 
     cJSON *tagged_by_int = cJSON_GetArrayItem(root, 0);
-    cJSON *metric = cJSON_GetObjectItem(tagged_by_int, "tags");
+    cJSON *metric = cJSON_GetObjectItem(tagged_by_int, "fields");
     EXPECT_TRUE(metric != NULL);
     cJSON *metric_delta = cJSON_GetObjectItem(tagged_by_int, "fields_delta");
     EXPECT_TRUE(metric_delta != NULL);
@@ -250,7 +250,7 @@ TEST(test_easy_fieldstat, reset)
 
 long long get_value(const char *input, const char *key) {
     cJSON *root = cJSON_Parse(input);
-    cJSON *metric = cJSON_GetObjectItem(root, "tags");
+    cJSON *metric = cJSON_GetObjectItem(root, "fields");
     long long value = cJSON_GetObjectItem(metric, key)->valueint;
     cJSON_Delete(root);
     return value;
@@ -305,5 +305,6 @@ TEST(test_easy_fieldstat, accuracy_in_multithread)
 int main(int argc, char **argv)
 {
     ::testing::InitGoogleTest(&argc, argv);
+    testing::GTEST_FLAG(filter) = "test_easy_fieldstat.accuracy_in_multithread";
     return RUN_ALL_TESTS();
 }

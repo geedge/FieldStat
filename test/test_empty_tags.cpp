@@ -111,7 +111,7 @@ TEST(test_empty_tag, export)
     cJSON *field = cJSON_GetObjectItem(root, "tags");
     EXPECT_EQ(cJSON_GetArraySize(field), 0);
 
-    cJSON *metrics = cJSON_GetObjectItem(root, "tags");
+    cJSON *metrics = cJSON_GetObjectItem(root, "fields");
     EXPECT_NE(metrics, nullptr);
     cJSON *counter = cJSON_GetObjectItem(metrics, "metric");
     EXPECT_EQ(counter->valueint, 1);
