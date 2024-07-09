@@ -36,9 +36,9 @@ enum sampling_mode {
     SAMPLING_MODE_TOPK,
 };
 
-struct fieldstat_tag {
+struct field {
 	const char *key;
-    enum fs_tag_type type;
+    enum field_type type;
 	union{
 		long long value_longlong;
 		double value_double;
@@ -163,7 +163,7 @@ int fieldstat_merge(struct fieldstat *instance, const struct fieldstat *src);
 /*                                    query                                   */
 /* -------------------------------------------------------------------------- */
 
-struct fieldstat_tag_list
+struct field_list
 {
     struct fieldstat_tag *tag;
     size_t n_tag;

@@ -24,7 +24,7 @@
 #include "exdata.h"
 
 #define FP_HASH_KEY 0
-#define INVALID_COUNT UINT64_MAX
+#define INVALID_COUNT UINT64_MAX // TODO：改名为 NOT FIND
 #define MAX(a, b)  	(((a) > (b)) ? (a) : (b))
 
 struct entry_data { // the value constitute of a sorted set entry
@@ -287,12 +287,12 @@ static inline bool sorted_set_check_is_full(const struct sorted_set *ss)
 {
     return ss->heap->cur_size >= ss->heap->max_size;
 }
-
+// TODO: 所有count 都改成long long
 unsigned long long sorted_set_get_min_count(const struct sorted_set *ss)
 {   
     heap *heap = ss->heap;
     if (heap->cur_size == 0) {
-        return INVALID_COUNT;
+        return INVALID_COUNT; // TODO: -1
     }
     const heap_entry *ret = (heap_entry *)(heap->nodes[0]);
 
@@ -582,7 +582,7 @@ int heavy_keeper_add(struct heavy_keeper *heavy_keeper, const char *key, size_t 
 
     struct sorted_set *summary = heavy_keeper->top_K_heap;
     
-    unsigned long long int old_cnt = sorted_set_get_count(summary, key, key_len);
+    unsigned long long int old_cnt = sorted_set_get_count(summary, key, key_len); // todo: 改成 score
     bool not_in_sorted_set = (old_cnt == INVALID_COUNT);
     unsigned long long maxv = 0;
     uint64_t fp = cal_hash_val_with_seed(key, key_len, FP_HASH_KEY);

@@ -147,6 +147,7 @@ static void tags2key(const struct fieldstat_tag tags[], size_t n_tags, char **ou
 	struct fieldstat_tag *tag = NULL;
 
     size_t alloced_every_time = 1024;
+    char dynamic_mem[1024*4];
     size_t remain_key_size = alloced_every_time;
     size_t total_key_size = alloced_every_time;
     char *dynamic_mem = (char *)malloc(total_key_size);
@@ -244,6 +245,10 @@ int cube_manager_find(const struct cube_manager *pthis, const struct fieldstat_t
 {
     char *key;
     size_t key_len;
+    
+    fields_calculate_keylen;
+    // fields_calculate_key_length(identifier, ntag) 用下面的吧
+    // fields2key_endeaver / try
     tags2key(identifier, n_tag, &key, &key_len);
 
     struct cube *node = NULL;
