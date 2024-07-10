@@ -34,6 +34,7 @@ enum field_type
 enum sampling_mode {
     SAMPLING_MODE_COMPREHENSIVE,
     SAMPLING_MODE_TOPK,
+    SAMPLING_MODE_SPREADSKETCH,
 };
 
 struct field {
