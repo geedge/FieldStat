@@ -13,6 +13,7 @@
 #include "metric.h"
 #include "heavy_keeper.h"
 #include "tag_map.h"
+#include "spread_sketch.h"
 
 #define DEFAULT_N_METRIC 32
 #define DEFAULT_N_CUBE 64
@@ -42,6 +43,7 @@ struct cube {
     union {
         struct heavy_keeper *topk;
         struct hash_table *comprehensive;
+        struct spread_sketch *spread_sketch;
     };
     size_t max_n_cell;
 
@@ -503,6 +505,9 @@ struct cube *cube_new(const struct fieldstat_tag *shared_tags, size_t n_tag, enu
             cube->comprehensive = hash_table_new(max_n_cell);
             hash_table_set_exdata_schema(cube->comprehensive, exdata_new_i, exdata_free_i, exdata_merge_i, exdata_reset_i, exdata_copy_i);
             break;
+        case SAMPLING_MODE_SPREADSKETCH:
+            cube->spread_sketch = spread_sketch_new(max_n_cell);
+            spread_sketch_set_exdata_schema(cube->spread_sketch, exdata_new_i, exdata_free_i, exdata_merge_i, exdata_reset_i, exdata_copy_i);
         default:
             assert(0);
             break;
@@ -520,6 +525,9 @@ void cube_free(struct cube *cube) {
     case SAMPLING_MODE_COMPREHENSIVE:
         hash_table_free(cube->comprehensive);
         break;
+    case SAMPLING_MODE_SPREADSKETCH:
+        spread_sketch_free(cube->spread_sketch);
+        break;
     default:
         assert(0);
         break;
@@ -532,10 +540,25 @@ void cube_free(struct cube *cube) {
 }
 
 void cube_reset(struct cube *cube) {
-    if (cube->sampling_mode == SAMPLING_MODE_TOPK) {
+    // if (cube->sampling_mode == SAMPLING_MODE_TOPK) {
+    //     heavy_keeper_reset(cube->topk);
+    // } else {
+    //     hash_table_reset(cube->comprehensive);
+    // }
+    switch (cube->sampling_mode)
+    {
+    case SAMPLING_MODE_TOPK:
         heavy_keeper_reset(cube->topk);
-    } else {
+        break;
+    case SAMPLING_MODE_COMPREHENSIVE:
         hash_table_reset(cube->comprehensive);
+        break;  
+    case SAMPLING_MODE_SPREADSKETCH:
+        spread_sketch_reset(cube->spread_sketch);
+        break;
+    default:
+        assert(0);
+        break;
     }
 }
 
@@ -580,7 +603,24 @@ struct cell *get_cell(struct cube *cube, const struct fieldstat_tag *tags, size_
             }
         }
         break;}
-    }
+    case SAMPLING_MODE_SPREADSKETCH: {
+        if (cube->primary_metric_id != metric_id) {
+            cell_data = spread_sketch_get0_exdata(cube->spread_sketch, tag_in_string, tag_len);
+            // todo: spread sketch 没办法支持dummy 场景。首先，我不能让所有metric 都走spread sketch流程，
+            // 因为正常来说，用level=0 的hashy 做数值，没有任何意义，肯定都更新不了，只是在刚开始的时候，起一个记录key 的作用。
+            // 而，如果像是topk 那样，给count=0 的一席之地，那么存在问题：spread sketch本身不对记录的个数有限制，所以什么时候停止记录呢？这样的设计也太麻烦了。
+            // 之前跟老板讨论的时候，给了两个方案，方案1：做一个buffer，如果get exdata0 get 不到，则往buffer 中的cell 里写，等到来了primary以后，把cell 送进去。
+            // 方案2：简单略去第一轮添加时的情况。这会造成很少量的误差。不过，实际上这个操作不是逐包而是会话开始结束时来一次，所以误差也不会太小。必须是让贺岚风能第一个操作primary metric。
+        }
+        if (cell_data == NULL) {
+            int tmp_ret = spread_sketch_add(cube->spread_sketch, tag_in_string, tag_len, 0, (void *)&args);
+            if (tmp_ret == 1) {
+                cell_data = spread_sketch_get0_exdata(cube->spread_sketch, tag_in_string, tag_len);
+            }
+        }
+        break;}
+    }   
+
 
     free(tag_in_string);
     return cell_data;

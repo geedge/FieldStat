@@ -8,7 +8,10 @@
 #include <random>
 #include <string.h>
 #include <algorithm>
-
+#include <fstream>
+#include <math.h>
+#include <unistd.h>
+#include <sstream>
 
 #include "fieldstat.h"
 #include "utils.hpp"
@@ -292,4 +295,146 @@ double test_cal_topk_accuracy(vector<struct Fieldstat_tag_list_wrapper *> &test_
 
     double accuracy = (double)correct / test_result.size();
     return accuracy;
+}
+
+
+//===========================================================================
+//=  Function to generate Zipf (power law) distributed random variables     =
+//=    - Input: alpha and N                                                 =
+//=    - Output: Returns with Zipf distributed random variable              =
+//===========================================================================
+int zipf(double alpha, int n)
+{
+  static bool first = true;      // Static first time flag
+  static double c = 0;          // Normalization constant
+  double z;                     // Uniform random number (0 < z < 1)
+  double sum_prob;              // Sum of probabilities
+  double zipf_value;            // Computed exponential value to be returned
+  int    i;                     // Loop counter
+
+  // Compute normalization constant on first call only
+  if (first)
+  {
+    for (i=1; i<=n; i++)
+      c = c + (1.0 / pow((double) i, alpha));
+    c = 1.0 / c;
+    first = false;
+  }
+
+  // Pull a uniform random number (0 < z < 1)
+  do
+  {
+    z = (double)rand() / (double)RAND_MAX;
+  }
+  while ((z == 0.0) || (z == 1.0));
+
+  // Map z to the value
+  sum_prob = 0;
+  for (i=1; i<=n; i++)
+  {
+    sum_prob = sum_prob + c / pow((double) i, alpha);
+    if (sum_prob >= z)
+    {
+      zipf_value = i;
+      break;
+    }
+  }
+
+  return(zipf_value);
+}
+
+
+// class SpreadSketchZipfGenerator {
+// private:
+//     const int MAX_DATA = 1000000;
+//     std::pair<std::string, std::string> *loadeds;
+//     unsigned cursor;
+
+// public:
+//     SpreadSketchZipfGenerator(double alpha, int n) {
+
+//     }
+
+//     struct Flow next() {
+//         int r_cursor = cursor % MAX_DATA;
+//         struct Flow flow;
+//         flow.src_ip = loadeds[r_cursor].first;
+//         flow.dst_ip = loadeds[r_cursor].second;
+
+//         cursor++;
+
+//         return flow;
+//     }
+
+//     ~SpreadSketchZipfGenerator() {
+//         delete[] loadeds;
+//     }
+
+//     double _alpha;
+//     int _n;
+// };
+
+SpreadSketchZipfGenerator::SpreadSketchZipfGenerator(double alpha, int n) { 
+    _alpha = alpha;
+    _n = n;
+    
+    // generate data and write them to file
+    std::string filename = "zipf_" + std::to_string(alpha) + "_" + std::to_string(n) + ".txt";
+
+    std::unordered_map<int, int> fanout_map; // src_ip_id -> fanout being used
+
+    if (access(filename.c_str(), F_OK) != 0) {
+        printf("file %s not found, generating data\n", filename.c_str());
+
+        std::ofstream file(filename);
+        if (!file.is_open()) {
+            printf("failed to open file %s\n", filename.c_str());
+            return;
+        }
+        
+        for (int i = 0; i < MAX_DATA; i++) {
+            int src_id = zipf(alpha, n);
+            int fanout = fanout_map.find(src_id) == fanout_map.end() ? 0 : fanout_map[src_id];
+            fanout_map[src_id] = fanout + 1;
+
+            file << "s_" << src_id << " d_" << fanout << std::endl;
+        }
+        
+        file.close();
+        printf("data generated and saved to file %s\n", filename.c_str());
+    }
+
+    // load data
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        printf("failed to open file %s\n", filename.c_str());
+        return;
+    }
+
+    loadeds = new std::pair<std::string, std::string>[MAX_DATA];
+    std::string line;
+    int i = 0;
+    while (std::getline(file, line) && i < MAX_DATA) {
+        std::istringstream iss(line);
+        std::string src_ip, dst_ip;
+        iss >> src_ip >> dst_ip;
+        loadeds[i] = std::make_pair(src_ip, dst_ip);
+        i++;
+    }
+    file.close();
+}
+
+SpreadSketchZipfGenerator::~SpreadSketchZipfGenerator() {
+    delete[] loadeds;
+}
+
+struct Flow SpreadSketchZipfGenerator::next() {
+    int r_cursor = cursor % MAX_DATA;
+    struct Flow flow;
+    flow.src_ip = loadeds[r_cursor].first;
+    flow.dst_ip = loadeds[r_cursor].second;
+
+    cursor++;
+
+    return flow;
 }

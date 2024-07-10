@@ -37,8 +37,18 @@ struct smart_ptr { // todo:entry
     UT_hash_handle hh;
 };
 
-struct smart_ptr_table {
-    struct smart_ptr *table;
+struct spread_sketch_scheme {
+    exdata_new_cb new_fn;
+    exdata_free_cb free_fn;
+    exdata_merge_cb merge_fn;
+    exdata_reset_cb reset_fn;
+    exdata_copy_cb copy_fn;
+};
+
+struct smart_ptr_table { // TODO: entry table
+    struct smart_ptr *entry;
+
+    struct spread_sketch_scheme scheme;
 };
 
 struct bucket {
@@ -50,14 +60,13 @@ struct spread_sketch {
     int depth;
     int width;
 
-    exdata_new_cb new_fn;
-    exdata_free_cb free_fn;
-    exdata_merge_cb merge_fn;
-    exdata_reset_cb reset_fn;
-    exdata_copy_cb copy_fn;
-
+    struct spread_sketch_scheme scheme;
+    
     struct bucket *buckets;
-    struct group_table *groups;
+    struct smart_ptr_table *table;
+
+    uint32_t *min_level_per_row; // TODO: 先看看性能吧, 之后再写。用来记录每行最小的level，从而跳过行数。对于64位的level，维持一个计数，额外使用64 r的空间，当一个最小位数的level 计数到0时，更新最小level。
+    // TODO: 对比heavy keeper,不仅仅是跳过的问题，heavykeeper 无论什么情况，在输入0的时候都不会走sketch 更新。
 };
 
 static void *default_new_fn(void *arg) {
@@ -87,9 +96,9 @@ static inline char *key_dup(const char *key, size_t key_len) {
     return ret;
 }
 
-const struct smart_ptr *smart_prt_table_get(struct smart_ptr_table *table, const char *key, size_t key_len, void *arg) {
+struct smart_ptr *smart_ptr_table_get(struct smart_ptr_table *table, const char *key, size_t key_len, void *arg) {
     struct smart_ptr *ret;
-    HASH_FIND(hh, table, key, key_len, ret);
+    HASH_FIND(hh, table->entry, key, key_len, ret);
 
     if (ret != NULL) {
         ret->ref_count++;
@@ -101,25 +110,25 @@ const struct smart_ptr *smart_prt_table_get(struct smart_ptr_table *table, const
         if (arg == NULL) {
             ret->exdata = NULL;
         } else {
-            ret->exdata = table->new_fn(arg);
+            ret->exdata = table->scheme.new_fn(arg);
         }
-        HASH_ADD_KEYPTR(hh, table->table, ret->key, ret->key_len, ret);
+        HASH_ADD_KEYPTR(hh, table->entry, ret->key, ret->key_len, ret);
     }
 
     return ret;
 }
 
-int smart_prt_table_release(struct smart_ptr_table *table, const char *key, size_t key_len) {
+int smart_ptr_table_release(struct smart_ptr_table *table, const char *key, size_t key_len) {
     struct smart_ptr *ret;
-    HASH_FIND(hh, table->table, key, key_len, ret);
+    HASH_FIND(hh, table->entry, key, key_len, ret);
     if (ret == NULL) {
         return -1;
     }
 
     ret->ref_count--;
     if (ret->ref_count == 0) {
-        HASH_DEL(table->table, ret);
-        table->free_fn(ret->exdata);
+        HASH_DEL(table->entry, ret);
+        table->scheme.free_fn(ret->exdata);
         free(ret->key);
         free(ret);
     }
@@ -127,26 +136,27 @@ int smart_prt_table_release(struct smart_ptr_table *table, const char *key, size
     return 0;
 }
 
-void smart_prt_table_free(struct smart_ptr_table *table) {
+void smart_ptr_table_free(struct smart_ptr_table *table) {
     struct smart_ptr *current, *tmp;
-    HASH_ITER(hh, table->table, current, tmp) {
-        HASH_DEL(table->table, current);
-        table->free_fn(current->exdata);
+    HASH_ITER(hh, table->entry, current, tmp) {
+        HASH_DEL(table->entry, current);
+        table->scheme.free_fn(current->exdata);
         free(current->key);
         free(current);
     }
     free(table);
 }
 
-struct smart_ptr_table *smart_prt_table_new() {
+struct smart_ptr_table *smart_ptr_table_new() {
     struct smart_ptr_table *table = malloc(sizeof(struct smart_ptr_table));
-    table->table = NULL;
+    table->entry = NULL;
 
-    table->new_fn = default_new_fn;
-    table->free_fn = default_free_fn;
-    table->merge_fn = default_merge_fn;
-    table->reset_fn = default_reset_fn;
-    table->copy_fn = default_copy_fn;
+    table->scheme.new_fn = default_new_fn;
+    table->scheme.free_fn = default_free_fn;
+    table->scheme.merge_fn = default_merge_fn;
+    table->scheme.reset_fn = default_reset_fn;
+    table->scheme.copy_fn = default_copy_fn;
+
     return table;
 }
 
@@ -172,7 +182,13 @@ struct spread_sketch *spread_sketch_new(int expected_query_num) {
     get_parameter_recommendation(expected_query_num, &pthis->depth, &pthis->width);
 
     pthis->buckets = calloc(pthis->depth * pthis->width, sizeof(struct bucket));
-    pthis->table = smart_prt_table_new();
+    pthis->scheme.new_fn = default_new_fn;
+    pthis->scheme.free_fn = default_free_fn;
+    pthis->scheme.merge_fn = default_merge_fn;
+    pthis->scheme.reset_fn = default_reset_fn;
+    pthis->scheme.copy_fn = default_copy_fn;
+    pthis->table = smart_ptr_table_new();
+    pthis->table->scheme = pthis->scheme;
 
     return pthis;
 }
@@ -204,9 +220,9 @@ int spread_sketch_add(struct spread_sketch *ss, const char *key, size_t key_leng
             uint32_t true_level = bucket->content == NULL ? 0: bucket->level;
 
             if (true_level < level) {
-                struct smart_ptr *content_old = bucket->content;
-                smart_prt_table_release(ss->table, content_old->key, content_old->key_len, ss->free_fn);
-                struct smart_ptr *content_new = smart_prt_table_get(ss->table, key, key_length, arg);
+                const struct smart_ptr *content_old = bucket->content;
+                smart_ptr_table_release(ss->table, content_old->key, content_old->key_len);
+                struct smart_ptr *content_new = smart_ptr_table_get(ss->table, key, key_length, arg);
                 bucket->content = content_new;
                 bucket->level = level;
 
@@ -219,7 +235,7 @@ int spread_sketch_add(struct spread_sketch *ss, const char *key, size_t key_leng
 }
 
 void spread_sketch_free(struct spread_sketch *ss) {
-    smart_prt_table_free(ss->table, ss->free_fn);
+    smart_ptr_table_free(ss->table);
     free(ss->buckets);
     free(ss);
 }
@@ -236,7 +252,7 @@ void spread_sketch_merge(struct spread_sketch *dst, const struct spread_sketch *
             continue;
         }
         if (bucket_dst->content == NULL) {
-            bucket_dst->content = smart_prt_table_get(dst->table, bucket_src->content->key, bucket_src->content->key_len, NULL);
+            bucket_dst->content = smart_ptr_table_get(dst->table, bucket_src->content->key, bucket_src->content->key_len, NULL);
             bucket_dst->level = bucket_src->level;
             continue;
         }
@@ -247,31 +263,33 @@ void spread_sketch_merge(struct spread_sketch *dst, const struct spread_sketch *
             }
         } else {
             if (bucket_src->level > bucket_dst->level) {
-                smart_prt_table_release(dst->table, bucket_dst->content->key, bucket_dst->content->key_len);
-                bucket_dst->content = smart_prt_table_get(dst->table, bucket_src->content->key, bucket_src->content->key_len, NULL);
+                smart_ptr_table_release(dst->table, bucket_dst->content->key, bucket_dst->content->key_len);
+                bucket_dst->content = smart_ptr_table_get(dst->table, bucket_src->content->key, bucket_src->content->key_len, NULL);
                 bucket_dst->level = bucket_src->level;
             }
         }
     }
 
+    const struct spread_sketch_scheme *scheme = &dst->table->scheme;
+
     struct smart_ptr *content_dest, *content_src, *tmp;
-    HASH_ITER(hh, dst->table->table, content_dest, tmp) {
-        HASH_FIND(hh, src->table->table, content_dest->key, content_dest->key_len, content_src);
+    HASH_ITER(hh, dst->table->entry, content_dest, tmp) {
+        HASH_FIND(hh, src->table->entry, content_dest->key, content_dest->key_len, content_src);
         if (content_src == NULL) {
             continue;
         }
 
         if (content_dest->exdata == NULL) {
-            content_dest->exdata = dst->table->copy_fn(content_src->exdata);
+            content_dest->exdata = scheme->copy_fn(content_src->exdata);
         } else {
-            dst->table->merge_fn(content_dest->exdata, content_src->exdata);
+            scheme->merge_fn(content_dest->exdata, content_src->exdata);
         }
     }
 }
 
 void *spread_sketch_get0_exdata(const struct spread_sketch *ss, const char *key, size_t key_len) {
     struct smart_ptr *content;
-    HASH_FIND(hh, ss->table->table, key, key_len, content);
+    HASH_FIND(hh, ss->table->entry, key, key_len, content);
     if (content == NULL) {
         return NULL;
     }
@@ -285,22 +303,23 @@ void spread_sketch_reset(struct spread_sketch *ss) {
     }
 
     struct smart_ptr *content, *tmp;
-    HASH_ITER(hh, ss->table->table, content, tmp) {
-        ss->reset_fn(content->exdata);
+    HASH_ITER(hh, ss->table->entry, content, tmp) {
+        ss->scheme.reset_fn(content->exdata);
     }
 }
 
 void spread_sketch_set_exdata_schema(struct spread_sketch *ss, exdata_new_cb new_fn, exdata_free_cb free_fn, exdata_merge_cb merge_fn, exdata_reset_cb reset_fn, exdata_copy_cb copy_fn) {
-    ss->table->new_fn = new_fn;
-    ss->table->free_fn = free_fn;
-    ss->table->merge_fn = merge_fn;
-    ss->table->reset_fn = reset_fn;
-    ss->table->copy_fn = copy_fn;
-    return 0;
+    ss->scheme.new_fn = new_fn;
+    ss->scheme.free_fn = free_fn;
+    ss->scheme.merge_fn = merge_fn;
+    ss->scheme.reset_fn = reset_fn;
+    ss->scheme.copy_fn = copy_fn;
+
+    ss->table->scheme = ss->scheme;
 }
 
 int spread_sketch_get_count(const struct spread_sketch *ss) {
-    return HASH_CNT(hh, ss->table->table);
+    return HASH_CNT(hh, ss->table->entry);
 }
 
 // 这个函数还是会忠实的把内部所有内容都拿出来，但是预期是最多expected_query_num 个，所以在外层要做一个排序。
@@ -308,7 +327,7 @@ int spread_sketch_get_count(const struct spread_sketch *ss) {
 size_t spread_sketch_list(const struct spread_sketch *ss, void **exdatas, size_t n_exdatas) {
     size_t count = 0;
     struct smart_ptr *content, *tmp;
-    HASH_ITER(hh, ss->table->table, content, tmp) {
+    HASH_ITER(hh, ss->table->entry, content, tmp) {
         if (count >= n_exdatas) {
             break;
         }
@@ -323,16 +342,16 @@ struct spread_sketch *spread_sketch_copy(const struct spread_sketch *src) {
     memcpy(dst, src, sizeof(struct spread_sketch));
 
     dst->buckets = calloc(dst->depth * dst->width, sizeof(struct bucket));
-    dst->table = smart_prt_table_new();
+    dst->table = smart_ptr_table_new();
 
     for (int i = 0; i < dst->depth * dst->width; i++) {
         if (src->buckets[i].content == NULL) {
             continue;
         }
-        dst->buckets[i].content = smart_prt_table_get(dst->table, src->buckets[i].content->key, src->buckets[i].content->key_len, NULL);
+        dst->buckets[i].content = smart_ptr_table_get(dst->table, src->buckets[i].content->key, src->buckets[i].content->key_len, NULL);
         dst->buckets[i].level = src->buckets[i].level;
         if (dst->buckets[i].content->exdata == NULL) {
-            dst->buckets[i].content->exdata = src->copy_fn(src->buckets[i].content->exdata);
+            dst->buckets[i].content->exdata = src->scheme.copy_fn(src->buckets[i].content->exdata);
         }
     }
     return dst;
