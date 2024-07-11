@@ -204,7 +204,9 @@ int fieldstat_cube_set_primary_metric(struct fieldstat *instance, int cube_id, i
     if (manifest == NULL) {
         return FS_ERR_INVALID_METRIC_ID;
     }
-    if (manifest->type != METRIC_TYPE_COUNTER) {
+    if (cube_get_sampling_mode(cube) == SAMPLING_MODE_COMPREHENSIVE ||
+        (cube_get_sampling_mode(cube) == SAMPLING_MODE_TOPK && manifest->type != METRIC_TYPE_COUNTER) ||
+        (cube_get_sampling_mode(cube) == SAMPLING_MODE_SPREADSKETCH && manifest->type != METRIC_TYPE_HLL)) {
         return FS_ERR_INVALID_PARAM;
     }
 
@@ -351,7 +353,7 @@ int fieldstat_hll_add_field(struct fieldstat *instance, int cube_id, int metric_
         return FS_ERR_INVALID_METRIC_ID;
     }
 
-    return cube_hll_add_tag(cube, manifest, cell_dimensions, n_dimensions, item, item_len);
+    return cube_hll_add_field(cube, manifest, cell_dimensions, n_dimensions, item, item_len);
 }
 
 // cppcheck-suppress [constParameterPointer, unmatchedSuppression]
@@ -589,5 +591,5 @@ int fieldstat_find_cube(const struct fieldstat *instance, const struct field *cu
 void fieldstat_get_metric_in_cell(const struct fieldstat *instance, int cube_id, const struct field_list *cell_dimensions, int **metric_id_out, size_t *n_metric_out)
 {
     const struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
-    return cube_get_cells_used_by_metric(cube, cell_dimensions, metric_id_out, n_metric_out);
+    return cube_get_metrics_in_cell(cube, cell_dimensions, metric_id_out, n_metric_out);
 }

@@ -8,6 +8,7 @@ extern "C"{
 
 #include "exdata.h"
 
+#define DUMMY_ITEM_HASH (1ULL<<63) // level(left most zeros) = 0
 
 struct spread_sketch;
 
@@ -18,7 +19,7 @@ void spread_sketch_free(struct spread_sketch *ss);
 
 void spread_sketch_reset(struct spread_sketch *ss);
 
-int spread_sketch_add(struct spread_sketch *ss, const char *key, size_t key_length, uint64_t hash_identifier, void *arg);
+int spread_sketch_add(struct spread_sketch *ss, const char *key, size_t key_length, uint64_t item_hash, void *arg);
 void spread_sketch_set_exdata_schema(struct spread_sketch *ss, exdata_new_cb new_fn, exdata_free_cb free_fn, exdata_merge_cb merge_fn, exdata_reset_cb reset_fn, exdata_copy_cb copy_fn);
 
 void *spread_sketch_get0_exdata(const struct spread_sketch *ss, const char *key, size_t key_len);

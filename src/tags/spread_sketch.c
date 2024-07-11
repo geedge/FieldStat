@@ -28,10 +28,11 @@
 会让cell 的操作变得麻烦，无法借用老的cell manager 流程，get exdata 会得到一个exdata 的数组（可能多个），而非单独的一个，要对多个cell综合起来当一个cell 看。。修改量非常小，但是确实会影响代码本身的整洁度。
 
 */
-struct smart_ptr { // todo:entry
+
+struct entry {
     int ref_count;
     void *exdata;
-
+    bool dying;
     char *key;
     size_t key_len;
     UT_hash_handle hh;
@@ -45,14 +46,14 @@ struct spread_sketch_scheme {
     exdata_copy_cb copy_fn;
 };
 
-struct smart_ptr_table { // TODO: entry table
-    struct smart_ptr *entry;
+struct entry_table {
+    struct entry *entry;
 
     struct spread_sketch_scheme scheme;
 };
 
 struct bucket {
-    struct smart_ptr *content;
+    struct entry *content;
     uint32_t level;
 };
 
@@ -63,7 +64,7 @@ struct spread_sketch {
     struct spread_sketch_scheme scheme;
     
     struct bucket *buckets;
-    struct smart_ptr_table *table;
+    struct entry_table *table;
 
     uint32_t *min_level_per_row; // TODO: 先看看性能吧, 之后再写。用来记录每行最小的level，从而跳过行数。对于64位的level，维持一个计数，额外使用64 r的空间，当一个最小位数的level 计数到0时，更新最小level。
     // TODO: 对比heavy keeper,不仅仅是跳过的问题，heavykeeper 无论什么情况，在输入0的时候都不会走sketch 更新。
@@ -91,19 +92,22 @@ static inline bool key_equal(const char *key1, size_t key1_len, const char *key2
     return memcmp(key1, key2, key1_len) == 0;
 }
 static inline char *key_dup(const char *key, size_t key_len) {
-    char *ret = malloc(key_len);
+    char *ret = malloc(key_len+1);
     memcpy(ret, key, key_len);
+    ret[key_len] = '\0';
     return ret;
 }
 
-struct smart_ptr *smart_ptr_table_get(struct smart_ptr_table *table, const char *key, size_t key_len, void *arg) {
-    struct smart_ptr *ret;
+struct entry *smart_ptr_table_get(struct entry_table *table, const char *key, size_t key_len, void *arg) {
+    struct entry *ret;
     HASH_FIND(hh, table->entry, key, key_len, ret);
 
     if (ret != NULL) {
+        ret->dying = false;
         ret->ref_count++;
     } else {
-        ret = malloc(sizeof(struct smart_ptr));
+        ret = malloc(sizeof(struct entry));
+        ret->dying = false;
         ret->ref_count = 1;
         ret->key = key_dup(key, key_len);
         ret->key_len = key_len;
@@ -118,8 +122,8 @@ struct smart_ptr *smart_ptr_table_get(struct smart_ptr_table *table, const char 
     return ret;
 }
 
-int smart_ptr_table_release(struct smart_ptr_table *table, const char *key, size_t key_len) {
-    struct smart_ptr *ret;
+int smart_ptr_table_release(struct entry_table *table, const char *key, size_t key_len) {
+    struct entry *ret;
     HASH_FIND(hh, table->entry, key, key_len, ret);
     if (ret == NULL) {
         return -1;
@@ -127,6 +131,7 @@ int smart_ptr_table_release(struct smart_ptr_table *table, const char *key, size
 
     ret->ref_count--;
     if (ret->ref_count == 0) {
+        // printf("release %s\n", key);
         HASH_DEL(table->entry, ret);
         table->scheme.free_fn(ret->exdata);
         free(ret->key);
@@ -136,8 +141,8 @@ int smart_ptr_table_release(struct smart_ptr_table *table, const char *key, size
     return 0;
 }
 
-void smart_ptr_table_free(struct smart_ptr_table *table) {
-    struct smart_ptr *current, *tmp;
+void smart_ptr_table_free(struct entry_table *table) {
+    struct entry *current, *tmp;
     HASH_ITER(hh, table->entry, current, tmp) {
         HASH_DEL(table->entry, current);
         table->scheme.free_fn(current->exdata);
@@ -147,8 +152,8 @@ void smart_ptr_table_free(struct smart_ptr_table *table) {
     free(table);
 }
 
-struct smart_ptr_table *smart_ptr_table_new() {
-    struct smart_ptr_table *table = malloc(sizeof(struct smart_ptr_table));
+struct entry_table *smart_ptr_table_new() {
+    struct entry_table *table = malloc(sizeof(struct entry_table));
     table->entry = NULL;
 
     table->scheme.new_fn = default_new_fn;
@@ -194,9 +199,10 @@ struct spread_sketch *spread_sketch_new(int expected_query_num) {
 }
 
 // return 0 if not added, return 1 if added
-int spread_sketch_add(struct spread_sketch *ss, const char *key, size_t key_length, uint64_t hash_identifier, void *arg) {// todo: entry, item
+int spread_sketch_add(struct spread_sketch *ss, const char *key, size_t key_length, uint64_t item_hash, void *arg) {
     // uint64_t hash_identifier = XXH3_64bits_withSeed(identifier, identifier_length, 171);
-    uint32_t level = (uint32_t)__builtin_clzll(hash_identifier) + 1;
+    uint32_t level = (uint32_t)__builtin_clzll(item_hash) + 1;
+    // printf("spread_sketch_add key %s, level %u\n", key, level);
     
     // https://www.eecs.harvard.edu/~michaelm/postscripts/tr-02-05.pdf
     // A technique from the hashing literature is to use two hash functions h1(x) and h2(x) to simulate additional hash functions of the form gi(x) = h1(x) + ih2(x)
@@ -212,17 +218,22 @@ int spread_sketch_add(struct spread_sketch *ss, const char *key, size_t key_leng
         struct bucket *bucket = &ss->buckets[bucket_idx];
 
         if (bucket->content != NULL && key_equal(bucket->content->key, bucket->content->key_len, key, key_length)) {
+            bucket->content->dying = false;
+
             if (bucket->level < level) {
                 bucket->level = level;
             }
             in_sketch = true;
         } else {
-            uint32_t true_level = bucket->content == NULL ? 0: bucket->level;
+            uint32_t old_level = bucket->content == NULL ? 0: bucket->level;
 
-            if (true_level < level) {
-                const struct smart_ptr *content_old = bucket->content;
-                smart_ptr_table_release(ss->table, content_old->key, content_old->key_len);
-                struct smart_ptr *content_new = smart_ptr_table_get(ss->table, key, key_length, arg);
+            if (level > old_level) {
+                // printf("update key %s to %s, and level %u to %u, in bucket (r,w)=(%d,%u)\n", bucket->content == NULL ? "NULL": bucket->content->key, key, old_level, level, i, hash_x % ss->width);
+                const struct entry *content_old = bucket->content;
+                if (content_old != NULL) {
+                    smart_ptr_table_release(ss->table, content_old->key, content_old->key_len);
+                }
+                struct entry *content_new = smart_ptr_table_get(ss->table, key, key_length, arg);
                 bucket->content = content_new;
                 bucket->level = level;
 
@@ -248,7 +259,7 @@ void spread_sketch_merge(struct spread_sketch *dst, const struct spread_sketch *
         const struct bucket *bucket_src = &src->buckets[i];
         struct bucket *bucket_dst = &dst->buckets[i];
 
-        if (bucket_src->content == NULL) {
+        if (bucket_src->content == NULL || bucket_src->content->dying) {
             continue;
         }
         if (bucket_dst->content == NULL) {
@@ -256,6 +267,7 @@ void spread_sketch_merge(struct spread_sketch *dst, const struct spread_sketch *
             bucket_dst->level = bucket_src->level;
             continue;
         }
+        bucket_dst->content->dying = false;
 
         if (key_equal(bucket_src->content->key, bucket_src->content->key_len, bucket_dst->content->key, bucket_dst->content->key_len)) {
             if (bucket_src->level > bucket_dst->level) {
@@ -272,10 +284,10 @@ void spread_sketch_merge(struct spread_sketch *dst, const struct spread_sketch *
 
     const struct spread_sketch_scheme *scheme = &dst->table->scheme;
 
-    struct smart_ptr *content_dest, *content_src, *tmp;
+    struct entry *content_dest, *content_src, *tmp;
     HASH_ITER(hh, dst->table->entry, content_dest, tmp) {
         HASH_FIND(hh, src->table->entry, content_dest->key, content_dest->key_len, content_src);
-        if (content_src == NULL) {
+        if (content_src == NULL || content_src->dying) {
             continue;
         }
 
@@ -288,9 +300,9 @@ void spread_sketch_merge(struct spread_sketch *dst, const struct spread_sketch *
 }
 
 void *spread_sketch_get0_exdata(const struct spread_sketch *ss, const char *key, size_t key_len) {
-    struct smart_ptr *content;
+    struct entry *content;
     HASH_FIND(hh, ss->table->entry, key, key_len, content);
-    if (content == NULL) {
+    if (content == NULL || content->dying) {
         return NULL;
     }
     return content->exdata;
@@ -302,9 +314,10 @@ void spread_sketch_reset(struct spread_sketch *ss) {
         bucket->level = 0;
     }
 
-    struct smart_ptr *content, *tmp;
+    struct entry *content, *tmp;
     HASH_ITER(hh, ss->table->entry, content, tmp) {
         ss->scheme.reset_fn(content->exdata);
+        content->dying = true;
     }
 }
 
@@ -319,15 +332,24 @@ void spread_sketch_set_exdata_schema(struct spread_sketch *ss, exdata_new_cb new
 }
 
 int spread_sketch_get_count(const struct spread_sketch *ss) {
-    return HASH_CNT(hh, ss->table->entry);
+    int cnt = 0;
+    struct entry *content, *tmp;
+    HASH_ITER(hh, ss->table->entry, content, tmp) {
+        if (!content->dying) {
+            cnt++;
+        }
+    }
+
+    return cnt;
 }
 
-// 这个函数还是会忠实的把内部所有内容都拿出来，但是预期是最多expected_query_num 个，所以在外层要做一个排序。
-// 这个排序在这里面没法做，因为没有具体的hll计数。
 size_t spread_sketch_list(const struct spread_sketch *ss, void **exdatas, size_t n_exdatas) {
     size_t count = 0;
-    struct smart_ptr *content, *tmp;
+    struct entry *content, *tmp;
     HASH_ITER(hh, ss->table->entry, content, tmp) {
+        if (content->dying) {
+            continue;
+        }
         if (count >= n_exdatas) {
             break;
         }
@@ -343,9 +365,10 @@ struct spread_sketch *spread_sketch_copy(const struct spread_sketch *src) {
 
     dst->buckets = calloc(dst->depth * dst->width, sizeof(struct bucket));
     dst->table = smart_ptr_table_new();
+    spread_sketch_set_exdata_schema(dst, src->scheme.new_fn, src->scheme.free_fn, src->scheme.merge_fn, src->scheme.reset_fn, src->scheme.copy_fn);
 
     for (int i = 0; i < dst->depth * dst->width; i++) {
-        if (src->buckets[i].content == NULL) {
+        if (src->buckets[i].content == NULL || src->buckets[i].content->dying) {
             continue;
         }
         dst->buckets[i].content = smart_ptr_table_get(dst->table, src->buckets[i].content->key, src->buckets[i].content->key_len, NULL);

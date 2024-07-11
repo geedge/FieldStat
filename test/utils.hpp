@@ -55,7 +55,7 @@ struct Flow {
 class SpreadSketchZipfGenerator {
 private:
     const int MAX_DATA = 1000000;
-    std::pair<std::string, std::string> *loadeds;
+    std::vector<std::pair<std::string, std::string>> *loadeds;
     unsigned cursor;
 
 public:

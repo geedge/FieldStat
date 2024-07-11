@@ -431,8 +431,8 @@ TEST(Fuzz_test, simple_one_for_perf)
 int main(int argc, char *argv[]) 
 {
 	testing::InitGoogleTest(&argc, argv);
-    // testing::GTEST_FLAG(filter) = "Fuzz_test.many_instance_random_flow_unregister_calibrate_reset_fork_merge_topk";
-    testing::GTEST_FLAG(filter) = "Fuzz_test.simple_one_for_perf";
+    // testing::GTEST_FLAG(filter) = "Fuzz_test.add_and_reset_with_randomly_generated_flows_and_randomly_chosen_metric";
+    testing::GTEST_FLAG(filter) = "-Fuzz_test.simple_one_for_perf";
 
 	return RUN_ALL_TESTS();
 }

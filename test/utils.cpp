@@ -343,40 +343,10 @@ int zipf(double alpha, int n)
   return(zipf_value);
 }
 
-
-// class SpreadSketchZipfGenerator {
-// private:
-//     const int MAX_DATA = 1000000;
-//     std::pair<std::string, std::string> *loadeds;
-//     unsigned cursor;
-
-// public:
-//     SpreadSketchZipfGenerator(double alpha, int n) {
-
-//     }
-
-//     struct Flow next() {
-//         int r_cursor = cursor % MAX_DATA;
-//         struct Flow flow;
-//         flow.src_ip = loadeds[r_cursor].first;
-//         flow.dst_ip = loadeds[r_cursor].second;
-
-//         cursor++;
-
-//         return flow;
-//     }
-
-//     ~SpreadSketchZipfGenerator() {
-//         delete[] loadeds;
-//     }
-
-//     double _alpha;
-//     int _n;
-// };
-
 SpreadSketchZipfGenerator::SpreadSketchZipfGenerator(double alpha, int n) { 
     _alpha = alpha;
     _n = n;
+    cursor = 0;
     
     // generate data and write them to file
     std::string filename = "zipf_" + std::to_string(alpha) + "_" + std::to_string(n) + ".txt";
@@ -411,28 +381,28 @@ SpreadSketchZipfGenerator::SpreadSketchZipfGenerator(double alpha, int n) {
         return;
     }
 
-    loadeds = new std::pair<std::string, std::string>[MAX_DATA];
+    loadeds = new std::vector<std::pair<std::string, std::string>>;
     std::string line;
-    int i = 0;
-    while (std::getline(file, line) && i < MAX_DATA) {
+    while (std::getline(file, line)) {
         std::istringstream iss(line);
         std::string src_ip, dst_ip;
         iss >> src_ip >> dst_ip;
-        loadeds[i] = std::make_pair(src_ip, dst_ip);
-        i++;
+        loadeds->push_back(std::make_pair(src_ip, dst_ip));
     }
     file.close();
+
 }
 
 SpreadSketchZipfGenerator::~SpreadSketchZipfGenerator() {
-    delete[] loadeds;
+    delete loadeds;
 }
 
 struct Flow SpreadSketchZipfGenerator::next() {
-    int r_cursor = cursor % MAX_DATA;
+    int r_cursor = cursor % loadeds->size();
     struct Flow flow;
-    flow.src_ip = loadeds[r_cursor].first;
-    flow.dst_ip = loadeds[r_cursor].second;
+
+    flow.src_ip = loadeds->at(r_cursor).first;
+    flow.dst_ip = loadeds->at(r_cursor).second;
 
     cursor++;
 
