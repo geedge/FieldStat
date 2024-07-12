@@ -656,8 +656,8 @@ TEST(unit_test_merge, gen_dest_full_all_src_inserted_given_src_flows_larger_spre
 }
 
 TEST(unit_test_merge, merge_accuracy_test_gen_dest_full_some_inserted_and_some_merged_and_some_fail_to_add_spreadsketch) {
-    int K = 100;
-    SpreadSketchZipfGenerator flow_generator(1.0, K); // exactly the number of cells, so there will be almost all(in case of hash collision happen) cells added successfully
+    int K = 10;
+    SpreadSketchZipfGenerator flow_generator(1.0, K * 10);
     struct fieldstat *instance_src = fieldstat_new();
     int cube_id = fieldstat_create_cube(instance_src, &TEST_SHARED_TAG, 1, SAMPLING_MODE_SPREADSKETCH, K);
     int metric_id = fieldstat_register_hll(instance_src, cube_id, "metric", 6);

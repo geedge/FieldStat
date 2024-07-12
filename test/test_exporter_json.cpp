@@ -283,6 +283,58 @@ TEST(export_test, cjson_export_on_one_cube_of_topk_sampling)
     fieldstat_free(instance);
 }
 
+extern "C" {
+    double fieldstat_hll_base64_to_count(char *buf);
+}
+TEST(export_test, cjson_export_on_one_cube_of_spreadsketch_sampling) {
+    int K = 10;
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_SPREADSKETCH, K);
+    int metric_id = fieldstat_register_hll(instance, cube_id, "metric", 7);
+    int metric_count = fieldstat_register_counter(instance, cube_id, "oper cnt");
+    SpreadSketchZipfGenerator flow_generator(1.0, K * 10);
+
+    for (int i = 0; i < 100000; i++) {
+        Flow flow = flow_generator.next();
+        Fieldstat_tag_list_wrapper dimension = Fieldstat_tag_list_wrapper("bigger fanouts", flow.src_ip.c_str());
+        Fieldstat_tag_list_wrapper item = Fieldstat_tag_list_wrapper("dummy", flow.dst_ip.c_str());
+        fieldstat_hll_add_field(instance, cube_id, metric_id, dimension.get_tag(), dimension.get_tag_count(), item.get_tag(), item.get_tag_count());
+        fieldstat_counter_incrby(instance, cube_id, metric_count, dimension.get_tag(), dimension.get_tag_count(), 1);
+    }
+    for (int i = 0; i < 100; i++) {
+        Flow flow = flow_generator.next();
+        Fieldstat_tag_list_wrapper dimension = Fieldstat_tag_list_wrapper("smaller fanouts", flow.src_ip.c_str());
+        Fieldstat_tag_list_wrapper item = Fieldstat_tag_list_wrapper("dummy", flow.dst_ip.c_str());
+        fieldstat_hll_add_field(instance, cube_id, metric_id, dimension.get_tag(), dimension.get_tag_count(), item.get_tag(), item.get_tag_count());
+        fieldstat_counter_incrby(instance, cube_id, metric_count, dimension.get_tag(), dimension.get_tag_count(), 1);
+    }
+
+    cJSON *root_arr = test_exporter_extract_results(instance);
+    int arr_num = cJSON_GetArraySize(root_arr);
+    EXPECT_EQ(arr_num, K);
+
+    for (int i = 0; i < arr_num; i++) {
+        cJSON *root = cJSON_GetArrayItem(root_arr, i);
+
+        // check tag
+        cJSON *tag = cJSON_GetObjectItem(root, "tags");
+        EXPECT_NE(tag, nullptr);
+        cJSON *tag_val = cJSON_GetObjectItem(tag, "bigger fanouts");
+        EXPECT_NE(tag_val, nullptr);
+
+        // check metrics
+        cJSON *metrics = cJSON_GetObjectItem(root, "fields");
+        EXPECT_NE(metrics, nullptr);
+        cJSON *metric = cJSON_GetObjectItem(metrics, "metric");
+        cJSON *metric_count = cJSON_GetObjectItem(metrics, "oper cnt");
+        double hll_value = fieldstat_hll_base64_to_count(metric->valuestring);
+        EXPECT_NEAR(hll_value, metric_count->valueint, metric_count->valueint * 0.2);
+    }
+
+    cJSON_Delete(root_arr);
+    fieldstat_free(instance);
+}
+
 TEST(export_test, empty_fieldstat_export_null) {
     struct fieldstat *instance = fieldstat_new();
     cJSON *root_arr = test_exporter_extract_results_with_standard_global(instance);
@@ -1060,8 +1112,9 @@ int main(int argc, char *argv[])
 {
     init_hll_standard_oper();
     init_histogram_standard_oper();
+
 	testing::InitGoogleTest(&argc, argv);
-    // testing::GTEST_FLAG(filter) = "export_test.cjson_export_on_one_cube_of_topk_sampling";
+    testing::GTEST_FLAG(filter) = "*spreadsketch_sampling";
 	int ret = RUN_ALL_TESTS();
 
     hyperloglog_free(g_hll_standard);

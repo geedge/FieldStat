@@ -331,6 +331,129 @@ TEST(Fuzz_test, many_instance_random_flow_unregister_calibrate_reset_fork_merge_
     }
 }
 
+TEST(Fuzz_test, many_instance_random_flow_unregister_calibrate_reset_fork_merge_spreadsketch)
+{
+    const int CUBE_NUM = 5;
+    const int INSTANCE_NUM = 10;
+    const int CELL_MAX = 50;
+    const int TEST_ROUND = 100000;
+    const int OUT_GAP = 10000;
+    struct fieldstat *master = fieldstat_new();
+    struct fieldstat *replica[INSTANCE_NUM];
+    struct fieldstat *dest = fieldstat_new();
+    
+    Fieldstat_tag_list_wrapper *shared_tags[CUBE_NUM];
+
+    // init cube
+    for (int i = 0; i < CUBE_NUM; i++) {
+        shared_tags[i] = new Fieldstat_tag_list_wrapper("shared_tag", i);
+        int cube_id = fieldstat_create_cube(master, shared_tags[i]->get_tag(), shared_tags[i]->get_tag_count(), SAMPLING_MODE_SPREADSKETCH, CELL_MAX);
+        EXPECT_EQ(cube_id, i);
+        fieldstat_register_hll(master, cube_id, "hll", 6);
+    }
+    
+    //init instance
+    for (int i = 0; i < INSTANCE_NUM; i++) {
+        replica[i] = fieldstat_fork(master);
+    }
+
+    SpreadSketchZipfGenerator generator(1.0, CELL_MAX * 10);
+    unordered_map<string, unordered_map<string, int>> count_map; // the first key is cube dimension, second key is cell dimension. value is the fanout(hll return value)
+
+    clock_t start = clock();
+    int next_shared_tag_value = CUBE_NUM;
+
+    for (int i = 0; i < TEST_ROUND; i++) {
+        if (i != 0 && i % OUT_GAP == 0) {
+            // merge
+            for (int j = 0; j < INSTANCE_NUM; j++) {
+                fieldstat_merge(dest, replica[j]);
+            }
+            for (int j = 0; j < INSTANCE_NUM; j++) {
+                fieldstat_reset(replica[j]);
+            }
+
+            // modify master and calibrate
+            int cube_id_to_change = rand() % CUBE_NUM;
+            Fieldstat_tag_list_wrapper *new_tag = new Fieldstat_tag_list_wrapper("shared_tag", next_shared_tag_value++);
+            delete shared_tags[cube_id_to_change];
+            shared_tags[cube_id_to_change] = new_tag;
+            fieldstat_destroy_cube(master, cube_id_to_change);
+            int cube_id_new = fieldstat_create_cube(master, new_tag->get_tag(), new_tag->get_tag_count(), SAMPLING_MODE_SPREADSKETCH, CELL_MAX);
+            fieldstat_register_hll(master, cube_id_new, "hll", 6);
+            EXPECT_EQ(cube_id_new, cube_id_to_change); // should new the cube in the hole leaved by the destroyed cube
+            // calibrate
+            for (int j = 0; j < INSTANCE_NUM; j++) {
+                fieldstat_calibrate(master, replica[j]);
+            }
+            
+            // let merge happens last(no add operation is missed)
+            if (i + OUT_GAP >= TEST_ROUND) {
+                break;
+            }
+        }
+
+        // add 
+        Flow flow = generator.next();
+
+        struct fieldstat *instance = replica[rand() % INSTANCE_NUM];
+        const Fieldstat_tag_list_wrapper cell_dimension("src_ip", flow.src_ip.c_str());
+        const Fieldstat_tag_list_wrapper item("dst_ip", flow.dst_ip.c_str());
+        int cube_id = rand() % CUBE_NUM;
+        const Fieldstat_tag_list_wrapper *shared_tag = shared_tags[cube_id];
+
+        int ret_add = fieldstat_hll_add_field(instance, cube_id, 0, cell_dimension.get_tag(), cell_dimension.get_tag_count(), item.get_tag(), item.get_tag_count());
+        if (ret_add == FS_ERR_TOO_MANY_CELLS) {
+            continue;
+        }
+        EXPECT_EQ(ret_add, FS_OK);
+        count_map[shared_tag->to_string()][cell_dimension.to_string()] += 1;
+    }
+
+    clock_t end = clock();
+    printf("time: %lf\n", (double)(end - start) / CLOCKS_PER_SEC);
+
+    for (int i = 0; i < CUBE_NUM; i++) {
+        delete shared_tags[i];
+    }
+
+    int *cube_ids;
+    int cube_num;
+    struct fieldstat *instance_in_focus = dest;
+    fieldstat_get_cubes(instance_in_focus, &cube_ids, &cube_num);
+    for (int i = 0; i < cube_num; i++) {
+        struct field_list *shared_tag_out = fieldstat_cube_get_tags(instance_in_focus, cube_ids[i]);
+
+        size_t cell_num;
+        struct field_list *cells;
+        fieldstat_cube_get_cells(instance_in_focus, cube_ids[i], &cells, &cell_num);
+
+        std::vector<struct Fieldstat_tag_list_wrapper *> test_result;
+        for (size_t j = 0; j < cell_num; j++) {
+            test_result.push_back(new Fieldstat_tag_list_wrapper(&cells[j]));
+        }
+
+        double accuracy = test_cal_topk_accuracy(test_result, count_map[Fieldstat_tag_list_wrapper(shared_tag_out).to_string()]);
+        EXPECT_GE(accuracy, 0.7);
+
+        for (size_t j = 0; j < cell_num; j++) {
+            delete test_result[j];
+        }
+
+        fieldstat_tag_list_arr_free(cells, cell_num);
+        fieldstat_tag_list_arr_free(shared_tag_out, 1);
+    }
+    free(cube_ids);
+
+    fieldstat_free(master);
+    fieldstat_free(dest);
+    for (int i = 0; i < INSTANCE_NUM; i++) {
+        fieldstat_free(replica[i]);
+    }
+}
+
+// issue： https://jira.geedge.net/browse/TSG-21192
+// 在reset后，所有项都是dying 状态，此时添加count = 0 的项，不能正常把dying pop掉，误以为sorted set 已满，出现添加失败（FS_ERR_TOO_MANY_CELLS）但是查不到任何cell 的情况。
 TEST(Fuzz_test, add_and_reset_with_randomly_generated_flows_and_randomly_chosen_metric)
 {
     const int FLOW_NUM = 50000;
@@ -391,7 +514,7 @@ TEST(Fuzz_test, simple_one_for_perf)
     // init cube
     for (int i = 0; i < CUBE_NUM; i++) {
         shared_tags[i] = new Fieldstat_tag_list_wrapper("shared_tag", i);
-        int cube_id = fieldstat_create_cube(master, shared_tags[i]->get_tag(), shared_tags[i]->get_tag_count(), SAMPLING_MODE_TOPK, CELL_MAX);
+        int cube_id = fieldstat_create_cube(master, shared_tags[i]->get_tag(), shared_tags[i]->get_tag_count(), SAMPLING_MODE_SPREADSKETCH, CELL_MAX);
         EXPECT_EQ(cube_id, i);
         fieldstat_register_counter(master, cube_id, "topk");
     }
@@ -437,8 +560,8 @@ TEST(Fuzz_test, simple_one_for_perf)
 int main(int argc, char *argv[]) 
 {
 	testing::InitGoogleTest(&argc, argv);
-    // testing::GTEST_FLAG(filter) = "Fuzz_test.add_and_reset_with_randomly_generated_flows_and_randomly_chosen_metric";
-    testing::GTEST_FLAG(filter) = "-Fuzz_test.simple_one_for_perf";
+    testing::GTEST_FLAG(filter) = "*spreadsketch";
+    // testing::GTEST_FLAG(filter) = "-Fuzz_test.simple_one_for_perf";
 
 	return RUN_ALL_TESTS();
 }
