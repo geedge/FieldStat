@@ -14,7 +14,7 @@ struct fieldstat *test_init_standard_instance_one_cube_one_metric_one_cell_hll(b
     int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
     EXPECT_EQ(cube_id, 0);
 
-    int metric_id = fieldstat_register_hll(instance, "czz_test hll metric", 10);
+    int metric_id = fieldstat_register_hll(instance, cube_id, "czz_test hll metric", 10);
     EXPECT_EQ(metric_id, 0);
 
     return instance;
@@ -29,7 +29,7 @@ void test_assert_standard_instance(const struct fieldstat *instance)
     int ret_cell_id = ret_cube_id_arr[0];
     free(ret_cube_id_arr);
     EXPECT_EQ(ret_cell_id, 0);
-    const char *name = fieldstat_get_metric_name(instance, 0);
+    const char *name = fieldstat_get_metric_name(instance, ret_cell_id, 0);
     EXPECT_STREQ(name, "czz_test hll metric");
 
     struct field_list *tag_list = NULL;
@@ -212,7 +212,7 @@ TEST(metric_test_hll, add_with_wrong_metric_id_expecting_fail)
 {
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_create_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
-    int metric_id = fieldstat_register_hll(instance, "czz_test hll metric", 10);
+    int metric_id = fieldstat_register_hll(instance, cube_id, "czz_test hll metric", 10);
 
     int ret = fieldstat_hll_add(instance, cube_id, metric_id + 1, &TEST_TAG_INT, 1, "hello", 5);
     EXPECT_EQ(ret, FS_ERR_INVALID_METRIC_ID);
@@ -227,7 +227,7 @@ TEST(metric_test_hll, spread_sketch_add_and_test_accuracy)
     struct fieldstat *instance = fieldstat_new();
     int K = 10;
     fieldstat_create_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_SPREADSKETCH, K);
-    fieldstat_register_hll(instance, "testss", 6);
+    fieldstat_register_hll(instance, 0, "testss", 6);
 
     int n_flows = 100000;
     std::unordered_map<std::string, std::unordered_set<std::string>> flow_cnt;

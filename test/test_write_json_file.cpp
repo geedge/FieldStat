@@ -71,7 +71,7 @@ static void write_hll(struct fieldstat *instance) {
 
     for(unsigned int i = 0; i < sizeof(hll_name) / sizeof(hll_name[0]); i++)
     {
-        int hll_id  = fieldstat_register_hll(instance, hll_name[i], 5);
+        int hll_id  = fieldstat_register_hll(instance, cube_id, hll_name[i], 5);
 
         for(int j = 0; j < 100; j++)
         {
@@ -112,7 +112,7 @@ void write_histogram(struct fieldstat *instance) {
 
     for(unsigned int i = 0; i < sizeof(hist_names)/sizeof(hist_names[0]); i++)
     {
-        int hist_id = fieldstat_register_hist(instance, hist_names[i], 1, 600000, 3);
+        int hist_id = fieldstat_register_hist(instance, cube_id, hist_names[i], 1, 600000, 3);
 
         for(int j = 0; j < 100; j++)
         {
@@ -188,9 +188,9 @@ void write_table(struct fieldstat *instance) {
     int cube_id = fieldstat_create_cube(instance, shared_tags, 2, 
                                           SAMPLING_MODE_COMPREHENSIVE, 100);
 
-    int counter_id_0 = fieldstat_register_counter(instance, "T_success_log");
+    int counter_id_0 = fieldstat_register_counter(instance, cube_id, "T_success_log");
 
-    int counter_id_1 = fieldstat_register_counter(instance, "T_fail_log");
+    int counter_id_1 = fieldstat_register_counter(instance, cube_id, "T_fail_log");
 
     for(unsigned int i = 0; i < sizeof(cell_tag_value)/sizeof(cell_tag_value[0]); i++)
     {

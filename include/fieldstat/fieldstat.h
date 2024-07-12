@@ -90,14 +90,14 @@ int fieldstat_destroy_cube(struct fieldstat *instance, int cube_id);
     * @param metric_name: name of the metric. Cannot be NULL. Must be unique.
     * @return metric id>=0 if success. If failed, return FS_ERR_NULL_HANDLER, FS_ERR_INVALID_KEY(when metric_name is not unique in this cube)
 */
-int fieldstat_register_counter(struct fieldstat *instance, const char *metric_name);
+int fieldstat_register_counter(struct fieldstat *instance, int cube_id, const char *metric_name);
 
 /*
     * @brief refer to fieldstat_register_counter.
     * @param precision: the bigger, the larger memory consumption, while accuracy improved. Must be in [4, 18].
     * @return metric id if success. If failed, return FS_ERR_NULL_HANDLER, FS_ERR_INVALID_KEY(when metric_name is not unique in this cube), or FS_ERR_INVALID_PARAM(if precision not in range)
 */
-int fieldstat_register_hll(struct fieldstat *instance, const char *metric_name, unsigned char precision);
+int fieldstat_register_hll(struct fieldstat *instance, int cube_id, const char *metric_name, unsigned char precision);
 
 /*
     * @brief refer to fieldstat_register_counter.
@@ -106,7 +106,7 @@ int fieldstat_register_hll(struct fieldstat *instance, const char *metric_name, 
     * @param significant_figures: the precision of the histogram. Must be in [1, 5].
         * @return metric id if success. If failed, return FS_ERR_NULL_HANDLER, FS_ERR_INVALID_KEY(when metric_name is not unique in this cube), or FS_ERR_INVALID_PARAM(if any of the 3 params are out of range)
 */
-int fieldstat_register_hist(struct fieldstat *instance, const char *metric_name, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures);
+int fieldstat_register_hist(struct fieldstat *instance, int cube_id, const char *metric_name, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures);
 
 /*
     * @brief let the value of counter metric of cell_id increase by `increment`.
@@ -180,15 +180,15 @@ void fieldstat_get_cubes(const struct fieldstat *instance, int **cube_ids, int *
 /*
     * @brief Get all the registered metrics by fieldstat_register_counter, fieldstat_register_hll, fieldstat_register_hist.
 */
-void fieldstat_get_metrics(const struct fieldstat *instance, int **metric_id_out, size_t *n_metric);
+void fieldstat_cube_get_metrics(const struct fieldstat *instance, int cube_id, int **metric_id_out, size_t *n_metric);
 
 void fieldstat_get_metric_in_cell(const struct fieldstat *instance, int cube_id, const struct field_list *cell_dimensions, int **metric_id_out, size_t *n_metric_out);
 
 // query the name of the metric, return NULL if metric_id is invalid.
-const char *fieldstat_get_metric_name(const struct fieldstat *instance, int metric_id);
+const char *fieldstat_get_metric_name(const struct fieldstat *instance, int cube_id, int metric_id);
 
 // query the type of the metric. return (enum metric_type)-1 if metric_id is invalid.
-enum metric_type fieldstat_get_metric_type(const struct fieldstat *instance, int metric_id);
+enum metric_type fieldstat_get_metric_type(const struct fieldstat *instance, int cube_id, int metric_id);
 
 /*
     get the cell_dimensions added to cube when calling fieldstat_counter_incrby, fieldstat_counter_set, fieldstat_hll_add, fieldstat_hist_record.

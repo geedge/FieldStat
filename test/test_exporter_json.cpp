@@ -168,8 +168,8 @@ void topk_init(struct fieldstat *instance, unsigned int test_expected_big_count)
 {
     const char *metric_name[TEST_METRIC_NUM] = {"topk1", "topk2"};
     int cube_id = fieldstat_create_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_TOPK, TEST_TOPK_STANDARD_K);
-    int m1 = fieldstat_register_counter(instance, metric_name[0]);
-    int m2 = fieldstat_register_counter(instance, metric_name[1]);
+    int m1 = fieldstat_register_counter(instance, cube_id, metric_name[0]);
+    int m2 = fieldstat_register_counter(instance, cube_id, metric_name[1]);
 
     std::function<void(Fieldstat_tag_list_wrapper *, unsigned int *)> topk_add = 
         [instance, cube_id, m1, m2](const Fieldstat_tag_list_wrapper *my_tags, unsigned int counts[TEST_METRIC_NUM]) {
@@ -187,9 +187,9 @@ TEST(export_test, cjson_export_with_fixed_tag_and_many_metrics_on_one_cube_of_co
     // new instance
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_create_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, tag_list_num);
-    int id_counter = fieldstat_register_counter(instance, "counter");
-    int id_gauge = fieldstat_register_hll(instance, "gauge", g_hll_standard->cfg.precision);
-    int id_histogram = fieldstat_register_hist(instance, "histogram",
+    int id_counter = fieldstat_register_counter(instance, cube_id, "counter");
+    int id_gauge = fieldstat_register_hll(instance, cube_id, "gauge", g_hll_standard->cfg.precision);
+    int id_histogram = fieldstat_register_hist(instance, cube_id, "histogram",
         g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
 
     Fieldstat_tag_list_wrapper *fields[tag_list_num];
@@ -294,10 +294,10 @@ TEST(export_test, only_registered_but_not_added_export_null_with_global_tag)
 {
     struct fieldstat *instance = fieldstat_new();
 
-    fieldstat_create_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
-    fieldstat_register_counter(instance, "counter");
-    fieldstat_register_hll(instance, "gauge", g_hll_standard->cfg.precision);
-    fieldstat_register_hist(instance, "histogram",
+    int cube_id = fieldstat_create_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
+    fieldstat_register_counter(instance, cube_id, "counter");
+    fieldstat_register_hll(instance, cube_id, "gauge", g_hll_standard->cfg.precision);
+    fieldstat_register_hist(instance, cube_id, "histogram",
         g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
 
     // add global field
@@ -313,9 +313,9 @@ TEST(export_test, skip_two_empty_cube_and_export_last_one_with_global_tag)
     (void)fieldstat_create_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
     (void)fieldstat_create_cube(instance, TEST_TAG_SHARED2, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
     int cube_id_3 = fieldstat_create_cube(instance, TEST_TAG_SHARED3, 1, SAMPLING_MODE_COMPREHENSIVE, 3);
-    (void)fieldstat_register_counter(instance, "counter");
-    (void)fieldstat_register_hll(instance, "gauge", g_hll_standard->cfg.precision);
-    int id_histogram = fieldstat_register_hist(instance, "histogram",
+    (void)fieldstat_register_counter(instance, cube_id_3, "counter");
+    (void)fieldstat_register_hll(instance, cube_id_3, "gauge", g_hll_standard->cfg.precision);
+    int id_histogram = fieldstat_register_hist(instance, cube_id_3, "histogram",
         g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
 
     const int tag_num = 1;
@@ -361,10 +361,10 @@ TEST(export_test, skip_empty_metrics_given_cube_deleted) {
     int cube_id_del = fieldstat_create_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
     int cube_id = fieldstat_create_cube(instance, TEST_TAG_SHARED2, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
     fieldstat_destroy_cube(instance, cube_id_del);
-    (void)fieldstat_register_counter(instance, "counter");
-    (void)fieldstat_register_counter(instance, "counter2");
-    int metric_id = fieldstat_register_counter(instance, "counter3");
-    (void)fieldstat_register_counter(instance, "counter4");
+    (void)fieldstat_register_counter(instance, cube_id, "counter");
+    (void)fieldstat_register_counter(instance, cube_id, "counter2");
+    int metric_id = fieldstat_register_counter(instance, cube_id, "counter3");
+    (void)fieldstat_register_counter(instance, cube_id, "counter4");
 
     const int tag_num = 1;
     Fieldstat_tag_list_wrapper *fields[tag_num];
@@ -408,7 +408,7 @@ TEST(export_test, enable_delta_and_export_twice_without_new_metric)
 {
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_create_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 10);
-    int id_counter = fieldstat_register_counter(instance, "counter");
+    int id_counter = fieldstat_register_counter(instance, cube_id, "counter");
     fieldstat_counter_incrby(instance, cube_id, id_counter, &TEST_TAG_INT, 1, 1);
 
     // export test
@@ -477,8 +477,8 @@ TEST(export_test, enable_delta_and_export_twice_with_new_metric_and_omit_histogr
 {
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_create_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 10);
-    int id_counter = fieldstat_register_counter(instance, "counter");
-    int id_histogram = fieldstat_register_hist(instance, "histogram",
+    int id_counter = fieldstat_register_counter(instance, cube_id, "counter");
+    int id_histogram = fieldstat_register_hist(instance, cube_id, "histogram",
         g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
     fieldstat_counter_incrby(instance, cube_id, id_counter, &TEST_TAG_INT, 1, 1);
     fieldstat_hist_record(instance, cube_id, id_histogram, &TEST_TAG_INT, 1, 123);
@@ -516,7 +516,7 @@ TEST(export_test, enable_delta_and_export_twice_with_new_metric_and_omit_histogr
 
     struct timeval new_ts = TEST_TIMEVAL;
     new_ts.tv_sec += 1;
-    int id_counter2 = fieldstat_register_counter(instance, "counter2");
+    int id_counter2 = fieldstat_register_counter(instance, cube_id, "counter2");
     fieldstat_counter_incrby(instance, cube_id, id_counter2, &TEST_TAG_INT, 1, 1);
     fieldstat_counter_incrby(instance, cube_id, id_counter, &TEST_TAG_INT, 1, 10);
 
@@ -559,8 +559,8 @@ TEST(export_test, enable_delta_and_export_three_times_skipping_cube_with_no_coun
 {
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_create_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 10);
-    int id_counter = fieldstat_register_counter(instance, "counter");
-    int id_histogram = fieldstat_register_hist(instance, "histogram",
+    int id_counter = fieldstat_register_counter(instance, cube_id, "counter");
+    int id_histogram = fieldstat_register_hist(instance, cube_id, "histogram",
         g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
     fieldstat_counter_incrby(instance, cube_id, id_counter, &TEST_TAG_INT, 1, 1);
     fieldstat_hist_record(instance, cube_id, id_histogram, &TEST_TAG_STRING, 1, 123);
@@ -668,13 +668,14 @@ TEST(export_test, enable_delta_and_export_instance_with_many_cells_with_global_t
 {
     struct fieldstat *instance = fieldstat_new();
     int cube_id1 = fieldstat_create_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 10);
-    int id_counter1 = fieldstat_register_counter(instance, "counter");
+    int id_counter1 = fieldstat_register_counter(instance, cube_id1, "counter");
     fieldstat_counter_incrby(instance, cube_id1, id_counter1, &TEST_TAG_INT, 1, 11);
     fieldstat_counter_incrby(instance, cube_id1, id_counter1, &TEST_TAG_STRING, 1, 12);
 
     int cube_id2 = fieldstat_create_cube(instance, TEST_TAG_SHARED3, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
-    fieldstat_counter_incrby(instance, cube_id2, id_counter1, &TEST_TAG_INT, 1, 21);
-    fieldstat_counter_incrby(instance, cube_id2, id_counter1, &TEST_TAG_DOUBLE, 1, 22);
+    int id_counter2 = fieldstat_register_counter(instance, cube_id2, "counter");
+    fieldstat_counter_incrby(instance, cube_id2, id_counter2, &TEST_TAG_INT, 1, 21);
+    fieldstat_counter_incrby(instance, cube_id2, id_counter2, &TEST_TAG_DOUBLE, 1, 22);
 
     // export test
     struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new();
@@ -753,7 +754,7 @@ void test_reset_one_round(std::function<void(struct fieldstat *, struct fieldsta
 {
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 1);
-    int id_counter = fieldstat_register_counter(instance, "counter");
+    int id_counter = fieldstat_register_counter(instance, cube_id, "counter");
     fieldstat_counter_incrby(instance, cube_id, id_counter, &TEST_TAG_INT, 1, 11);
 
     // export test
@@ -779,6 +780,7 @@ void test_reset_one_round(std::function<void(struct fieldstat *, struct fieldsta
     fieldstat_counter_set(instance, cube_id, id_counter, &TEST_TAG_INT, 1, 123);
 
     json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, instance, &TEST_TIMEVAL);
+    printf("test_reset_one_round :\n%s\n", json_string);
     root_arr = cJSON_Parse(json_string);
     free(json_string);
 
@@ -817,6 +819,7 @@ TEST(export_test, enable_delta_and_reset_on_delete_cube) {
     auto trigger = [](struct fieldstat *instance, struct fieldstat_json_exporter *fieldstat_json_exporter) {
         fieldstat_destroy_cube(instance, 0);
         fieldstat_create_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
+        fieldstat_register_counter(instance, 0, "counter");
     };
 
     test_reset_one_round(trigger);
@@ -825,11 +828,11 @@ TEST(export_test, enable_delta_and_reset_on_delete_cube) {
 TEST(export_test, delta_with_two_instance_same_config)
 {
     struct fieldstat *instance = fieldstat_new();
-    fieldstat_create_cube(instance, NULL, 0, SAMPLING_MODE_COMPREHENSIVE, 0);
-    int id_counter = fieldstat_register_counter(instance, "counter");
+    int cube_id = fieldstat_create_cube(instance, NULL, 0, SAMPLING_MODE_COMPREHENSIVE, 0);
+    int id_counter = fieldstat_register_counter(instance, cube_id, "counter");
     fieldstat_counter_incrby(instance, 0, id_counter, &TEST_TAG_INT, 1, 123);
-    int id_hist = fieldstat_register_hist(instance, "histogram", 1, 1000, 3);
-    fieldstat_hist_record(instance, 0, id_hist, &TEST_TAG_INT, 1, 5);
+    int id_hist = fieldstat_register_hist(instance, cube_id, "histogram", 1, 1000, 3);
+    fieldstat_hist_record(instance, cube_id, id_hist, &TEST_TAG_INT, 1, 5);
     
     struct fieldstat *acc = fieldstat_new();
     fieldstat_merge(acc, instance);
@@ -865,10 +868,10 @@ TEST(export_test, delta_with_two_instance_same_config)
 TEST(export_test, delta_with_two_instance_one_empty)
 {
     struct fieldstat *instance = fieldstat_new();
-    fieldstat_create_cube(instance, NULL, 0, SAMPLING_MODE_COMPREHENSIVE, 0);
-    int id_counter = fieldstat_register_counter(instance, "counter");
+    int cube_id = fieldstat_create_cube(instance, NULL, 0, SAMPLING_MODE_COMPREHENSIVE, 0);
+    int id_counter = fieldstat_register_counter(instance, cube_id, "counter");
     fieldstat_counter_incrby(instance, 0, id_counter, &TEST_TAG_INT, 1, 123);
-    int id_hist = fieldstat_register_hist(instance, "histogram", 1, 1000, 3);
+    int id_hist = fieldstat_register_hist(instance, cube_id, "histogram", 1, 1000, 3);
     fieldstat_hist_record(instance, 0, id_hist, &TEST_TAG_INT, 1, 5);
     
     struct fieldstat *delta = fieldstat_fork(instance);
@@ -876,7 +879,6 @@ TEST(export_test, delta_with_two_instance_one_empty)
     // export test
     struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new();
     char *json = fieldstat_json_exporter_export_with_delta(fieldstat_json_exporter, instance, delta, &TEST_TIMEVAL, &TEST_TIMEVAL);
-    printf("delta_with_two_instance_one_empty :\n%s\n", json);
     cJSON *root_arr = cJSON_Parse(json);
     free(json);
 
@@ -906,7 +908,7 @@ TEST(export_test, delta_with_two_instance_different_cell)
 {
     struct fieldstat *instance = fieldstat_new();
     fieldstat_create_cube(instance, NULL, 0, SAMPLING_MODE_COMPREHENSIVE, 0);
-    int id_counter = fieldstat_register_counter(instance, "counter");
+    int id_counter = fieldstat_register_counter(instance, 0, "counter");
     fieldstat_counter_incrby(instance, 0, id_counter, &TEST_TAG_INT, 1, 123);
 
     struct fieldstat *delta = fieldstat_fork(instance);

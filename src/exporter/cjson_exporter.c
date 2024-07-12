@@ -524,16 +524,17 @@ int cell_iter_next(struct cell_iter *iter) {
 /* -------------------------------------------------------------------------- */
 
 struct export_kv_pair *cell_query_with_iter(const struct cell_iter *iter, int metric_id) {
-    enum metric_type type = fieldstat_get_metric_type(iter->instance, metric_id);
+    int cube_id = iter->cube_ids[iter->curr_cube_idx];
+    enum metric_type type = fieldstat_get_metric_type(iter->instance, cube_id, metric_id);
     struct export_kv_pair *ret = NULL;
     if (type == METRIC_TYPE_COUNTER) {
         long long value;
-        int tmp_ret = fieldstat_counter_get(iter->instance, iter->cube_ids[iter->curr_cube_idx], &iter->tag_list[iter->curr_cell_idx], metric_id, &value);
+        int tmp_ret = fieldstat_counter_get(iter->instance, cube_id, &iter->tag_list[iter->curr_cell_idx], metric_id, &value);
         if (tmp_ret < 0) {
             return NULL;
         }
         ret = malloc(sizeof(struct export_kv_pair));
-        ret->key = strdup(fieldstat_get_metric_name(iter->instance, metric_id));
+        ret->key = strdup(fieldstat_get_metric_name(iter->instance, cube_id, metric_id));
         ret->type = TAG_INTEGER;
         ret->value_longlong = value;
         return ret;
@@ -541,12 +542,12 @@ struct export_kv_pair *cell_query_with_iter(const struct cell_iter *iter, int me
     if (type == METRIC_TYPE_HLL || type == METRIC_TYPE_HISTOGRAM) {
         char *value;
         size_t len;
-        fieldstat_get_serialized_blob(iter->instance, iter->cube_ids[iter->curr_cube_idx], metric_id, &iter->tag_list[iter->curr_cell_idx], &value, &len);
+        fieldstat_get_serialized_blob(iter->instance, cube_id, metric_id, &iter->tag_list[iter->curr_cell_idx], &value, &len);
         if (value == NULL) {
             return NULL;
         }
         ret = malloc(sizeof(struct export_kv_pair));
-        ret->key = strdup(fieldstat_get_metric_name(iter->instance, metric_id));
+        ret->key = strdup(fieldstat_get_metric_name(iter->instance, cube_id, metric_id));
         ret->type = TAG_CSTRING;
         ret->value_str = value;
         return ret;

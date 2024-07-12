@@ -26,7 +26,7 @@ TEST(test_empty_tag, add_many_times)
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_create_cube(instance, NULL, 0, SAMPLING_MODE_COMPREHENSIVE, 1);
 
-    int metric_id = fieldstat_register_counter(instance, "metric");
+    int metric_id = fieldstat_register_counter(instance, cube_id, "metric");
     fieldstat_counter_incrby(instance, cube_id, metric_id, NULL, 0, 1);
     fieldstat_counter_incrby(instance, cube_id, metric_id, NULL, 0, 1);
 
@@ -39,7 +39,7 @@ struct fieldstat *test_empty_my_init(enum sampling_mode mode = SAMPLING_MODE_COM
 {
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_create_cube(instance, NULL, 0, mode, 1);
-    int metric_id = fieldstat_register_counter(instance, "metric");
+    int metric_id = fieldstat_register_counter(instance, cube_id, "metric");
     fieldstat_counter_incrby(instance, cube_id, metric_id, NULL, 0, 1);
 
     return instance;
@@ -98,7 +98,7 @@ TEST(test_empty_tag, merge_spreadsketch)
 {
     struct fieldstat *instance_src = fieldstat_new();
     int cube_id = fieldstat_create_cube(instance_src, NULL, 0, SAMPLING_MODE_SPREADSKETCH, 1);
-    int metric_id = fieldstat_register_hll(instance_src, "metric", 4);
+    int metric_id = fieldstat_register_hll(instance_src, cube_id, "metric", 4);
     fieldstat_hll_add(instance_src, cube_id, metric_id, NULL, 0, "1", 1);
     struct fieldstat *instance_dst = fieldstat_new();
 

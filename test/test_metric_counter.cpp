@@ -13,7 +13,7 @@ struct fieldstat *test_init_standard_instance()
     int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
     EXPECT_EQ(cube_id, 0);
 
-    int metric_id = fieldstat_register_counter(instance, "czz_test counter metric");
+    int metric_id = fieldstat_register_counter(instance, cube_id, "czz_test counter metric");
     EXPECT_EQ(metric_id, 0);
 
     return instance;
@@ -35,7 +35,7 @@ void test_assert_standard_instance(const struct fieldstat *instance)
     int ret_cell_id = ret_cube_id_arr[0];
     free(ret_cube_id_arr);
     EXPECT_EQ(ret_cell_id, 0);
-    const char *name = fieldstat_get_metric_name(instance, 0);
+    const char *name = fieldstat_get_metric_name(instance, ret_cell_id, 0);
     EXPECT_STREQ(name, "czz_test counter metric");
 
     struct field_list *tag_list = NULL;
@@ -111,7 +111,7 @@ TEST(metric_test_counter, topk_add_and_test_accuracy)
 {
     struct fieldstat *instance = fieldstat_new();
     fieldstat_create_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_TOPK, 10);
-    fieldstat_register_counter(instance, "test");
+    fieldstat_register_counter(instance, 0, "test");
 
     int tag_list_num = 10000;
     Fieldstat_tag_list_wrapper *fields[tag_list_num];
@@ -179,7 +179,7 @@ TEST(metric_test_counter, add_with_wrong_metric_id_expecting_fail)
 {
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_create_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_TOPK, 10);
-    int metric_id = fieldstat_register_counter(instance, "test");
+    int metric_id = fieldstat_register_counter(instance, 0, "test");
 
     int ret = fieldstat_counter_incrby(instance, cube_id, metric_id + 1, &TEST_TAG_INT, 1, 1);
     EXPECT_EQ(ret, FS_ERR_INVALID_METRIC_ID);
@@ -193,8 +193,8 @@ TEST(metric_test_counter, add_and_query_on_dummy_cell_of_topk)
 {
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 10);
-    fieldstat_register_counter(instance, "primary"); // also the dummy one
-    int metric_id = fieldstat_register_counter(instance, "using");
+    fieldstat_register_counter(instance, cube_id, "primary"); // also the dummy one
+    int metric_id = fieldstat_register_counter(instance, cube_id, "using");
 
     fieldstat_counter_incrby(instance, cube_id, metric_id, &TEST_TAG_INT, 1, 1);
 
@@ -216,8 +216,8 @@ TEST(metric_test_counter, primary_counter_add_after_first)
 {
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 10);
-    int metric_id_primary = fieldstat_register_counter(instance, "primary");
-    int metric_id2 = fieldstat_register_counter(instance, "using");
+    int metric_id_primary = fieldstat_register_counter(instance, cube_id, "primary");
+    int metric_id2 = fieldstat_register_counter(instance, cube_id, "using");
     fieldstat_cube_set_primary_metric(instance, cube_id, metric_id_primary);
 
 
