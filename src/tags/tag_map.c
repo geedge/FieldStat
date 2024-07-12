@@ -18,7 +18,7 @@ struct tag_exdata_item {
     UT_hash_handle hh;
 };
 
-struct hash_table {
+struct hash_table { // todo: 文件改名字
     struct tag_exdata_item *tag_id_map;
     int current_cell_num;
     int max_cell_num;

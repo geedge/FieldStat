@@ -26,7 +26,7 @@ enum metric_type
 
 enum field_type
 {
-	TAG_INTEGER,
+	TAG_INTEGER, // TODO: rename
 	TAG_DOUBLE,
 	TAG_CSTRING,
 };
@@ -34,7 +34,7 @@ enum field_type
 enum sampling_mode {
     SAMPLING_MODE_COMPREHENSIVE,
     SAMPLING_MODE_TOPK,
-    SAMPLING_MODE_SPREADSKETCH,
+    SAMPLING_MODE_SPREADSKETCH, // TODO: rename TOP_CARDINALITY // todo: 问问gpt cardinality，unique....
 };
 
 struct field {
@@ -146,7 +146,7 @@ int fieldstat_hll_add_field(struct fieldstat *instance, int cube_id, int metric_
     * @return FS_OK if success. FS_ERR_NULL_HANDLER, FS_ERR_INVALID_CUBE_ID, FS_ERR_INVALID_METRIC_ID if fail.
     *         FS_ERR_INVALID_PARAM when value is less than 0, or the cube is topk.
 */
-int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id, const struct field *cell_dimensions, size_t n_dimensions, long long value);
+int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id, const struct field *cell_dimensions, size_t n_dimensions, long long value); // todo: 重命名,hist，不管符号冲突问题了
 
 /*
     * @brief Delete all the cells, also the content of every metrics. The cube and metrics are not deleted. Increase cell_version by 1.

@@ -11,23 +11,7 @@
 #include "spread_sketch.h"
 #include "exdata.h"
 
-/*
-方案1，smart ptr。
-省内存，更符合对cell manager 类结构的期待。
-额外增加一个额外的管理smart ptr的结构体。不过，总体来说修改量不算大，比如merge和add操作基本保持原样，仅仅是对key 的malloc 和free 做修改。
-对dummy 特殊情况的支持更容易。
-
-根据测试结果，如果是每次reset bucket 的时候都重置，误差都仅仅是微微增加，如果是每次所有sketch中的key 都失去索引才删除，这个影响只会更小。可以用。
-*/
-
-/*
-方案2，把exdata 放入bucket 里，每个bucket一份。
-
-可以保留spread sketch 的风味，不会引入新的误差。
-根据实验情况，大概会多占用一半的内存，因为根据测试的经验，保存的key 总量是bucket 总数的2/3左右。哈希表本身的HH handle 也占内存，这部分反而可以节约回去。
-会让cell 的操作变得麻烦，无法借用老的cell manager 流程，get exdata 会得到一个exdata 的数组（可能多个），而非单独的一个，要对多个cell综合起来当一个cell 看。。修改量非常小，但是确实会影响代码本身的整洁度。
-
-*/
+// todo：把primary metric 记到sketch 里，且使用特殊的st Hyperloglog
 
 struct entry {
     int ref_count;

@@ -25,25 +25,25 @@ struct exdata_new_args {
 };
 
 struct cube_manager {
-    struct cube *hash_table;
+    struct cube *hash_table; // the key of cube is serialized cube dimensions
     
-    struct cube **cube;
-    size_t cube_cnt;
-    size_t cube_size;
+    struct cube **cube_slots;
+    size_t next_index; // next_index
+    size_t slots_number;
 };
 
 struct cell {
-    struct metric **metrics;
-    size_t metrics_len;
-    size_t max_n_metric;
+    struct metric **slots;
+    size_t next_index; //index of next available slot
+    size_t slots_number;
     struct field_list cell_dimensions;
 };
 
 struct cube {
     enum sampling_mode sampling_mode;
     union {
-        struct heavy_keeper *topk;
-        struct hash_table *comprehensive;
+        struct heavy_keeper *heavykeeper; // todo: 这两个改了
+        struct hash_table *table; // todo: 
         struct spread_sketch *spread_sketch;
     };
     size_t max_n_cell;
@@ -53,8 +53,8 @@ struct cube {
     size_t n_dimensions;
 
     int primary_metric_id;
-    char *key;     // the key of cube is the combination of cube_dimensions
-    size_t key_len;
+    char *serialized_dimensions;     // the key of cube is serialized cube dimensions
+    size_t serialized_dimensions_len; // todo: 重命名
     int id;
     UT_hash_handle hh;
 };
@@ -99,18 +99,18 @@ static void fieldstat_free_tag_array(struct field *fields, size_t n_tags)
 
 void add_cube_to_position(struct cube_manager *pthis, struct cube *cube, int id)
 {
-    if (id >= pthis->cube_size) {
-        struct cube **old_cube_arr = pthis->cube;
-        pthis->cube = calloc(pthis->cube_size * 2, sizeof(struct cube *));
-        memcpy(pthis->cube, old_cube_arr, sizeof(struct cube *) * pthis->cube_size);
+    if (id >= pthis->slots_number) {
+        struct cube **old_cube_arr = pthis->cube_slots;
+        pthis->cube_slots = calloc(pthis->slots_number * 2, sizeof(struct cube *));
+        memcpy(pthis->cube_slots, old_cube_arr, sizeof(struct cube *) * pthis->slots_number);
         free(old_cube_arr);
 
-        pthis->cube_size *= 2;
+        pthis->slots_number *= 2;
     }
-    pthis->cube[id] = cube;
+    pthis->cube_slots[id] = cube;
 
-    if (id >= pthis->cube_cnt) {
-        pthis->cube_cnt = id + 1;
+    if (id >= pthis->next_index) {
+        pthis->next_index = id + 1;
     }
 }
 
@@ -123,7 +123,7 @@ void cube_manager_free(struct cube_manager *pthis) {
         cube_free(node);
     }
     
-    free(pthis->cube);
+    free(pthis->cube_slots);
     free(pthis);
 }
 
@@ -131,9 +131,9 @@ struct cube_manager *cube_manager_new() {
     struct cube_manager *pthis = (struct cube_manager *)malloc(sizeof(struct cube_manager));
     pthis->hash_table = NULL;
 
-    pthis->cube = (struct cube **)calloc(DEFAULT_N_CUBE, sizeof(struct cube *));
-    pthis->cube_cnt = 0;
-    pthis->cube_size = DEFAULT_N_CUBE;
+    pthis->cube_slots = (struct cube **)calloc(DEFAULT_N_CUBE, sizeof(struct cube *));
+    pthis->next_index = 0;
+    pthis->slots_number = DEFAULT_N_CUBE;
     return pthis;
 }
 
@@ -256,8 +256,8 @@ static void field_array_to_key_endeavor(const struct field fields[], size_t n_ta
 
 int cube_manager_add(struct cube_manager *pthis, struct cube *cube)
 {
-    char *key = cube->key;
-    size_t key_len = cube->key_len;
+    char *key = cube->serialized_dimensions;
+    size_t key_len = cube->serialized_dimensions_len;
 
     struct cube *old_cube = NULL;
     HASH_FIND(hh, pthis->hash_table, key, key_len, old_cube);
@@ -266,14 +266,14 @@ int cube_manager_add(struct cube_manager *pthis, struct cube *cube)
     }
 
     int id = 0;
-    for ( ;id < pthis->cube_cnt; id++) {
-        if (pthis->cube[id] == NULL) {
+    for ( ;id < pthis->next_index; id++) {
+        if (pthis->cube_slots[id] == NULL) {
             break;
         }
     }
 
     cube->id = id;
-    HASH_ADD_KEYPTR(hh, pthis->hash_table, cube->key, key_len, cube);
+    HASH_ADD_KEYPTR(hh, pthis->hash_table, cube->serialized_dimensions, key_len, cube);
 
     add_cube_to_position(pthis, cube, id);
 
@@ -294,9 +294,9 @@ void cube_manager_delete(struct cube_manager *pthis, struct cube *cube)
     HASH_DEL(pthis->hash_table, cube);
 
     cube_free(cube);
-    pthis->cube[id] = NULL;
-    if (id == pthis->cube_cnt - 1) {
-        pthis->cube_cnt--;
+    pthis->cube_slots[id] = NULL;
+    if (id == pthis->next_index - 1) {
+        pthis->next_index--;
     }
 }
 
@@ -328,18 +328,18 @@ int cube_manager_find(const struct cube_manager *pthis, const struct field *cube
 }
 
 struct cube *cube_manager_get_cube_by_id(const struct cube_manager *manager, int cube_id) {
-    if (cube_id < 0 || cube_id >= manager->cube_size) {
+    if (cube_id < 0 || cube_id >= manager->slots_number) {
         return NULL;
     }
-    return manager->cube[cube_id];
+    return manager->cube_slots[cube_id];
 }
 
 void cube_manager_list(const struct cube_manager *pthis, int **cube_ids, int *n_cube) {
     int all_available_cube_count = 0;
 
-    int *tmp_ids = (int *)malloc(sizeof(int) * pthis->cube_cnt);
-    for (int i = 0; i < pthis->cube_cnt; i++) {
-        if (pthis->cube[i] != NULL) {
+    int *tmp_ids = (int *)malloc(sizeof(int) * pthis->next_index);
+    for (int i = 0; i < pthis->next_index; i++) {
+        if (pthis->cube_slots[i] != NULL) {
             tmp_ids[all_available_cube_count++] = i;
         }
     }
@@ -360,7 +360,7 @@ void cube_manager_calibrate(struct cube_manager *pthis, const struct cube_manage
 
     
     HASH_ITER(hh, pthis->hash_table, node_in_dest, tmp) {
-        HASH_FIND(hh, master->hash_table, node_in_dest->key, node_in_dest->key_len, node_in_master);
+        HASH_FIND(hh, master->hash_table, node_in_dest->serialized_dimensions, node_in_dest->serialized_dimensions_len, node_in_master);
 
         if (node_in_master == NULL) { // exist in self but not in master
             cube_manager_delete(pthis, node_in_dest);
@@ -372,7 +372,7 @@ void cube_manager_calibrate(struct cube_manager *pthis, const struct cube_manage
 
     // exist in master but not in self
     HASH_ITER(hh, master->hash_table, node_in_master, tmp) {
-        HASH_FIND(hh, pthis->hash_table, node_in_master->key, node_in_master->key_len, node_in_dest);
+        HASH_FIND(hh, pthis->hash_table, node_in_master->serialized_dimensions, node_in_master->serialized_dimensions_len, node_in_dest);
 
         if (node_in_dest == NULL) {
             cube_manager_add(pthis, cube_fork(node_in_master));
@@ -406,7 +406,7 @@ int cube_manager_merge(struct cube_manager *dest, const struct cube_manager *src
     int ret = FS_OK;
     HASH_ITER(hh, src->hash_table, node, tmp) {
         struct cube *node_in_dest = NULL;
-        HASH_FIND(hh, dest->hash_table, node->key, node->key_len, node_in_dest);
+        HASH_FIND(hh, dest->hash_table, node->serialized_dimensions, node->serialized_dimensions_len, node_in_dest);
 
         if (node_in_dest == NULL) {
             cube_manager_add(dest, cube_copy(node));
@@ -423,34 +423,34 @@ int cube_manager_merge(struct cube_manager *dest, const struct cube_manager *src
 
 void cube_manager_reset(struct cube_manager *pthis)
 {
-    for (int i = 0; i < pthis->cube_cnt; i++) {
-        if (pthis->cube[i] == NULL) {
+    for (int i = 0; i < pthis->next_index; i++) {
+        if (pthis->cube_slots[i] == NULL) {
             continue;
         }
-        cube_reset(pthis->cube[i]);
+        cube_reset(pthis->cube_slots[i]);
     }
 }
 
 struct metric *find_metric_in_cell(const struct cell *cell, int metric_id)
 {
-    if (metric_id >= cell->metrics_len) {
+    if (metric_id >= cell->next_index) {
         return NULL;
     }
-    return cell->metrics[metric_id];
+    return cell->slots[metric_id];
 }
 
 void add_metric_to_cell(struct cell *cell, struct metric *metric, int metric_id)
 {
-    if (metric_id >= cell->max_n_metric) {
-        cell->metrics = realloc(cell->metrics, sizeof(struct metric *) * cell->max_n_metric * 2);
-        memset(cell->metrics + cell->max_n_metric, 0, sizeof(struct metric *) * cell->max_n_metric);
-        cell->max_n_metric *= 2;
+    if (metric_id >= cell->slots_number) {
+        cell->slots = realloc(cell->slots, sizeof(struct metric *) * cell->slots_number * 2);
+        memset(cell->slots + cell->slots_number, 0, sizeof(struct metric *) * cell->slots_number);
+        cell->slots_number *= 2;
     }
 
-    cell->metrics[metric_id] = metric;
+    cell->slots[metric_id] = metric;
 
-    if (metric_id >= cell->metrics_len) {
-        cell->metrics_len = metric_id + 1;
+    if (metric_id >= cell->next_index) {
+        cell->next_index = metric_id + 1;
     }
 }
 
@@ -468,9 +468,9 @@ struct metric *add_or_find_metric_in_cell(const struct metric_manifest *manifest
 
 struct cell *cell_new(const struct exdata_new_args *args) {
     struct cell *pthis = malloc(sizeof(struct cell));
-    pthis->metrics = calloc(DEFAULT_N_METRIC, sizeof(struct metric *));
-    pthis->max_n_metric = DEFAULT_N_METRIC;
-    pthis->metrics_len = 0;
+    pthis->slots = calloc(DEFAULT_N_METRIC, sizeof(struct metric *));
+    pthis->slots_number = DEFAULT_N_METRIC;
+    pthis->next_index = 0;
 
     pthis->cell_dimensions.n_field = args->n_dimensions;
     pthis->cell_dimensions.field = field_array_duplicate(args->cell_dimensions, args->n_dimensions);
@@ -478,10 +478,10 @@ struct cell *cell_new(const struct exdata_new_args *args) {
 }
 
 void cell_free(struct cell *pthis) {
-    for (size_t i = 0; i < pthis->metrics_len; i++) {
-        metric_free(pthis->metrics[i]);
+    for (size_t i = 0; i < pthis->next_index; i++) {
+        metric_free(pthis->slots[i]);
     }
-    free(pthis->metrics);
+    free(pthis->slots);
     for (size_t i = 0; i < pthis->cell_dimensions.n_field; i++) {
         free((char *)pthis->cell_dimensions.field[i].key);
         if (pthis->cell_dimensions.field[i].type == TAG_CSTRING) {
@@ -494,15 +494,15 @@ void cell_free(struct cell *pthis) {
 
 struct cell *cell_copy(const struct cell *src) {
     struct cell *pthis = malloc(sizeof(struct cell));
-    pthis->metrics = calloc(src->max_n_metric, sizeof(struct metric *));
-    pthis->max_n_metric = src->max_n_metric;
-    pthis->metrics_len = src->metrics_len;
-    for (size_t i = 0; i < src->metrics_len; i++) {
-        if (src->metrics[i] == NULL) {
+    pthis->slots = calloc(src->slots_number, sizeof(struct metric *));
+    pthis->slots_number = src->slots_number;
+    pthis->next_index = src->next_index;
+    for (size_t i = 0; i < src->next_index; i++) {
+        if (src->slots[i] == NULL) {
             continue;
         }
 
-        pthis->metrics[i] = metric_copy(src->metrics[i]);
+        pthis->slots[i] = metric_copy(src->slots[i]);
     }
     
     pthis->cell_dimensions.n_field = src->cell_dimensions.n_field;
@@ -512,17 +512,17 @@ struct cell *cell_copy(const struct cell *src) {
 }
 
 void cell_reset(struct cell *pthis) {
-    for (size_t i = 0; i < pthis->metrics_len; i++) {
-        if (pthis->metrics[i] == NULL) {
+    for (size_t i = 0; i < pthis->next_index; i++) {
+        if (pthis->slots[i] == NULL) {
             continue;
         }
-        metric_reset(pthis->metrics[i]);
+        metric_reset(pthis->slots[i]);
     }
 }
 
 void cell_merge(struct cell *dest, const struct cell *src) {
-    for (size_t i = 0; i < src->metrics_len; i++) {
-        const struct metric *metric_src = src->metrics[i];
+    for (size_t i = 0; i < src->next_index; i++) {
+        const struct metric *metric_src = src->slots[i];
         if (metric_src == NULL) {
             continue;
         }
@@ -570,7 +570,7 @@ struct cube *cube_info_new(const struct field *dimensions, size_t n_dimensions, 
 
     cube->n_dimensions = n_dimensions;
     cube->max_n_cell = max_n_cell;
-    field_array_to_key_endeavor(dimensions, n_dimensions, &cube->key, &cube->key_len);
+    field_array_to_key_endeavor(dimensions, n_dimensions, &cube->serialized_dimensions, &cube->serialized_dimensions_len);
 
     cube->id = -1;
 
@@ -585,12 +585,12 @@ struct cube *cube_new(const struct field *dimensions, size_t n_dimensions, enum 
     switch (mode)
     {
         case SAMPLING_MODE_TOPK:
-            cube->topk = heavy_keeper_new(max_n_cell);
-            heavy_keeper_set_exdata_schema(cube->topk, exdata_new_i, exdata_free_i, exdata_merge_i, exdata_reset_i, exdata_copy_i);
+            cube->heavykeeper = heavy_keeper_new(max_n_cell);
+            heavy_keeper_set_exdata_schema(cube->heavykeeper, exdata_new_i, exdata_free_i, exdata_merge_i, exdata_reset_i, exdata_copy_i);
             break;
         case SAMPLING_MODE_COMPREHENSIVE:
-            cube->comprehensive = hash_table_new(max_n_cell);
-            hash_table_set_exdata_schema(cube->comprehensive, exdata_new_i, exdata_free_i, exdata_merge_i, exdata_reset_i, exdata_copy_i);
+            cube->table = hash_table_new(max_n_cell);
+            hash_table_set_exdata_schema(cube->table, exdata_new_i, exdata_free_i, exdata_merge_i, exdata_reset_i, exdata_copy_i);
             break;
         case SAMPLING_MODE_SPREADSKETCH:
             cube->spread_sketch = spread_sketch_new(max_n_cell);
@@ -608,10 +608,10 @@ void cube_free(struct cube *cube) {
     switch (cube->sampling_mode)
     {
     case SAMPLING_MODE_TOPK:
-        heavy_keeper_free(cube->topk);
+        heavy_keeper_free(cube->heavykeeper);
         break;
     case SAMPLING_MODE_COMPREHENSIVE:
-        hash_table_free(cube->comprehensive);
+        hash_table_free(cube->table);
         break;
     case SAMPLING_MODE_SPREADSKETCH:
         spread_sketch_free(cube->spread_sketch);
@@ -622,7 +622,7 @@ void cube_free(struct cube *cube) {
     }
 
     fieldstat_free_tag_array(cube->cube_dimensions, cube->n_dimensions);
-    free(cube->key);
+    free(cube->serialized_dimensions);
     metric_manifest_manager_free(cube->manifest_manager);
 
     free(cube);
@@ -637,10 +637,10 @@ void cube_reset(struct cube *cube) {
     switch (cube->sampling_mode)
     {
     case SAMPLING_MODE_TOPK:
-        heavy_keeper_reset(cube->topk);
+        heavy_keeper_reset(cube->heavykeeper);
         break;
     case SAMPLING_MODE_COMPREHENSIVE:
-        hash_table_reset(cube->comprehensive);
+        hash_table_reset(cube->table);
         break;  
     case SAMPLING_MODE_SPREADSKETCH:
         spread_sketch_reset(cube->spread_sketch);
@@ -686,11 +686,11 @@ struct cell *get_cell_in_comprehensive_cube(struct cube *cube, const struct fiel
     struct cell *cell_data = NULL;
     assert(cube->sampling_mode == SAMPLING_MODE_COMPREHENSIVE);
     
-    cell_data = hash_table_get0_exdata(cube->comprehensive, key, key_len);
+    cell_data = hash_table_get0_exdata(cube->table, key, key_len);
     if (cell_data == NULL) {
-        int tmp_ret = hash_table_add(cube->comprehensive, key, key_len, (void *)&args);
+        int tmp_ret = hash_table_add(cube->table, key, key_len, (void *)&args);
         if (tmp_ret == 1) {
-            cell_data = hash_table_get0_exdata(cube->comprehensive, key, key_len);
+            cell_data = hash_table_get0_exdata(cube->table, key, key_len);
         }
     }
 
@@ -721,18 +721,18 @@ struct cell *get_cell_in_topk_cube(struct cube *cube, const struct field *dimens
     struct cell *cell_data = NULL;
     assert(cube->sampling_mode == SAMPLING_MODE_TOPK);
     if (cube->primary_metric_id != metric_id) { // FIXME: TODO: 我想把这个先get 再add 的逻辑直接改成add然后看返回值，结果在fuzz test 中的特殊码返回值里发现了问题。
-        cell_data = heavy_keeper_get0_exdata(cube->topk, key, key_len);
+        cell_data = heavy_keeper_get0_exdata(cube->heavykeeper, key, key_len);
         if (cell_data == NULL) {
-            int tmp_ret = heavy_keeper_add(cube->topk, key, key_len, 0, (void *)&args);
+            int tmp_ret = heavy_keeper_add(cube->heavykeeper, key, key_len, 0, (void *)&args);
             if (tmp_ret == 1) {
-                cell_data = heavy_keeper_get0_exdata(cube->topk, key, key_len);
+                cell_data = heavy_keeper_get0_exdata(cube->heavykeeper, key, key_len);
             }
         }
     } else {
         // heavy_keeper_add should be called anyway, to let the topk record update.
-        int tmp_ret = heavy_keeper_add(cube->topk, key, key_len, increment, (void *)&args);
+        int tmp_ret = heavy_keeper_add(cube->heavykeeper, key, key_len, increment, (void *)&args);
         if (tmp_ret == 1) {
-            cell_data = heavy_keeper_get0_exdata(cube->topk, key, key_len);
+            cell_data = heavy_keeper_get0_exdata(cube->heavykeeper, key, key_len);
         }
     }
 
@@ -1082,10 +1082,10 @@ struct cube *cube_copy(const struct cube *cube)
     switch (cube->sampling_mode)
     {
     case SAMPLING_MODE_TOPK:
-        cube_dup->topk = heavy_keeper_copy(cube->topk);
+        cube_dup->heavykeeper = heavy_keeper_copy(cube->heavykeeper);
         break;
     case SAMPLING_MODE_COMPREHENSIVE:
-        cube_dup->comprehensive = hash_table_copy(cube->comprehensive);
+        cube_dup->table = hash_table_copy(cube->table);
         break;
     case SAMPLING_MODE_SPREADSKETCH:
         cube_dup->spread_sketch = spread_sketch_copy(cube->spread_sketch);
@@ -1126,10 +1126,10 @@ int cube_merge(struct cube *dest, const struct cube *src)
     switch (dest->sampling_mode)
     {
     case SAMPLING_MODE_TOPK:
-        heavy_keeper_merge(dest->topk, src->topk);
+        heavy_keeper_merge(dest->heavykeeper, src->heavykeeper);
         break;
     case SAMPLING_MODE_COMPREHENSIVE:
-        hash_table_merge(dest->comprehensive, src->comprehensive);
+        hash_table_merge(dest->table, src->table);
         break;
     case SAMPLING_MODE_SPREADSKETCH:
         spread_sketch_merge(dest->spread_sketch, src->spread_sketch);
@@ -1149,12 +1149,12 @@ struct cube *cube_fork(const struct cube *cube) {
 
     switch (cube->sampling_mode) {
         case SAMPLING_MODE_TOPK:
-            ret->topk = heavy_keeper_new(cube->max_n_cell);
-            heavy_keeper_set_exdata_schema(ret->topk, exdata_new_i, exdata_free_i, exdata_merge_i, exdata_reset_i, exdata_copy_i);
+            ret->heavykeeper = heavy_keeper_new(cube->max_n_cell);
+            heavy_keeper_set_exdata_schema(ret->heavykeeper, exdata_new_i, exdata_free_i, exdata_merge_i, exdata_reset_i, exdata_copy_i);
             break;
         case SAMPLING_MODE_COMPREHENSIVE:
-            ret->comprehensive = hash_table_new(cube->max_n_cell);
-            hash_table_set_exdata_schema(ret->comprehensive, exdata_new_i, exdata_free_i, exdata_merge_i, exdata_reset_i, exdata_copy_i);
+            ret->table = hash_table_new(cube->max_n_cell);
+            hash_table_set_exdata_schema(ret->table, exdata_new_i, exdata_free_i, exdata_merge_i, exdata_reset_i, exdata_copy_i);
             break;
         case SAMPLING_MODE_SPREADSKETCH:
             ret->spread_sketch = spread_sketch_new(cube->max_n_cell);
@@ -1191,10 +1191,10 @@ void cube_get_cells(const struct cube *cube, struct field_list **cell_dimensions
     size_t n_cell_tmp = 0;
     switch (cube->sampling_mode) {
         case SAMPLING_MODE_COMPREHENSIVE:
-            n_cell_tmp = hash_table_get_count(cube->comprehensive);
+            n_cell_tmp = hash_table_get_count(cube->table);
             break;
         case SAMPLING_MODE_TOPK:
-            n_cell_tmp = heavy_keeper_get_count(cube->topk);
+            n_cell_tmp = heavy_keeper_get_count(cube->heavykeeper);
             break;
         case SAMPLING_MODE_SPREADSKETCH:
             n_cell_tmp = spread_sketch_get_count(cube->spread_sketch);
@@ -1212,10 +1212,10 @@ void cube_get_cells(const struct cube *cube, struct field_list **cell_dimensions
     struct cell **cell_datas = (struct cell **)malloc(sizeof(struct cell *) * n_cell_tmp);
     switch (cube->sampling_mode) {
         case SAMPLING_MODE_COMPREHENSIVE:
-            hash_table_list(cube->comprehensive, (void **)cell_datas, n_cell_tmp);
+            hash_table_list(cube->table, (void **)cell_datas, n_cell_tmp);
             break;
         case SAMPLING_MODE_TOPK:
-            heavy_keeper_list(cube->topk, (void **)cell_datas, n_cell_tmp);
+            heavy_keeper_list(cube->heavykeeper, (void **)cell_datas, n_cell_tmp);
             break;
         case SAMPLING_MODE_SPREADSKETCH:
             spread_sketch_list(cube->spread_sketch, (void **)cell_datas, n_cell_tmp);
@@ -1229,7 +1229,7 @@ void cube_get_cells(const struct cube *cube, struct field_list **cell_dimensions
         struct tmp_sorted_data_spread_sketch_cell *tmp_sorted_data = (struct tmp_sorted_data_spread_sketch_cell *)malloc(sizeof(struct tmp_sorted_data_spread_sketch_cell) * n_cell_tmp);
         for (int i = 0; i < n_cell_tmp; i++) {
             tmp_sorted_data[i].data = cell_datas[i];
-            tmp_sorted_data[i].hll_value = metric_hll_get(cell_datas[i]->metrics[cube->primary_metric_id]);
+            tmp_sorted_data[i].hll_value = metric_hll_get(cell_datas[i]->slots[cube->primary_metric_id]);
         }
         qsort(tmp_sorted_data, n_cell_tmp, sizeof(struct tmp_sorted_data_spread_sketch_cell), compare_tmp_sorted_data_spread_sketch_cell);
 
@@ -1269,10 +1269,10 @@ const struct cell *get_cell_by_tag_list(const struct cube *cube, const struct fi
     switch (cube->sampling_mode)
     {
     case SAMPLING_MODE_TOPK:
-        ret = heavy_keeper_get0_exdata(cube->topk, tag_in_string, tag_len);
+        ret = heavy_keeper_get0_exdata(cube->heavykeeper, tag_in_string, tag_len);
         break;
     case SAMPLING_MODE_COMPREHENSIVE:
-        ret = hash_table_get0_exdata(cube->comprehensive, tag_in_string, tag_len);
+        ret = hash_table_get0_exdata(cube->table, tag_in_string, tag_len);
         break;
     case SAMPLING_MODE_SPREADSKETCH:
         ret = spread_sketch_get0_exdata(cube->spread_sketch, tag_in_string, tag_len);
@@ -1295,13 +1295,13 @@ const struct metric *get_metric_by_tag_list(const struct cube *cube, const struc
         return NULL;
     }
 
-    if (metric_id < 0 || metric_id >= data->metrics_len) {
+    if (metric_id < 0 || metric_id >= data->next_index) {
         *ret = FS_ERR_INVALID_METRIC_ID;
         return NULL;
     }
     *ret = FS_OK;
 
-    return data->metrics[metric_id];
+    return data->slots[metric_id];
 }
 
 int cube_counter_get(const struct cube *cube, int metric_id, const struct field_list *fields, long long *value)
@@ -1380,11 +1380,14 @@ int cube_get_serialization(const struct cube *cube, int metric_id, const struct 
 int cube_get_cell_count(const struct cube *cube) {
     switch (cube->sampling_mode) {
         case SAMPLING_MODE_COMPREHENSIVE:
-            return hash_table_get_count(cube->comprehensive);
+            return hash_table_get_count(cube->table);
         case SAMPLING_MODE_TOPK:
-            return heavy_keeper_get_count(cube->topk);
+            return heavy_keeper_get_count(cube->heavykeeper);
+        case SAMPLING_MODE_SPREADSKETCH:
+            return spread_sketch_get_count(cube->spread_sketch);
         default:
-            return FS_ERR_INVALID_PARAM;
+            assert(0);
+            return -1; // to mute cppcheck
     }
 }
 
@@ -1396,10 +1399,10 @@ void cube_get_metrics_in_cell(const struct cube *cube, const struct field_list *
         return;
     }
 
-    *metric_id_out = (int *)malloc(sizeof(int) * cell_data->metrics_len);
+    *metric_id_out = (int *)malloc(sizeof(int) * cell_data->next_index);
     int n_metric = 0;
-    for (int i = 0; i < cell_data->metrics_len; i++) {
-        if (cell_data->metrics[i] != NULL) {
+    for (int i = 0; i < cell_data->next_index; i++) {
+        if (cell_data->slots[i] != NULL) {
             (*metric_id_out)[n_metric] = i;
             n_metric++;
         }
