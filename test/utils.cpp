@@ -45,13 +45,13 @@ Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(const struct field_list *
         tag_list_c.field[i].type = tag_list->field[i].type;
         switch (tag_list->field[i].type)
         {
-            case TAG_INTEGER:
+            case FIELD_VALUE_INTEGER:
                 tag_list_c.field[i].value_longlong = tag_list->field[i].value_longlong;
                 break;
-            case TAG_DOUBLE:
+            case FIELD_VALUE_DOUBLE:
                 tag_list_c.field[i].value_double = tag_list->field[i].value_double;
                 break;
-            case TAG_CSTRING:
+            case FIELD_VALUE_CSTRING:
                 tag_list_c.field[i].value_str = strdup(tag_list->field[i].value_str);
                 break;
             default:
@@ -65,7 +65,7 @@ Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(const char * key, int val
     tag_list_c.field = (struct field *)malloc(sizeof(struct field));
     tag_list_c.n_field = 1;
     tag_list_c.field[0].key = strdup(key);
-    tag_list_c.field[0].type = TAG_INTEGER;
+    tag_list_c.field[0].type = FIELD_VALUE_INTEGER;
     tag_list_c.field[0].value_longlong = value;
 }
 
@@ -74,7 +74,7 @@ Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(const char * key, const c
     tag_list_c.field = (struct field *)malloc(sizeof(struct field));
     tag_list_c.n_field = 1;
     tag_list_c.field[0].key = strdup(key);
-    tag_list_c.field[0].type = TAG_CSTRING;
+    tag_list_c.field[0].type = FIELD_VALUE_CSTRING;
     tag_list_c.field[0].value_str = strdup(value);
 }
 
@@ -82,7 +82,7 @@ Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(const char * key, const c
 Fieldstat_tag_list_wrapper::~Fieldstat_tag_list_wrapper() {
     for (size_t i = 0; i < tag_list_c.n_field; i++) {
         free((char *)tag_list_c.field[i].key);
-        if (tag_list_c.field[i].type == TAG_CSTRING) {
+        if (tag_list_c.field[i].type == FIELD_VALUE_CSTRING) {
             free((char *)tag_list_c.field[i].value_str);
         }
     }
@@ -100,17 +100,17 @@ Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(std::uniform_int_distribu
         int rand_ret = rand() % 3;
         if (rand_ret == 0)
         {
-            tag_list_c.field[i].type = TAG_INTEGER;
+            tag_list_c.field[i].type = FIELD_VALUE_INTEGER;
             tag_list_c.field[i].value_longlong = static_cast<long long>(dist(rng));
         }
         else if (rand_ret == 1)
         {
-            tag_list_c.field[i].type = TAG_DOUBLE;
+            tag_list_c.field[i].type = FIELD_VALUE_DOUBLE;
             tag_list_c.field[i].value_double = static_cast<double>(dist(rng)) + 0.5;
         }
         else
         {
-            tag_list_c.field[i].type = TAG_CSTRING;
+            tag_list_c.field[i].type = FIELD_VALUE_CSTRING;
             tag_list_c.field[i].value_str = strdup(gen_rand_string(10).c_str());
         }
     }
@@ -132,13 +132,13 @@ Fieldstat_tag_list_wrapper::Fieldstat_tag_list_wrapper(const Fieldstat_tag_list_
         tag_list_c.field[i].type = tag_list->field[i].type;
         switch (tag_list->field[i].type)
         {
-            case TAG_INTEGER:
+            case FIELD_VALUE_INTEGER:
                 tag_list_c.field[i].value_longlong = tag_list->field[i].value_longlong;
                 break;
-            case TAG_DOUBLE:
+            case FIELD_VALUE_DOUBLE:
                 tag_list_c.field[i].value_double = tag_list->field[i].value_double;
                 break;
-            case TAG_CSTRING:
+            case FIELD_VALUE_CSTRING:
                 tag_list_c.field[i].value_str = strdup(tag_list->field[i].value_str);
                 break;
             default:
@@ -171,13 +171,13 @@ void Fieldstat_tag_list_wrapper::print_tag_list() const
         printf("tag_list_c.field[%zu].type: %d\n", i, (int)tag_list_c.field[i].type);
         switch (tag_list_c.field[i].type)
         {
-            case TAG_INTEGER:
+            case FIELD_VALUE_INTEGER:
                 printf("tag_list_c.field[%zu].value_longlong: %lld\n", i, tag_list_c.field[i].value_longlong);
                 break;
-            case TAG_DOUBLE:
+            case FIELD_VALUE_DOUBLE:
                 printf("tag_list_c.field[%zu].value_double: %lf\n", i, tag_list_c.field[i].value_double);
                 break;
-            case TAG_CSTRING:
+            case FIELD_VALUE_CSTRING:
                 printf("tag_list_c.field[%zu].value_str: %s\n", i, tag_list_c.field[i].value_str);
                 break;
             default:
@@ -196,13 +196,13 @@ string Fieldstat_tag_list_wrapper::to_string() const
         str += ":";
         switch (tag_list_c.field[i].type)
         {
-            case TAG_INTEGER:
+            case FIELD_VALUE_INTEGER:
                 str += std::to_string(tag_list_c.field[i].value_longlong);
                 break;
-            case TAG_DOUBLE:
+            case FIELD_VALUE_DOUBLE:
                 str += std::to_string(tag_list_c.field[i].value_double);
                 break;
-            case TAG_CSTRING:
+            case FIELD_VALUE_CSTRING:
                 str += tag_list_c.field[i].value_str;
                 break;
             default:
@@ -227,17 +227,17 @@ bool Fieldstat_tag_list_wrapper::operator==(const Fieldstat_tag_list_wrapper &ta
             return false;
         }
         switch (tag_list_c.field[i].type) {
-            case TAG_INTEGER:
+            case FIELD_VALUE_INTEGER:
                 if (tag_list_c.field[i].value_longlong != tag_list->field[i].value_longlong) {
                     return false;
                 }
                 break;
-            case TAG_DOUBLE:
+            case FIELD_VALUE_DOUBLE:
                 if (tag_list_c.field[i].value_double != tag_list->field[i].value_double) {
                     return false;
                 }
                 break;
-            case TAG_CSTRING:
+            case FIELD_VALUE_CSTRING:
                 if (strcmp((char *)tag_list_c.field[i].value_str, (char *)tag_list->field[i].value_str) != 0) {
                     return false;
                 }

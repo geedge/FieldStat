@@ -26,15 +26,15 @@ enum metric_type
 
 enum field_type
 {
-	TAG_INTEGER, // TODO: rename
-	TAG_DOUBLE,
-	TAG_CSTRING,
+	FIELD_VALUE_INTEGER,
+	FIELD_VALUE_DOUBLE,
+	FIELD_VALUE_CSTRING,
 };
 
 enum sampling_mode {
     SAMPLING_MODE_COMPREHENSIVE,
     SAMPLING_MODE_TOPK,
-    SAMPLING_MODE_SPREADSKETCH, // TODO: rename TOP_CARDINALITY // todo: 问问gpt cardinality，unique....
+    SAMPLING_MODE_TOP_CARDINALITY,
 };
 
 struct field {
@@ -106,7 +106,7 @@ int fieldstat_register_hll(struct fieldstat *instance, int cube_id, const char *
     * @param significant_figures: the precision of the histogram. Must be in [1, 5].
         * @return metric id if success. If failed, return FS_ERR_NULL_HANDLER, FS_ERR_INVALID_KEY(when metric_name is not unique in this cube), or FS_ERR_INVALID_PARAM(if any of the 3 params are out of range)
 */
-int fieldstat_register_hist(struct fieldstat *instance, int cube_id, const char *metric_name, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures);
+int fieldstat_register_histogram(struct fieldstat *instance, int cube_id, const char *metric_name, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures);
 
 /*
     * @brief let the value of counter metric of cell_id increase by `increment`.
@@ -146,7 +146,7 @@ int fieldstat_hll_add_field(struct fieldstat *instance, int cube_id, int metric_
     * @return FS_OK if success. FS_ERR_NULL_HANDLER, FS_ERR_INVALID_CUBE_ID, FS_ERR_INVALID_METRIC_ID if fail.
     *         FS_ERR_INVALID_PARAM when value is less than 0, or the cube is topk.
 */
-int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id, const struct field *cell_dimensions, size_t n_dimensions, long long value); // todo: 重命名,hist，不管符号冲突问题了
+int fieldstat_histogram_record(struct fieldstat *instance, int cube_id, int metric_id, const struct field *cell_dimensions, size_t n_dimensions, long long value);
 
 /*
     * @brief Delete all the cells, also the content of every metrics. The cube and metrics are not deleted. Increase cell_version by 1.
@@ -178,7 +178,7 @@ struct field_list
 void fieldstat_get_cubes(const struct fieldstat *instance, int **cube_ids, int *n_cube);
 
 /*
-    * @brief Get all the registered metrics by fieldstat_register_counter, fieldstat_register_hll, fieldstat_register_hist.
+    * @brief Get all the registered metrics by fieldstat_register_counter, fieldstat_register_hll, fieldstat_register_histogram.
 */
 void fieldstat_cube_get_metrics(const struct fieldstat *instance, int cube_id, int **metric_id_out, size_t *n_metric);
 
@@ -191,7 +191,7 @@ const char *fieldstat_get_metric_name(const struct fieldstat *instance, int cube
 enum metric_type fieldstat_get_metric_type(const struct fieldstat *instance, int cube_id, int metric_id);
 
 /*
-    get the cell_dimensions added to cube when calling fieldstat_counter_incrby, fieldstat_counter_set, fieldstat_hll_add, fieldstat_hist_record.
+    get the cell_dimensions added to cube when calling fieldstat_counter_incrby, fieldstat_counter_set, fieldstat_hll_add, fieldstat_histogram_record.
 */
 void fieldstat_cube_get_cells(const struct fieldstat *instance, int cube_id, struct field_list **cell_dimensions, size_t *n_cell);
 
@@ -226,8 +226,8 @@ int fieldstat_counter_get(const struct fieldstat *instance, int cube_id, const s
     @return >= 0 if success. FS_ERR_INVALID_PARAM if precision is invalid.
 */
 int fieldstat_hll_get(const struct fieldstat *instance, int cube_id, const struct field_list *cell_dimensions, int metric_id, double *value);
-long long fieldstat_hist_value_at_percentile(const struct fieldstat *instance, int cube_id, const struct field_list *cell_dimensions, int metric_id, double percentile);
-long long fieldstat_hist_count_le_value(const struct fieldstat *instance, int cube_id, const struct field_list *cell_dimensions, int metric_id, long long value);
+long long fieldstat_histogram_value_at_percentile(const struct fieldstat *instance, int cube_id, const struct field_list *cell_dimensions, int metric_id, double percentile);
+long long fieldstat_histogram_count_le_value(const struct fieldstat *instance, int cube_id, const struct field_list *cell_dimensions, int metric_id, long long value);
 
 // get the base 64 encoded string of the serialized blob of a cell
 void fieldstat_get_serialized_blob(const struct fieldstat *instance, int cube_id, int metric_id, const struct field_list *cell_dimensions, char **blob, size_t *blob_size);

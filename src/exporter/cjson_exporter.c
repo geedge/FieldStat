@@ -116,7 +116,7 @@ struct couple_export_table {
 
 
 void kv_pair_free(struct export_kv_pair *pair) {
-    if (pair->type == TAG_CSTRING) {
+    if (pair->type == FIELD_VALUE_CSTRING) {
         free((char *)pair->value_str);
     }
     free((char *)pair->key);
@@ -128,13 +128,13 @@ void kv_pair_fill_with_tags(struct export_kv_pair *dest, const struct field *src
     dest->key = strdup(src->key);
     dest->type = src->type;
     switch (src->type) {
-        case TAG_INTEGER:
+        case FIELD_VALUE_INTEGER:
             dest->value_longlong = src->value_longlong;
             break;
-        case TAG_DOUBLE:
+        case FIELD_VALUE_DOUBLE:
             dest->value_double = src->value_double;
             break;
-        case TAG_CSTRING:
+        case FIELD_VALUE_CSTRING:
             dest->value_str = strdup(src->value_str);
             break;
         default:
@@ -229,17 +229,17 @@ bool fieldstat_tag_list_cmp(const struct field_list *a, const struct field_list 
         }
         switch (a->field[i].type)
         {
-        case TAG_INTEGER:
+        case FIELD_VALUE_INTEGER:
             if (a->field[i].value_longlong != b->field[i].value_longlong) {
                 return false;
             }
             break;
-        case TAG_DOUBLE:
+        case FIELD_VALUE_DOUBLE:
             if (a->field[i].value_double != b->field[i].value_double) {
                 return false;
             }
             break;
-        case TAG_CSTRING:
+        case FIELD_VALUE_CSTRING:
             if (strcmp(a->field[i].value_str, b->field[i].value_str) != 0) {
                 return false;
             }
@@ -262,13 +262,13 @@ struct field_list *my_copy_fs_tag_list(const struct field_list *src)
         dest->field[i].type = src->field[i].type;
         switch (src->field[i].type)
         {
-        case TAG_INTEGER:
+        case FIELD_VALUE_INTEGER:
             dest->field[i].value_longlong = src->field[i].value_longlong;
             break;
-        case TAG_DOUBLE:
+        case FIELD_VALUE_DOUBLE:
             dest->field[i].value_double = src->field[i].value_double;
             break;
-        case TAG_CSTRING:
+        case FIELD_VALUE_CSTRING:
             dest->field[i].value_str = strdup(src->field[i].value_str);
             break;
         default:
@@ -342,7 +342,7 @@ void write_delta_to_json(struct fieldstat_json_exporter *exporter, struct cellwi
         tag_json = "\a\t\a"; // just a dummy string
     }
     for (int j = 0; j < tag_field_pair->n_metric; j++) {
-        if (tag_field_pair->metric_pairs[j]->type != TAG_INTEGER) { // only counter type need to write delta
+        if (tag_field_pair->metric_pairs[j]->type != FIELD_VALUE_INTEGER) { // only counter type need to write delta
             continue;
         }
         const char *metric_name = tag_field_pair->metric_pairs[j]->key;
@@ -535,7 +535,7 @@ struct export_kv_pair *cell_query_with_iter(const struct cell_iter *iter, int me
         }
         ret = malloc(sizeof(struct export_kv_pair));
         ret->key = strdup(fieldstat_get_metric_name(iter->instance, cube_id, metric_id));
-        ret->type = TAG_INTEGER;
+        ret->type = FIELD_VALUE_INTEGER;
         ret->value_longlong = value;
         return ret;
     }
@@ -548,7 +548,7 @@ struct export_kv_pair *cell_query_with_iter(const struct cell_iter *iter, int me
         }
         ret = malloc(sizeof(struct export_kv_pair));
         ret->key = strdup(fieldstat_get_metric_name(iter->instance, cube_id, metric_id));
-        ret->type = TAG_CSTRING;
+        ret->type = FIELD_VALUE_CSTRING;
         ret->value_str = value;
         return ret;
     }
@@ -560,13 +560,13 @@ void kv_pair_write_to_json(const struct export_kv_pair *pairs, struct json_write
 {
     switch (pairs->type)
     {
-        case TAG_INTEGER:
+        case FIELD_VALUE_INTEGER:
             json_writer_longlong_field(writer, pairs->key, pairs->value_longlong);
             break;
-        case TAG_DOUBLE:
+        case FIELD_VALUE_DOUBLE:
             json_writer_double_field(writer, pairs->key, pairs->value_double);
             break;
-        case TAG_CSTRING:
+        case FIELD_VALUE_CSTRING:
             json_writer_str_field(writer, pairs->key, pairs->value_str, strlen(pairs->value_str));
             break;
         default:
@@ -588,13 +588,13 @@ void tag_list_append_to_tag_object(const struct field_list *tag_list, struct jso
         pairs.type = tag_list->field[i].type;
         switch (pairs.type)
         {
-            case TAG_INTEGER:
+            case FIELD_VALUE_INTEGER:
                 pairs.value_longlong = tag_list->field[i].value_longlong;
                 break;
-            case TAG_DOUBLE:
+            case FIELD_VALUE_DOUBLE:
                 pairs.value_double = tag_list->field[i].value_double;
                 break;
-            case TAG_CSTRING:
+            case FIELD_VALUE_CSTRING:
                 pairs.value_str = (char *)tag_list->field[i].value_str;
                 break;
             default:
@@ -627,7 +627,7 @@ void kv_pair_free_list(struct export_kv_pair *pairs, size_t len)
 {
     for (int i = 0; i < len; i++) {
         struct export_kv_pair *pair = &pairs[i];
-        if (pair->type == TAG_CSTRING) {
+        if (pair->type == FIELD_VALUE_CSTRING) {
             free(pair->value_str);
         }
         free(pair->key);
@@ -992,13 +992,13 @@ void fieldstat_json_exporter_set_global_tag(struct fieldstat_json_exporter *expo
         field->type = tag_list[i].type;
         switch (field->type)
         {
-        case TAG_INTEGER:
+        case FIELD_VALUE_INTEGER:
             field->value_longlong = tag_list[i].value_longlong;
             break;
-        case TAG_CSTRING:
+        case FIELD_VALUE_CSTRING:
             field->value_str = strdup(tag_list[i].value_str);
             break;
-        case TAG_DOUBLE:
+        case FIELD_VALUE_DOUBLE:
             field->value_double = tag_list[i].value_double;
             break;
         

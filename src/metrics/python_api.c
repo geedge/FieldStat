@@ -16,12 +16,12 @@ void *fieldstat_histogram_base64_decode(char *buf)
     return hdr;
 }
 
-long long fieldstat_histogram_value_at_percentile(void* h, double percentile)
+long long fieldstat_histogram_value_at_percentile_api(void* h, double percentile)
 {
     return hdr_value_at_percentile((const struct hdr_histogram *)h, percentile);
 }
 
-long long fieldstat_histogram_count_le_value(void* h, long long value)
+long long fieldstat_histogram_count_le_value_api(void* h, long long value)
 {
 	return hdr_count_le_value((const struct hdr_histogram *)h, value);
 }

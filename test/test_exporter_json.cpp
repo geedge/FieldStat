@@ -23,22 +23,22 @@ struct hdr_histogram *g_histogram_standard;
 #define TEST_TOPK_STANDARD_K 5
 #define TEST_METRIC_NUM 2
 
-const struct field TEST_TAG_GLOBAL1 = {"test_tag_global 1", .type = TAG_INTEGER, {.value_longlong = 1}};
-const struct field TEST_TAG_GLOBAL2 = {"test_tag_global 2", .type = TAG_DOUBLE, {.value_double = 2.2}};
-const struct field TEST_TAG_GLOBAL3 = {"test_tag_global 3", .type = TAG_CSTRING, {.value_str = "string3"}};
+const struct field TEST_TAG_GLOBAL1 = {"test_tag_global 1", .type = FIELD_VALUE_INTEGER, {.value_longlong = 1}};
+const struct field TEST_TAG_GLOBAL2 = {"test_tag_global 2", .type = FIELD_VALUE_DOUBLE, {.value_double = 2.2}};
+const struct field TEST_TAG_GLOBAL3 = {"test_tag_global 3", .type = FIELD_VALUE_CSTRING, {.value_str = "string3"}};
 const struct field TEST_TAG_GLOBAL[3] = {TEST_TAG_GLOBAL1, TEST_TAG_GLOBAL2, TEST_TAG_GLOBAL3};
 
-const struct field TEST_TAG_SHARED1_1 = {"test_tag_shared 1", .type = TAG_INTEGER, {.value_longlong = 3}};
-const struct field TEST_TAG_SHARED1_2 = {"test_tag_shared 2", .type = TAG_DOUBLE, {.value_double = 0.2}};
-const struct field TEST_TAG_SHARED1_3 = {"test_tag_shared 3", .type = TAG_CSTRING, {.value_str = "1string"}};
+const struct field TEST_TAG_SHARED1_1 = {"test_tag_shared 1", .type = FIELD_VALUE_INTEGER, {.value_longlong = 3}};
+const struct field TEST_TAG_SHARED1_2 = {"test_tag_shared 2", .type = FIELD_VALUE_DOUBLE, {.value_double = 0.2}};
+const struct field TEST_TAG_SHARED1_3 = {"test_tag_shared 3", .type = FIELD_VALUE_CSTRING, {.value_str = "1string"}};
 const struct field TEST_TAG_SHARED1[3] = {TEST_TAG_SHARED1_1, TEST_TAG_SHARED1_2, TEST_TAG_SHARED1_3};
 
-const struct field TEST_TAG_SHARED2_1 = {"test_tag_shared 11", .type = TAG_INTEGER, {.value_longlong = 4}};
-const struct field TEST_TAG_SHARED2_2 = {"test_tag_shared 22", .type = TAG_DOUBLE, {.value_double = 0.3}};
-const struct field TEST_TAG_SHARED2_3 = {"test_tag_shared 33", .type = TAG_CSTRING, {.value_str = "2string"}};
+const struct field TEST_TAG_SHARED2_1 = {"test_tag_shared 11", .type = FIELD_VALUE_INTEGER, {.value_longlong = 4}};
+const struct field TEST_TAG_SHARED2_2 = {"test_tag_shared 22", .type = FIELD_VALUE_DOUBLE, {.value_double = 0.3}};
+const struct field TEST_TAG_SHARED2_3 = {"test_tag_shared 33", .type = FIELD_VALUE_CSTRING, {.value_str = "2string"}};
 const struct field TEST_TAG_SHARED2[3] = {TEST_TAG_SHARED2_1, TEST_TAG_SHARED2_2, TEST_TAG_SHARED2_3};
 
-const struct field TEST_TAG_SHARED3_1 = {"test_tag_shared 3", .type = TAG_INTEGER, {.value_longlong = 5}};
+const struct field TEST_TAG_SHARED3_1 = {"test_tag_shared 3", .type = FIELD_VALUE_INTEGER, {.value_longlong = 5}};
 const struct field TEST_TAG_SHARED3[1] = {TEST_TAG_SHARED3_1};
 
 void test_check_if_tag_list_is_in_json(cJSON *tag_obj, const Fieldstat_tag_list_wrapper *benchmark)
@@ -49,7 +49,7 @@ void test_check_if_tag_list_is_in_json(cJSON *tag_obj, const Fieldstat_tag_list_
         if (tag_val->type == cJSON_String) {
             EXPECT_STREQ(tag_val->valuestring, benchmark->get_tag()[tag_id].value_str);
         } else {
-            if (benchmark->get_tag()[tag_id].type == TAG_INTEGER) {
+            if (benchmark->get_tag()[tag_id].type == FIELD_VALUE_INTEGER) {
                 EXPECT_EQ(tag_val->valueint, benchmark->get_tag()[tag_id].value_longlong);
             } else {
                 EXPECT_NEAR(tag_val->valuedouble, benchmark->get_tag()[tag_id].value_double, 0.0001);
@@ -189,7 +189,7 @@ TEST(export_test, cjson_export_with_fixed_tag_and_many_metrics_on_one_cube_of_co
     int cube_id = fieldstat_create_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, tag_list_num);
     int id_counter = fieldstat_register_counter(instance, cube_id, "counter");
     int id_gauge = fieldstat_register_hll(instance, cube_id, "gauge", g_hll_standard->cfg.precision);
-    int id_histogram = fieldstat_register_hist(instance, cube_id, "histogram",
+    int id_histogram = fieldstat_register_histogram(instance, cube_id, "histogram",
         g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
 
     Fieldstat_tag_list_wrapper *fields[tag_list_num];
@@ -202,7 +202,7 @@ TEST(export_test, cjson_export_with_fixed_tag_and_many_metrics_on_one_cube_of_co
         fieldstat_counter_incrby(instance, cube_id, id_counter, tag_tmp, tag_count, 1);
         for (size_t i = 0; i < OPER_NUM; i++){
             fieldstat_hll_add(instance, cube_id, id_gauge, tag_tmp, tag_count, g_hll_standard_oper[i].c_str(), g_hll_standard_oper[i].length());
-            fieldstat_hist_record(instance, cube_id, id_histogram, tag_tmp, tag_count, g_histogram_standard_oper[i]);
+            fieldstat_histogram_record(instance, cube_id, id_histogram, tag_tmp, tag_count, g_histogram_standard_oper[i]);
         }
     }
 
@@ -289,7 +289,7 @@ extern "C" {
 TEST(export_test, cjson_export_on_one_cube_of_spreadsketch_sampling) {
     int K = 10;
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_SPREADSKETCH, K);
+    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOP_CARDINALITY, K);
     int metric_id = fieldstat_register_hll(instance, cube_id, "metric", 7);
     int metric_count = fieldstat_register_counter(instance, cube_id, "oper cnt");
     SpreadSketchZipfGenerator flow_generator(1.0, K * 10);
@@ -349,7 +349,7 @@ TEST(export_test, only_registered_but_not_added_export_null_with_global_tag)
     int cube_id = fieldstat_create_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 3);
     fieldstat_register_counter(instance, cube_id, "counter");
     fieldstat_register_hll(instance, cube_id, "gauge", g_hll_standard->cfg.precision);
-    fieldstat_register_hist(instance, cube_id, "histogram",
+    fieldstat_register_histogram(instance, cube_id, "histogram",
         g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
 
     // add global field
@@ -367,7 +367,7 @@ TEST(export_test, skip_two_empty_cube_and_export_last_one_with_global_tag)
     int cube_id_3 = fieldstat_create_cube(instance, TEST_TAG_SHARED3, 1, SAMPLING_MODE_COMPREHENSIVE, 3);
     (void)fieldstat_register_counter(instance, cube_id_3, "counter");
     (void)fieldstat_register_hll(instance, cube_id_3, "gauge", g_hll_standard->cfg.precision);
-    int id_histogram = fieldstat_register_hist(instance, cube_id_3, "histogram",
+    int id_histogram = fieldstat_register_histogram(instance, cube_id_3, "histogram",
         g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
 
     const int tag_num = 1;
@@ -375,7 +375,7 @@ TEST(export_test, skip_two_empty_cube_and_export_last_one_with_global_tag)
     fill_random_tag(fields, tag_num);
     const Fieldstat_tag_list_wrapper *the_tag = fields[0];
     for (size_t i = 0; i < OPER_NUM; i++){
-        fieldstat_hist_record(instance, cube_id_3, id_histogram, the_tag->get_tag(), the_tag->get_tag_count(), g_histogram_standard_oper[i]);
+        fieldstat_histogram_record(instance, cube_id_3, id_histogram, the_tag->get_tag(), the_tag->get_tag_count(), g_histogram_standard_oper[i]);
     }
 
     // export test
@@ -530,10 +530,10 @@ TEST(export_test, enable_delta_and_export_twice_with_new_metric_and_omit_histogr
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_create_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 10);
     int id_counter = fieldstat_register_counter(instance, cube_id, "counter");
-    int id_histogram = fieldstat_register_hist(instance, cube_id, "histogram",
+    int id_histogram = fieldstat_register_histogram(instance, cube_id, "histogram",
         g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
     fieldstat_counter_incrby(instance, cube_id, id_counter, &TEST_TAG_INT, 1, 1);
-    fieldstat_hist_record(instance, cube_id, id_histogram, &TEST_TAG_INT, 1, 123);
+    fieldstat_histogram_record(instance, cube_id, id_histogram, &TEST_TAG_INT, 1, 123);
 
     // export test
     struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new();
@@ -612,10 +612,10 @@ TEST(export_test, enable_delta_and_export_three_times_skipping_cube_with_no_coun
     struct fieldstat *instance = fieldstat_new();
     int cube_id = fieldstat_create_cube(instance, TEST_TAG_SHARED1, 3, SAMPLING_MODE_COMPREHENSIVE, 10);
     int id_counter = fieldstat_register_counter(instance, cube_id, "counter");
-    int id_histogram = fieldstat_register_hist(instance, cube_id, "histogram",
+    int id_histogram = fieldstat_register_histogram(instance, cube_id, "histogram",
         g_histogram_standard->lowest_discernible_value, g_histogram_standard->highest_trackable_value, g_histogram_standard->significant_figures);
     fieldstat_counter_incrby(instance, cube_id, id_counter, &TEST_TAG_INT, 1, 1);
-    fieldstat_hist_record(instance, cube_id, id_histogram, &TEST_TAG_STRING, 1, 123);
+    fieldstat_histogram_record(instance, cube_id, id_histogram, &TEST_TAG_STRING, 1, 123);
 
     /* -------------------------- export test, 1st time ------------------------- */
     struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new();
@@ -671,7 +671,7 @@ TEST(export_test, enable_delta_and_export_three_times_skipping_cube_with_no_coun
     /* -------------------------------- 3rd time -------------------------------- */
     // add some new recs
     fieldstat_counter_incrby(instance, cube_id, id_counter, &TEST_TAG_INT, 1, 10);
-    fieldstat_hist_record(instance, cube_id, id_histogram, &TEST_TAG_STRING, 1, 1234);
+    fieldstat_histogram_record(instance, cube_id, id_histogram, &TEST_TAG_STRING, 1, 1234);
     json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, instance, &TEST_TIMEVAL);
     root_arr = cJSON_Parse(json_string);
     free(json_string);
@@ -727,7 +727,7 @@ TEST(export_test, enable_delta_and_export_instance_with_many_cells_with_global_t
     int cube_id2 = fieldstat_create_cube(instance, TEST_TAG_SHARED3, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
     int id_counter2 = fieldstat_register_counter(instance, cube_id2, "counter");
     fieldstat_counter_incrby(instance, cube_id2, id_counter2, &TEST_TAG_INT, 1, 21);
-    fieldstat_counter_incrby(instance, cube_id2, id_counter2, &TEST_TAG_DOUBLE, 1, 22);
+    fieldstat_counter_incrby(instance, cube_id2, id_counter2, &TEST_FIELD_VALUE_DOUBLE, 1, 22);
 
     // export test
     struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new();
@@ -757,14 +757,14 @@ TEST(export_test, enable_delta_and_export_instance_with_many_cells_with_global_t
     test_check_delta_for_one_json(&tmp_tag_cell, &tmp_tag_shared, 21, 21, root);
     /* ------------------------------ cube 1 cell 1 ----------------------------- */
     root = cJSON_GetArrayItem(root_arr, 3);
-    tmp_tag_cell = (struct field_list){(struct field *)&TEST_TAG_DOUBLE, 1};
+    tmp_tag_cell = (struct field_list){(struct field *)&TEST_FIELD_VALUE_DOUBLE, 1};
     test_check_delta_for_one_json(&tmp_tag_cell, &tmp_tag_shared, 22, 22, root);
 
     // new turn 
     fieldstat_counter_incrby(instance, cube_id1, id_counter1, &TEST_TAG_INT, 1, 100);
     fieldstat_counter_incrby(instance, cube_id1, id_counter1, &TEST_TAG_STRING, 1, 200);
     fieldstat_counter_incrby(instance, cube_id2, id_counter1, &TEST_TAG_INT, 1, 300);
-    fieldstat_counter_incrby(instance, cube_id2, id_counter1, &TEST_TAG_DOUBLE, 1, 400);
+    fieldstat_counter_incrby(instance, cube_id2, id_counter1, &TEST_FIELD_VALUE_DOUBLE, 1, 400);
 
     cJSON_Delete(root_arr);
 
@@ -793,7 +793,7 @@ TEST(export_test, enable_delta_and_export_instance_with_many_cells_with_global_t
     test_check_delta_for_one_json(&tmp_tag_cell, &tmp_tag_shared, 321, 300, root);
     /* ------------------------------ cube 1 cell 1 ----------------------------- */
     root = cJSON_GetArrayItem(root_arr, 3);
-    tmp_tag_cell = (struct field_list){(struct field *)&TEST_TAG_DOUBLE, 1};
+    tmp_tag_cell = (struct field_list){(struct field *)&TEST_FIELD_VALUE_DOUBLE, 1};
     test_check_delta_for_one_json(&tmp_tag_cell, &tmp_tag_shared, 422, 400, root);
 
     cJSON_Delete(root_arr);
@@ -883,8 +883,8 @@ TEST(export_test, delta_with_two_instance_same_config)
     int cube_id = fieldstat_create_cube(instance, NULL, 0, SAMPLING_MODE_COMPREHENSIVE, 0);
     int id_counter = fieldstat_register_counter(instance, cube_id, "counter");
     fieldstat_counter_incrby(instance, 0, id_counter, &TEST_TAG_INT, 1, 123);
-    int id_hist = fieldstat_register_hist(instance, cube_id, "histogram", 1, 1000, 3);
-    fieldstat_hist_record(instance, cube_id, id_hist, &TEST_TAG_INT, 1, 5);
+    int id_hist = fieldstat_register_histogram(instance, cube_id, "histogram", 1, 1000, 3);
+    fieldstat_histogram_record(instance, cube_id, id_hist, &TEST_TAG_INT, 1, 5);
     
     struct fieldstat *acc = fieldstat_new();
     fieldstat_merge(acc, instance);
@@ -923,8 +923,8 @@ TEST(export_test, delta_with_two_instance_one_empty)
     int cube_id = fieldstat_create_cube(instance, NULL, 0, SAMPLING_MODE_COMPREHENSIVE, 0);
     int id_counter = fieldstat_register_counter(instance, cube_id, "counter");
     fieldstat_counter_incrby(instance, 0, id_counter, &TEST_TAG_INT, 1, 123);
-    int id_hist = fieldstat_register_hist(instance, cube_id, "histogram", 1, 1000, 3);
-    fieldstat_hist_record(instance, 0, id_hist, &TEST_TAG_INT, 1, 5);
+    int id_hist = fieldstat_register_histogram(instance, cube_id, "histogram", 1, 1000, 3);
+    fieldstat_histogram_record(instance, 0, id_hist, &TEST_TAG_INT, 1, 5);
     
     struct fieldstat *delta = fieldstat_fork(instance);
 
@@ -964,7 +964,7 @@ TEST(export_test, delta_with_two_instance_different_cell)
     fieldstat_counter_incrby(instance, 0, id_counter, &TEST_TAG_INT, 1, 123);
 
     struct fieldstat *delta = fieldstat_fork(instance);
-    fieldstat_counter_incrby(delta, 0, id_counter, &TEST_TAG_DOUBLE, 1, 1);
+    fieldstat_counter_incrby(delta, 0, id_counter, &TEST_FIELD_VALUE_DOUBLE, 1, 1);
     fieldstat_merge(instance, delta);
 
     // export test

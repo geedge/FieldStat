@@ -583,7 +583,7 @@ int heavy_keeper_add(struct heavy_keeper *heavy_keeper, const char *key, size_t 
 
     struct sorted_set *summary = heavy_keeper->top_K_heap;
     
-    long long old_cnt = sorted_set_get_score(summary, key, key_len); // todo: 改成 score
+    long long old_cnt = sorted_set_get_score(summary, key, key_len);
     bool not_in_sorted_set = (old_cnt == NOT_FIND);
     long long maxv = 0;
     uint64_t fp = cal_hash_val_with_seed(key, key_len, FP_HASH_KEY);

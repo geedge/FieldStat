@@ -97,7 +97,7 @@ TEST(test_empty_tag, merge_topk)
 TEST(test_empty_tag, merge_spreadsketch)
 {
     struct fieldstat *instance_src = fieldstat_new();
-    int cube_id = fieldstat_create_cube(instance_src, NULL, 0, SAMPLING_MODE_SPREADSKETCH, 1);
+    int cube_id = fieldstat_create_cube(instance_src, NULL, 0, SAMPLING_MODE_TOP_CARDINALITY, 1);
     int metric_id = fieldstat_register_hll(instance_src, cube_id, "metric", 4);
     fieldstat_hll_add(instance_src, cube_id, metric_id, NULL, 0, "1", 1);
     struct fieldstat *instance_dst = fieldstat_new();

@@ -69,7 +69,7 @@ void fieldstat_free_tag_array(struct field *fields, size_t n_tags)
     for (size_t i = 0; i < n_tags; i++) {
         struct field *field = &fields[i];
         free((char *)field->key);
-        if (field->type == TAG_CSTRING) {
+        if (field->type == FIELD_VALUE_CSTRING) {
             free((char *)field->value_str);
         }
     }
@@ -142,7 +142,7 @@ int fieldstat_register_hll(struct fieldstat *instance, int cube_id, const char *
 }
 
 // cppcheck-suppress [constParameterPointer, unmatchedSuppression]
-int fieldstat_register_hist(struct fieldstat *instance, int cube_id, const char *metric_name, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures)
+int fieldstat_register_histogram(struct fieldstat *instance, int cube_id, const char *metric_name, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures)
 {
     struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
     if (cube == NULL) {
@@ -200,7 +200,7 @@ int fieldstat_hll_add_field(struct fieldstat *instance, int cube_id, int metric_
 }
 
 // cppcheck-suppress [constParameterPointer, unmatchedSuppression]
-int fieldstat_hist_record(struct fieldstat *instance, int cube_id, int metric_id, const struct field *cell_dimensions, size_t n_dimensions, long long value)
+int fieldstat_histogram_record(struct fieldstat *instance, int cube_id, int metric_id, const struct field *cell_dimensions, size_t n_dimensions, long long value)
 {
     struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
     if (cube == NULL) {
@@ -277,7 +277,7 @@ int fieldstat_hll_get(const struct fieldstat *instance, int cube_id, const struc
     return ret;
 }
 
-long long fieldstat_hist_value_at_percentile(const struct fieldstat *instance, int cube_id, const struct field_list *cell_dimensions, int metric_id, double percentile)
+long long fieldstat_histogram_value_at_percentile(const struct fieldstat *instance, int cube_id, const struct field_list *cell_dimensions, int metric_id, double percentile)
 {
     const struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
     if (cube == NULL) {
@@ -292,7 +292,7 @@ long long fieldstat_hist_value_at_percentile(const struct fieldstat *instance, i
     return value;
 }
 
-long long fieldstat_hist_count_le_value(const struct fieldstat *instance, int cube_id, const struct field_list *cell_dimensions, int metric_id, long long value)
+long long fieldstat_histogram_count_le_value(const struct fieldstat *instance, int cube_id, const struct field_list *cell_dimensions, int metric_id, long long value)
 {
     const struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
     if (cube == NULL) {

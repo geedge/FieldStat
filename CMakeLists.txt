@@ -98,14 +98,14 @@ include_directories(${PROJECT_SOURCE_DIR}/vendors)
 include_directories(${PROJECT_SOURCE_DIR}/src)
 include_directories(${PROJECT_SOURCE_DIR}/include/fieldstat)
 include_directories(${PROJECT_SOURCE_DIR}/src/metrics)
-include_directories(${PROJECT_SOURCE_DIR}/src/tags)
+include_directories(${PROJECT_SOURCE_DIR}/src/cells)
 include_directories(${PROJECT_SOURCE_DIR}/src/utils)
 
 
 file(GLOB SRC
     "src/*.c"
     "src/metrics/*.c"
-    "src/tags/*.c"
+    "src/cells/*.c"
     "src/exporter/*.c"
     "src/utils/*.c"
     "vendors/cjson/*.c"

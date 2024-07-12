@@ -172,7 +172,7 @@ const int N_THREADS = 3;
 struct field global_tags[1];
 struct field tmptag;
 tmptag.key = "app id";
-tmptag.type = TAG_INTEGER;
+tmptag.type = FIELD_VALUE_INTEGER;
 tmptag.value_longlong = 1;
 global_tags[0] = tmptag;
 

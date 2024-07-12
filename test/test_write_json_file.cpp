@@ -28,17 +28,17 @@ extern "C" {
     struct field cell_tags[2];
 
     global_tags[0].key  = "rule_id";
-    global_tags[0].type = TAG_INTEGER;
+    global_tags[0].type = FIELD_VALUE_INTEGER;
     global_tags[0].value_longlong = 1;
     global_tags[1].key  = "action";
-    global_tags[1].type = TAG_CSTRING;
+    global_tags[1].type = FIELD_VALUE_CSTRING;
     global_tags[1].value_str = "deny";
 
     cell_tags[0].key  = "thread_id";
-    cell_tags[0].type = TAG_INTEGER;
+    cell_tags[0].type = FIELD_VALUE_INTEGER;
     cell_tags[0].value_longlong = 1;
     cell_tags[1].key  = "hit_rate";
-    cell_tags[1].type = TAG_DOUBLE;
+    cell_tags[1].type = FIELD_VALUE_DOUBLE;
     cell_tags[1].value_double = 1.1;
 
     const char *hist_names[] = {"list_num", "max_wt_ms", "ivt_nx_itv_ms", 
@@ -62,7 +62,7 @@ static void write_hll(struct fieldstat *instance) {
     struct field shared_tags[1];
 
     shared_tags[0].key  = "rule_id";
-    shared_tags[0].type = TAG_INTEGER;
+    shared_tags[0].type = FIELD_VALUE_INTEGER;
     shared_tags[0].value_longlong = 1;
 
     const char *hll_name[] = {"external_ip", "internal_ip", "acc_ip"};
@@ -89,17 +89,17 @@ void write_histogram(struct fieldstat *instance) {
     struct field cell_tags[2];
 
     shared_tags[0].key  = "rule_id";
-    shared_tags[0].type = TAG_INTEGER;
+    shared_tags[0].type = FIELD_VALUE_INTEGER;
     shared_tags[0].value_longlong = 1;
     shared_tags[1].key  = "action";
-    shared_tags[1].type = TAG_CSTRING;
+    shared_tags[1].type = FIELD_VALUE_CSTRING;
     shared_tags[1].value_str = "deny";
 
     cell_tags[0].key  = "thread_id";
-    cell_tags[0].type = TAG_INTEGER;
+    cell_tags[0].type = FIELD_VALUE_INTEGER;
     cell_tags[0].value_longlong = 1;
     cell_tags[1].key  = "hit_rate";
-    cell_tags[1].type = TAG_DOUBLE;
+    cell_tags[1].type = FIELD_VALUE_DOUBLE;
     cell_tags[1].value_double = 1.1;
 
     const char *hist_names[] = {"list_num", "max_wt_ms", "ivt_nx_itv_ms", 
@@ -112,11 +112,11 @@ void write_histogram(struct fieldstat *instance) {
 
     for(unsigned int i = 0; i < sizeof(hist_names)/sizeof(hist_names[0]); i++)
     {
-        int hist_id = fieldstat_register_hist(instance, cube_id, hist_names[i], 1, 600000, 3);
+        int hist_id = fieldstat_register_histogram(instance, cube_id, hist_names[i], 1, 600000, 3);
 
         for(int j = 0; j < 100; j++)
         {
-            fieldstat_hist_record(instance, cube_id, hist_id, cell_tags, 2, i*100 + j);
+            fieldstat_histogram_record(instance, cube_id, hist_id, cell_tags, 2, i*100 + j);
         }
     }
 }
@@ -127,10 +127,10 @@ void write_histogram(struct fieldstat *instance) {
 //     struct field cell_tags;
 
 //     global_tags[0].key  = "policy_id";
-//     global_tags[0].type = TAG_INTEGER;
+//     global_tags[0].type = FIELD_VALUE_INTEGER;
 //     global_tags[0].value_longlong = 1;
 //     global_tags[1].key  = "quanlity";
-//     global_tags[1].type = TAG_DOUBLE;
+//     global_tags[1].type = FIELD_VALUE_DOUBLE;
 //     global_tags[1].value_double = 0.5;
 
 //     const char *cell_tag_value[] = {
@@ -140,7 +140,7 @@ void write_histogram(struct fieldstat *instance) {
 //         "STATISTICS-RULE-METRIC", "OBJECT-STATISTICS-METRIC"};
 
 //     cell_tags.key  = "send_log";
-//     cell_tags.type = TAG_CSTRING;
+//     cell_tags.type = FIELD_VALUE_CSTRING;
 //     cell_tags.value_str = "true";
 
 //     struct fieldstat_easy *fse = fieldstat_easy_new(N_THREAD, NULL, global_tags, 2);
@@ -168,10 +168,10 @@ void fieldstat_easy_to_file(struct fieldstat_easy *fse, const char *file_path)
 void write_table(struct fieldstat *instance) {
     struct field shared_tags[2];   
     shared_tags[0].key  = "policy_id";
-    shared_tags[0].type = TAG_INTEGER;
+    shared_tags[0].type = FIELD_VALUE_INTEGER;
     shared_tags[0].value_longlong = 1;
     shared_tags[1].key  = "quanlity";
-    shared_tags[1].type = TAG_DOUBLE;
+    shared_tags[1].type = FIELD_VALUE_DOUBLE;
     shared_tags[1].value_double = 0.5;
 
     const char *cell_tag_value[] = {
@@ -182,7 +182,7 @@ void write_table(struct fieldstat *instance) {
 
     struct field cell_tags;
     cell_tags.key = "send_log";
-    cell_tags.type = TAG_CSTRING;
+    cell_tags.type = FIELD_VALUE_CSTRING;
     cell_tags.value_str = "true";
 
     int cube_id = fieldstat_create_cube(instance, shared_tags, 2, 

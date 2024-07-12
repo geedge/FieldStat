@@ -347,7 +347,7 @@ TEST(Fuzz_test, many_instance_random_flow_unregister_calibrate_reset_fork_merge_
     // init cube
     for (int i = 0; i < CUBE_NUM; i++) {
         shared_tags[i] = new Fieldstat_tag_list_wrapper("shared_tag", i);
-        int cube_id = fieldstat_create_cube(master, shared_tags[i]->get_tag(), shared_tags[i]->get_tag_count(), SAMPLING_MODE_SPREADSKETCH, CELL_MAX);
+        int cube_id = fieldstat_create_cube(master, shared_tags[i]->get_tag(), shared_tags[i]->get_tag_count(), SAMPLING_MODE_TOP_CARDINALITY, CELL_MAX);
         EXPECT_EQ(cube_id, i);
         fieldstat_register_hll(master, cube_id, "hll", 6);
     }
@@ -379,7 +379,7 @@ TEST(Fuzz_test, many_instance_random_flow_unregister_calibrate_reset_fork_merge_
             delete shared_tags[cube_id_to_change];
             shared_tags[cube_id_to_change] = new_tag;
             fieldstat_destroy_cube(master, cube_id_to_change);
-            int cube_id_new = fieldstat_create_cube(master, new_tag->get_tag(), new_tag->get_tag_count(), SAMPLING_MODE_SPREADSKETCH, CELL_MAX);
+            int cube_id_new = fieldstat_create_cube(master, new_tag->get_tag(), new_tag->get_tag_count(), SAMPLING_MODE_TOP_CARDINALITY, CELL_MAX);
             fieldstat_register_hll(master, cube_id_new, "hll", 6);
             EXPECT_EQ(cube_id_new, cube_id_to_change); // should new the cube in the hole leaved by the destroyed cube
             // calibrate
@@ -514,7 +514,7 @@ TEST(Fuzz_test, simple_one_for_perf)
     // init cube
     for (int i = 0; i < CUBE_NUM; i++) {
         shared_tags[i] = new Fieldstat_tag_list_wrapper("shared_tag", i);
-        int cube_id = fieldstat_create_cube(master, shared_tags[i]->get_tag(), shared_tags[i]->get_tag_count(), SAMPLING_MODE_SPREADSKETCH, CELL_MAX);
+        int cube_id = fieldstat_create_cube(master, shared_tags[i]->get_tag(), shared_tags[i]->get_tag_count(), SAMPLING_MODE_TOP_CARDINALITY, CELL_MAX);
         EXPECT_EQ(cube_id, i);
         fieldstat_register_counter(master, cube_id, "topk");
     }

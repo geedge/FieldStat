@@ -218,17 +218,17 @@ int fieldstat_easy_register_histogram(struct fieldstat_easy *fse, const char *na
         pthread_spin_lock(&fse->fsu[i].lock);
     }
 
-    int ret = fieldstat_register_hist(fse->fsu[0].active, 0, name, lowest_trackable_value, highest_trackable_value, significant_figures); // try to register
+    int ret = fieldstat_register_histogram(fse->fsu[0].active, 0, name, lowest_trackable_value, highest_trackable_value, significant_figures); // try to register
     if (ret < 0) {
         for (int i = 0; i < fse->max_thread_num; i++) {
             pthread_spin_unlock(&fse->fsu[i].lock);
         }
         return ret;
     }
-    fieldstat_register_hist(fse->fsu[0].read_only, 0, name, lowest_trackable_value, highest_trackable_value, significant_figures);
+    fieldstat_register_histogram(fse->fsu[0].read_only, 0, name, lowest_trackable_value, highest_trackable_value, significant_figures);
     for (int i = 1; i < fse->max_thread_num; i++) {
-        fieldstat_register_hist(fse->fsu[i].active, 0, name, lowest_trackable_value, highest_trackable_value, significant_figures);
-        fieldstat_register_hist(fse->fsu[i].read_only, 0, name, lowest_trackable_value, highest_trackable_value, significant_figures);
+        fieldstat_register_histogram(fse->fsu[i].active, 0, name, lowest_trackable_value, highest_trackable_value, significant_figures);
+        fieldstat_register_histogram(fse->fsu[i].read_only, 0, name, lowest_trackable_value, highest_trackable_value, significant_figures);
     }
 
     for (int i = 0; i < fse->max_thread_num; i++) {
@@ -354,7 +354,7 @@ int fieldstat_easy_histogram_record(struct fieldstat_easy *fse, int thread_id, i
     }
 
     pthread_spin_lock(&fse->fsu[thread_id].lock);
-    int ret = fieldstat_hist_record(fse->fsu[thread_id].active, 0, metric_id, dimensions, n_dimensions, value);
+    int ret = fieldstat_histogram_record(fse->fsu[thread_id].active, 0, metric_id, dimensions, n_dimensions, value);
     pthread_spin_unlock(&fse->fsu[thread_id].lock);
 
     return ret;

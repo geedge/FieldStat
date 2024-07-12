@@ -76,10 +76,10 @@ TEST(test_performance, merge_performance_one_instance_comprehensive_hll_empty_de
 TEST(test_performance, merge_performance_one_instance_comprehensive_histogram_empty_dest)
 {   
     auto metric_add_func = [](struct fieldstat *instance, int cube_id, int metric_id, const struct field *fields, int n_field) {
-        fieldstat_hist_record(instance, cube_id, metric_id, fields, n_field, 1234);
+        fieldstat_histogram_record(instance, cube_id, metric_id, fields, n_field, 1234);
     };
     auto metric_register_func = [](struct fieldstat *instance) {
-        return fieldstat_register_hist(instance, 0, "histogram metric", 1, 100000, 1);
+        return fieldstat_register_histogram(instance, 0, "histogram metric", 1, 100000, 1);
     };
 
     double elapsed = perform_merge_test(metric_add_func, metric_register_func, SAMPLING_MODE_COMPREHENSIVE, true);
@@ -132,10 +132,10 @@ TEST(test_performance, merge_performance_one_instance_comprehensive_hll_full_des
 TEST(test_performance, merge_performance_one_instance_comprehensive_histogram_full_dest)
 {   
     auto metric_add_func = [](struct fieldstat *instance, int cube_id, int metric_id, const struct field *fields, int n_field) {
-        fieldstat_hist_record(instance, cube_id, metric_id, fields, n_field, 1234);
+        fieldstat_histogram_record(instance, cube_id, metric_id, fields, n_field, 1234);
     };
     auto metric_register_func = [](struct fieldstat *instance) {
-        return fieldstat_register_hist(instance, 0, "histogram metric", 1, 100000, 1);
+        return fieldstat_register_histogram(instance, 0, "histogram metric", 1, 100000, 1);
     };
 
     double elapsed = perform_merge_test(metric_add_func, metric_register_func, SAMPLING_MODE_COMPREHENSIVE, false);
@@ -268,7 +268,7 @@ TEST(test_performance, performance_test_add_cells_histogram_record)
 {
     struct fieldstat *instance = fieldstat_new();
     fieldstat_create_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
-    fieldstat_register_hist(instance, 0, "test", 1, 100000, 3);
+    fieldstat_register_histogram(instance, 0, "test", 1, 100000, 3);
     size_t test_num = 100000;
     long long vals[test_num];
     for (size_t i = 0; i < test_num; i++) {
@@ -276,7 +276,7 @@ TEST(test_performance, performance_test_add_cells_histogram_record)
     }
     clock_t start = clock();
     for (size_t i = 0; i < test_num; i++) {
-        fieldstat_hist_record(instance, 0, 0, &TEST_TAG_INT, 1, vals[i]);
+        fieldstat_histogram_record(instance, 0, 0, &TEST_TAG_INT, 1, vals[i]);
     }
     clock_t end = clock();
     double seconds = (double)(end - start) / test_num;
@@ -347,7 +347,7 @@ TEST(test_performance, performance_test_add_cells_histogram_record_5tags)
 {
     struct fieldstat *instance = fieldstat_new();
     fieldstat_create_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
-    fieldstat_register_hist(instance, 0, "test", 1, 100000, 3);
+    fieldstat_register_histogram(instance, 0, "test", 1, 100000, 3);
     size_t test_num = 100000;
     long long vals[test_num];
     for (size_t i = 0; i < test_num; i++) {
@@ -357,12 +357,12 @@ TEST(test_performance, performance_test_add_cells_histogram_record_5tags)
     struct field fields[5];
     fields[0] = TEST_TAG_INT;
     fields[1] = TEST_TAG_STRING;
-    fields[2] = TEST_TAG_DOUBLE;
+    fields[2] = TEST_FIELD_VALUE_DOUBLE;
     fields[3] = TEST_TAG_INT;
     fields[4] = TEST_TAG_INT;
     clock_t start = clock();
     for (size_t i = 0; i < test_num; i++) {
-        fieldstat_hist_record(instance, 0, 0, fields, 5, vals[i]);
+        fieldstat_histogram_record(instance, 0, 0, fields, 5, vals[i]);
     }
     clock_t end = clock();
     double seconds = (double)(end - start) / test_num;
@@ -385,7 +385,7 @@ TEST(test_performance, performance_test_add_cells_hll_add_5tags)
     struct field fields[5];
     fields[0] = TEST_TAG_INT;
     fields[1] = TEST_TAG_STRING;
-    fields[2] = TEST_TAG_DOUBLE;
+    fields[2] = TEST_FIELD_VALUE_DOUBLE;
     fields[3] = TEST_TAG_INT;
     fields[4] = TEST_TAG_INT;
     clock_t start = clock();

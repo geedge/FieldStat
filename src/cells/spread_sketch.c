@@ -52,6 +52,7 @@ struct spread_sketch {
 
     uint32_t *min_level_per_row; // TODO: 先看看性能吧, 之后再写。用来记录每行最小的level，从而跳过行数。对于64位的level，维持一个计数，额外使用64 r的空间，当一个最小位数的level 计数到0时，更新最小level。
     // TODO: 对比heavy keeper,不仅仅是跳过的问题，heavykeeper 无论什么情况，在输入0的时候都不会走sketch 更新。
+    // 或者简单记录用掉的bucket 数量也挺好。
 };
 
 static void *default_new_fn(void *arg) {

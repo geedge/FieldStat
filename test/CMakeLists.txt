@@ -16,7 +16,7 @@ set(DEBUG_FLAGS "-O3")
 include_directories(${PROJECT_SOURCE_DIR}/test)
 include_directories(${PROJECT_SOURCE_DIR}/test/deps)
 include_directories(${PROJECT_SOURCE_DIR}/src)
-include_directories(${PROJECT_SOURCE_DIR}/src/tags)
+include_directories(${PROJECT_SOURCE_DIR}/src/cells)
 include_directories(${PROJECT_SOURCE_DIR}/src/metrics)
 include_directories(${PROJECT_SOURCE_DIR}/include/fieldstat)
 

@@ -13,7 +13,7 @@
 #include "metric_manifest.h"
 #include "metric.h"
 #include "heavy_keeper.h"
-#include "tag_map.h"
+#include "hash_table.h"
 #include "spread_sketch.h"
 
 #define DEFAULT_N_METRIC 32
@@ -42,8 +42,8 @@ struct cell {
 struct cube {
     enum sampling_mode sampling_mode;
     union {
-        struct heavy_keeper *heavykeeper; // todo: 这两个改了
-        struct hash_table *table; // todo: 
+        struct heavy_keeper *heavykeeper;
+        struct hash_table *table;
         struct spread_sketch *spread_sketch;
     };
     size_t max_n_cell;
@@ -54,7 +54,7 @@ struct cube {
 
     int primary_metric_id;
     char *serialized_dimensions;     // the key of cube is serialized cube dimensions
-    size_t serialized_dimensions_len; // todo: 重命名
+    size_t serialized_dimensions_len;
     int id;
     UT_hash_handle hh;
 };
@@ -68,13 +68,13 @@ static struct field *field_array_duplicate(const struct field *fields_src, size_
         ret[i].type = fields_src[i].type;
         switch (fields_src[i].type)
         {
-        case TAG_INTEGER:
+        case FIELD_VALUE_INTEGER:
             ret[i].value_longlong = fields_src[i].value_longlong;
             break;
-        case TAG_CSTRING:
+        case FIELD_VALUE_CSTRING:
             ret[i].value_str = strdup(fields_src[i].value_str);
             break;
-        case TAG_DOUBLE:
+        case FIELD_VALUE_DOUBLE:
             ret[i].value_double = fields_src[i].value_double;
             break;
         default:
@@ -90,7 +90,7 @@ static void fieldstat_free_tag_array(struct field *fields, size_t n_tags)
     for (size_t i = 0; i < n_tags; i++) {
         struct field *field = &fields[i];
         free((char *)field->key);
-        if (field->type == TAG_CSTRING) {
+        if (field->type == FIELD_VALUE_CSTRING) {
             free((char *)field->value_str);
         }
     }
@@ -164,16 +164,16 @@ static int field_array_to_key_safe(const struct field fields[], size_t n_tags, c
         key_len = strlen(field->key);
 		switch(field->type)
 		{
-			case TAG_INTEGER:
+			case FIELD_VALUE_INTEGER:
                 val_len = sizeof(long long);
                 val_position = (void *)&field->value_longlong;
 				break;
-			case TAG_DOUBLE:
+			case FIELD_VALUE_DOUBLE:
                 val_len = sizeof(double);
                 val_position = (void *)&field->value_double;
 
 				break;
-			case TAG_CSTRING:
+			case FIELD_VALUE_CSTRING:
                 val_len = strlen(field->value_str);
                 val_position = (void *)field->value_str;
 				break;
@@ -221,16 +221,16 @@ static void field_array_to_key_endeavor(const struct field fields[], size_t n_ta
         key_len = strlen(field->key);
 		switch(field->type)
 		{
-			case TAG_INTEGER:
+			case FIELD_VALUE_INTEGER:
                 val_len = sizeof(long long);
                 val_position = (void *)&field->value_longlong;
 				break;
-			case TAG_DOUBLE:
+			case FIELD_VALUE_DOUBLE:
                 val_len = sizeof(double);
                 val_position = (void *)&field->value_double;
 
 				break;
-			case TAG_CSTRING:
+			case FIELD_VALUE_CSTRING:
                 val_len = strlen(field->value_str);
                 val_position = (void *)field->value_str;
 				break;
@@ -484,7 +484,7 @@ void cell_free(struct cell *pthis) {
     free(pthis->slots);
     for (size_t i = 0; i < pthis->cell_dimensions.n_field; i++) {
         free((char *)pthis->cell_dimensions.field[i].key);
-        if (pthis->cell_dimensions.field[i].type == TAG_CSTRING) {
+        if (pthis->cell_dimensions.field[i].type == FIELD_VALUE_CSTRING) {
             free((char *)pthis->cell_dimensions.field[i].value_str);
         }
     }
@@ -592,7 +592,7 @@ struct cube *cube_new(const struct field *dimensions, size_t n_dimensions, enum 
             cube->table = hash_table_new(max_n_cell);
             hash_table_set_exdata_schema(cube->table, exdata_new_i, exdata_free_i, exdata_merge_i, exdata_reset_i, exdata_copy_i);
             break;
-        case SAMPLING_MODE_SPREADSKETCH:
+        case SAMPLING_MODE_TOP_CARDINALITY:
             cube->spread_sketch = spread_sketch_new(max_n_cell);
             spread_sketch_set_exdata_schema(cube->spread_sketch, exdata_new_i, exdata_free_i, exdata_merge_i, exdata_reset_i, exdata_copy_i);
             break;
@@ -613,7 +613,7 @@ void cube_free(struct cube *cube) {
     case SAMPLING_MODE_COMPREHENSIVE:
         hash_table_free(cube->table);
         break;
-    case SAMPLING_MODE_SPREADSKETCH:
+    case SAMPLING_MODE_TOP_CARDINALITY:
         spread_sketch_free(cube->spread_sketch);
         break;
     default:
@@ -642,7 +642,7 @@ void cube_reset(struct cube *cube) {
     case SAMPLING_MODE_COMPREHENSIVE:
         hash_table_reset(cube->table);
         break;  
-    case SAMPLING_MODE_SPREADSKETCH:
+    case SAMPLING_MODE_TOP_CARDINALITY:
         spread_sketch_reset(cube->spread_sketch);
         break;
     default:
@@ -658,7 +658,7 @@ int cube_set_primary_metric(struct cube *cube, int metric_id) {
     }
     if (cube->sampling_mode == SAMPLING_MODE_COMPREHENSIVE ||
         (cube->sampling_mode == SAMPLING_MODE_TOPK && manifest->type != METRIC_TYPE_COUNTER) ||
-        (cube->sampling_mode == SAMPLING_MODE_SPREADSKETCH && manifest->type != METRIC_TYPE_HLL)) {
+        (cube->sampling_mode == SAMPLING_MODE_TOP_CARDINALITY && manifest->type != METRIC_TYPE_HLL)) {
         return FS_ERR_INVALID_PARAM;
     }
     cube->primary_metric_id = metric_id;
@@ -761,9 +761,8 @@ struct cell *get_cell_in_spread_sketch_cube(struct cube *cube, const struct fiel
     args.n_dimensions = n_dimension;
 
     struct cell *cell_data = NULL;
-    assert(cube->sampling_mode == SAMPLING_MODE_SPREADSKETCH);
+    assert(cube->sampling_mode == SAMPLING_MODE_TOP_CARDINALITY);
     
-    // todo: spread sketch 现在支持dummy 的方式是让他们也走sketch，可以用“满行”来减少这种计算，但确实加入level 低的内容，会走相同的流程，不像heavy keeper 一样就简单的查哈希表。
     if (cube->primary_metric_id != metric_id) {
         cell_data = spread_sketch_get0_exdata(cube->spread_sketch, key, key_len);
         if (cell_data == NULL) {
@@ -894,7 +893,7 @@ int cube_histogram_record(struct cube *cube, int metric_id, const struct field *
     case SAMPLING_MODE_TOPK: {
         cell_data = get_cell_in_topk_cube(cube, dimensions, n_dimensions, 0, metric_id);
         break;}
-    case SAMPLING_MODE_SPREADSKETCH: {
+    case SAMPLING_MODE_TOP_CARDINALITY: {
         cell_data = get_cell_in_spread_sketch_cube(cube, dimensions, n_dimensions, 0, metric_id);
         break;}
     default:
@@ -923,7 +922,7 @@ int cube_hll_add(struct cube *cube, int metric_id, const struct field *dimension
     }
 
     uint64_t hash = 0; // just any value, if we do not need to update the primary metric of spread sketch cube, hash value is not used
-    if (cube->sampling_mode == SAMPLING_MODE_SPREADSKETCH && cube->primary_metric_id == metric_id) {
+    if (cube->sampling_mode == SAMPLING_MODE_TOP_CARDINALITY && cube->primary_metric_id == metric_id) {
         hash = XXH3_64bits(key, key_len);
     }
     struct cell *cell_data = NULL;
@@ -934,7 +933,7 @@ int cube_hll_add(struct cube *cube, int metric_id, const struct field *dimension
     case SAMPLING_MODE_TOPK: {
         cell_data = get_cell_in_topk_cube(cube, dimensions, n_dimensions, 0, metric_id);
         break;}
-    case SAMPLING_MODE_SPREADSKETCH: {
+    case SAMPLING_MODE_TOP_CARDINALITY: {
         cell_data = get_cell_in_spread_sketch_cube(cube, dimensions, n_dimensions, hash, metric_id);
         break;}
     default:
@@ -956,7 +955,7 @@ uint64_t field_array_to_hash(const struct field *field, size_t n_dimensions) {
 
     for (int i = 0; i < n_dimensions; i++) {
         XXH3_64bits_update(&state, field[i].key, strlen(field[i].key));
-        if (field[i].type != TAG_CSTRING) {
+        if (field[i].type != FIELD_VALUE_CSTRING) {
             XXH3_64bits_update(&state, &field[i].value_longlong, sizeof(long long));
         } else {
             XXH3_64bits_update(&state, field[i].value_str, strlen(field[i].value_str));
@@ -975,7 +974,7 @@ int cube_hll_add_field(struct cube *cube, int metric_id, const struct field *dim
     }
 
     uint64_t hash = 0; // just any value, if we do not need to update the primary metric of spread sketch cube, hash value is not used
-    if (cube->sampling_mode == SAMPLING_MODE_SPREADSKETCH && cube->primary_metric_id == metric_id) {
+    if (cube->sampling_mode == SAMPLING_MODE_TOP_CARDINALITY && cube->primary_metric_id == metric_id) {
         hash = field_array_to_hash(tags_key, n_tag_key);
     }
     struct cell *cell_data = NULL;
@@ -986,7 +985,7 @@ int cube_hll_add_field(struct cube *cube, int metric_id, const struct field *dim
     case SAMPLING_MODE_TOPK: {
         cell_data = get_cell_in_topk_cube(cube, dimensions, n_dimensions, 0, metric_id);
         break;}
-    case SAMPLING_MODE_SPREADSKETCH: {
+    case SAMPLING_MODE_TOP_CARDINALITY: {
         cell_data = get_cell_in_spread_sketch_cube(cube, dimensions, n_dimensions, hash, metric_id);
         break;}
     default:
@@ -1008,7 +1007,7 @@ int cube_hll_add_field(struct cube *cube, int metric_id, const struct field *dim
 int cube_counter_incrby(struct cube *cube, int metric_id, const struct field *dimensions, size_t n_dimensions, long long increment) {
     assert(cube->sampling_mode == SAMPLING_MODE_COMPREHENSIVE || 
           (cube->sampling_mode == SAMPLING_MODE_TOPK && (cube->primary_metric_id != metric_id || increment >= 0)) ||
-          (cube->sampling_mode == SAMPLING_MODE_SPREADSKETCH && cube->primary_metric_id != metric_id)
+          (cube->sampling_mode == SAMPLING_MODE_TOP_CARDINALITY && cube->primary_metric_id != metric_id)
           );
 
     const struct metric_manifest *manifest = metric_manifest_manager_get_by_id(cube->manifest_manager, metric_id);
@@ -1024,7 +1023,7 @@ int cube_counter_incrby(struct cube *cube, int metric_id, const struct field *di
     case SAMPLING_MODE_TOPK: {
         cell_data = get_cell_in_topk_cube(cube, dimensions, n_dimensions, increment, metric_id);
         break;}
-    case SAMPLING_MODE_SPREADSKETCH: {
+    case SAMPLING_MODE_TOP_CARDINALITY: {
         cell_data = get_cell_in_spread_sketch_cube(cube, dimensions, n_dimensions, 0, metric_id);
         break;}
     default:
@@ -1058,7 +1057,7 @@ int cube_counter_set(struct cube *cube, int metric_id, const struct field *dimen
     case SAMPLING_MODE_TOPK: {
         cell_data = get_cell_in_topk_cube(cube, dimensions, n_dimensions, 0, metric_id);
         break;}
-    case SAMPLING_MODE_SPREADSKETCH: {
+    case SAMPLING_MODE_TOP_CARDINALITY: {
         cell_data = get_cell_in_spread_sketch_cube(cube, dimensions, n_dimensions, 0, metric_id);
         break;}
     default:
@@ -1087,7 +1086,7 @@ struct cube *cube_copy(const struct cube *cube)
     case SAMPLING_MODE_COMPREHENSIVE:
         cube_dup->table = hash_table_copy(cube->table);
         break;
-    case SAMPLING_MODE_SPREADSKETCH:
+    case SAMPLING_MODE_TOP_CARDINALITY:
         cube_dup->spread_sketch = spread_sketch_copy(cube->spread_sketch);
         break;
     default:
@@ -1131,7 +1130,7 @@ int cube_merge(struct cube *dest, const struct cube *src)
     case SAMPLING_MODE_COMPREHENSIVE:
         hash_table_merge(dest->table, src->table);
         break;
-    case SAMPLING_MODE_SPREADSKETCH:
+    case SAMPLING_MODE_TOP_CARDINALITY:
         spread_sketch_merge(dest->spread_sketch, src->spread_sketch);
         break;
     default:
@@ -1156,7 +1155,7 @@ struct cube *cube_fork(const struct cube *cube) {
             ret->table = hash_table_new(cube->max_n_cell);
             hash_table_set_exdata_schema(ret->table, exdata_new_i, exdata_free_i, exdata_merge_i, exdata_reset_i, exdata_copy_i);
             break;
-        case SAMPLING_MODE_SPREADSKETCH:
+        case SAMPLING_MODE_TOP_CARDINALITY:
             ret->spread_sketch = spread_sketch_new(cube->max_n_cell);
             spread_sketch_set_exdata_schema(ret->spread_sketch, exdata_new_i, exdata_free_i, exdata_merge_i, exdata_reset_i, exdata_copy_i);
             break;
@@ -1196,7 +1195,7 @@ void cube_get_cells(const struct cube *cube, struct field_list **cell_dimensions
         case SAMPLING_MODE_TOPK:
             n_cell_tmp = heavy_keeper_get_count(cube->heavykeeper);
             break;
-        case SAMPLING_MODE_SPREADSKETCH:
+        case SAMPLING_MODE_TOP_CARDINALITY:
             n_cell_tmp = spread_sketch_get_count(cube->spread_sketch);
             break;
         default:
@@ -1217,7 +1216,7 @@ void cube_get_cells(const struct cube *cube, struct field_list **cell_dimensions
         case SAMPLING_MODE_TOPK:
             heavy_keeper_list(cube->heavykeeper, (void **)cell_datas, n_cell_tmp);
             break;
-        case SAMPLING_MODE_SPREADSKETCH:
+        case SAMPLING_MODE_TOP_CARDINALITY:
             spread_sketch_list(cube->spread_sketch, (void **)cell_datas, n_cell_tmp);
             break;
         default:
@@ -1225,7 +1224,7 @@ void cube_get_cells(const struct cube *cube, struct field_list **cell_dimensions
     }
 
     // spread sketch often stores more than max_n_cell. So sort out the top max_n_cell cells.
-    if (cube->sampling_mode == SAMPLING_MODE_SPREADSKETCH && n_cell_tmp > cube->max_n_cell) {
+    if (cube->sampling_mode == SAMPLING_MODE_TOP_CARDINALITY && n_cell_tmp > cube->max_n_cell) {
         struct tmp_sorted_data_spread_sketch_cell *tmp_sorted_data = (struct tmp_sorted_data_spread_sketch_cell *)malloc(sizeof(struct tmp_sorted_data_spread_sketch_cell) * n_cell_tmp);
         for (int i = 0; i < n_cell_tmp; i++) {
             tmp_sorted_data[i].data = cell_datas[i];
@@ -1274,7 +1273,7 @@ const struct cell *get_cell_by_tag_list(const struct cube *cube, const struct fi
     case SAMPLING_MODE_COMPREHENSIVE:
         ret = hash_table_get0_exdata(cube->table, tag_in_string, tag_len);
         break;
-    case SAMPLING_MODE_SPREADSKETCH:
+    case SAMPLING_MODE_TOP_CARDINALITY:
         ret = spread_sketch_get0_exdata(cube->spread_sketch, tag_in_string, tag_len);
         break;
     default:
@@ -1383,7 +1382,7 @@ int cube_get_cell_count(const struct cube *cube) {
             return hash_table_get_count(cube->table);
         case SAMPLING_MODE_TOPK:
             return heavy_keeper_get_count(cube->heavykeeper);
-        case SAMPLING_MODE_SPREADSKETCH:
+        case SAMPLING_MODE_TOP_CARDINALITY:
             return spread_sketch_get_count(cube->spread_sketch);
         default:
             assert(0);
