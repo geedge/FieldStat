@@ -30,13 +30,13 @@ extern "C"
 
 #define REGISTER_SIZE(precision) INT_WIDTH*INT_CEIL(NUM_REG(precision), REG_PER_WORD)
 
-struct ST_HLL_configuration
+struct HLL_configuration
 {
     unsigned char precision;
 };
 struct hyperloglog
 {
-    struct ST_HLL_configuration cfg;
+    struct HLL_configuration cfg;
     uint32_t *registers;
 };
 
@@ -54,7 +54,6 @@ struct hyperloglog *hyperloglog_deserialize(const char *blob, size_t blob_sz);
 int hyperloglog_merge(struct hyperloglog *dest, const struct hyperloglog *src);
 void hyperloglog_merge_blob(struct hyperloglog *dest, const char *blob, size_t blob_sz);
 double hyperloglog_error_for_precision(unsigned char precision);
-void hyperloglog_configure(struct hyperloglog *h, unsigned char precision, int time_window_seconds, const struct timeval now);
 #ifdef __cplusplus
 }
 #endif

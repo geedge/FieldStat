@@ -712,7 +712,7 @@ TEST(unit_test_merge, merge_accuracy_test_gen_dest_full_some_inserted_and_some_m
 int main(int argc, char *argv[]) 
 {
 	testing::InitGoogleTest(&argc, argv);
-    testing::GTEST_FLAG(filter) = "*spreadsketch";
+    // testing::GTEST_FLAG(filter) = "*spreadsketch";
     
 	return RUN_ALL_TESTS();
 }

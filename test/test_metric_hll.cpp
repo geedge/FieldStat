@@ -128,7 +128,7 @@ TEST(metric_test_hll, merge_twice_with_reset)
                                                        (((uint32_t)(A) & 0x0000ff00) << 8) | \
                                                        (((uint32_t)(A) & 0x000000ff) << 24))
 #include "base64/b64.h"
-#include "st_hyperloglog.h"
+#include "hyperloglog.h"
 TEST(metric_test_hll, serialize_with_b64_and_query)
 {
     struct fieldstat *instance = test_init_standard_instance_one_cube_one_metric_one_cell_hll();

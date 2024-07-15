@@ -560,7 +560,7 @@ TEST(Fuzz_test, simple_one_for_perf)
 int main(int argc, char *argv[]) 
 {
 	testing::InitGoogleTest(&argc, argv);
-    testing::GTEST_FLAG(filter) = "*spreadsketch";
+    // testing::GTEST_FLAG(filter) = "*spreadsketch";
     // testing::GTEST_FLAG(filter) = "-Fuzz_test.simple_one_for_perf";
 
 	return RUN_ALL_TESTS();

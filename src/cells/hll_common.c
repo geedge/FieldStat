@@ -1,76 +1,29 @@
-/*
- * The HyperLogLog uses 6 bits for register, and a 64bit hash function. 
- * For our needs, we always use a dense representation and avoid the sparse/dense conversions.
- *
- */
-#include "st_hyperloglog.h"
-#include "xxhash/xxhash.h"
+
+#include "hll_common.h"
 #include "crdt_utils.h"
 
-#include <stdint.h>
+#include <string.h>
 #include <math.h>
 #include <assert.h>
-#include <string.h>
-#include <stdlib.h>
-#include "base64/b64.h"
+#define REG_WIDTH 6     // Bits per register
+#define INT_WIDTH 32    // Bits in an int
+#define REG_PER_WORD 5  // floor(INT_WIDTH / REG_WIDTH)
 
-const size_t BLOB_HDR_SIZE= offsetof(struct hyperloglog, registers);
+#define NUM_REG(precision) ((1 << precision))
+#define INT_CEIL(num, denom) (((num) + (denom) - 1) / (denom))
 
+#define PRECISION_TO_WORD(precision) INT_CEIL(NUM_REG(precision), REG_PER_WORD)
+#define RESET_TIME_SLOT_US(time_window_ms, precision) (time_window_ms*2*1000/NUM_REG(precision))
+#define REGISTER_SIZE(precision) INT_WIDTH*INT_CEIL(NUM_REG(precision), REG_PER_WORD)
 
-struct hyperloglog *hyperloglog_new(unsigned char precision)
-{
-    // Ensure the precision is somewhat sane
-    if (precision < HLL_MIN_PRECISION || precision > HLL_MAX_PRECISION)
-        return NULL;
-
-    struct hyperloglog *h=ALLOC(struct hyperloglog, 1);
-
-    h->cfg.precision = precision;
-
-    // Determine how many registers are needed
-    int num_reg = NUM_REG(precision);
-
-    // Get the full words required
-    int words = INT_CEIL(num_reg, REG_PER_WORD);
-
-    // Allocate and zero out the registers
-    h->registers = ALLOC(uint32_t, words);
-    return h;
-}
-void hyperloglog_configure(struct hyperloglog *h, unsigned char precision, int time_window_seconds, const struct timeval now)
-{
-    if(h->cfg.precision != precision)
-    {
-        free(h->registers);
-        // Determine how many registers are needed
-        int reg = NUM_REG(precision);
-
-        // Get the full words required
-        int words = INT_CEIL(reg, REG_PER_WORD);
-
-        // Allocate and zero out the registers
-        h->registers = ALLOC(uint32_t, words);
-        h->cfg.precision=precision;
-    }
-    return;
-}
-void hyperloglog_free(struct hyperloglog *h)
-{
-    free(h->registers);
-    h->registers=NULL;
-    free(h);
-    return;
-}
-
-static int get_register(const struct hyperloglog *h, int idx) {
-    uint32_t word = *(h->registers + (idx / REG_PER_WORD));
-
+static int get_register(const uint32_t *registers, int idx) {
+    uint32_t word = *(registers + (idx / REG_PER_WORD));
     word = word >> REG_WIDTH * (idx % REG_PER_WORD);
     return word & ((1 << REG_WIDTH) - 1);
 }
 
-static void set_register(const struct hyperloglog *h, int idx, int val) {
-    uint32_t *word = h->registers + (idx / REG_PER_WORD);
+static void set_register(uint32_t *registers, int idx, int val) {
+    uint32_t *word = registers + (idx / REG_PER_WORD);
 
     // Shift the val into place
     unsigned shift = REG_WIDTH * (idx % REG_PER_WORD);
@@ -79,157 +32,57 @@ static void set_register(const struct hyperloglog *h, int idx, int val) {
 
     // Store the word
     *word = (*word & ~val_mask) | val;
-
     return;
 }
-static void reset_register(const struct hyperloglog *h, int idx)
+static void reset_register(uint32_t *registers, int idx)
 {
-    uint32_t *word = h->registers + (idx / REG_PER_WORD);
+    uint32_t *word = registers + (idx / REG_PER_WORD);
     unsigned shift = REG_WIDTH * (idx % REG_PER_WORD);
     uint32_t val_mask = ((1 << REG_WIDTH) - 1) << shift;
     *word &= ~val_mask;
 }
-
-void hyperloglog_reset(struct hyperloglog *h)
+uint32_t *hll_create_register(int precision)
 {
-    int n_register=NUM_REG(h->cfg.precision);
-
-    for(int i=0; i<n_register; i++) {
-        reset_register(h, i);
-    }
+    return ALLOC(uint32_t, PRECISION_TO_WORD(precision));
+}
+uint32_t *hll_duplicate(const uint32_t *registers, unsigned char precision)
+{
+    int words = PRECISION_TO_WORD(precision);
+    uint32_t *new_registers = ALLOC(uint32_t, words);
+    memcpy(new_registers, registers, sizeof(uint32_t)*words);
+    return new_registers;
+}
+void hll_free_register(uint32_t *registers)
+{
+    free(registers);
     return;
 }
-
-int hyperloglog_add_hash(struct hyperloglog *h, uint64_t hash)
+static void clear_register(uint32_t *registers, int precision)
+{
+    memset(registers, 0, PRECISION_TO_WORD(precision)*sizeof(uint32_t));
+    return;
+}
+int hll_add_hash(uint32_t *registers, unsigned char precision, uint64_t hash)
 {
     // Determine the index using the first p bits
-    int idx = hash >> (64 - h->cfg.precision);
+    int idx = hash >> (64 - precision);
 
     // Shift out the index bits
-    hash = hash << h->cfg.precision | (1 << (h->cfg.precision -1));
+    hash = hash << precision | (1 << (precision -1));
 
     // Determine the count of leading zeros. The __builtin_clzll() is provided by GCC
     int leading = __builtin_clzll(hash) + 1;
 
     // Update the register if the new value is larger
-    if (leading > get_register(h, idx)) {
-        set_register(h, idx, leading);
+    if (leading > get_register(registers, idx)) {
+        set_register(registers, idx, leading);
         return 1;
     }
     return 0;
 }
 
-int hyperloglog_add(struct hyperloglog *h, const char *key, size_t keylen)
-{
-    uint64_t hash=0;
 
-    hash=XXH3_64bits_withSeed(key, keylen, 171);
-
-    // Add the hashed value
-   return hyperloglog_add_hash(h, hash);
-}
-// https://djhworld.github.io/hyperloglog/merging/
-int hyperloglog_merge(struct hyperloglog *dest, const struct hyperloglog *src)
-{
-    if(dest->cfg.precision != src->cfg.precision) return -1;
-    int n_register=NUM_REG(dest->cfg.precision);
-    int s_reg=0, d_reg=0;
-    for(int i=0; i<n_register; i++)
-    {
-        s_reg=get_register(src, i);
-        d_reg=get_register(dest, i);
-        set_register(dest, i, MAX(s_reg, d_reg));
-    }
-    return 0;
-}
-size_t hyperloglog_serialized_size(const struct hyperloglog *h)
-{
-    size_t sz=0;
-    size_t num_reg = NUM_REG(h->cfg.precision);
-    size_t words = INT_CEIL(num_reg, REG_PER_WORD);
-
-    sz += BLOB_HDR_SIZE;
-    sz += words*sizeof(int32_t);
-    return sz;
-}
-
-void hyperloglog_serialize(const struct hyperloglog *h, char **blob, size_t *blob_sz)
-{
-    size_t sz=0, offset=0;
-    size_t num_reg = NUM_REG(h->cfg.precision);
-    size_t words = INT_CEIL(num_reg, REG_PER_WORD);
-
-    sz = hyperloglog_serialized_size(h);
-
-    char *buffer = ALLOC(char, sz);
-    memcpy(buffer+offset, h, BLOB_HDR_SIZE);
-    offset += BLOB_HDR_SIZE;
-    
-    memcpy(buffer+offset, h->registers,  words*sizeof(int32_t));
-    offset +=  words*sizeof(int32_t);
-    *blob_sz=sz;
-    *blob=buffer;
-    return;
-}
-
-struct hyperloglog *hyperloglog_deserialize(const char *blob, size_t blob_sz)
-{
-    struct hyperloglog *h=ALLOC(struct hyperloglog, 1);
-    size_t offset=0;
-    memcpy(h, blob, BLOB_HDR_SIZE);
-    offset += BLOB_HDR_SIZE;
-
-    size_t num_reg = NUM_REG(h->cfg.precision);
-    size_t words = INT_CEIL(num_reg, REG_PER_WORD);
-
-    h->registers=ALLOC(uint32_t, words);
-    memcpy(h->registers, blob+offset, words*sizeof(int32_t));
-    return h;
-}
-
-void hyperloglog_serialize_for_networking(const struct hyperloglog *h, char **blob, size_t *blob_sz)
-{
-    size_t sz=0, offset=0;
-    size_t num_reg = NUM_REG(h->cfg.precision);
-    size_t words = INT_CEIL(num_reg, REG_PER_WORD);
-
-    sz = hyperloglog_serialized_size(h) + 1; // [precision][version][data...
-    unsigned char *buffer = ALLOC(unsigned char, sz);
-
-    const unsigned char version = 1;
-    memcpy(buffer+offset, &version, 1);
-    offset += 1;
-
-    unsigned char precision = h->cfg.precision;
-    memcpy(buffer+offset, &precision, 1);
-    offset += 1;
-
-    for (int i = 0; i < words; i++) {
-        uint32_t word = h->registers[i];
-        buffer[offset++] = word >> 24;
-        buffer[offset++] = word >> 16;
-        buffer[offset++] = word >> 8;
-        buffer[offset++] = word;
-    }
-
-    char *enc = b64_encode(buffer, sz);
-    free(buffer);
-    *blob_sz = strlen(enc);
-    *blob = enc;
-    return;
-}
-
-void hyperloglog_merge_blob(struct hyperloglog *dest, const char *blob, size_t blob_sz)
-{
-    struct hyperloglog *src=hyperloglog_deserialize(blob, blob_sz);
-    hyperloglog_merge(dest, src);
-    hyperloglog_free(src);
-    return;
-}
-double g_switchThreshold[15] = {10, 20, 40, 80, 220, 400, 900, 1800, 3100, 6500,
-    11500, 20000, 50000, 120000, 350000};
-
-static double *g_rawEstimateData[] = {
+static const double *g_rawEstimateData[] = {
     // precision 4
     (double[]) { 11, 11.717, 12.207, 12.7896, 13.2882, 13.8204, 14.3772, 14.9342, 15.5202, 16.161, 16.7722, 17.4636, 18.0396, 18.6766, 19.3566, 20.0454, 20.7936, 21.4856, 22.2666, 22.9946, 23.766, 24.4692, 25.3638, 26.0764, 26.7864, 27.7602, 28.4814, 29.433, 30.2926, 31.0664, 31.9996, 32.7956, 33.5366, 34.5894, 35.5738, 36.2698, 37.3682, 38.0544, 39.2342, 40.0108, 40.7966, 41.9298, 42.8704, 43.6358, 44.5194, 45.773, 46.6772, 47.6174, 48.4888, 49.3304, 50.2506, 51.4996, 52.3824, 53.3078, 54.3984, 55.5838, 56.6618, 57.2174, 58.3514, 59.0802, 60.1482, 61.0376, 62.3598, 62.8078, 63.9744, 64.914, 65.781, 67.1806, 68.0594, 68.8446, 69.7928, 70.8248, 71.8324, 72.8598, 73.6246, 74.7014, 75.393, 76.6708, 77.2394, },
     // precision 5
@@ -262,7 +115,7 @@ static double *g_rawEstimateData[] = {
     (double[]) { 189084, 192250.913, 195456.774, 198696.946, 201977.762, 205294.444, 208651.754, 212042.099, 215472.269, 218941.91, 222443.912, 225996.845, 229568.199, 233193.568, 236844.457, 240543.233, 244279.475, 248044.27, 251854.588, 255693.2, 259583.619, 263494.621, 267445.385, 271454.061, 275468.769, 279549.456, 283646.446, 287788.198, 291966.099, 296181.164, 300431.469, 304718.618, 309024.004, 313393.508, 317760.803, 322209.731, 326675.061, 331160.627, 335654.47, 340241.442, 344841.833, 349467.132, 354130.629, 358819.432, 363574.626, 368296.587, 373118.482, 377914.93, 382782.301, 387680.669, 392601.981, 397544.323, 402529.115, 407546.018, 412593.658, 417638.657, 422762.865, 427886.169, 433017.167, 438213.273, 443441.254, 448692.421, 453937.533, 459239.049, 464529.569, 469910.083, 475274.03, 480684.473, 486070.26, 491515.237, 496995.651, 502476.617, 507973.609, 513497.19, 519083.233, 524726.509, 530305.505, 535945.728, 541584.404, 547274.055, 552967.236, 558667.862, 564360.216, 570128.148, 575965.08, 581701.952, 587532.523, 593361.144, 599246.128, 605033.418, 610958.779, 616837.117, 622772.818, 628672.04, 634675.369, 640574.831, 646585.739, 652574.547, 658611.217, 664642.684, 670713.914, 676737.681, 682797.313, 688837.897, 694917.874, 701009.882, 707173.648, 713257.254, 719415.392, 725636.761, 731710.697, 737906.209, 744103.074, 750313.39, 756504.185, 762712.579, 768876.985, 775167.859, 781359, 787615.959, 793863.597, 800245.477, 806464.582, 812785.294, 819005.925, 825403.057, 831676.197, 837936.284, 844266.968, 850642.711, 856959.756, 863322.774, 869699.931, 876102.478, 882355.787, 888694.463, 895159.952, 901536.143, 907872.631, 914293.672, 920615.14, 927130.974, 933409.404, 939922.178, 946331.47, 952745.93, 959209.264, 965590.224, 972077.284, 978501.961, 984953.19, 991413.271, 997817.479, 1004222.658, 1010725.676, 1017177.138, 1023612.529, 1030098.236, 1036493.719, 1043112.207, 1049537.036, 1056008.096, 1062476.184, 1068942.337, 1075524.95, 1081932.864, 1088426.025, 1094776.005, 1101327.448, 1107901.673, 1114423.639, 1120884.602, 1127324.923, 1133794.24, 1140328.886, 1146849.376, 1153346.682, 1159836.502, 1166478.703, 1172953.304, 1179391.502, 1185950.982, 1192544.052, 1198913.41, 1205430.994, 1212015.525, 1218674.042, 1225121.683, 1231551.101, 1238126.379, 1244673.795, 1251260.649, 1257697.86, 1264320.983, 1270736.319, 1277274.694, 1283804.95, 1290211.514, 1296858.568, 1303455.691, }
 };
 
-static double *g_biasData[] = {
+static const double *g_biasData[] = {
     // precision 4
     (double[]) { 10, 9.717, 9.207, 8.7896, 8.2882, 7.8204, 7.3772, 6.9342, 6.5202, 6.161, 5.7722, 5.4636, 5.0396, 4.6766, 4.3566, 4.0454, 3.7936, 3.4856, 3.2666, 2.9946, 2.766, 2.4692, 2.3638, 2.0764, 1.7864, 1.7602, 1.4814, 1.433, 1.2926, 1.0664, 0.999600000000001, 0.7956, 0.5366, 0.589399999999998, 0.573799999999999, 0.269799999999996, 0.368200000000002, 0.0544000000000011, 0.234200000000001, 0.0108000000000033, -0.203400000000002, -0.0701999999999998, -0.129600000000003, -0.364199999999997, -0.480600000000003, -0.226999999999997, -0.322800000000001, -0.382599999999996, -0.511200000000002, -0.669600000000003, -0.749400000000001, -0.500399999999999, -0.617600000000003, -0.6922, -0.601599999999998, -0.416200000000003, -0.338200000000001, -0.782600000000002, -0.648600000000002, -0.919800000000002, -0.851799999999997, -0.962400000000002, -0.6402, -1.1922, -1.0256, -1.086, -1.21899999999999, -0.819400000000002, -0.940600000000003, -1.1554, -1.2072, -1.1752, -1.16759999999999, -1.14019999999999, -1.3754, -1.29859999999999, -1.607, -1.3292, -1.7606, },
     // precision 5
@@ -311,36 +164,12 @@ static double alpha(unsigned char precision) {
     }
 }
 
-/*
- * Computes the raw cardinality estimate
- */
-static double raw_estimate(const struct hyperloglog *h, int *num_zero)
+// Estimates cardinality using a linear counting. Used when some registers still have a zero value.
+static double linear_count(int num_reg, int num_zero)
 {
-    unsigned char precision = h->cfg.precision;
-    int num_reg = NUM_REG(precision);
-    double multi = alpha(precision) * num_reg * num_reg;
-
-    int reg_val;
-    double inv_sum = 0;
-    for (int i=0; i < num_reg; i++) {
-        reg_val = get_register(h, i);
-        inv_sum += pow(2.0, -1 * reg_val);
-        if (!reg_val) *num_zero += 1;
-    }
-    return multi * (1.0 / inv_sum);
+    double est = num_reg * log((double)num_reg / (double)num_zero);
+    return est;
 }
-
-/*
- * Estimates cardinality using a linear counting.
- * Used when some registers still have a zero value.
- */
-static double linear_count(const struct hyperloglog *h, int num_zero)
-{
-    int registers = NUM_REG(h->cfg.precision);
-    return registers *
-        log((double)registers / (double)num_zero);
-}
-
 /**
  * Binary searches for the nearest matching index
  * @return The matching index, or closest match
@@ -364,10 +193,9 @@ static int binary_search(double val, int num, const double *array) {
  * empircal data collected by Google, from the
  * paper mentioned above.
  */
-static double bias_estimate(const struct hyperloglog *h, double raw_est) {
+static double bias_estimate(int precision, double raw_est) {
     // Determine the samples available
     int samples;
-    int precision = h->cfg.precision;
     switch (precision) {
         case 4:
             samples = 80;
@@ -382,7 +210,7 @@ static double bias_estimate(const struct hyperloglog *h, double raw_est) {
 
     // Get the proper arrays based on precision
     const double *estimates = *(g_rawEstimateData+(precision-4));
-    double *biases = *(g_biasData+(precision-4));
+    const double *biases = *(g_biasData+(precision-4));
 
     // Get the matching biases
     int idx = binary_search(raw_est, samples, estimates);
@@ -394,50 +222,130 @@ static double bias_estimate(const struct hyperloglog *h, double raw_est) {
         return (biases[idx] + biases[idx-1]) / 2;
 }
 
-double hyperloglog_count(const struct hyperloglog *h){
-    int num_zero = 0;
-    int num_reg = NUM_REG(h->cfg.precision);
-    double raw_est = raw_estimate(h, &num_zero);
+// Computes the raw cardinality estimate 
+static double hll_raw_estimate(const uint32_t *registers, unsigned char precision, long long reset_idx, long long time_window_ms, int *num_zero)
+{
+    int m = NUM_REG(precision);
 
-    // Check if we need to apply bias correction
-    
+    double Mi=0, Wi=0;//Wi as the time window span of the i-th register Mi.
+    double lambda=0;
+    double harmonic_mean=0;
+    *num_zero=0;
+    int effective_reg=0;
+    for (int i=0; i < m; i++) 
+    {
+        Wi=(i>=reset_idx)?(m+reset_idx-i):(reset_idx-i)+1;  
+        Mi = get_register(registers, i);
+        if(!Mi)
+            *num_zero += 1;
+        //STHLL++ neglects the 1/8 of the lowest registers to reduce the variance in the final evaluation.
+        if(Wi < m/8 && time_window_ms)
+        {
+            continue;
+        }
+        effective_reg++;
+        lambda=pow(2.0, Mi-1)*m*m/Wi;
+        harmonic_mean += 1/lambda;        
+    }
+    harmonic_mean = effective_reg/harmonic_mean;
+    return harmonic_mean;
+}
+double hll_count(const uint32_t *registers, unsigned char precision, long long reset_idx, long long time_window_ms)
+{
+    int num_zero=0;
+    double raw_est=hll_raw_estimate(registers, precision, reset_idx, time_window_ms, &num_zero);
+    raw_est*=alpha(precision);
+    double est=0;
+    double num_reg=NUM_REG(precision);
     if (raw_est <= 5 * num_reg) {
-        raw_est -= bias_estimate(h, raw_est);
+        raw_est -= bias_estimate(precision, raw_est);
     }
-
-    // Check if linear counting should be used
-    double alt_est;
-    if (num_zero) {
-        alt_est = linear_count(h, num_zero);
-    } else {
-        alt_est = raw_est;
+    if(raw_est<=5*num_reg/2)
+    {
+        if(num_zero)
+        {
+            est=linear_count(num_reg, num_zero);
+            assert(est>=0);
+            return est;
+        }
     }
-
-    // Determine which estimate to use
-    if (alt_est <= g_switchThreshold[h->cfg.precision-4]) {
-        return alt_est;
-    } else {
-        return raw_est;
+    if(raw_est>INT32_MAX/30)
+    {
+        return INT32_MIN*log(1-raw_est/INT32_MAX);
+    }
+    assert(raw_est>=0);
+    return raw_est;
+}
+void hll_reset_registers(uint32_t *registers, unsigned char precision, long long offset, long long count)
+{
+    int num_reg=NUM_REG(precision);
+    if(count>=num_reg)
+    {
+        clear_register(registers, precision);
+        return;
+    }
+    for(int i=0; i<count; i++)
+    {
+        reset_register(registers, (offset+i)%num_reg);
+    }
+    return;
+}
+void hll_advance_reset_index(long long *reset_idx, long long reset_reg_count, unsigned char precision)
+{
+    *reset_idx=(*reset_idx+reset_reg_count)%NUM_REG(precision);
+    return;
+}
+long long hll_get_reset_register_count(unsigned char precision, long long time_window_ms, struct timeval now, struct timeval *reset_time)
+{
+    long long reset_time_slot_us=RESET_TIME_SLOT_US(time_window_ms, precision);
+    long long delta_us=timeval_delta_us(*reset_time, now);
+    if(delta_us < reset_time_slot_us)
+        return 0;
+    
+    //We cannot use 'now' as reset_time, but rounded to the nearest time slot.
+    long long reset_bit_count=0;
+    reset_bit_count=delta_us/reset_time_slot_us;
+    struct timeval elapse;
+    elapse.tv_sec=reset_time_slot_us*reset_bit_count/1000/1000;
+    elapse.tv_usec=reset_time_slot_us*reset_bit_count%(1000*1000);
+    timeradd(reset_time, &elapse, reset_time);
+    return reset_bit_count;
+}
+void hll_merge(uint32_t *dst_registers, const uint32_t *src_registers, unsigned char precision)
+{
+    int n_register=NUM_REG(precision);
+    int s_reg=0, d_reg=0;
+    for(int i=0; i<n_register; i++)
+    {
+    
+        s_reg=get_register(src_registers, i);
+        d_reg=get_register(dst_registers, i);
+        set_register(dst_registers, i, MAX(s_reg, d_reg));
     }
 }
-
-/**
- * Computes the upper bound on variance given
- * a precision
- * @arg precision The precision to use
- * @return The expected variance in the count,
- * or zero on error.
- */
-double hyperloglog_error_for_precision(unsigned char precision)
+double hll_error(unsigned char precision)
 {
-    // Check that the error bound is sane
-    if (precision < HLL_MIN_PRECISION || precision > HLL_MAX_PRECISION)
-        return 0;
-
     /*
      * Error of HLL is 1.04 / sqrt(m)
      * m is given by 2^p
      */
+    return 1.04/sqrt(NUM_REG(precision));
+}
+size_t hll_size(unsigned char precision)
+{
+    // Determine how many registers are needed
+    int num_reg = NUM_REG(precision);
 
-    return 1.04 / sqrt(NUM_REG(precision));
+    // Get the full words required
+    int words = INT_CEIL(num_reg, REG_PER_WORD);
+    return sizeof(uint32_t)*words;
+}
+int hll_should_slide(unsigned char precision, long long time_window_ms, struct timeval now, struct timeval reset_time)
+{
+    assert(time_window_ms>0);
+    long long reset_time_slot_us=RESET_TIME_SLOT_US(time_window_ms, precision);
+    long long delta_us=timeval_delta_us(reset_time, now);
+    if(delta_us >= reset_time_slot_us)
+        return 1;
+    return 0;
 }

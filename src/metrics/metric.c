@@ -10,7 +10,7 @@
 #include "metric.h"
 #include "hdr/hdr_histogram.h"
 #include "hdr/hdr_histogram_log.h"
-#include "st_hyperloglog.h"
+#include "hyperloglog.h"
 #include "metric_manifest.h"
 
 struct metric_counter_or_gauge {
