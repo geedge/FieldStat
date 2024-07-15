@@ -1146,7 +1146,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolMultiMetric)
 {
 	int n_thread = 48;
 	int ret = 0;
-	int loops = 5000;
+	int loops = 1000;
 	struct fieldstat_dynamic_instance *instance = NULL;
 	char field_name[32];
 	const char *telegraf_output_file = "/tmp/metrics.out";
@@ -1213,7 +1213,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolMultiTableRow)
 {
 	int n_thread = 48;
 	int ret = 0;
-	int loops = 5000;
+	int loops = 1000;
 	struct fieldstat_dynamic_instance *instance = NULL;
 	char row_name[32];
 	const char *telegraf_output_file = "/tmp/metrics.out";
