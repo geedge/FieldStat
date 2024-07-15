@@ -434,6 +434,7 @@ TEST(Fuzz_test, many_instance_random_flow_unregister_calibrate_reset_fork_merge_
         }
 
         double accuracy = test_cal_topk_accuracy(test_result, count_map[Fieldstat_tag_list_wrapper(shared_tag_out).to_string()]);
+        // printf("spreadsketch accuracy: %lf\n", accuracy);
         EXPECT_GE(accuracy, 0.7);
 
         for (size_t j = 0; j < cell_num; j++) {
@@ -501,7 +502,7 @@ TEST(Fuzz_test, add_and_reset_with_randomly_generated_flows_and_randomly_chosen_
 }
 
 
-TEST(Fuzz_test, simple_one_for_perf)
+TEST(Fuzz_test, simple_one_for_perf_topk)
 {
     const int CUBE_NUM = 5;
     const int FLOW_NUM = 50000;
@@ -556,12 +557,43 @@ TEST(Fuzz_test, simple_one_for_perf)
     fieldstat_free(master);
 }
 
+TEST(Fuzz_test, simple_one_for_perf_spreadsketch)
+{
+    const int CELL_MAX = 100;
+    const int TEST_ROUND = 500000;
+    struct fieldstat *instance = fieldstat_new();
+    
+    int cube_id = fieldstat_create_cube(instance, &TEST_TAG_STRING, 1, SAMPLING_MODE_TOP_CARDINALITY, CELL_MAX);
+    fieldstat_register_hll(instance, cube_id, "hll", 6);
+
+    SpreadSketchZipfGenerator generator(1.0, CELL_MAX * 10);
+    Fieldstat_tag_list_wrapper *cell_dimension[TEST_ROUND];
+    Fieldstat_tag_list_wrapper *items[TEST_ROUND];
+    for (int i = 0; i < TEST_ROUND; i++) {
+        Flow flow = generator.next();
+        cell_dimension[i] = new Fieldstat_tag_list_wrapper("src_ip", flow.src_ip.c_str());
+        items[i] = new Fieldstat_tag_list_wrapper("dst_ip", flow.dst_ip.c_str());
+    }
+
+    clock_t start = clock();
+    printf("press any key to start \n");
+    getchar();
+
+    for (int i = 0; i < TEST_ROUND; i++) {
+        fieldstat_hll_add_field(instance, cube_id, 0, cell_dimension[i]->get_tag(), cell_dimension[i]->get_tag_count(), items[i]->get_tag(), items[i]->get_tag_count());
+    }
+
+    clock_t end = clock();
+    printf("time: %lf second\n", (double)(end - start) / CLOCKS_PER_SEC);
+
+    fieldstat_free(instance);
+}
 
 int main(int argc, char *argv[]) 
 {
 	testing::InitGoogleTest(&argc, argv);
     // testing::GTEST_FLAG(filter) = "*spreadsketch";
-    testing::GTEST_FLAG(filter) = "Fuzz_test.simple_one_for_perf";
+    testing::GTEST_FLAG(filter) = "-Fuzz_test.simple_one_for_perf*";
 
 	return RUN_ALL_TESTS();
 }
