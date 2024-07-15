@@ -514,7 +514,7 @@ TEST(Fuzz_test, simple_one_for_perf)
     // init cube
     for (int i = 0; i < CUBE_NUM; i++) {
         shared_tags[i] = new Fieldstat_tag_list_wrapper("shared_tag", i);
-        int cube_id = fieldstat_create_cube(master, shared_tags[i]->get_tag(), shared_tags[i]->get_tag_count(), SAMPLING_MODE_TOP_CARDINALITY, CELL_MAX);
+        int cube_id = fieldstat_create_cube(master, shared_tags[i]->get_tag(), shared_tags[i]->get_tag_count(), SAMPLING_MODE_TOPK, CELL_MAX);
         EXPECT_EQ(cube_id, i);
         fieldstat_register_counter(master, cube_id, "topk");
     }
@@ -560,8 +560,8 @@ TEST(Fuzz_test, simple_one_for_perf)
 int main(int argc, char *argv[]) 
 {
 	testing::InitGoogleTest(&argc, argv);
-    testing::GTEST_FLAG(filter) = "*spreadsketch";
-    // testing::GTEST_FLAG(filter) = "-Fuzz_test.simple_one_for_perf";
+    // testing::GTEST_FLAG(filter) = "*spreadsketch";
+    testing::GTEST_FLAG(filter) = "Fuzz_test.simple_one_for_perf";
 
 	return RUN_ALL_TESTS();
 }

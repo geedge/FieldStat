@@ -137,64 +137,7 @@ struct cube_manager *cube_manager_new() {
     return pthis;
 }
 
-static int field_array_to_key_safe(const struct field fields[], size_t n_tags, char *out_key, size_t out_key_size)
-{
-    if (n_tags == 0) {
-        const char dummy[] = "no fields";
-        size_t len_dummy = sizeof(dummy) - 1;
-        if (out_key_size < len_dummy) {
-            return -1;
-        }
-        memcpy(out_key, dummy, len_dummy);
-        return len_dummy;
-    }
-	int i = 0;
-	size_t used_len = 0;
-	struct field *field = NULL;
-
-    size_t remain_key_size = out_key_size;
-    void *val_position = NULL;
-
-    size_t key_len = 0;
-    size_t val_len = 0;
-
-	for(i = 0; i < (int)n_tags; i++)
-	{
-		field = (struct field *)&fields[i];
-        key_len = strlen(field->key);
-		switch(field->type)
-		{
-			case FIELD_VALUE_INTEGER:
-                val_len = sizeof(long long);
-                val_position = (void *)&field->value_longlong;
-				break;
-			case FIELD_VALUE_DOUBLE:
-                val_len = sizeof(double);
-                val_position = (void *)&field->value_double;
-
-				break;
-			case FIELD_VALUE_CSTRING:
-                val_len = strlen(field->value_str);
-                val_position = (void *)field->value_str;
-				break;
-			default:
-				assert(0);
-				break;
-		}
-        
-        used_len = key_len + val_len;
-        while (used_len >= remain_key_size) {
-            return -1;
-        }
-        memcpy(out_key + out_key_size - remain_key_size, field->key, key_len);
-        memcpy(out_key + out_key_size - remain_key_size + key_len, val_position, val_len);
-        remain_key_size -= used_len;
-	}
-
-    return out_key_size - remain_key_size;
-}
-
-static void field_array_to_key_endeavor(const struct field fields[], size_t n_tags, char **out_key, size_t *out_key_size)
+static void field_array_to_key(const struct field fields[], size_t n_tags, char **out_key, size_t *out_key_size)
 {
     if (n_tags == 0) {
         // use a default dummy key
@@ -282,14 +225,6 @@ int cube_manager_add(struct cube_manager *pthis, struct cube *cube)
 
 void cube_manager_delete(struct cube_manager *pthis, struct cube *cube)
 {
-    // char *key = cube->key;
-    // size_t key_len = cube->key_len;
-    // struct cube *node = NULL;
-    // HASH_FIND(hh, pthis->head, key, key_len, node);
-    // if (node == NULL) {
-    //     return;
-    // }
-
     int id = cube->id;
     HASH_DEL(pthis->hash_table, cube);
 
@@ -302,24 +237,14 @@ void cube_manager_delete(struct cube_manager *pthis, struct cube *cube)
 
 int cube_manager_find(const struct cube_manager *pthis, const struct field *cube_dimensions, size_t n_dimension)
 {
-    char key_stack[4096];
-    char *key = key_stack;
-    int key_len = field_array_to_key_safe(cube_dimensions, n_dimension, key, sizeof(key_stack));
-    bool free_key = false;
-    if (key_len < 0) {  // very unlikely to happen
-        char *key_heap;
-        size_t key_len_tmp;
-        field_array_to_key_endeavor(cube_dimensions, n_dimension, &key_heap, &key_len_tmp);
-        key = key_heap;
-        key_len = key_len_tmp;
-        free_key = true;
-    }
+    char *key;
+    size_t key_len;
+    field_array_to_key(cube_dimensions, n_dimension, &key, &key_len);
 
     struct cube *node = NULL;
     HASH_FIND(hh, pthis->hash_table, key, key_len, node);
-    if (free_key) {
-        free(key);
-    }
+
+    free(key);
     if (node == NULL) {
         return -1;
     } else {
@@ -358,7 +283,6 @@ void cube_manager_calibrate(struct cube_manager *pthis, const struct cube_manage
 {
     struct cube *node_in_master, *node_in_dest, *tmp;
 
-    
     HASH_ITER(hh, pthis->hash_table, node_in_dest, tmp) {
         HASH_FIND(hh, master->hash_table, node_in_dest->serialized_dimensions, node_in_dest->serialized_dimensions_len, node_in_master);
 
@@ -570,7 +494,7 @@ struct cube *cube_info_new(const struct field *dimensions, size_t n_dimensions, 
 
     cube->n_dimensions = n_dimensions;
     cube->max_n_cell = max_n_cell;
-    field_array_to_key_endeavor(dimensions, n_dimensions, &cube->serialized_dimensions, &cube->serialized_dimensions_len);
+    field_array_to_key(dimensions, n_dimensions, &cube->serialized_dimensions, &cube->serialized_dimensions_len);
 
     cube->id = -1;
 
@@ -666,18 +590,9 @@ int cube_set_primary_metric(struct cube *cube, int metric_id) {
 }
 
 struct cell *get_cell_in_comprehensive_cube(struct cube *cube, const struct field *dimensions, size_t n_dimension) {
-    char key_stack[4096] = {0};
-    char *key = key_stack;
-    int key_len = field_array_to_key_safe(dimensions, n_dimension, key, sizeof(key_stack));
-    bool free_key = false;
-    if (key_len < 0) {  // very unlikely to happen
-        char *key_heap;
-        size_t key_len_tmp;
-        field_array_to_key_endeavor(dimensions, n_dimension, &key_heap, &key_len_tmp);
-        key = key_heap;
-        key_len = key_len_tmp;
-        free_key = true;
-    }
+    char *key;
+    size_t key_len;
+    field_array_to_key(dimensions, n_dimension, &key, &key_len);
 
     struct exdata_new_args args;
     args.cell_dimensions = dimensions;
@@ -694,25 +609,14 @@ struct cell *get_cell_in_comprehensive_cube(struct cube *cube, const struct fiel
         }
     }
 
-    if (free_key) {
-        free(key);
-    }
+    free(key);
     return cell_data;
 }
 
 struct cell *get_cell_in_topk_cube(struct cube *cube, const struct field *dimensions, size_t n_dimension, long long increment, int metric_id) {
-    char key_stack[4096] = {0};
-    char *key = key_stack;
-    int key_len = field_array_to_key_safe(dimensions, n_dimension, key, sizeof(key_stack));
-    bool free_key = false;
-    if (key_len < 0) {  // very unlikely to happen
-        char *key_heap;
-        size_t key_len_tmp;
-        field_array_to_key_endeavor(dimensions, n_dimension, &key_heap, &key_len_tmp);
-        key = key_heap;
-        key_len = key_len_tmp;
-        free_key = true;
-    }
+    char *key;
+    size_t key_len;
+    field_array_to_key(dimensions, n_dimension, &key, &key_len);
 
     struct exdata_new_args args;
     args.cell_dimensions = dimensions;
@@ -720,7 +624,7 @@ struct cell *get_cell_in_topk_cube(struct cube *cube, const struct field *dimens
 
     struct cell *cell_data = NULL;
     assert(cube->sampling_mode == SAMPLING_MODE_TOPK);
-    if (cube->primary_metric_id != metric_id) { // FIXME: TODO: 我想把这个先get 再add 的逻辑直接改成add然后看返回值，结果在fuzz test 中的特殊码返回值里发现了问题。
+    if (cube->primary_metric_id != metric_id) {
         cell_data = heavy_keeper_get0_exdata(cube->heavykeeper, key, key_len);
         if (cell_data == NULL) {
             int tmp_ret = heavy_keeper_add(cube->heavykeeper, key, key_len, 0, (void *)&args);
@@ -736,25 +640,14 @@ struct cell *get_cell_in_topk_cube(struct cube *cube, const struct field *dimens
         }
     }
 
-    if (free_key) {
-        free(key);
-    }
+    free(key);
     return cell_data;
 }
 
 struct cell *get_cell_in_spread_sketch_cube(struct cube *cube, const struct field *dimensions, size_t n_dimension, uint64_t item_hash, int metric_id) {
-    char key_stack[4096] = {0};
-    char *key = key_stack;
-    int key_len = field_array_to_key_safe(dimensions, n_dimension, key, sizeof(key_stack));
-    bool free_key = false;
-    if (key_len < 0) {  // very unlikely to happen
-        char *key_heap;
-        size_t key_len_tmp;
-        field_array_to_key_endeavor(dimensions, n_dimension, &key_heap, &key_len_tmp);
-        key = key_heap;
-        key_len = key_len_tmp;
-        free_key = true;
-    }
+    char *key;
+    size_t key_len;
+    field_array_to_key(dimensions, n_dimension, &key, &key_len);
 
     struct exdata_new_args args;
     args.cell_dimensions = dimensions;
@@ -778,9 +671,7 @@ struct cell *get_cell_in_spread_sketch_cube(struct cube *cube, const struct fiel
         }
     }
 
-    if (free_key) {
-        free(key);
-    }
+    free(key);
     return cell_data;
 }
 
@@ -1263,7 +1154,7 @@ const struct cell *get_cell_by_tag_list(const struct cube *cube, const struct fi
     const struct cell *ret = NULL;
     char *tag_in_string;
     size_t tag_len;
-    field_array_to_key_endeavor(fields->field, fields->n_field, &tag_in_string, &tag_len);
+    field_array_to_key(fields->field, fields->n_field, &tag_in_string, &tag_len);
 
     switch (cube->sampling_mode)
     {
