@@ -12,6 +12,7 @@
 #include "exdata.h"
 
 // todo：把primary metric 记到sketch 里，且使用特殊的st Hyperloglog
+// todo: topk 也是这样
 
 struct entry {
     int ref_count;

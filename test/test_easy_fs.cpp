@@ -123,7 +123,7 @@ TEST(test_easy_fieldstat, output_to_file)
     cJSON_Delete(root);
 
     // 4th interval: new data, output again
-    fieldstat_easy_counter_incrby(fse, 0, counter_id, &TEST_FIELD_VALUE_DOUBLE, 1, 10086);
+    fieldstat_easy_counter_incrby(fse, 0, counter_id, &TEST_TAG_DOUBLE, 1, 10086);
     sleep(2);
     printf("4th interval\n");
     root = read_file();
@@ -183,7 +183,7 @@ TEST(test_easy_fieldstat, output_interval_ok)
     struct fieldstat_easy *fse = fieldstat_easy_new(10, NULL, NULL, 0);
     fieldstat_easy_register_histogram(fse, "metric histogram", 1, 10000, 3); // a pretty time consuming metric
     fieldstat_easy_histogram_record(fse, 0, 0, &TEST_TAG_INT, 1, 1);
-    fieldstat_easy_histogram_record(fse, 0, 0, &TEST_FIELD_VALUE_DOUBLE, 1, 10);
+    fieldstat_easy_histogram_record(fse, 0, 0, &TEST_TAG_DOUBLE, 1, 10);
     fieldstat_easy_histogram_record(fse, 0, 0, &TEST_TAG_STRING, 1, 110);
 
     fieldstat_easy_enable_auto_output(fse, FILENAME, 1);

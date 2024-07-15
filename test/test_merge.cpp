@@ -49,7 +49,7 @@ double merge_test_fieldstat_hll_get(const struct fieldstat *instance, int cube_i
 TEST(unit_test_merge, cube_shared_tag_mapping_with_new_cube)
 {
     struct fieldstat *instance = fieldstat_new();
-    (void)fieldstat_create_cube(instance, &TEST_FIELD_VALUE_DOUBLE, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    (void)fieldstat_create_cube(instance, &TEST_TAG_DOUBLE, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
     int cube_id2 = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
     int metric_id = fieldstat_register_counter(instance,cube_id2,"metric in cube 2");
     fieldstat_counter_incrby(instance, cube_id2, metric_id, &TEST_TAG_STRING, 1, 1);
@@ -168,7 +168,7 @@ TEST(unit_test_merge, new_too_many_cells_on_one_metric_given_source_cube_reset_a
     fieldstat_reset(instance);
 
     fieldstat_counter_incrby(instance, cube_id, metric_id, &TEST_TAG_INT, 1, 2); // 2nd cell
-    fieldstat_counter_incrby(instance, cube_id, metric_id, &TEST_FIELD_VALUE_DOUBLE, 1, 3); // 3rd cell, exceeding the limit 2
+    fieldstat_counter_incrby(instance, cube_id, metric_id, &TEST_TAG_DOUBLE, 1, 3); // 3rd cell, exceeding the limit 2
 
     fieldstat_merge(instance_dest, instance);
 
@@ -197,7 +197,7 @@ TEST(unit_test_merge, new_too_many_cells_on_multiple_metric_given_source_cube_re
 
     int metric_id3 = fieldstat_register_counter(instance, cube_id, "metric name3");
     fieldstat_counter_incrby(instance, cube_id, metric_id3, &TEST_TAG_INT, 1, 2); // 2nd cell on metric name3, this is a metric dest dont have
-    fieldstat_counter_incrby(instance, cube_id, metric_id2, &TEST_FIELD_VALUE_DOUBLE, 1, 3); // 3nd cell on metric name2
+    fieldstat_counter_incrby(instance, cube_id, metric_id2, &TEST_TAG_DOUBLE, 1, 3); // 3nd cell on metric name2
     fieldstat_merge(instance_dest, instance);
 
     int *metric_ids = NULL;
@@ -315,7 +315,7 @@ TEST(unit_test_merge, new_too_many_cells_on_one_metric_given_source_cube_reset_a
     fieldstat_reset(instance);
 
     fieldstat_counter_incrby(instance, cube_id, metric_id, &TEST_TAG_INT, 1, 2); // 2nd cell
-    fieldstat_counter_incrby(instance, cube_id, metric_id, &TEST_FIELD_VALUE_DOUBLE, 1, 3); // 3rd cell,bigger than the others, so keep it
+    fieldstat_counter_incrby(instance, cube_id, metric_id, &TEST_TAG_DOUBLE, 1, 3); // 3rd cell,bigger than the others, so keep it
 
     fieldstat_merge(instance_dest, instance);
 
@@ -578,9 +578,9 @@ TEST(unit_test_merge, new_too_many_cells_on_one_metric_given_source_cube_reset_a
     fieldstat_reset(instance);
     fieldstat_hll_add(instance, cube_id, metric_id, &TEST_TAG_INT, 1, "21", 2);
     fieldstat_hll_add(instance, cube_id, metric_id, &TEST_TAG_INT, 1, "22", 2);
-    fieldstat_hll_add(instance, cube_id, metric_id, &TEST_FIELD_VALUE_DOUBLE, 1, "31", 2);
-    fieldstat_hll_add(instance, cube_id, metric_id, &TEST_FIELD_VALUE_DOUBLE, 1, "32", 2);
-    fieldstat_hll_add(instance, cube_id, metric_id, &TEST_FIELD_VALUE_DOUBLE, 1, "33", 2);
+    fieldstat_hll_add(instance, cube_id, metric_id, &TEST_TAG_DOUBLE, 1, "31", 2);
+    fieldstat_hll_add(instance, cube_id, metric_id, &TEST_TAG_DOUBLE, 1, "32", 2);
+    fieldstat_hll_add(instance, cube_id, metric_id, &TEST_TAG_DOUBLE, 1, "33", 2);
     fieldstat_merge(instance_dest, instance);
 
     struct field_list *tag_list = NULL;
@@ -589,7 +589,7 @@ TEST(unit_test_merge, new_too_many_cells_on_one_metric_given_source_cube_reset_a
     EXPECT_EQ(n_cell, 2);
     EXPECT_NEAR(merge_test_fieldstat_hll_get(instance_dest, 0, 0, &tag_list[0]), 3, 0.3);
     EXPECT_NEAR(merge_test_fieldstat_hll_get(instance_dest, 0, 0, &tag_list[1]), 2, 0.3);
-    EXPECT_STREQ(tag_list[0].field[0].key, TEST_FIELD_VALUE_DOUBLE.key);
+    EXPECT_STREQ(tag_list[0].field[0].key, TEST_TAG_DOUBLE.key);
     EXPECT_STREQ(tag_list[1].field[0].key, TEST_TAG_INT.key);
 
     fieldstat_free(instance);

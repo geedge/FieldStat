@@ -357,7 +357,7 @@ TEST(test_performance, performance_test_add_cells_histogram_record_5tags)
     struct field fields[5];
     fields[0] = TEST_TAG_INT;
     fields[1] = TEST_TAG_STRING;
-    fields[2] = TEST_FIELD_VALUE_DOUBLE;
+    fields[2] = TEST_TAG_DOUBLE;
     fields[3] = TEST_TAG_INT;
     fields[4] = TEST_TAG_INT;
     clock_t start = clock();
@@ -385,7 +385,7 @@ TEST(test_performance, performance_test_add_cells_hll_add_5tags)
     struct field fields[5];
     fields[0] = TEST_TAG_INT;
     fields[1] = TEST_TAG_STRING;
-    fields[2] = TEST_FIELD_VALUE_DOUBLE;
+    fields[2] = TEST_TAG_DOUBLE;
     fields[3] = TEST_TAG_INT;
     fields[4] = TEST_TAG_INT;
     clock_t start = clock();

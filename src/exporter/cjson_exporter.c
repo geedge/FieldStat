@@ -1039,3 +1039,55 @@ void fieldstat_json_exporter_enable_delta(struct fieldstat_json_exporter *export
     }
     exporter->history = counter_history_new();
 }
+
+void fieldstat_json_exporter_export_flat(const struct fieldstat_json_exporter *exporter, const struct fieldstat *instance, const struct timeval *timestamp, char ***output, size_t *output_size) {
+    long long timestamp_ms = cal_ms_time(timestamp);
+
+    size_t n_pair;
+    struct cellwise_rec_for_export *tag_field_pair = read_tag_and_field(instance, &n_pair);
+    if (tag_field_pair == NULL || n_pair == 0) {
+        free(tag_field_pair); // tag_field_pair is not NULL when there are registered metrics but no valid cells
+        *output = NULL;
+        *output_size = 0;
+        return;
+    }
+
+    fieldstat_json_exporter_write_global_tags(exporter, tag_field_pair, n_pair);
+
+    char **cjson_str_arr = (char **)malloc(sizeof(char *) * n_pair);
+    for (int i = 0; i < n_pair; i++) {
+        struct cellwise_rec_for_export *current = &tag_field_pair[i];
+        struct json_writer *root = current->cjson_tags;
+        for (int j = 0; j < tag_field_pair[i].n_metric; j++) {
+            kv_pair_write_to_json(tag_field_pair[i].metric_pairs[j], root);
+        }
+
+        const char *tmp_name = exporter->name ? exporter->name : DEFAULT_EXPORTER_NAME;
+        json_writer_str_field(root, "name", tmp_name, strlen(tmp_name));
+        json_writer_longlong_field(root, "timestamp_ms", timestamp_ms);
+
+        char *cjson_str;
+        size_t cjson_str_len;
+        json_writer_finish(root, &cjson_str, &cjson_str_len);
+        char *cjson_with_braces = malloc(cjson_str_len + 3);
+        cjson_with_braces[0] = '{';
+        memcpy(cjson_with_braces + 1, cjson_str, cjson_str_len);
+        cjson_with_braces[cjson_str_len + 1] = '}';
+        cjson_with_braces[cjson_str_len + 2] = '\0';
+
+        cjson_str_arr[i] = cjson_with_braces;
+        free(cjson_str);
+    }
+
+    *output = cjson_str_arr;
+    *output_size = n_pair;
+
+    for (int i = 0; i < n_pair; i++) {
+        for (int j = 0; j < tag_field_pair[i].n_metric; j++) {
+            kv_pair_free(tag_field_pair[i].metric_pairs[j]);
+        }
+        free(tag_field_pair[i].metric_pairs);
+    }
+
+    free(tag_field_pair);
+}

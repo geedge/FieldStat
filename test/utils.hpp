@@ -9,8 +9,8 @@ const struct field TEST_TAG_STRING_collided = {"collided", FIELD_VALUE_CSTRING, 
 const struct field TEST_TAG_INT = {"INT key_", FIELD_VALUE_INTEGER, {.value_longlong = 100}};
 const struct field_list TEST_TAG_LIST_INT = {(struct field *)&TEST_TAG_INT, 1};
 const struct field TEST_TAG_INT_collided = {"collided", FIELD_VALUE_INTEGER, {.value_longlong = 2}};
-const struct field TEST_FIELD_VALUE_DOUBLE = {"DOUBLE key_", FIELD_VALUE_DOUBLE, {.value_double = 100.1}};
-const struct field_list TEST_TAG_LIST_DOUBLE = {(struct field *)&TEST_FIELD_VALUE_DOUBLE, 1};
+const struct field TEST_TAG_DOUBLE = {"DOUBLE key_", FIELD_VALUE_DOUBLE, {.value_double = 100.1}};
+const struct field_list TEST_TAG_LIST_DOUBLE = {(struct field *)&TEST_TAG_DOUBLE, 1};
 const struct field TEST_FIELD_VALUE_DOUBLE_collided = {"collided", FIELD_VALUE_DOUBLE, {.value_double = 2.0}};
 const struct field TEST_SHARED_TAG = {"shared", FIELD_VALUE_INTEGER, {.value_longlong = 1}};
 const struct timeval TEST_TIMEVAL = {100, 10000};
