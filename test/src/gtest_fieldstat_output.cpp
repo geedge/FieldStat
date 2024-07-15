@@ -615,7 +615,7 @@ TEST(FeildStatOutput, HistogramOutputFile)
 	struct fieldstat_instance *instance = fieldstat_instance_new("maat");
 	fieldstat_set_local_output(instance, "/tmp/fieldstat.txt", "default");
 
-	metric_id = fieldstat_register_histogram(instance, "hit_rate", NULL, 0, 
+	metric_id = fieldstat_register_distribution(instance, "hit_rate", NULL, 0, 
 										     upper_inclusive_bounds, 1, 100, 2, 0);
 	EXPECT_EQ(0, metric_id);
 	fieldstat_instance_start(instance);
@@ -669,7 +669,7 @@ TEST(FeildStatOutput, HistogramOutputLineProtocol)
 	instance = fieldstat_instance_new("maat");
 	fieldstat_set_line_protocol_server(instance, "127.0.0.1", 8700);
 
-	metric_id = fieldstat_register_histogram(instance, "hit_rate", NULL, 0, 
+	metric_id = fieldstat_register_distribution(instance, "hit_rate", NULL, 0, 
 										     upper_inclusive_bounds, 1, 100, 2, 0);
 	EXPECT_EQ(0, metric_id);
 	fieldstat_instance_start(instance);
@@ -737,7 +737,7 @@ TEST(FeildStatOutput, HistogramOutputPrometheus)
 	instance = fieldstat_instance_new("maat");
 	fieldstat_global_enable_prometheus_endpoint(9024, NULL);
 	fieldstat_enable_prometheus_output(instance);
-	metric_id = fieldstat_register_histogram(instance, "hit_rate", NULL, 0, 
+	metric_id = fieldstat_register_distribution(instance, "hit_rate", NULL, 0, 
 										     upper_inclusive_bounds, 1, 100, 2, 0);
 	EXPECT_EQ(0, metric_id);
 	fieldstat_instance_start(instance);

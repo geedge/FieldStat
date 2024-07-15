@@ -1118,7 +1118,7 @@ error_out:
 }
 
 
-static int fieldstat_register_histogram_and_summary(struct fieldstat_instance *instance, enum field_type type, const char *field_name, const struct fieldstat_tag tags[], size_t n_tag, 
+static int fieldstat_register_histogram(struct fieldstat_instance *instance, enum field_type type, const char *field_name, const struct fieldstat_tag tags[], size_t n_tag, 
 		const char * bins, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures, int output_window)
 {
 	struct metric *metric = NULL;
@@ -1181,17 +1181,17 @@ static int fieldstat_register_histogram_and_summary(struct fieldstat_instance *i
 }
 
 
-int fieldstat_register_histogram(struct fieldstat_instance *instance, const char *field_name,const struct fieldstat_tag tags[], size_t n_tag, 
+int fieldstat_register_distribution(struct fieldstat_instance *instance, const char *field_name,const struct fieldstat_tag tags[], size_t n_tag, 
 		const char * bins, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures, int output_window)
 {
-	return fieldstat_register_histogram_and_summary(instance, FILED_TYPE_HISTOGRAM, field_name, tags, n_tag, 
+	return fieldstat_register_histogram(instance, FILED_TYPE_HISTOGRAM, field_name, tags, n_tag, 
 		bins, lowest_trackable_value, highest_trackable_value, significant_figures, output_window);
 }
 
 int fieldstat_register_summary(struct fieldstat_instance *instance, const char *field_name, const struct fieldstat_tag tags[], size_t n_tag, 
 		const char * bins, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures, int output_window)
 {
-	return fieldstat_register_histogram_and_summary(instance, FIELD_TYPE_SUMMARY, field_name, tags, n_tag, 
+	return fieldstat_register_histogram(instance, FIELD_TYPE_SUMMARY, field_name, tags, n_tag, 
 		bins, lowest_trackable_value, highest_trackable_value, significant_figures, output_window);
 }
 

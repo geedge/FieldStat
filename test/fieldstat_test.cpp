@@ -98,7 +98,7 @@ static void* dynamic_register(void* arg)
 
 		memset(name, 0, sizeof(name));
 		snprintf(name, sizeof(name), "summary_%d_%d", loops, rand()%10000);
-		fieldstat_register_histogram(instance, name, tags, 1, bins_htr, 1, 10000, 2, 0);
+		fieldstat_register_distribution(instance, name, tags, 1, bins_htr, 1, 10000, 2, 0);
 
 		memset(name, 0, sizeof(name));
 		snprintf(name, sizeof(name), "histogram_%d_%d", loops, rand()%10000);
@@ -266,7 +266,7 @@ int test_register_by_fieldstat_type(struct fieldstat_instance *instance)
 
 //Register histogram and summary start
 	const char * bins_htr = "10,20,30,40,50,60,70,80,90";
-	ret = fieldstat_register_histogram(instance, "htr", NULL, 0, bins_htr, 1, 1000, 2, 0);
+	ret = fieldstat_register_distribution(instance, "htr", NULL, 0, bins_htr, 1, 1000, 2, 0);
 	if(ret == -1)
 	{
 		printf("Failed ot register htr, type = histogram\n");

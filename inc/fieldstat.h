@@ -173,7 +173,7 @@ void fieldstat_passive_output(struct fieldstat_instance *instance);
  * @param output_window The of output data. 1: output the data in the time interval window, 0: output data all the time.
  * @return metric id: -1 is failed,  >= 0 is success
  */
-int fieldstat_register_histogram(struct fieldstat_instance *instance, const char *field_name, const struct fieldstat_tag tags[], size_t n_tag, 
+int fieldstat_register_distribution(struct fieldstat_instance *instance, const char *field_name, const struct fieldstat_tag tags[], size_t n_tag, 
 		const char *upper_inclusive_bounds, const long long lowest_trackable_value, long long highest_trackable_value, int significant_figures, int output_window);
 
 /**

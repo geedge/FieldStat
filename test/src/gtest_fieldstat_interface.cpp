@@ -649,19 +649,19 @@ TEST(FeildStatAPI, RegisterHistogram)
 
 	instance = fieldstat_instance_new("maat");
 
-	ret = fieldstat_register_histogram(instance, "latency", NULL, 0, quantiles, 1, 5, 2, 0);
+	ret = fieldstat_register_distribution(instance, "latency", NULL, 0, quantiles, 1, 5, 2, 0);
 	EXPECT_EQ(0, ret);
 
-	ret = fieldstat_register_histogram(instance, "latency", NULL, 0, quantiles, -1, 5, 2, 0);
+	ret = fieldstat_register_distribution(instance, "latency", NULL, 0, quantiles, -1, 5, 2, 0);
 	EXPECT_EQ(-1, ret);
 
-	ret = fieldstat_register_histogram(instance, "latency", NULL, 0, quantiles, 2, 3, 2, 0);
+	ret = fieldstat_register_distribution(instance, "latency", NULL, 0, quantiles, 2, 3, 2, 0);
 	EXPECT_EQ(-1, ret);
 
-	ret = fieldstat_register_histogram(instance, "latency", NULL, 0, quantiles, 1, 5, 10, 0);
+	ret = fieldstat_register_distribution(instance, "latency", NULL, 0, quantiles, 1, 5, 10, 0);
 	EXPECT_EQ(-1, ret);
 
-	ret = fieldstat_register_histogram(instance, "latency", NULL, 0, quantiles, 1, 5, 2, 2);
+	ret = fieldstat_register_distribution(instance, "latency", NULL, 0, quantiles, 1, 5, 2, 2);
 	EXPECT_EQ(-1, ret);
 
 	fieldstat_instance_free(instance);
