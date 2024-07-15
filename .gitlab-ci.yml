@@ -116,7 +116,7 @@ release_build_release_for_centos8:
     UNIT_TEST: 1
     PACKAGE: 1
     UPLOAD_RPM: 1
-    UPLOAD_SYMBOL_FILES: 1
+    UPLOAD_SYMBOL_FILES: 0
     SYMBOL_TARGET: libfieldstat3
     PULP3_REPO_NAME: framework-stable-x86_64.el8
     PULP3_DIST_NAME: framework-stable-x86_64.el8
