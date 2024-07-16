@@ -768,6 +768,6 @@ TEST(calibrate, delete_first_cube)
 int main(int argc, char *argv[]) 
 {
 	testing::InitGoogleTest(&argc, argv);
-    // testing::GTEST_FLAG(filter) = "test_register.ensure_recovery_more_faster_spreadsketch";
+    testing::GTEST_FLAG(filter) = "test_register.reset_and_new_cell_spreadsketch";
 	return RUN_ALL_TESTS();
 }

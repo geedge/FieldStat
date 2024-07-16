@@ -13,6 +13,11 @@
 
 // todo：把primary metric 记到sketch 里，且使用特殊的st Hyperloglog
 // todo: topk 也是这样
+/*
+1. 修改set primary metric 为 set sampling
+2. 增加一个list key 和一堆根据key 查base64之类的接口
+3. serialize 不用实现带exdata的情况
+*/
 
 struct entry {
     int ref_count;
@@ -336,6 +341,7 @@ void spread_sketch_reset(struct spread_sketch *ss) {
 
     memset(ss->level_cnt, 0, sizeof(ss->level_cnt));
     ss->level_cnt[0] = ss->depth * ss->width;
+    ss->level_min = 0;
 }
 
 void spread_sketch_set_exdata_schema(struct spread_sketch *ss, exdata_new_cb new_fn, exdata_free_cb free_fn, exdata_merge_cb merge_fn, exdata_reset_cb reset_fn, exdata_copy_cb copy_fn) {

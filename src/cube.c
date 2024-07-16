@@ -137,6 +137,28 @@ struct cube_manager *cube_manager_new() {
     return pthis;
 }
 
+void print_field_array(const struct field *fields, size_t n_field)
+{
+    printf("dimension with length %zu \n", n_field);
+    for (size_t i = 0; i < n_field; i++) {
+        printf("%s: ", fields[i].key);
+        switch (fields[i].type)
+        {
+        case FIELD_VALUE_INTEGER:
+            printf("%lld\n", fields[i].value_longlong);
+            break;
+        case FIELD_VALUE_DOUBLE:
+            printf("%lf\n", fields[i].value_double);
+            break;
+        case FIELD_VALUE_CSTRING:
+            printf("%s\n", fields[i].value_str);
+            break;
+        default:
+            break;
+        }
+    }
+}
+
 static void field_array_to_key(const struct field fields[], size_t n_tags, char **out_key, size_t *out_key_size)
 {
     if (n_tags == 0) {
@@ -303,13 +325,6 @@ void cube_manager_calibrate(struct cube_manager *pthis, const struct cube_manage
         }
     }
 
-    // for (int i = 0; i < pthis->cube_cnt; i++) {
-    //     if (pthis->cube[i] == NULL) {
-    //         continue;
-    //     }
-    //     metric_manifest_manager_free(pthis->cube[i]->manifest_manager);
-    //     pthis->cube[i]->manifest_manager = metric_manifest_manager_copy(master->cube[i]->manifest_manager);
-    // }
 }
 
 struct cube_manager *cube_manager_fork(const struct cube_manager *src)

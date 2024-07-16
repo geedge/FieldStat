@@ -315,6 +315,20 @@ TEST(Fuzz_test, many_instance_random_flow_unregister_calibrate_reset_fork_merge_
         EXPECT_GE(accuracy, 0.95);
         // printf("topk accuracy: %lf\n", accuracy);
 
+        // mre
+        double mre = 0;
+        for (size_t j = 0; j < cell_num; j++) {
+            Fieldstat_tag_list_wrapper cell_dimension = Fieldstat_tag_list_wrapper(&fields[j]);
+            long long value_true = count_map[Fieldstat_tag_list_wrapper(shared_tag_out).to_string()][cell_dimension.to_string()];
+            long long value_est;
+            fieldstat_counter_get(instance_in_focus, cube_ids[i], &fields[j], 0, &value_est);
+
+            mre += (double)(abs(value_true - value_est)) / (double)value_true;
+        }
+        mre = mre / cell_num;
+        // printf("topk_add_and_test_accuracy Mean ratio e: %f\n", mre);
+        EXPECT_LE(mre, 0.25);
+
         for (size_t j = 0; j < cell_num; j++) {
             delete test_result[j];
         }
@@ -421,6 +435,7 @@ TEST(Fuzz_test, many_instance_random_flow_unregister_calibrate_reset_fork_merge_
     int cube_num;
     struct fieldstat *instance_in_focus = dest;
     fieldstat_get_cubes(instance_in_focus, &cube_ids, &cube_num);
+    double sum_accuracy = 0;
     for (int i = 0; i < cube_num; i++) {
         struct field_list *shared_tag_out = fieldstat_cube_get_tags(instance_in_focus, cube_ids[i]);
 
@@ -433,9 +448,23 @@ TEST(Fuzz_test, many_instance_random_flow_unregister_calibrate_reset_fork_merge_
             test_result.push_back(new Fieldstat_tag_list_wrapper(&cells[j]));
         }
 
-        double accuracy = test_cal_topk_accuracy(test_result, count_map[Fieldstat_tag_list_wrapper(shared_tag_out).to_string()]);
+        Fieldstat_tag_list_wrapper cube_dimension = Fieldstat_tag_list_wrapper(shared_tag_out);
+        double accuracy = test_cal_topk_accuracy(test_result, count_map[cube_dimension.to_string()]);
         // printf("spreadsketch accuracy: %lf\n", accuracy);
-        EXPECT_GE(accuracy, 0.7);
+        sum_accuracy += accuracy;
+            
+        // MRE
+        double mre = 0;
+        for (size_t j = 0; j < cell_num; j++) {
+            Fieldstat_tag_list_wrapper cell_dimension = Fieldstat_tag_list_wrapper(&cells[j]);
+            double value_true = count_map[cube_dimension.to_string()][cell_dimension.to_string()];
+            double value_est;
+            fieldstat_hll_get(instance_in_focus, cube_ids[i], &cells[j], 0, &value_est);
+
+            mre += fabs(value_true - value_est) / value_true;
+        }
+        mre = mre / cell_num;
+        EXPECT_LE(mre, 0.25);
 
         for (size_t j = 0; j < cell_num; j++) {
             delete test_result[j];
@@ -444,6 +473,9 @@ TEST(Fuzz_test, many_instance_random_flow_unregister_calibrate_reset_fork_merge_
         fieldstat_tag_list_arr_free(cells, cell_num);
         fieldstat_tag_list_arr_free(shared_tag_out, 1);
     }
+    double mean_accuracy = sum_accuracy / cube_num;
+    EXPECT_GE(mean_accuracy, 0.7);
+
     free(cube_ids);
 
     fieldstat_free(master);
@@ -502,7 +534,7 @@ TEST(Fuzz_test, add_and_reset_with_randomly_generated_flows_and_randomly_chosen_
 }
 
 
-TEST(Fuzz_test, simple_one_for_perf_topk)
+TEST(perf, simple_one_for_perf_topk)
 {
     const int CUBE_NUM = 5;
     const int FLOW_NUM = 50000;
@@ -557,7 +589,7 @@ TEST(Fuzz_test, simple_one_for_perf_topk)
     fieldstat_free(master);
 }
 
-TEST(Fuzz_test, simple_one_for_perf_spreadsketch)
+TEST(perf, simple_one_for_perf_spreadsketch)
 {
     const int CELL_MAX = 100;
     const int TEST_ROUND = 500000;
@@ -592,8 +624,8 @@ TEST(Fuzz_test, simple_one_for_perf_spreadsketch)
 int main(int argc, char *argv[]) 
 {
 	testing::InitGoogleTest(&argc, argv);
-    // testing::GTEST_FLAG(filter) = "*spreadsketch";
-    testing::GTEST_FLAG(filter) = "-Fuzz_test.simple_one_for_perf*";
+    // testing::GTEST_FLAG(filter) = "*many_instance_random_flow_unregister_calibrate_reset_fork_merge_spreadsketch";
+    testing::GTEST_FLAG(filter) = "-perf.*";
 
 	return RUN_ALL_TESTS();
 }

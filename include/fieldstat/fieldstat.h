@@ -68,6 +68,10 @@ int fieldstat_calibrate(const struct fieldstat *master, struct fieldstat *replic
     * @return cube id, if success; otherwise, return FS_ERR_NULL_HANDLER, or FS_ERR_INVALID_PARAM when (max_n_cell == 0 && mode == TOPK). return FS_ERR_INVALID_KEY when the cube_dimensions is not unique.
 */
 int fieldstat_create_cube(struct fieldstat *instance, const struct field *cube_dimensions, size_t n_dimension, enum sampling_mode mode, size_t max_n_cell);
+// todo: 重命名为fieldstat_cube_create
+
+//todo: create cube 接口变化
+// int fieldstat_cube_set_sampling(struct fieldstat *instance, int cube_id, enum sampling_mode mode, int max_n_cell, int primary_metric_id);
 
 /*
     @brief Change the topk cube primary metric id. When fieldstat_counter_add or fieldstat_counter_set are called on the primary metric, the topk record of such cell will be updated.
