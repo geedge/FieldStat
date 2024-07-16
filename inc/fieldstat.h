@@ -14,7 +14,7 @@ enum field_type
 };
 
 
-struct fieldstat_tag{
+struct field_tag{
 	const char *key;
 	int value_type;  // 0 int, 1 double, 2 str
 	union{
@@ -99,7 +99,7 @@ int fieldstat_set_output_interval(struct fieldstat_instance *instance, int milli
  * @param n_tag Size of tags[]
  * @return metric id. -1 is failed. >=0 is success.
  */
-int fieldstat_register(struct fieldstat_instance *instance, enum field_type type, const char *field_name, const struct fieldstat_tag tags[], size_t n_tag);
+int fieldstat_register(struct fieldstat_instance *instance, enum field_type type, const char *field_name, const struct field_tag tags[], size_t n_tag);
 /**
  * Register table. Max table num is 64. Max table columns is 64.
  * @param instance The fieldstat instance.
@@ -120,7 +120,7 @@ int fieldstat_register_table(struct fieldstat_instance *instance, const char *ta
  * @param output_metric_ids Output metric ids
  * @return -1 is failed. 0 is success.
  */
-int fieldstat_register_table_row(struct fieldstat_instance *instance, int table_id, const char *row_name, const struct fieldstat_tag tags[],size_t n_tag, int output_metric_ids[]);
+int fieldstat_register_table_row(struct fieldstat_instance *instance, int table_id, const char *row_name, const struct field_tag tags[],size_t n_tag, int output_metric_ids[]);
 /**
  * Increment fieldstat metric value by metric_id.
  * @param instance The fieldstat instance.
@@ -173,7 +173,7 @@ void fieldstat_passive_output(struct fieldstat_instance *instance);
  * @param output_window The of output data. 1: output the data in the time interval window, 0: output data all the time.
  * @return metric id: -1 is failed,  >= 0 is success
  */
-int fieldstat_register_distribution(struct fieldstat_instance *instance, const char *field_name, const struct fieldstat_tag tags[], size_t n_tag, 
+int fieldstat_register_distribution(struct fieldstat_instance *instance, const char *field_name, const struct field_tag tags[], size_t n_tag, 
 		const char *upper_inclusive_bounds, const long long lowest_trackable_value, long long highest_trackable_value, int significant_figures, int output_window);
 
 /**
@@ -194,7 +194,7 @@ int fieldstat_register_distribution(struct fieldstat_instance *instance, const c
  * @param output_window The of output data. 1: output the data in the time interval window, 0: output data all the time.
  * @return metric id: -1 is failed,  >= 0 is success
  */
-int fieldstat_register_summary(struct fieldstat_instance *instance, const char *field_name, const struct fieldstat_tag tags[], size_t n_tag, 
+int fieldstat_register_summary(struct fieldstat_instance *instance, const char *field_name, const struct field_tag tags[], size_t n_tag, 
 		const char *quantiles, const long long lowest_trackable_value, long long highest_trackable_value, int significant_figures, int output_window);
 
 /**
@@ -261,7 +261,7 @@ int fieldstat_register_dynamic_table(struct fieldstat_dynamic_instance *instance
  * @param thread_id The thread id of the call.
  * @return -1 is failed. 0 is success.
  */
-int fieldstat_dynamic_metric_value_incrby(struct fieldstat_dynamic_instance *instance, enum field_type type, const char *field_name, long long value, const struct fieldstat_tag tags[], size_t n_tags, int thread_id);
+int fieldstat_dynamic_metric_value_incrby(struct fieldstat_dynamic_instance *instance, enum field_type type, const char *field_name, long long value, const struct field_tag tags[], size_t n_tags, int thread_id);
 /**
  * fieldstat dynamic instance metric value set operate. metirc type in[gauge, counter]
  * @param instance The fieldstat dynamic instance.
@@ -273,7 +273,7 @@ int fieldstat_dynamic_metric_value_incrby(struct fieldstat_dynamic_instance *ins
  * @param thread_id The thread id of the call.
  * @return -1 is failed. 0 is success.
  */
-int fieldstat_dynamic_metric_value_set(struct fieldstat_dynamic_instance *instance, enum field_type type, const char *field_name, long long value, const struct fieldstat_tag tags[], size_t n_tags, int thread_id);
+int fieldstat_dynamic_metric_value_set(struct fieldstat_dynamic_instance *instance, enum field_type type, const char *field_name, long long value, const struct field_tag tags[], size_t n_tags, int thread_id);
 /**
  * fieldstat dynamic instance metric value decrment operate. metirc type in[gauge, counter]
  * @param instance The fieldstat dynamic instance.
@@ -285,7 +285,7 @@ int fieldstat_dynamic_metric_value_set(struct fieldstat_dynamic_instance *instan
  * @param thread_id The thread id of the call.
  * @return -1 is failed. 0 is success.
  */
-int fieldstat_dynamic_metric_value_decrby(struct fieldstat_dynamic_instance *instance, enum field_type type, const char *field_name, long long value, const struct fieldstat_tag tags[], size_t n_tags, int thread_id);
+int fieldstat_dynamic_metric_value_decrby(struct fieldstat_dynamic_instance *instance, enum field_type type, const char *field_name, long long value, const struct field_tag tags[], size_t n_tags, int thread_id);
 /**
  * fieldstat dynamic instance table metric value incrment operate.
  * @param instance The fieldstat dynamic instance.
@@ -298,7 +298,7 @@ int fieldstat_dynamic_metric_value_decrby(struct fieldstat_dynamic_instance *ins
  * @param thread_id The thread id of the call.
  * @return -1 is failed. 0 is success.
  */
-int fieldstat_dynamic_table_metric_value_incrby(struct fieldstat_dynamic_instance *instance, int table_id, unsigned int column_id, const char *row_name, long long value, const struct fieldstat_tag tags[], size_t n_tags, int thread_id);
+int fieldstat_dynamic_table_metric_value_incrby(struct fieldstat_dynamic_instance *instance, int table_id, unsigned int column_id, const char *row_name, long long value, const struct field_tag tags[], size_t n_tags, int thread_id);
 /**
  * fieldstat dynamic instance table metric value set operate.
  * @param instance The fieldstat dynamic instance.
@@ -311,7 +311,7 @@ int fieldstat_dynamic_table_metric_value_incrby(struct fieldstat_dynamic_instanc
  * @param thread_id The thread id of the call.
  * @return -1 is failed. 0 is success.
  */
-int fieldstat_dynamic_table_metric_value_set(struct fieldstat_dynamic_instance *instance, int table_id, unsigned int column_id, const char *row_name, long long value, const struct fieldstat_tag tags[], size_t n_tags, int thread_id);
+int fieldstat_dynamic_table_metric_value_set(struct fieldstat_dynamic_instance *instance, int table_id, unsigned int column_id, const char *row_name, long long value, const struct field_tag tags[], size_t n_tags, int thread_id);
 /**
  * fieldstat dynamic instance table metric value decrment operate.
  * @param instance The fieldstat dynamic instance.
@@ -324,7 +324,7 @@ int fieldstat_dynamic_table_metric_value_set(struct fieldstat_dynamic_instance *
  * @param thread_id The thread id of the call.
  * @return -1 is failed. 0 is success.
  */
-int fieldstat_dynamic_table_metric_value_decrby(struct fieldstat_dynamic_instance *instance, int table_id, unsigned int column_id, const char *row_name, long long value, const struct fieldstat_tag tags[], size_t n_tags, int thread_id);
+int fieldstat_dynamic_table_metric_value_decrby(struct fieldstat_dynamic_instance *instance, int table_id, unsigned int column_id, const char *row_name, long long value, const struct field_tag tags[], size_t n_tags, int thread_id);
 /**
  * fieldstat instance free.
  * @param instance The fieldstat instance need to free.
@@ -347,7 +347,7 @@ void fieldstat_dynamic_instance_free(struct fieldstat_dynamic_instance *instance
  * @param thread_id The thread id of the call.
  * @return  long long value.
  */
-long long fieldstat_dynamic_table_metric_value_get(struct fieldstat_dynamic_instance *instance, int table_id, unsigned int column_id, const char *row_name, const struct fieldstat_tag tags[], size_t n_tags, int thread_id);
+long long fieldstat_dynamic_table_metric_value_get(struct fieldstat_dynamic_instance *instance, int table_id, unsigned int column_id, const char *row_name, const struct field_tag tags[], size_t n_tags, int thread_id);
 /**
  * fieldstat dynamic instance metric value get operate. metirc type in[gauge, counter]
  * @param instance The fieldstat dynamic instance.
@@ -357,7 +357,7 @@ long long fieldstat_dynamic_table_metric_value_get(struct fieldstat_dynamic_inst
  * @param thread_id The thread id of the call.
  * @return long long value.
  */
-long long fieldstat_dynamic_metric_value_get(struct fieldstat_dynamic_instance *instance, const char *field_name, const struct fieldstat_tag tags[], size_t n_tags, int thread_id);
+long long fieldstat_dynamic_metric_value_get(struct fieldstat_dynamic_instance *instance, const char *field_name, const struct field_tag tags[], size_t n_tags, int thread_id);
 /**
  * fieldstat set metric ratio parameter. 
  * @param instance The fieldstat instance.
@@ -395,7 +395,7 @@ int fieldstat_dynamic_table_row_metric_values_incrby(
     const char *row_name,
     long long values[],
     size_t n_values,
-    const struct fieldstat_tag tags[],
+    const struct field_tag tags[],
     size_t n_tags,
     int thread_id);
 
@@ -417,7 +417,7 @@ int fieldstat_dynamic_table_row_metric_values_decrby(
     const char *row_name,
     long long values[],
     size_t n_values,
-    const struct fieldstat_tag tags[],
+    const struct field_tag tags[],
     size_t n_tags,
     int thread_id);
 
@@ -439,7 +439,7 @@ int fieldstat_dynamic_table_row_metric_values_set(
     const char *row_name,
     long long values[],
     size_t n_values,
-    const struct fieldstat_tag tags[],
+    const struct field_tag tags[],
     size_t n_tags,
     int thread_id);
 

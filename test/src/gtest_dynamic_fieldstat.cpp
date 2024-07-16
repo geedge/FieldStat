@@ -190,7 +190,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicMetricValueIncrby)
 {
 	int ret = 0;
 	int n_thread = 64;
-	struct fieldstat_tag tags[3];
+	struct field_tag tags[3];
 
 	tags[0].key = "policy_id";
 	tags[0].value_int = 1;
@@ -252,7 +252,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicMetricValueSet)
 {
 	int ret = 0;
 	int n_thread = 64;
-	struct fieldstat_tag tags[3];
+	struct field_tag tags[3];
 
 	tags[0].key = "policy_id";
 	tags[0].value_int = 1;
@@ -312,7 +312,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicMetricValueDecrby)
 {
 	int ret = 0;
 	int n_thread = 64;
-	struct fieldstat_tag tags[3];
+	struct field_tag tags[3];
 
 	tags[0].key = "policy_id";
 	tags[0].value_int = 1;
@@ -373,7 +373,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicTableMetricValueIncrby)
 {
 	int ret = 0;
 	int n_thread = 64;
-	struct fieldstat_tag tags[3];
+	struct field_tag tags[3];
 
 	tags[0].key = "policy_id";
 	tags[0].value_int = 1;
@@ -444,7 +444,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicTableMetricValueSet)
 {
 	int ret = 0;
 	int n_thread = 64;
-	struct fieldstat_tag tags[3];
+	struct field_tag tags[3];
 
 	tags[0].key = "policy_id";
 	tags[0].value_int = 1;
@@ -515,7 +515,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicTableMetricValueDecrby)
 {
 	int ret = 0;
 	int n_thread = 64;
-	struct fieldstat_tag tags[3];
+	struct field_tag tags[3];
 
 	tags[0].key = "policy_id";
 	tags[0].value_int = 1;
@@ -657,7 +657,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolOneTag)
 	int n_thread = 48;
 	int ret = 0;
 	struct fieldstat_dynamic_instance *instance = NULL;
-	struct fieldstat_tag tags[1];
+	struct field_tag tags[1];
 	instance = fieldstat_dynamic_instance_new("firewall", n_thread);
 	const char *compare_one_tag  = "{\"fields\":{\"Active_sessions\":11},\"name\":\"Active_sessions\",\"tags\":{\"app_name\":\"firewall\",\"policy_id\":\"1\"}}";
 
@@ -684,7 +684,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolTwoTags)
 	int n_thread = 48;
 	int ret = 0;
 	struct fieldstat_dynamic_instance *instance = NULL;
-	struct fieldstat_tag tags[2];
+	struct field_tag tags[2];
 	instance = fieldstat_dynamic_instance_new("firewall", n_thread);
 	const char *compare_two_tags = "{\"fields\":{\"Active_sessions\":12},\"name\":\"Active_sessions\",\"tags\":{\"app_name\":\"firewall\",\"policy_id\":\"1\",\"quanlity\":\"0.500000\"}}";
 
@@ -752,7 +752,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolTableMetricOneTag)
 	enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
 	unsigned int out_column_ids[2];
 	int table_id = -1;
-	struct fieldstat_tag tags[1];
+	struct field_tag tags[1];
 
 	const char *compare_one_tag = "{\"fields\":{\"bytes\":30,\"packages\":30},\"name\":\"security_rule_hits\",\"tags\":{\"app_name\":\"firewall\",\"policy_id\":\"1\",\"table_name\":\"shaping\"}}";
 
@@ -791,7 +791,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolTableMetricTowTags)
 	enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
 	unsigned int out_column_ids[2];
 	int table_id = -1;
-	struct fieldstat_tag tags[2];
+	struct field_tag tags[2];
 
 	const char *compare_two_tags = "{\"fields\":{\"bytes\":30,\"packages\":30},\"name\":\"security_rule_hits\",\"tags\":{\"app_name\":\"firewall\",\"policy_id\":\"1\",\"quanlity\":\"0.500000\",\"table_name\":\"shaping\"}}";
 
@@ -1308,7 +1308,7 @@ void _worker_thread_multi_incrby(void *arg)
 
 	struct fieldstat_dynamic_instance *instance = para->instance;
 	int ret = 0;
-	struct fieldstat_tag tags[3];
+	struct field_tag tags[3];
 
 	int i = 0;
 
@@ -1445,7 +1445,7 @@ void _worker_thread_multi_decrby(void *arg)
 
 	struct fieldstat_dynamic_instance *instance = para->instance;
 	int ret = 0;
-	struct fieldstat_tag tags[3];
+	struct field_tag tags[3];
 
 	int i = 0;
 
@@ -1582,7 +1582,7 @@ void _worker_thread_multi_set(void *arg)
 
 	struct fieldstat_dynamic_instance *instance = para->instance;
 	int ret = 0;
-	struct fieldstat_tag tags[3];
+	struct field_tag tags[3];
 
 	int i = 0;
 
@@ -1719,7 +1719,7 @@ void _worker_thread_incrby_multi_metric(void *arg)
 
 	struct fieldstat_dynamic_instance *instance = para->instance;
 	int ret = 0;
-	struct fieldstat_tag tags[3];
+	struct field_tag tags[3];
 
 	int i = 0;
 
@@ -1861,7 +1861,7 @@ void _worker_thread_decrby_multi_metric(void *arg)
 
 	struct fieldstat_dynamic_instance *instance = para->instance;
 	int ret = 0;
-	struct fieldstat_tag tags[3];
+	struct field_tag tags[3];
 
 	int i = 0;
 
@@ -2005,7 +2005,7 @@ void _worker_thread_set_multi_metric(void *arg)
 
 	struct fieldstat_dynamic_instance *instance = para->instance;
 	int ret = 0;
-	struct fieldstat_tag tags[3];
+	struct field_tag tags[3];
 
 	int i = 0;
 
@@ -2150,7 +2150,7 @@ void _worker_thread_multi_incrby_multi_metric(void *arg)
 
 	struct fieldstat_dynamic_instance *instance = para->instance;
 	int ret = 0;
-	struct fieldstat_tag tags[3];
+	struct field_tag tags[3];
 
 	int i = 0;
 
@@ -2296,7 +2296,7 @@ void _worker_thread_multi_decrby_multi_metric(void *arg)
 
 	struct fieldstat_dynamic_instance *instance = para->instance;
 	int ret = 0;
-	struct fieldstat_tag tags[3];
+	struct field_tag tags[3];
 
 	int i = 0;
 
@@ -2441,7 +2441,7 @@ void _worker_thread_multi_set_multi_metric(void *arg)
 
 	struct fieldstat_dynamic_instance *instance = para->instance;
 	int ret = 0;
-	struct fieldstat_tag tags[3];
+	struct field_tag tags[3];
 
 	int i = 0;
 
@@ -2775,7 +2775,7 @@ TEST(FeildStatDynamicAPI, SendLenEqualUDPPayload)
 	enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
 	unsigned int out_column_ids[2];
 
-	struct fieldstat_tag tags[4];
+	struct field_tag tags[4];
 
 	tags[0].key = "policy_id";
 	tags[0].value_int = 1;

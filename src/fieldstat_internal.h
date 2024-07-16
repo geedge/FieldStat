@@ -287,9 +287,9 @@ struct metric * get_metric(struct fieldstat_instance *instance, int metric_id);
 long long get_metric_unit_val(struct metric *metric,enum field_calc_algo calc_type,int is_refer);
 long long read_metric_current_value(struct metric *metric);
 int is_valid_field_name(const char* name);
-int is_valid_tags(const struct fieldstat_tag *tags, size_t n_tags);
+int is_valid_tags(const struct field_tag *tags, size_t n_tags);
 struct metric ** read_metric_slot(struct fieldstat_instance *instance, int metric_id);
-struct metric * metric_new(enum field_type type, const char *field_name, const struct fieldstat_tag tags[], size_t n_tag);
+struct metric * metric_new(enum field_type type, const char *field_name, const struct field_tag tags[], size_t n_tag);
 void metric_free(struct metric *metric);
 int file_output(struct fieldstat_instance *instance,long long interval_ms);
 struct table_line * read_table_line(struct table_metric *table, int line_id);
@@ -302,7 +302,7 @@ void metric_value_operate(struct metric *metric, enum field_op op, long long val
 struct table_metric* table_metric_new(const char *name, const char *column_name[], enum field_type column_type[], size_t n_column);
 void table_metric_free(struct table_metric *table);
 
-struct table_line *table_line_new(const char *name, const struct fieldstat_tag tags[],size_t n_tag);
+struct table_line *table_line_new(const char *name, const struct field_tag tags[],size_t n_tag);
 void table_line_free(struct table_line *table_line);
 int line_protocol_dynamic_metric_output(struct fieldstat_dynamic_instance *instance);
 

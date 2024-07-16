@@ -30,7 +30,7 @@ void _worker_thread_multi_incrby(void *arg)
 
 	struct fieldstat_dynamic_instance *instance = para->instance;
 	int ret = 0;
-	struct fieldstat_tag tags[3];
+	struct field_tag tags[3];
 
 	int i = 0;
 
@@ -126,7 +126,7 @@ void _worker_thread_table_incrby(void *arg)
 	const char *row_name = "security_rule_hits";
 	struct fieldstat_dynamic_instance *instance = para->instance;
 	int ret = 0;
-	struct fieldstat_tag tags[14];
+	struct field_tag tags[14];
 	long long values[20];
 
 

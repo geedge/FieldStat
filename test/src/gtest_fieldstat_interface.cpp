@@ -171,7 +171,7 @@ TEST(FeildStatAPI, FieldStatRegister)
 	struct fieldstat_instance * instance = NULL;
 	int metric_id = -1;
 	struct metric **in_block_metric = NULL;
-	struct fieldstat_tag tags[2];
+	struct field_tag tags[2];
 	tags[0].value_type = 2;
 	tags[0].value_str = "127.0.0.1";
 	tags[0].key = "dest_ip";

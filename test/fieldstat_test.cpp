@@ -80,7 +80,7 @@ static void* dynamic_register(void* arg)
 	const char * bins_htr = "10,20,30,40,50,60,70,80,90";
 	const char * bins_sar = "0.1,0.5,0.8,0.9,0.95,0.99";
 
-	struct fieldstat_tag tags[16];
+	struct field_tag tags[16];
 	tags[0].key = "disable_output_prometheus";
 	tags[0].value_type = 2;
 	tags[0].value_str = "yes";
@@ -183,7 +183,7 @@ int test_register_by_fieldstat_type(struct fieldstat_instance *instance)
 	}
 	g_counter_id[0] = ret;
 
-	struct fieldstat_tag tag_counter;
+	struct field_tag tag_counter;
 	tag_counter.value_type = 2;
 	tag_counter.value_str = "C_one_tag";
 	tag_counter.key = "C_one_tag_yes";
@@ -196,7 +196,7 @@ int test_register_by_fieldstat_type(struct fieldstat_instance *instance)
 	}
 	g_counter_id[1] = ret;
 
-	struct fieldstat_tag tags_counter[3];
+	struct field_tag tags_counter[3];
 	tags_counter[0].value_type = 2;
 	tags_counter[0].value_str = "C_tags_0";
 	tags_counter[0].key = "C_tags_0_yes";
@@ -229,7 +229,7 @@ int test_register_by_fieldstat_type(struct fieldstat_instance *instance)
 	}
 	g_gauge_id[0] = ret;
 
-	struct fieldstat_tag tag_gauge;
+	struct field_tag tag_gauge;
 	tag_gauge.value_type = 2;
 	tag_gauge.value_str = "G_one_tag";
 	tag_gauge.key = "G_one_tag_yes";
@@ -242,7 +242,7 @@ int test_register_by_fieldstat_type(struct fieldstat_instance *instance)
 	}
 	g_gauge_id[1] = ret;
 
-	struct fieldstat_tag tags_gauge[3];
+	struct field_tag tags_gauge[3];
 	tags_gauge[0].value_type = 2;
 	tags_gauge[0].value_str = "G_tags_0";
 	tags_gauge[0].key = "G_tags_0_yes";

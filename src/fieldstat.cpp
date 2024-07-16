@@ -69,14 +69,14 @@ int is_valid_tag_value(const char* value)
 }
 
 
-int is_valid_tags(const struct fieldstat_tag *tags, size_t n_tags)
+int is_valid_tags(const struct field_tag *tags, size_t n_tags)
 {
 	int i = 0;
-	struct fieldstat_tag *tag = NULL;
+	struct field_tag *tag = NULL;
 
 	for(i = 0; i < (int)n_tags; i++)
 	{
-		tag = (struct fieldstat_tag *)&tags[i];
+		tag = (struct field_tag *)&tags[i];
 		if (0 == is_valid_field_name(tag->key))
 		{
 			return 0;
@@ -172,16 +172,16 @@ struct metric * get_metric(struct fieldstat_instance *instance, int metric_id)
 	return metric;
 }
 
-void add_tags_to_metric(const struct fieldstat_tag tags[], size_t n_tag, char *tag_key[], char *tag_value[])
+void add_tags_to_metric(const struct field_tag tags[], size_t n_tag, char *tag_key[], char *tag_value[])
 {
 	int i = 0;
-	struct fieldstat_tag *tag = NULL;
+	struct field_tag *tag = NULL;
 	char str_longlong[32] = {0};
 	char str_double[32] = {0};
 
 	for(i = 0; i < (int)n_tag; i++)
 	{
-		tag = (struct fieldstat_tag *)&tags[i];
+		tag = (struct field_tag *)&tags[i];
 		tag_key[i] = __str_dup(tag->key);
 		switch(tag->value_type)
 		{
@@ -205,7 +205,7 @@ void add_tags_to_metric(const struct fieldstat_tag tags[], size_t n_tag, char *t
 	}
 }
 
-struct metric * metric_new(enum field_type type, const char *field_name, const struct fieldstat_tag tags[], size_t n_tag)
+struct metric * metric_new(enum field_type type, const char *field_name, const struct field_tag tags[], size_t n_tag)
 {
 	struct metric *metric = (struct metric*)calloc(1, sizeof(struct metric));
 	metric->field_name = __str_dup(field_name);
@@ -507,7 +507,7 @@ int fieldstat_set_statsd_server(struct fieldstat_instance *instance, const char 
 	return 0;
 }
 
-int fieldstat_register(struct fieldstat_instance *instance, enum field_type type, const char *field_name, const struct fieldstat_tag tags[], size_t n_tag)
+int fieldstat_register(struct fieldstat_instance *instance, enum field_type type, const char *field_name, const struct field_tag tags[], size_t n_tag)
 {
 	int metric_id = 0;
 	struct metric *metric = NULL;
@@ -899,7 +899,7 @@ struct table_line ** read_table_line_slot(struct table_metric *table, int line_i
 	return (struct table_line **)&(line[in_block_index]);
 }
 
-struct table_line *table_line_new(const char *name, const struct fieldstat_tag tags[],size_t n_tag)
+struct table_line *table_line_new(const char *name, const struct field_tag tags[],size_t n_tag)
 {
 	struct table_line *table_line = (struct table_line *)calloc(1, sizeof(struct table_line));
 
@@ -939,7 +939,7 @@ void table_line_free(struct table_line *table_line)
 
 
 
-int fieldstat_register_table_row(struct fieldstat_instance * instance, int table_id, const char *row_name, const struct fieldstat_tag tags[], size_t n_tag, int output_metric_ids[])
+int fieldstat_register_table_row(struct fieldstat_instance * instance, int table_id, const char *row_name, const struct field_tag tags[], size_t n_tag, int output_metric_ids[])
 {
 	int metric_id = 0;
 	struct metric *metric = NULL;
@@ -1118,7 +1118,7 @@ error_out:
 }
 
 
-static int fieldstat_register_histogram(struct fieldstat_instance *instance, enum field_type type, const char *field_name, const struct fieldstat_tag tags[], size_t n_tag, 
+static int fieldstat_register_histogram(struct fieldstat_instance *instance, enum field_type type, const char *field_name, const struct field_tag tags[], size_t n_tag, 
 		const char * bins, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures, int output_window)
 {
 	struct metric *metric = NULL;
@@ -1181,14 +1181,14 @@ static int fieldstat_register_histogram(struct fieldstat_instance *instance, enu
 }
 
 
-int fieldstat_register_distribution(struct fieldstat_instance *instance, const char *field_name,const struct fieldstat_tag tags[], size_t n_tag, 
+int fieldstat_register_distribution(struct fieldstat_instance *instance, const char *field_name,const struct field_tag tags[], size_t n_tag, 
 		const char * bins, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures, int output_window)
 {
 	return fieldstat_register_histogram(instance, FILED_TYPE_HISTOGRAM, field_name, tags, n_tag, 
 		bins, lowest_trackable_value, highest_trackable_value, significant_figures, output_window);
 }
 
-int fieldstat_register_summary(struct fieldstat_instance *instance, const char *field_name, const struct fieldstat_tag tags[], size_t n_tag, 
+int fieldstat_register_summary(struct fieldstat_instance *instance, const char *field_name, const struct field_tag tags[], size_t n_tag, 
 		const char * bins, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures, int output_window)
 {
 	return fieldstat_register_histogram(instance, FIELD_TYPE_SUMMARY, field_name, tags, n_tag, 
