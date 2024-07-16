@@ -5,7 +5,7 @@
 
 #include "histogram_encoder.h"
 #include "base64/b64.h"
-#include "st_hyperloglog.h"
+#include "hyperloglog.h"
 
 // user must free the buf after use
 void *fieldstat_histogram_base64_decode(char *buf)

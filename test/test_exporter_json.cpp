@@ -11,7 +11,7 @@
 #include "utils.hpp"
 #include "hdr/hdr_histogram.h"
 #include "hdr/hdr_histogram_log.h"
-#include "st_hyperloglog.h"
+#include "hyperloglog.h"
 #include "histogram_encoder.h"
 #include "very_fast_json_writer.h"
 
@@ -1175,7 +1175,7 @@ int main(int argc, char *argv[])
     init_histogram_standard_oper();
 
 	testing::InitGoogleTest(&argc, argv);
-    testing::GTEST_FLAG(filter) = "*flat*";
+    // testing::GTEST_FLAG(filter) = "*flat*";
 	int ret = RUN_ALL_TESTS();
 
     hyperloglog_free(g_hll_standard);
