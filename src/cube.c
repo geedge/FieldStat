@@ -497,10 +497,9 @@ void *exdata_copy_i(void *exdata) {
     return cell_copy((struct cell *)exdata);
 }
 
-struct cube *cube_info_new(const struct field *dimensions, size_t n_dimensions, enum sampling_mode mode, size_t max_n_cell)
+struct cube *cube_info_new(const struct field *dimensions, size_t n_dimensions)
 {
     struct cube *cube = calloc(1, sizeof(struct cube));
-    cube->sampling_mode = mode;
 
     if (n_dimensions == 0) {
         cube->cube_dimensions = NULL;
@@ -509,42 +508,81 @@ struct cube *cube_info_new(const struct field *dimensions, size_t n_dimensions, 
     }
 
     cube->n_dimensions = n_dimensions;
-    cube->max_n_cell = max_n_cell;
     field_array_to_key(dimensions, n_dimensions, &cube->serialized_dimensions, &cube->serialized_dimensions_len);
 
     cube->id = -1;
+    cube->primary_metric_id = -1;
 
     return cube;
 }
 
-struct cube *cube_new(const struct field *dimensions, size_t n_dimensions, enum sampling_mode mode, size_t max_n_cell)
+struct cube *cube_new(const struct field *dimensions, size_t n_dimensions)
 {
-    struct cube *cube = cube_info_new(dimensions, n_dimensions, mode, max_n_cell);
+    struct cube *cube = cube_info_new(dimensions, n_dimensions);
     cube->manifest_manager = metric_manifest_manager_new();
 
-    switch (mode)
-    {
+    return cube;
+}
+
+int cube_set_sampling_mode(struct cube *cube, enum sampling_mode mode, int max_n_cell, int primary_metric_id) {
+    if (cube->sampling_mode == mode && cube->max_n_cell == max_n_cell && cube->primary_metric_id == primary_metric_id) {
+        return FS_OK;
+    }
+    const struct metric_manifest *manifest = metric_manifest_manager_get_by_id(cube->manifest_manager, primary_metric_id);
+    if (manifest == NULL && mode != SAMPLING_MODE_COMPREHENSIVE) {
+        return FS_ERR_INVALID_METRIC_ID;
+    }
+    if ((mode == SAMPLING_MODE_TOPK && manifest->type != METRIC_TYPE_COUNTER) ||
+        (mode == SAMPLING_MODE_TOP_CARDINALITY && manifest->type != METRIC_TYPE_HLL)) {
+        return FS_ERR_INVALID_PARAM;
+    }
+
+    if (cube->primary_metric_id != -1) {
+        // delete previous settings
+        switch (cube->sampling_mode)
+        {
         case SAMPLING_MODE_TOPK:
-            cube->heavykeeper = heavy_keeper_new(max_n_cell);
-            heavy_keeper_set_exdata_schema(cube->heavykeeper, exdata_new_i, exdata_free_i, exdata_merge_i, exdata_reset_i, exdata_copy_i);
+            heavy_keeper_free(cube->heavykeeper);
             break;
         case SAMPLING_MODE_COMPREHENSIVE:
-            cube->table = hash_table_new(max_n_cell);
-            hash_table_set_exdata_schema(cube->table, exdata_new_i, exdata_free_i, exdata_merge_i, exdata_reset_i, exdata_copy_i);
+            hash_table_free(cube->table);
             break;
-        case SAMPLING_MODE_TOP_CARDINALITY: {
-            int width, depth;
-            unsigned char precision;
-            spread_sketch_get_parameter_recommendation(max_n_cell, &depth, &width, &precision);
-            cube->spread_sketch = spread_sketch_new(depth, width, precision, 0, DUMMY_TIME_VAL);
-            spread_sketch_set_exdata_schema(cube->spread_sketch, exdata_new_i, exdata_free_i, exdata_merge_i, exdata_reset_i, exdata_copy_i);
-            break; }
+        case SAMPLING_MODE_TOP_CARDINALITY:
+            spread_sketch_free(cube->spread_sketch);
+            break;
         default:
             assert(0);
             break;
+        }
     }
 
-    return cube;
+    switch (mode)
+    {
+    case SAMPLING_MODE_TOPK:
+        cube->heavykeeper = heavy_keeper_new(max_n_cell);
+        heavy_keeper_set_exdata_schema(cube->heavykeeper, exdata_new_i, exdata_free_i, exdata_merge_i, exdata_reset_i, exdata_copy_i);
+        break;
+    case SAMPLING_MODE_COMPREHENSIVE:
+        cube->table = hash_table_new(max_n_cell);
+        hash_table_set_exdata_schema(cube->table, exdata_new_i, exdata_free_i, exdata_merge_i, exdata_reset_i, exdata_copy_i);
+        break;
+    case SAMPLING_MODE_TOP_CARDINALITY: {
+        int width, depth;
+        unsigned char precision;
+        spread_sketch_get_parameter_recommendation(max_n_cell, &depth, &width, &precision);
+        cube->spread_sketch = spread_sketch_new(depth, width, precision, 0, DUMMY_TIME_VAL);
+        spread_sketch_set_exdata_schema(cube->spread_sketch, exdata_new_i, exdata_free_i, exdata_merge_i, exdata_reset_i, exdata_copy_i);
+        break; }
+    default:
+        assert(0);
+        break;
+    }
+
+    cube->sampling_mode = mode;
+    cube->max_n_cell = max_n_cell;
+    cube->primary_metric_id = primary_metric_id;
+
+    return FS_OK;
 }
 
 void cube_free(struct cube *cube) {
@@ -932,6 +970,7 @@ int cube_hll_add_field(struct cube *cube, int metric_id, const struct field *dim
 }
 
 int cube_counter_incrby(struct cube *cube, int metric_id, const struct field *dimensions, size_t n_dimensions, long long increment) {
+    assert(cube->primary_metric_id != -1);
     assert(cube->sampling_mode == SAMPLING_MODE_COMPREHENSIVE || 
           (cube->sampling_mode == SAMPLING_MODE_TOPK && (cube->primary_metric_id != metric_id || increment >= 0)) ||
           (cube->sampling_mode == SAMPLING_MODE_TOP_CARDINALITY && cube->primary_metric_id != metric_id)
@@ -1020,8 +1059,10 @@ int cube_counter_set(struct cube *cube, int metric_id, const struct field *dimen
 
 struct cube *cube_copy(const struct cube *cube)
 {
-    struct cube *cube_dup = cube_info_new(cube->cube_dimensions, cube->n_dimensions, cube->sampling_mode, cube->max_n_cell);
+    struct cube *cube_dup = cube_info_new(cube->cube_dimensions, cube->n_dimensions);
     cube_dup->primary_metric_id = cube->primary_metric_id;
+    cube_dup->sampling_mode = cube->sampling_mode;
+    cube_dup->max_n_cell = cube->max_n_cell;
 
     switch (cube->sampling_mode)
     {
@@ -1087,8 +1128,10 @@ int cube_merge(struct cube *dest, const struct cube *src)
 }
 
 struct cube *cube_fork(const struct cube *cube) {
-    struct cube *ret = cube_info_new(cube->cube_dimensions, cube->n_dimensions, cube->sampling_mode, cube->max_n_cell);
+    struct cube *ret = cube_info_new(cube->cube_dimensions, cube->n_dimensions);
     ret->primary_metric_id = cube->primary_metric_id;
+    ret->sampling_mode = cube->sampling_mode;
+    ret->max_n_cell = cube->max_n_cell;
     ret->manifest_manager = metric_manifest_manager_copy(cube->manifest_manager);
 
     switch (cube->sampling_mode) {
@@ -1431,7 +1474,6 @@ struct field_list *cube_get_identifier(const struct cube *cube) {
 const char *cube_get_metric_name(const struct cube *cube, int metric_id) {
     const struct metric_manifest *metric = metric_manifest_manager_get_by_id(cube->manifest_manager, metric_id);
     if (metric == NULL) {
-        printf("metric is null\n");
         return NULL;
     }
 

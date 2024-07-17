@@ -6,10 +6,18 @@
 #include "hdr/hdr_histogram.h"
 #include "histogram_encoder.h"
 
+int test_fieldstat_cube_create(struct fieldstat *instance, const struct field *dimensions, size_t n_dimensions, enum sampling_mode mode, int k)
+{
+    assert(mode == SAMPLING_MODE_COMPREHENSIVE);
+    int ret = fieldstat_cube_create(instance, dimensions, n_dimensions);
+    fieldstat_cube_set_sampling(instance, ret, mode, k, 0);
+    return ret;
+}
+
 struct fieldstat *test_init_standard_instance_one_cube_one_metric_one_cell_hdr()
 {
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    int cube_id = test_fieldstat_cube_create(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
     EXPECT_EQ(cube_id, 0);
 
     int metric_id = fieldstat_register_histogram(instance, cube_id, "czz_test hdr metric", 1, 600000, 3);
@@ -107,7 +115,7 @@ TEST(metric_test_histogram, merge_twice_with_reset)
 TEST(metric_test_histogram, add_with_wrong_cube_id_expecting_fail)
 {
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_create_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    int cube_id = test_fieldstat_cube_create(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
 
     int ret = fieldstat_histogram_record(instance, cube_id + 1, 0, &TEST_TAG_INT, 1, 1);
     EXPECT_EQ(ret, FS_ERR_INVALID_CUBE_ID);
@@ -120,7 +128,7 @@ TEST(metric_test_histogram, add_with_wrong_cube_id_expecting_fail)
 TEST(metric_test_histogram, add_with_wrong_metric_id_expecting_fail)
 {
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_create_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    int cube_id = test_fieldstat_cube_create(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
     int metric_id = fieldstat_register_histogram(instance, cube_id, "czz_test", 1, 600000, 3);
 
     int ret = fieldstat_histogram_record(instance, cube_id, metric_id + 1, &TEST_TAG_INT, 1, 1);
@@ -169,7 +177,7 @@ TEST(metric_test_histogram, encode_decode_b64)
 TEST(metric_test_histogram, can_add_0value) // histogram only allow min_val > 0, but it can accept value == 0
 {
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_create_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    int cube_id = test_fieldstat_cube_create(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
     int metric_id = fieldstat_register_histogram(instance, cube_id, "czz_test", 1, 600000, 3);
 
     int ret = fieldstat_histogram_record(instance, cube_id, metric_id, &TEST_TAG_INT, 1, 0);

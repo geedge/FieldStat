@@ -77,11 +77,12 @@ TEST(Fuzz_test, many_instance_random_flow_unregister_calibrate_reset_fork_merge_
     // init cube
     for (int i = 0; i < CUBE_NUM; i++) {
         shared_tags[i] = new Fieldstat_tag_list_wrapper("shared_tag", i);
-        int cube_id = fieldstat_create_cube(master, shared_tags[i]->get_tag(), shared_tags[i]->get_tag_count(), SAMPLING_MODE_COMPREHENSIVE, CELL_MAX);
+        int cube_id = fieldstat_cube_create(master, shared_tags[i]->get_tag(), shared_tags[i]->get_tag_count());
         EXPECT_EQ(cube_id, i);
 
         fieldstat_register_counter(master, cube_id, metric_name[METRIC_ID_COUNTER]);
         fieldstat_register_hll(master, cube_id, metric_name[METRIC_ID_HLL], 6);
+        fieldstat_cube_set_sampling(master, cube_id, SAMPLING_MODE_COMPREHENSIVE, CELL_MAX, 0);
     }
 
     // all the possible fields
@@ -120,10 +121,12 @@ TEST(Fuzz_test, many_instance_random_flow_unregister_calibrate_reset_fork_merge_
             Fieldstat_tag_list_wrapper *new_tag = new Fieldstat_tag_list_wrapper("shared_tag", next_shared_tag_value++);
             delete shared_tags[cube_id_to_change];
             shared_tags[cube_id_to_change] = new_tag;
-            fieldstat_destroy_cube(master, cube_id_to_change);
-            int cube_id_new = fieldstat_create_cube(master, new_tag->get_tag(), new_tag->get_tag_count(), SAMPLING_MODE_COMPREHENSIVE, CELL_MAX);
+            fieldstat_cube_destroy(master, cube_id_to_change);
+            int cube_id_new = fieldstat_cube_create(master, new_tag->get_tag(), new_tag->get_tag_count());
             fieldstat_register_counter(master, cube_id_new, metric_name[METRIC_ID_COUNTER]);
             fieldstat_register_hll(master, cube_id_new, metric_name[METRIC_ID_HLL], 6);
+            fieldstat_cube_set_sampling(master, cube_id_new, SAMPLING_MODE_COMPREHENSIVE, CELL_MAX, 0);
+            
             EXPECT_EQ(cube_id_new, cube_id_to_change); // should new the cube in the hole leaved by the destroyed cube
             // calibrate
             for (int j = 0; j < INSTANCE_NUM; j++) {
@@ -220,9 +223,10 @@ TEST(Fuzz_test, many_instance_random_flow_unregister_calibrate_reset_fork_merge_
     // init cube
     for (int i = 0; i < CUBE_NUM; i++) {
         shared_tags[i] = new Fieldstat_tag_list_wrapper("shared_tag", i);
-        int cube_id = fieldstat_create_cube(master, shared_tags[i]->get_tag(), shared_tags[i]->get_tag_count(), SAMPLING_MODE_TOPK, CELL_MAX);
+        int cube_id = fieldstat_cube_create(master, shared_tags[i]->get_tag(), shared_tags[i]->get_tag_count());
         EXPECT_EQ(cube_id, i);
         fieldstat_register_counter(master, cube_id, "topk");
+        fieldstat_cube_set_sampling(master, cube_id, SAMPLING_MODE_TOPK, CELL_MAX, 0);
     }
     
     // all the possible fields
@@ -258,9 +262,11 @@ TEST(Fuzz_test, many_instance_random_flow_unregister_calibrate_reset_fork_merge_
             Fieldstat_tag_list_wrapper *new_tag = new Fieldstat_tag_list_wrapper("shared_tag", next_shared_tag_value++);
             delete shared_tags[cube_id_to_change];
             shared_tags[cube_id_to_change] = new_tag;
-            fieldstat_destroy_cube(master, cube_id_to_change);
-            int cube_id_new = fieldstat_create_cube(master, new_tag->get_tag(), new_tag->get_tag_count(), SAMPLING_MODE_TOPK, CELL_MAX);
+            fieldstat_cube_destroy(master, cube_id_to_change);
+            int cube_id_new = fieldstat_cube_create(master, new_tag->get_tag(), new_tag->get_tag_count());
             fieldstat_register_counter(master, cube_id_new, "topk");
+            fieldstat_cube_set_sampling(master, cube_id_new, SAMPLING_MODE_TOPK, CELL_MAX, 0);
+
             EXPECT_EQ(cube_id_new, cube_id_to_change); // should new the cube in the hole leaved by the destroyed cube
             // calibrate
             for (int j = 0; j < INSTANCE_NUM; j++) {
@@ -361,9 +367,10 @@ TEST(Fuzz_test, many_instance_random_flow_unregister_calibrate_reset_fork_merge_
     // init cube
     for (int i = 0; i < CUBE_NUM; i++) {
         shared_tags[i] = new Fieldstat_tag_list_wrapper("shared_tag", i);
-        int cube_id = fieldstat_create_cube(master, shared_tags[i]->get_tag(), shared_tags[i]->get_tag_count(), SAMPLING_MODE_TOP_CARDINALITY, CELL_MAX);
+        int cube_id = fieldstat_cube_create(master, shared_tags[i]->get_tag(), shared_tags[i]->get_tag_count());
         EXPECT_EQ(cube_id, i);
         fieldstat_register_hll(master, cube_id, "hll", 6);
+        fieldstat_cube_set_sampling(master, cube_id, SAMPLING_MODE_TOP_CARDINALITY, CELL_MAX, 0);
     }
     
     //init instance
@@ -392,10 +399,12 @@ TEST(Fuzz_test, many_instance_random_flow_unregister_calibrate_reset_fork_merge_
             Fieldstat_tag_list_wrapper *new_tag = new Fieldstat_tag_list_wrapper("shared_tag", next_shared_tag_value++);
             delete shared_tags[cube_id_to_change];
             shared_tags[cube_id_to_change] = new_tag;
-            fieldstat_destroy_cube(master, cube_id_to_change);
-            int cube_id_new = fieldstat_create_cube(master, new_tag->get_tag(), new_tag->get_tag_count(), SAMPLING_MODE_TOP_CARDINALITY, CELL_MAX);
+            fieldstat_cube_destroy(master, cube_id_to_change);
+            int cube_id_new = fieldstat_cube_create(master, new_tag->get_tag(), new_tag->get_tag_count());
             fieldstat_register_hll(master, cube_id_new, "hll", 6);
             EXPECT_EQ(cube_id_new, cube_id_to_change); // should new the cube in the hole leaved by the destroyed cube
+            fieldstat_cube_set_sampling(master, cube_id_new, SAMPLING_MODE_TOP_CARDINALITY, CELL_MAX, 0);
+
             // calibrate
             for (int j = 0; j < INSTANCE_NUM; j++) {
                 fieldstat_calibrate(master, replica[j]);
@@ -499,9 +508,11 @@ TEST(Fuzz_test, add_and_reset_with_randomly_generated_flows_and_randomly_chosen_
 
     struct fieldstat *instance = fieldstat_new();
 
-    int cube_id = fieldstat_create_cube(instance,NULL,0,SAMPLING_MODE_TOPK, 1); // K = 1, just to increase the possibility of FS_ERR_TOO_MANY_CELLS
+    int cube_id = fieldstat_cube_create(instance,NULL,0); 
     int primary_metric_id = fieldstat_register_counter(instance, cube_id, "counter");
     int counter2_id = fieldstat_register_counter(instance, cube_id, "counter2");
+    fieldstat_cube_set_sampling(instance, cube_id, SAMPLING_MODE_TOPK, 1, 0); // K = 1, just to increase the possibility of FS_ERR_TOO_MANY_CELLS
+
     fieldstat_counter_incrby(instance, cube_id, primary_metric_id, tag_list_wrapper[0]->get_tag(), tag_list_wrapper[0]->get_tag_count(), 1);
     fieldstat_counter_incrby(instance, cube_id, counter2_id, tag_list_wrapper[0]->get_tag(), tag_list_wrapper[0]->get_tag_count(), 1);
 
@@ -550,9 +561,10 @@ TEST(perf, simple_one_for_perf_topk)
     // init cube
     for (int i = 0; i < CUBE_NUM; i++) {
         shared_tags[i] = new Fieldstat_tag_list_wrapper("shared_tag", i);
-        int cube_id = fieldstat_create_cube(master, shared_tags[i]->get_tag(), shared_tags[i]->get_tag_count(), SAMPLING_MODE_TOPK, CELL_MAX);
+        int cube_id = fieldstat_cube_create(master, shared_tags[i]->get_tag(), shared_tags[i]->get_tag_count());
         EXPECT_EQ(cube_id, i);
         fieldstat_register_counter(master, cube_id, "topk");
+        fieldstat_cube_set_sampling(master, cube_id, SAMPLING_MODE_TOPK, CELL_MAX, 0);
     }
     // init metric
     
@@ -598,8 +610,9 @@ TEST(perf, simple_one_for_perf_spreadsketch)
     const int TEST_ROUND = 500000;
     struct fieldstat *instance = fieldstat_new();
     
-    int cube_id = fieldstat_create_cube(instance, &TEST_TAG_STRING, 1, SAMPLING_MODE_TOP_CARDINALITY, CELL_MAX);
+    int cube_id = fieldstat_cube_create(instance, &TEST_TAG_STRING, 1);
     fieldstat_register_hll(instance, cube_id, "hll", 6);
+    fieldstat_cube_set_sampling(instance, cube_id, SAMPLING_MODE_TOP_CARDINALITY, CELL_MAX, 0);
 
     SpreadSketchZipfGenerator generator(1.0, CELL_MAX * 10);
     Fieldstat_tag_list_wrapper *cell_dimension[TEST_ROUND];

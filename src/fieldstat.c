@@ -48,7 +48,7 @@ void fieldstat_reset(struct fieldstat *instance)
     cube_manager_reset(instance->cube_manager);
 }
 
-int fieldstat_destroy_cube(struct fieldstat *instance, int cube_id)
+int fieldstat_cube_destroy(struct fieldstat *instance, int cube_id)
 {
     struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
     if (cube == NULL) {
@@ -76,7 +76,24 @@ void fieldstat_free_tag_array(struct field *fields, size_t n_tags)
     free(fields);
 }
 
-int fieldstat_create_cube(struct fieldstat *instance, const struct field *cube_dimensions, size_t n_dimension, enum sampling_mode mode, size_t max_n_cell)
+// cppcheck-suppress [constParameterPointer, unmatchedSuppression]
+int fieldstat_cube_set_sampling(struct fieldstat *instance, int cube_id, enum sampling_mode mode, int max_n_cell, int primary_metric_id) {
+    if (max_n_cell <= 0) {
+        if (mode != SAMPLING_MODE_COMPREHENSIVE) {
+            return FS_ERR_INVALID_PARAM;
+        }
+        max_n_cell = INT32_MAX;
+    }
+
+    struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
+    if (cube == NULL) {
+        return FS_ERR_INVALID_CUBE_ID;
+    }
+    
+    return cube_set_sampling_mode(cube, mode, max_n_cell, primary_metric_id);
+}
+
+int fieldstat_cube_create(struct fieldstat *instance, const struct field *cube_dimensions, size_t n_dimension)
 {
     if (instance == NULL) {
         return  FS_ERR_NULL_HANDLER;
@@ -86,14 +103,8 @@ int fieldstat_create_cube(struct fieldstat *instance, const struct field *cube_d
         cube_dimensions = NULL;
         n_dimension = 0;
     }
-    if (mode == SAMPLING_MODE_TOPK && max_n_cell == 0) {
-        return FS_ERR_INVALID_PARAM;
-    }
-    if (max_n_cell == 0) {
-        max_n_cell = INT32_MAX;
-    }
-    
-    struct cube *cube = cube_new(cube_dimensions, n_dimension, mode, max_n_cell);
+
+    struct cube *cube = cube_new(cube_dimensions, n_dimension);
     int ret = cube_manager_add(instance->cube_manager, cube);
     if (ret < 0) {
         cube_free(cube);
@@ -101,21 +112,6 @@ int fieldstat_create_cube(struct fieldstat *instance, const struct field *cube_d
     }
 
     return ret; //ret is the cube_id
-}
-
-// cppcheck-suppress [constParameterPointer, unmatchedSuppression]
-int fieldstat_cube_set_primary_metric(struct fieldstat *instance, int cube_id, int metric_id)
-{
-    if (instance == NULL) {
-        return FS_ERR_NULL_HANDLER;
-    }
-    
-    struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
-    if (cube == NULL) {
-        return FS_ERR_INVALID_CUBE_ID;
-    }
-    
-    return cube_set_primary_metric(cube, metric_id);
 }
 
 /* -------------------------------------------------------------------------- */

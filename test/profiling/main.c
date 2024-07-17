@@ -31,7 +31,7 @@ int main () {
     };
 
     struct fieldstat *instance = fieldstat_new();
-    fieldstat_create_cube(instance, NULL, 0, SAMPLING_MODE_COMPREHENSIVE, 0);
+    fieldstat_cube_create(instance, NULL, 0, SAMPLING_MODE_COMPREHENSIVE, 0);
     fieldstat_register_counter(instance, "counter");
 
     start = clock();

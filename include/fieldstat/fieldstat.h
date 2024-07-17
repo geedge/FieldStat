@@ -67,11 +67,8 @@ int fieldstat_calibrate(const struct fieldstat *master, struct fieldstat *replic
     * @param max_n_cell: max number of samplings(cells) in each cube. When mode is TOPK, max_n_cell > 0, while in COMPREHENSIVE mode, max_n_cell can be 0, meaning that there is no limit.
     * @return cube id, if success; otherwise, return FS_ERR_NULL_HANDLER, or FS_ERR_INVALID_PARAM when (max_n_cell == 0 && mode == TOPK). return FS_ERR_INVALID_KEY when the cube_dimensions is not unique.
 */
-int fieldstat_create_cube(struct fieldstat *instance, const struct field *cube_dimensions, size_t n_dimension, enum sampling_mode mode, size_t max_n_cell);
-// todo: 重命名为fieldstat_cube_create
-
-//todo: create cube 接口变化
-// int fieldstat_cube_set_sampling(struct fieldstat *instance, int cube_id, enum sampling_mode mode, int max_n_cell, int primary_metric_id);
+int fieldstat_cube_create(struct fieldstat *instance, const struct field *cube_dimensions, size_t n_dimension);
+int fieldstat_cube_set_sampling(struct fieldstat *instance, int cube_id, enum sampling_mode mode, int max_n_cell, int primary_metric_id);
 
 /*
     @brief Change the topk cube primary metric id. When fieldstat_counter_add or fieldstat_counter_set are called on the primary metric, the topk record of such cell will be updated.
@@ -87,7 +84,7 @@ int fieldstat_cube_set_primary_metric(struct fieldstat *instance, int cube_id, i
     * @brief Delete the cube of cube_id. All the cells and metrics are deleted. The cube_id may be reused by other new cubes. Increase the corresponding cube_version by 1.
     * @return FS_OK, FS_ERR_NULL_HANDLER or FS_ERR_INVALID_CUBE_ID
 */
-int fieldstat_destroy_cube(struct fieldstat *instance, int cube_id);
+int fieldstat_cube_destroy(struct fieldstat *instance, int cube_id);
 
 /*
     * @brief add a metric to the cube of cube_id. One metric may be associated with different cells.
@@ -114,7 +111,7 @@ int fieldstat_register_histogram(struct fieldstat *instance, int cube_id, const 
 
 /*
     * @brief let the value of counter metric of cell_id increase by `increment`.
-    * @param cube_id: cube id, previously returned by fieldstat_create_cube.
+    * @param cube_id: cube id, previously returned by fieldstat_cube_create.
     * @param metric_id: metric id, previously returned by fieldstat_register_counter.
     * @param increment: increment of the counter metric. Can be negative.
     * @return FS_OK if success. FS_ERR_NULL_HANDLER, FS_ERR_INVALID_CUBE_ID, FS_ERR_INVALID_METRIC_ID if fail.
@@ -200,7 +197,7 @@ enum metric_type fieldstat_get_metric_type(const struct fieldstat *instance, int
 void fieldstat_cube_get_cells(const struct fieldstat *instance, int cube_id, struct field_list **cell_dimensions, size_t *n_cell);
 
 /*
-    get the field of fieldstat_create_cube. User free them by calling fieldstat_tag_list_arr_free(struct field_list *, 1)
+    get the field of fieldstat_cube_create. User free them by calling fieldstat_tag_list_arr_free(struct field_list *, 1)
     return NULL when ID is invalid.
 */
 struct field_list *fieldstat_cube_get_tags(const struct fieldstat *instance, int cube_id);

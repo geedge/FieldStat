@@ -382,6 +382,9 @@ struct spread_sketch *duplicate_and_step(const struct spread_sketch *ss, const s
 }
 
 void spread_sketch_free(struct spread_sketch *ss) {
+    if (ss == NULL) {
+        return;
+    }
     smart_ptr_table_free(ss->table);
     for (int i = 0; i < ss->depth * ss->width; i++) {
         hll_free_register(ss->buckets[i].sthll_register);

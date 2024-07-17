@@ -40,7 +40,7 @@ Download fieldstat4 rpm from https://repo.geedge.net/pulp/content/ and install r
 #include "fieldstat.h"
 
 struct fieldstat *instance = fieldstat_new();
-int cube_id = fieldstat_create_cube(instance, YOUR_SHARED_TAG, YOUR_SHARED_TAG_LENGTH, SAMPLING_MODE_TOPK, MAX_CELL_NUMBER);
+int cube_id = fieldstat_cube_create(instance, YOUR_SHARED_TAG, YOUR_SHARED_TAG_LENGTH, SAMPLING_MODE_TOPK, MAX_CELL_NUMBER);
 int metric_counter_id = fieldstat_register_counter(instance, cube_id, "any metric name", 0/1);
 int metric_histogram_id = fieldstat_register_histogramogram(instance, cube_id, "any metric name", THE_MINIMUM_NUMBER_TO_RECORD, THE_MAXIMUM_NUMBER_TO_RECORD, PRECISION);
 int metric_hll_id = fieldstat_register_hll(instance, cube_id, "any metric name", PRECISION);

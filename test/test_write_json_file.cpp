@@ -58,6 +58,14 @@ extern "C" {
     return fse;
 }
 
+int test_fieldstat_cube_create(struct fieldstat *instance, const struct field *dimensions, size_t n_dimensions, enum sampling_mode mode, int k)
+{
+    assert(mode == SAMPLING_MODE_COMPREHENSIVE);
+    int ret = fieldstat_cube_create(instance, dimensions, n_dimensions);
+    fieldstat_cube_set_sampling(instance, ret, mode, k, 0);
+    return ret;
+}
+
 static void write_hll(struct fieldstat *instance) {
     struct field shared_tags[1];
 
@@ -66,7 +74,7 @@ static void write_hll(struct fieldstat *instance) {
     shared_tags[0].value_longlong = 1;
 
     const char *hll_name[] = {"external_ip", "internal_ip", "acc_ip"};
-    int cube_id = fieldstat_create_cube(instance, shared_tags, 1, 
+    int cube_id = test_fieldstat_cube_create(instance, shared_tags, 1, 
                                           SAMPLING_MODE_COMPREHENSIVE, 100);
 
     for(unsigned int i = 0; i < sizeof(hll_name) / sizeof(hll_name[0]); i++)
@@ -107,7 +115,7 @@ void write_histogram(struct fieldstat *instance) {
                                 "bye/udp", "oth_mtd/udp"};
 
 
-    int cube_id = fieldstat_create_cube(instance, shared_tags, 2, 
+    int cube_id = test_fieldstat_cube_create(instance, shared_tags, 2, 
                                           SAMPLING_MODE_COMPREHENSIVE, 100);
 
     for(unsigned int i = 0; i < sizeof(hist_names)/sizeof(hist_names[0]); i++)
@@ -185,7 +193,7 @@ void write_table(struct fieldstat *instance) {
     cell_tags.type = FIELD_VALUE_CSTRING;
     cell_tags.value_str = "true";
 
-    int cube_id = fieldstat_create_cube(instance, shared_tags, 2, 
+    int cube_id = test_fieldstat_cube_create(instance, shared_tags, 2, 
                                           SAMPLING_MODE_COMPREHENSIVE, 100);
 
     int counter_id_0 = fieldstat_register_counter(instance, cube_id, "T_success_log");

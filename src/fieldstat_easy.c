@@ -122,7 +122,8 @@ struct fieldstat_easy *fieldstat_easy_new(int max_thread_num, const char *name, 
     fse->fsu = malloc(sizeof(struct fs_easy_thread) * max_thread_num);
     fse->max_thread_num = max_thread_num;
     fse->delta = fieldstat_new();
-    fieldstat_create_cube(fse->delta, NULL, 0, SAMPLING_MODE_COMPREHENSIVE, 0);
+    fieldstat_cube_create(fse->delta, NULL, 0);
+    fieldstat_cube_set_sampling(fse->delta, 0, SAMPLING_MODE_COMPREHENSIVE, 0, 0);
 
     fse->accumulate = fieldstat_fork(fse->delta);
     fse->exporter = fieldstat_json_exporter_new();

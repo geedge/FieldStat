@@ -64,6 +64,9 @@ struct hash_table *hash_table_new(int max_query_num) {
 }
 
 void hash_table_free(struct hash_table *pthis) {
+    if (pthis == NULL) {
+        return;
+    }
     struct tag_exdata_item *item, *tmp;
     HASH_ITER(hh, pthis->tag_id_map, item, tmp) {
         HASH_DEL(pthis->tag_id_map, item);

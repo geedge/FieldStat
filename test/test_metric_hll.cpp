@@ -8,10 +8,18 @@
 #include "fieldstat.h"
 #include "utils.hpp"
 
+int test_fieldstat_cube_create(struct fieldstat *instance, const struct field *dimensions, size_t n_dimensions, enum sampling_mode mode, int k)
+{
+    assert(mode == SAMPLING_MODE_COMPREHENSIVE);
+    int ret = fieldstat_cube_create(instance, dimensions, n_dimensions);
+    fieldstat_cube_set_sampling(instance, ret, mode, k, 0);
+    return ret;
+}
+
 struct fieldstat *test_init_standard_instance_one_cube_one_metric_one_cell_hll(bool is_gauge = false)
 {
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    int cube_id = test_fieldstat_cube_create(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
     EXPECT_EQ(cube_id, 0);
 
     int metric_id = fieldstat_register_hll(instance, cube_id, "czz_test hll metric", 10);
@@ -198,7 +206,7 @@ TEST(metric_test_hll, serialize_with_b64_and_query_with_python_api)
 TEST(metric_test_hll, add_with_wrong_cube_id_expecting_fail)
 {
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_create_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    int cube_id = test_fieldstat_cube_create(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
 
     int ret = fieldstat_hll_add(instance, cube_id + 1, 0, &TEST_TAG_INT, 1, "hello", 5);
     EXPECT_EQ(ret, FS_ERR_INVALID_CUBE_ID);
@@ -211,7 +219,7 @@ TEST(metric_test_hll, add_with_wrong_cube_id_expecting_fail)
 TEST(metric_test_hll, add_with_wrong_metric_id_expecting_fail)
 {
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_create_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    int cube_id = test_fieldstat_cube_create(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
     int metric_id = fieldstat_register_hll(instance, cube_id, "czz_test hll metric", 10);
 
     int ret = fieldstat_hll_add(instance, cube_id, metric_id + 1, &TEST_TAG_INT, 1, "hello", 5);
@@ -226,8 +234,9 @@ TEST(metric_test_hll, spread_sketch_add_and_test_accuracy)
 {
     struct fieldstat *instance = fieldstat_new();
     int K = 10;
-    fieldstat_create_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_TOP_CARDINALITY, K);
+    fieldstat_cube_create(instance, &TEST_TAG_INT_collided, 1);
     fieldstat_register_hll(instance, 0, "testss", 6);
+    fieldstat_cube_set_sampling(instance, 0, SAMPLING_MODE_TOP_CARDINALITY, K, 0);
 
     int n_flows = 100000;
     std::unordered_map<std::string, std::unordered_set<std::string>> flow_cnt;

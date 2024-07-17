@@ -518,6 +518,9 @@ struct heavy_keeper *heavy_keeper_new(int max_query_num) {
 }
 
 void heavy_keeper_free(struct heavy_keeper *hk) {
+    if (hk == NULL) {
+        return;
+    }
     sorted_set_free(hk->top_K_heap);
     free(hk->sketch);
 

@@ -13,7 +13,8 @@ extern "C"
 struct cube;
 struct cube_manager;
 
-struct cube *cube_new(const struct field *dimensions, size_t n_dimensions, enum sampling_mode mode, size_t max_n_cell);
+struct cube *cube_new(const struct field *dimensions, size_t n_dimensions);
+int cube_set_sampling_mode(struct cube *cube, enum sampling_mode mode, int max_n_cell, int primary_metric_id);
 void cube_free(struct cube *cube);
 void cube_reset(struct cube *cube);
 struct cube *cube_copy(const struct cube *cube);

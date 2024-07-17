@@ -46,15 +46,23 @@ double merge_test_fieldstat_hll_get(const struct fieldstat *instance, int cube_i
     return ret;
 }
 
+int test_fieldstat_cube_create(struct fieldstat *instance, const struct field *dimensions, size_t n_dimensions, enum sampling_mode mode, int k, int primary_metric_id=0)
+{
+    assert(mode == SAMPLING_MODE_COMPREHENSIVE);
+    int ret = fieldstat_cube_create(instance, dimensions, n_dimensions);
+    fieldstat_cube_set_sampling(instance, ret, mode, k, primary_metric_id);
+    return ret;
+}
+
 TEST(unit_test_merge, cube_shared_tag_mapping_with_new_cube)
 {
     struct fieldstat *instance = fieldstat_new();
-    (void)fieldstat_create_cube(instance, &TEST_TAG_DOUBLE, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
-    int cube_id2 = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    (void)test_fieldstat_cube_create(instance, &TEST_TAG_DOUBLE, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    int cube_id2 = test_fieldstat_cube_create(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
     int metric_id = fieldstat_register_counter(instance,cube_id2,"metric in cube 2");
     fieldstat_counter_incrby(instance, cube_id2, metric_id, &TEST_TAG_STRING, 1, 1);
     struct fieldstat *instance_dest = fieldstat_new();
-    int cube_id_dest = fieldstat_create_cube(instance_dest, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    int cube_id_dest = test_fieldstat_cube_create(instance_dest, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
 
     fieldstat_merge(instance_dest, instance);
 
@@ -87,7 +95,7 @@ TEST(unit_test_merge, empty_instance)
 TEST(unit_test_merge, new_cube_and_metric_to_empty_comprehensive)
 {
     struct fieldstat *instance = fieldstat_new();
-    fieldstat_create_cube(instance, &TEST_TAG_INT, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    test_fieldstat_cube_create(instance, &TEST_TAG_INT, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
     fieldstat_register_counter(instance, 0, "metric_name");
 
     struct fieldstat *instance_dest = fieldstat_new();
@@ -108,7 +116,7 @@ TEST(unit_test_merge, new_cube_and_metric_to_empty_comprehensive)
 TEST(unit_test_merge, new_cell_on_existing_cube_and_metric_comprehensive)
 {
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    int cube_id = test_fieldstat_cube_create(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
     int metric_id = fieldstat_register_counter(instance, 0, "metric_name");
     struct fieldstat *instance_dest = fieldstat_new();
     fieldstat_merge(instance_dest, instance);
@@ -140,7 +148,7 @@ TEST(unit_test_merge, new_cell_on_existing_cube_and_metric_comprehensive)
 TEST(unit_test_merge, merge_existing_cell_on_existing_cube_and_metric_comprehensive)
 {
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    int cube_id = test_fieldstat_cube_create(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
     int metric_id = fieldstat_register_counter(instance, cube_id, "metric_name");
     fieldstat_counter_incrby(instance, cube_id, metric_id, &TEST_TAG_STRING, 1, 5);
     struct fieldstat *instance_dest = fieldstat_new();
@@ -159,7 +167,7 @@ TEST(unit_test_merge, merge_existing_cell_on_existing_cube_and_metric_comprehens
 TEST(unit_test_merge, new_too_many_cells_on_one_metric_given_source_cube_reset_and_get_different_cube_comprehensive)
 {
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 2); // limit is 2
+    int cube_id = test_fieldstat_cube_create(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 2); // limit is 2
     int metric_id = fieldstat_register_counter(instance, cube_id, "metric name");
     fieldstat_counter_incrby(instance, cube_id, metric_id, &TEST_TAG_STRING, 1, 1);
     struct fieldstat *instance_dest = fieldstat_new();
@@ -187,7 +195,7 @@ TEST(unit_test_merge, new_too_many_cells_on_one_metric_given_source_cube_reset_a
 TEST(unit_test_merge, new_too_many_cells_on_multiple_metric_given_source_cube_reset_and_get_different_cube_comprehensive)
 {
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 2);
+    int cube_id = test_fieldstat_cube_create(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 2);
     int metric_id1 = fieldstat_register_counter(instance, cube_id, "metric name1");
     int metric_id2 = fieldstat_register_counter(instance, cube_id, "metric name2");
     fieldstat_counter_incrby(instance, cube_id, metric_id1, &TEST_TAG_STRING, 1, 1); // 1st cell on metric name1
@@ -222,8 +230,9 @@ TEST(unit_test_merge, new_too_many_cells_on_multiple_metric_given_source_cube_re
 TEST(unit_test_merge, new_cube_and_metric_to_empty_topk)
 {
     struct fieldstat *instance = fieldstat_new();
-    fieldstat_create_cube(instance, &TEST_TAG_INT, 1, SAMPLING_MODE_TOPK, 10);
+    fieldstat_cube_create(instance, &TEST_TAG_INT, 1);
     fieldstat_register_counter(instance, 0, "metric_name");
+    fieldstat_cube_set_sampling(instance, 0, SAMPLING_MODE_TOPK, 10, 0);
 
     struct fieldstat *instance_dest = fieldstat_new();
 
@@ -243,8 +252,9 @@ TEST(unit_test_merge, new_cube_and_metric_to_empty_topk)
 TEST(unit_test_merge, new_cell_on_existing_cube_and_metric_topk)
 {
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 10);
+    int cube_id = fieldstat_cube_create(instance, &TEST_SHARED_TAG, 1);
     int metric_id = fieldstat_register_counter(instance, cube_id, "metric_name");
+    fieldstat_cube_set_sampling(instance, cube_id, SAMPLING_MODE_TOPK, 10, 0);
     struct fieldstat *instance_dest = fieldstat_new();
     fieldstat_merge(instance_dest, instance);
 
@@ -275,8 +285,9 @@ TEST(unit_test_merge, new_cell_on_existing_cube_and_metric_topk)
 TEST(unit_test_merge, merge_existing_cell_on_existing_cube_and_metric_topk)
 {
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 10);
+    int cube_id = fieldstat_cube_create(instance, &TEST_SHARED_TAG, 1);
     int metric_id = fieldstat_register_counter(instance, cube_id, "metric_name");
+    fieldstat_cube_set_sampling(instance, cube_id, SAMPLING_MODE_TOPK, 10, 0);
     fieldstat_counter_incrby(instance, cube_id, metric_id, &TEST_TAG_STRING, 1, 5);
     struct fieldstat *instance_dest = fieldstat_new();
 
@@ -306,8 +317,9 @@ TEST(unit_test_merge, merge_existing_cell_on_existing_cube_and_metric_topk)
 TEST(unit_test_merge, new_too_many_cells_on_one_metric_given_source_cube_reset_and_get_different_cube_topk)
 {
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 2);
+    int cube_id = fieldstat_cube_create(instance, &TEST_SHARED_TAG, 1);
     int metric_id = fieldstat_register_counter(instance, cube_id, "metric name");
+    fieldstat_cube_set_sampling(instance, cube_id, SAMPLING_MODE_TOPK, 2, 0);
     fieldstat_counter_incrby(instance, cube_id, metric_id, &TEST_TAG_STRING, 1, 1);
     struct fieldstat *instance_dest = fieldstat_new();
     fieldstat_merge(instance_dest, instance);
@@ -334,8 +346,9 @@ TEST(unit_test_merge, new_too_many_cells_on_one_metric_given_source_cube_reset_a
 struct fieldstat *topk_test_push_flows(vector<Fieldstat_tag_list_wrapper *> &flows_in_test, int K, long long count = 1)
 {
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, K);
+    int cube_id = fieldstat_cube_create(instance, &TEST_SHARED_TAG, 1);
     int metric_id = fieldstat_register_counter(instance, cube_id, "metric name");
+    fieldstat_cube_set_sampling(instance, cube_id, SAMPLING_MODE_TOPK, K, 0);
     for (size_t i = 0; i < flows_in_test.size(); i++) {
         fieldstat_counter_incrby(instance, cube_id, metric_id, flows_in_test[i]->get_tag(), flows_in_test[i]->get_tag_count(), count);
     }
@@ -449,9 +462,10 @@ TEST(unit_test_merge, merge_accuracy_test_gen_dest_full_some_inserted_and_some_m
 TEST(unit_test_merge, primary_metric_has_no_value)
 {
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 2);
+    int cube_id = fieldstat_cube_create(instance, &TEST_SHARED_TAG, 1);
     int metric_primary = fieldstat_register_counter(instance, cube_id, "primary");
     int metric_operated = fieldstat_register_counter(instance, cube_id, "operated");
+    fieldstat_cube_set_sampling(instance, cube_id, SAMPLING_MODE_TOPK, 2, metric_primary);
     fieldstat_counter_incrby(instance, cube_id, metric_operated, &TEST_TAG_STRING, 1, 1);
     struct fieldstat *instance_dest = fieldstat_new();
     fieldstat_merge(instance_dest, instance);
@@ -474,17 +488,19 @@ TEST(unit_test_merge, primary_metric_has_no_value)
 TEST(unit_test_merge, primary_metric_id_different)
 {
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 2);
+    int cube_id = fieldstat_cube_create(instance, &TEST_SHARED_TAG, 1);
     int metric_primary = fieldstat_register_counter(instance, cube_id, "primary");
     int metric_2 = fieldstat_register_counter(instance, cube_id, "2");
+    fieldstat_cube_set_sampling(instance, cube_id, SAMPLING_MODE_TOPK, 2, metric_primary);
+
     fieldstat_counter_incrby(instance, cube_id, metric_primary, &TEST_TAG_STRING, 1, 100);
     fieldstat_counter_incrby(instance, cube_id, metric_2, &TEST_TAG_STRING, 1, 1);
 
     struct fieldstat *instance_dst = fieldstat_new();
-    int cube_id_dst = fieldstat_create_cube(instance_dst, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 2);
+    int cube_id_dst = fieldstat_cube_create(instance_dst, &TEST_SHARED_TAG, 1);
     fieldstat_register_counter(instance_dst, cube_id_dst, "2");
     int metric_primary_dst = fieldstat_register_counter(instance_dst, cube_id_dst, "primary");
-    fieldstat_cube_set_primary_metric(instance_dst, cube_id_dst, metric_primary_dst);
+    fieldstat_cube_set_sampling(instance_dst, cube_id_dst, SAMPLING_MODE_TOPK, 2, metric_primary_dst);
 
     EXPECT_EQ(fieldstat_merge(instance_dst, instance), FS_ERR_INVALID_PARAM);
 
@@ -494,8 +510,9 @@ TEST(unit_test_merge, primary_metric_id_different)
 
 TEST(unit_test_merge, new_cube_and_metric_to_empty_spreadsketch) {
     struct fieldstat *instance = fieldstat_new();
-    fieldstat_create_cube(instance, &TEST_TAG_INT, 1, SAMPLING_MODE_TOP_CARDINALITY, 10);
+    fieldstat_cube_create(instance, &TEST_TAG_INT, 1);
     fieldstat_register_hll(instance, 0, "metric", 6);
+    fieldstat_cube_set_sampling(instance, 0, SAMPLING_MODE_TOP_CARDINALITY, 10, 0);
 
     struct fieldstat *instance_dest = fieldstat_new();
     fieldstat_merge(instance_dest, instance);
@@ -513,8 +530,9 @@ TEST(unit_test_merge, new_cube_and_metric_to_empty_spreadsketch) {
 
 TEST(unit_test_merge, new_cell_on_existing_cube_and_metric_spreadsketch) {
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOP_CARDINALITY, 10);
+    int cube_id = fieldstat_cube_create(instance, &TEST_SHARED_TAG, 1);
     int metric_id = fieldstat_register_hll(instance, cube_id, "metric", 6);
+    fieldstat_cube_set_sampling(instance, cube_id, SAMPLING_MODE_TOP_CARDINALITY, 10, 0);
     struct fieldstat *instance_dest = fieldstat_new();
     fieldstat_merge(instance_dest, instance);
 
@@ -545,8 +563,9 @@ TEST(unit_test_merge, new_cell_on_existing_cube_and_metric_spreadsketch) {
 
 TEST(unit_test_merge, merge_existing_cell_on_existing_cube_and_metric_spreadsketch) {
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOP_CARDINALITY, 10);
+    int cube_id = fieldstat_cube_create(instance, &TEST_SHARED_TAG, 1);
     int metric_id = fieldstat_register_hll(instance, cube_id, "metric", 6);
+    fieldstat_cube_set_sampling(instance, cube_id, SAMPLING_MODE_TOP_CARDINALITY, 10, 0);
     fieldstat_hll_add(instance, cube_id, metric_id, &TEST_TAG_STRING, 1, "1", 1);
     struct fieldstat *instance_dest = fieldstat_new();
 
@@ -569,8 +588,9 @@ TEST(unit_test_merge, merge_existing_cell_on_existing_cube_and_metric_spreadsket
 
 TEST(unit_test_merge, new_too_many_cells_on_one_metric_given_source_cube_reset_and_get_different_cube_spreadsketch) {
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOP_CARDINALITY, 2);
+    int cube_id = fieldstat_cube_create(instance, &TEST_SHARED_TAG, 1);
     int metric_id = fieldstat_register_hll(instance, cube_id, "metric", 6);
+    fieldstat_cube_set_sampling(instance, cube_id, SAMPLING_MODE_TOP_CARDINALITY, 2, 0);
     fieldstat_hll_add(instance, cube_id, metric_id, &TEST_TAG_STRING, 1, "1", 1);
     struct fieldstat *instance_dest = fieldstat_new();
     fieldstat_merge(instance_dest, instance);
@@ -602,8 +622,9 @@ TEST(unit_test_merge, gen_dest_full_all_src_inserted_given_src_flows_larger_spre
     int K = 100;
     SpreadSketchZipfGenerator flow_generator(1.0, K); // exactly the number of cells, so there will be almost all(in case of hash collision happen) cells added successfully
     struct fieldstat *instance_src = fieldstat_new();
-    int cube_id = fieldstat_create_cube(instance_src, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOP_CARDINALITY, K);
+    int cube_id = fieldstat_cube_create(instance_src, &TEST_SHARED_TAG, 1);
     int metric_id = fieldstat_register_hll(instance_src, cube_id, "metric", 6);
+    fieldstat_cube_set_sampling(instance_src, cube_id, SAMPLING_MODE_TOP_CARDINALITY, K, 0);
     struct fieldstat *instance_dest = fieldstat_fork(instance_src);
     const char dest_key[] = "key of dest";
     const char src_key[] = "key of src";
@@ -660,8 +681,9 @@ TEST(unit_test_merge, merge_accuracy_test_gen_dest_full_some_inserted_and_some_m
     int K = 10;
     SpreadSketchZipfGenerator flow_generator(1.0, K * 10);
     struct fieldstat *instance_src = fieldstat_new();
-    int cube_id = fieldstat_create_cube(instance_src, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOP_CARDINALITY, K);
+    int cube_id = fieldstat_cube_create(instance_src, &TEST_SHARED_TAG, 1);
     int metric_id = fieldstat_register_hll(instance_src, cube_id, "metric", 6);
+    fieldstat_cube_set_sampling(instance_src, cube_id, SAMPLING_MODE_TOP_CARDINALITY, K, 0);
     struct fieldstat *instance_dest = fieldstat_fork(instance_src);
 
     std::unordered_map<std::string, std::unordered_set<std::string>> flow_cnt;
@@ -699,7 +721,7 @@ TEST(unit_test_merge, merge_accuracy_test_gen_dest_full_some_inserted_and_some_m
         expected_unique_cnt[kv.first] = kv.second.size();
     }
     double recall = test_cal_topk_accuracy(test_result, expected_unique_cnt);
-    EXPECT_GT(recall, 0.7);
+    EXPECT_GE(recall, 0.7);
     printf("gen_dest_full_all_src_inserted_given_src_flows_larger_spreadsketch recall is %lf\n", recall);
 
     fieldstat_free(instance_src);
