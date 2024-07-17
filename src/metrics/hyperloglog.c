@@ -14,6 +14,8 @@
 #include <stdlib.h>
 #include "base64/b64.h"
 
+#include "hll_common.h"
+
 const size_t BLOB_HDR_SIZE= offsetof(struct hyperloglog, registers);
 
 
@@ -171,36 +173,9 @@ struct hyperloglog *hyperloglog_deserialize(const char *blob, size_t blob_sz)
     return h;
 }
 
-void hyperloglog_serialize_for_networking(const struct hyperloglog *h, char **blob, size_t *blob_sz)
+void hyperloglog_serialize_into_base64(const struct hyperloglog *h, char **blob, size_t *blob_sz)
 {
-    size_t sz=0, offset=0;
-    size_t num_reg = NUM_REG(h->cfg.precision);
-    size_t words = INT_CEIL(num_reg, REG_PER_WORD);
-
-    sz = hyperloglog_serialized_size(h) + 1; // [precision][version][data...
-    unsigned char *buffer = ALLOC(unsigned char, sz);
-
-    const unsigned char version = 1;
-    memcpy(buffer+offset, &version, 1);
-    offset += 1;
-
-    unsigned char precision = h->cfg.precision;
-    memcpy(buffer+offset, &precision, 1);
-    offset += 1;
-
-    for (int i = 0; i < words; i++) {
-        uint32_t word = h->registers[i];
-        buffer[offset++] = word >> 24;
-        buffer[offset++] = word >> 16;
-        buffer[offset++] = word >> 8;
-        buffer[offset++] = word;
-    }
-
-    char *enc = b64_encode(buffer, sz);
-    free(buffer);
-    *blob_sz = strlen(enc);
-    *blob = enc;
-    return;
+    hll_encode_into_base64(h->registers, h->cfg.precision, blob, blob_sz);
 }
 
 void hyperloglog_merge_blob(struct hyperloglog *dest, const char *blob, size_t blob_sz)

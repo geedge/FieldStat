@@ -234,7 +234,7 @@ long long fieldstat_histogram_value_at_percentile(const struct fieldstat *instan
 long long fieldstat_histogram_count_le_value(const struct fieldstat *instance, int cube_id, const struct field_list *cell_dimensions, int metric_id, long long value);
 
 // get the base 64 encoded string of the serialized blob of a cell
-void fieldstat_get_serialized_blob(const struct fieldstat *instance, int cube_id, int metric_id, const struct field_list *cell_dimensions, char **blob, size_t *blob_size);
+void fieldstat_metric_get_serialization_as_base64(const struct fieldstat *instance, int cube_id, int metric_id, const struct field_list *cell_dimensions, char **blob, size_t *blob_size);
 
 void fieldstat_tag_list_arr_free(struct field_list *tag_list, size_t n_cell);
 

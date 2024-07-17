@@ -542,7 +542,7 @@ struct export_kv_pair *cell_query_with_iter(const struct cell_iter *iter, int me
     if (type == METRIC_TYPE_HLL || type == METRIC_TYPE_HISTOGRAM) {
         char *value;
         size_t len;
-        fieldstat_get_serialized_blob(iter->instance, cube_id, metric_id, &iter->tag_list[iter->curr_cell_idx], &value, &len);
+        fieldstat_metric_get_serialization_as_base64(iter->instance, cube_id, metric_id, &iter->tag_list[iter->curr_cell_idx], &value, &len);
         if (value == NULL) {
             return NULL;
         }

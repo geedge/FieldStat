@@ -35,7 +35,7 @@ int cube_counter_get(const struct cube *cube, int metric_id, const struct field_
 int cube_hll_get(const struct cube *cube, int metric_id, const struct field_list *dimensions, double *value);
 int cube_histogram_value_at_percentile(const struct cube *cube, int metric_id, const struct field_list *dimensions, double percentile, long long *value);
 int cube_histogram_count_le_value(const struct cube *cube, int metric_id, const struct field_list *dimensions, long long value, long long *count);
-int cube_get_serialization(const struct cube *cube, int metric_id, const struct field_list *dimensions, char **blob, size_t *blob_size);
+int cube_get_serialization_as_base64(const struct cube *cube, int metric_id, const struct field_list *dimensions, char **blob, size_t *blob_size);
 
 int cube_get_cell_count(const struct cube *cube);
 enum sampling_mode cube_get_sampling_mode(const struct cube *cube);

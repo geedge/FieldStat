@@ -297,7 +297,7 @@ void metric_serialize(const struct metric *pthis, char **blob, size_t *blob_size
     struct metric_data *data = pthis->data;
     enum metric_type type = pthis->type;
     if (type == METRIC_TYPE_HLL) {
-        hyperloglog_serialize_for_networking(data->hll, blob, blob_size);
+        hyperloglog_serialize_into_base64(data->hll, blob, blob_size);
         return;
     }
     if (type == METRIC_TYPE_HISTOGRAM) {

@@ -49,7 +49,7 @@ void hyperloglog_reset(struct hyperloglog *h);
 double hyperloglog_count(const struct hyperloglog *h);
 size_t hyperloglog_serialized_size(const struct hyperloglog *h);
 void hyperloglog_serialize(const struct hyperloglog *h, char **blob, size_t *blob_sz);
-void hyperloglog_serialize_for_networking(const struct hyperloglog *h, char **blob, size_t *blob_sz);
+void hyperloglog_serialize_into_base64(const struct hyperloglog *h, char **blob, size_t *blob_sz);
 struct hyperloglog *hyperloglog_deserialize(const char *blob, size_t blob_sz);
 int hyperloglog_merge(struct hyperloglog *dest, const struct hyperloglog *src);
 void hyperloglog_merge_blob(struct hyperloglog *dest, const char *blob, size_t blob_sz);

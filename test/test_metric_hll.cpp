@@ -138,7 +138,7 @@ TEST(metric_test_hll, serialize_with_b64_and_query)
 
     char *blob = NULL;
     size_t blob_len = 0;
-    fieldstat_get_serialized_blob(instance, 0, 0, &TEST_TAG_LIST_INT, &blob, &blob_len);
+    fieldstat_metric_get_serialization_as_base64(instance, 0, 0, &TEST_TAG_LIST_INT, &blob, &blob_len);
     size_t dec_size = 0;
     unsigned char *dec = b64_decode_ex(blob, blob_len, &dec_size);
 
@@ -183,7 +183,7 @@ TEST(metric_test_hll, serialize_with_b64_and_query_with_python_api)
 
     char *blob = NULL;
     size_t blob_len = 0;
-    fieldstat_get_serialized_blob(instance, 0, 0, &TEST_TAG_LIST_INT, &blob, &blob_len);
+    fieldstat_metric_get_serialization_as_base64(instance, 0, 0, &TEST_TAG_LIST_INT, &blob, &blob_len);
 
     bool flag = fieldstat_is_hll(blob);
     EXPECT_EQ(flag, true);

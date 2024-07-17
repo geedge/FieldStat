@@ -2,6 +2,8 @@
 #include "hll_common.h"
 #include "crdt_utils.h"
 
+#include "base64/b64.h"
+
 #include <string.h>
 #include <math.h>
 #include <assert.h>
@@ -298,7 +300,7 @@ void hll_advance_reset_index(long long *reset_idx, long long reset_reg_count, un
 long long hll_get_reset_register_count(unsigned char precision, long long time_window_ms, struct timeval now, struct timeval *reset_time)
 {
     long long reset_time_slot_us=RESET_TIME_SLOT_US(time_window_ms, precision);
-    long long delta_us=timeval_delta_us(*reset_time, now);
+    long long delta_us=timeval_delta_us((*reset_time), now);
     if(delta_us < reset_time_slot_us)
         return 0;
     
@@ -348,4 +350,35 @@ int hll_should_slide(unsigned char precision, long long time_window_ms, struct t
     if(delta_us >= reset_time_slot_us)
         return 1;
     return 0;
+}
+
+void hll_encode_into_base64(const uint32_t *registers, unsigned char precision, char **blob, size_t *blob_sz)
+{
+    size_t sz=0, offset=0;
+    size_t num_reg = NUM_REG(precision);
+    size_t words = INT_CEIL(num_reg, REG_PER_WORD);
+
+    sz = hll_size(precision) + 2; // [version][precision][data..., + 2 for version and precision
+    unsigned char *buffer = ALLOC(unsigned char, sz);
+
+    const unsigned char version = 1;
+    memcpy(buffer+offset, &version, 1);
+    offset += 1;
+
+    memcpy(buffer+offset, &precision, 1);
+    offset += 1;
+
+    for (int i = 0; i < words; i++) {
+        uint32_t word = registers[i];
+        buffer[offset++] = word >> 24;
+        buffer[offset++] = word >> 16;
+        buffer[offset++] = word >> 8;
+        buffer[offset++] = word;
+    }
+
+    char *enc = b64_encode(buffer, sz);
+    free(buffer);
+    *blob_sz = strlen(enc);
+    *blob = enc;
+    return;
 }

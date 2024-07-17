@@ -120,8 +120,8 @@ TEST(unit_test_merge, new_cell_on_existing_cube_and_metric_comprehensive)
     int n_cube;
     fieldstat_get_cubes(instance_dest, &cube_id_dest, &n_cube);
     EXPECT_TRUE(n_cube == 1);
-    free(cube_id_dest);
     EXPECT_STREQ(fieldstat_get_metric_name(instance_dest, cube_id_dest[0], 0), "metric_name");
+    free(cube_id_dest);
     long long measure = merge_test_fieldstat_counter_get(instance, cube_id, metric_id);
     EXPECT_EQ(measure, 10086);
 
@@ -255,8 +255,8 @@ TEST(unit_test_merge, new_cell_on_existing_cube_and_metric_topk)
     int n_cube;
     fieldstat_get_cubes(instance_dest, &cube_id_dest, &n_cube);
     EXPECT_TRUE(n_cube == 1);
-    free(cube_id_dest);
     EXPECT_STREQ(fieldstat_get_metric_name(instance_dest,cube_id_dest[0], 0), "metric_name");
+    free(cube_id_dest);
     long long measure = merge_test_fieldstat_counter_get(instance, cube_id, metric_id);
     EXPECT_EQ(measure, 10086);
 
@@ -288,8 +288,8 @@ TEST(unit_test_merge, merge_existing_cell_on_existing_cube_and_metric_topk)
     fieldstat_get_cubes(instance_dest, &cube_id_dest, &n_cube);
     EXPECT_TRUE(n_cube == 1);
     int ret_cube_id = cube_id_dest[0];
-    free(cube_id_dest);
     EXPECT_STREQ(fieldstat_get_metric_name(instance_dest,cube_id_dest[0], 0), "metric_name");
+    free(cube_id_dest);
 
     struct field_list *tag_list = NULL;
     size_t n_cell = 0;
@@ -597,6 +597,7 @@ TEST(unit_test_merge, new_too_many_cells_on_one_metric_given_source_cube_reset_a
     fieldstat_tag_list_arr_free(tag_list, n_cell);
 }
 
+
 TEST(unit_test_merge, gen_dest_full_all_src_inserted_given_src_flows_larger_spreadsketch) {
     int K = 100;
     SpreadSketchZipfGenerator flow_generator(1.0, K); // exactly the number of cells, so there will be almost all(in case of hash collision happen) cells added successfully
@@ -712,7 +713,7 @@ TEST(unit_test_merge, merge_accuracy_test_gen_dest_full_some_inserted_and_some_m
 int main(int argc, char *argv[]) 
 {
 	testing::InitGoogleTest(&argc, argv);
-    // testing::GTEST_FLAG(filter) = "*spreadsketch";
+    // testing::GTEST_FLAG(filter) = "*gen_dest_full_all_src_inserted_given_src_flows_larger_spreadsketch";
     
 	return RUN_ALL_TESTS();
 }

@@ -84,7 +84,7 @@ void test_check_if_metric_gauge_correct(cJSON *metric_obj, const char *name)
 {
     char *blob_gauge_benchmark = NULL;
     size_t size_dummy = 0;
-    hyperloglog_serialize_for_networking(g_hll_standard, &blob_gauge_benchmark, &size_dummy);
+    hyperloglog_serialize_into_base64(g_hll_standard, &blob_gauge_benchmark, &size_dummy);
 
     cJSON *gauge_obj = cJSON_GetObjectItem(metric_obj, name);
     EXPECT_NE(gauge_obj, nullptr);

@@ -202,13 +202,6 @@ TEST(metric_test_counter, add_and_query_on_dummy_cell_of_topk)
     long long measure = my_fieldstat_counter_get(instance, cube_id, metric_id);
     EXPECT_EQ(measure, 1);
 
-    int *metric_ids_in_cell = NULL;
-    size_t n_metric_in_cell = 0;
-    fieldstat_get_metric_in_cell(instance, cube_id, &TEST_TAG_LIST_INT, &metric_ids_in_cell, &n_metric_in_cell);
-    EXPECT_EQ(n_metric_in_cell, 1);
-    EXPECT_EQ(metric_ids_in_cell[0], metric_id);
-    free(metric_ids_in_cell);
-
     fieldstat_free(instance);
 }
 

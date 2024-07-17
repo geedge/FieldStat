@@ -306,7 +306,7 @@ long long fieldstat_histogram_count_le_value(const struct fieldstat *instance, i
     return count;
 }
 
-void fieldstat_get_serialized_blob(const struct fieldstat *instance, int cube_id, int metric_id, const struct field_list *cell_dimensions, char **blob, size_t *blob_size)
+void fieldstat_metric_get_serialization_as_base64(const struct fieldstat *instance, int cube_id, int metric_id, const struct field_list *cell_dimensions, char **blob, size_t *blob_size)
 {
     const struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
     if (cube == NULL) {
@@ -315,7 +315,7 @@ void fieldstat_get_serialized_blob(const struct fieldstat *instance, int cube_id
         return;
     }
 
-    cube_get_serialization(cube, metric_id, cell_dimensions, blob, blob_size);
+    cube_get_serialization_as_base64(cube, metric_id, cell_dimensions, blob, blob_size);
 }
 
 void fieldstat_tag_list_arr_free(struct field_list *tag_list, size_t n_cell)
