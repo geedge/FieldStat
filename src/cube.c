@@ -943,7 +943,7 @@ int cube_counter_incrby(struct cube *cube, int metric_id, const struct field *di
     }
 
     if (cube->primary_metric_id == metric_id && cube->sampling_mode == SAMPLING_MODE_TOPK) {
-        if (increment <= 0) {
+        if (increment < 0) {
             return FS_ERR_INVALID_PARAM;
         }
 
@@ -1299,9 +1299,12 @@ int cube_hll_get(const struct cube *cube, int metric_id, const struct field_list
         field_array_to_key(fields->field, fields->n_field, &dimension_in_string, &dimension_string_len);
 
         double hll_value = spread_sketch_get_cardinality(cube->spread_sketch, dimension_in_string, dimension_string_len);
-        *value = hll_value;
-
         free(dimension_in_string);
+        if (hll_value < 0) {
+            return FS_ERR_INVALID_TAG;
+        }
+
+        *value = hll_value;
         return FS_OK;
     }
 

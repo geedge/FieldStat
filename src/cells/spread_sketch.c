@@ -540,6 +540,10 @@ void spread_sketch_list_keys(const struct spread_sketch *ss, char ***keys, size_
 }
 
 double spread_sketch_get_cardinality(const struct spread_sketch *ss, const char *key, size_t key_len) {
+    if (spread_sketch_get0_exdata(ss, key, key_len) == NULL) {
+        return -1;
+    }
+
     double est = spread_sketch_point_query(ss, key, key_len);
     return est;
 }
@@ -575,6 +579,9 @@ struct spread_sketch *spread_sketch_copy(const struct spread_sketch *src) {
     dst->buckets = calloc(dst->depth * dst->width, sizeof(struct bucket));
     dst->table = smart_ptr_table_new();
     spread_sketch_set_exdata_schema(dst, src->scheme.new_fn, src->scheme.free_fn, src->scheme.merge_fn, src->scheme.reset_fn, src->scheme.copy_fn);
+    for (int i = 0; i < dst->depth * dst->width; i++) {
+        dst->buckets[i].sthll_register = hll_duplicate(src->buckets[i].sthll_register, src->precision);
+    }
 
     for (int i = 0; i < dst->depth * dst->width; i++) {
         if (src->buckets[i].content == NULL || src->buckets[i].content->dying) {
@@ -585,7 +592,6 @@ struct spread_sketch *spread_sketch_copy(const struct spread_sketch *src) {
         if (dst->buckets[i].content->exdata == NULL) {
             dst->buckets[i].content->exdata = src->scheme.copy_fn(src->buckets[i].content->exdata);
         }
-        dst->buckets[i].sthll_register = hll_duplicate(src->buckets[i].sthll_register, dst->precision);
     }
     return dst;
 }

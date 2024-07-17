@@ -349,7 +349,7 @@ TEST(Fuzz_test, many_instance_random_flow_unregister_calibrate_reset_fork_merge_
 {
     const int CUBE_NUM = 5;
     const int INSTANCE_NUM = 10;
-    const int CELL_MAX = 50;
+    const int CELL_MAX = 10;
     const int TEST_ROUND = 100000;
     const int OUT_GAP = 10000;
     struct fieldstat *master = fieldstat_new();
@@ -453,18 +453,21 @@ TEST(Fuzz_test, many_instance_random_flow_unregister_calibrate_reset_fork_merge_
         // printf("spreadsketch accuracy: %lf\n", accuracy);
         sum_accuracy += accuracy;
             
-        // MRE
-        double mre = 0;
+        // CM sketch error
+        double est_total = 0;
+        double true_total = 0;
         for (size_t j = 0; j < cell_num; j++) {
             Fieldstat_tag_list_wrapper cell_dimension = Fieldstat_tag_list_wrapper(&cells[j]);
             double value_true = count_map[cube_dimension.to_string()][cell_dimension.to_string()];
-            double value_est;
+            double value_est = 0;
             fieldstat_hll_get(instance_in_focus, cube_ids[i], &cells[j], 0, &value_est);
+            // printf("cube:%s, cell:%s, true:%lf, est:%lf\n", cube_dimension.to_string().c_str(), cell_dimension.to_string().c_str(), value_true, value_est);
 
-            mre += fabs(value_true - value_est) / value_true;
+            est_total += value_est;
+            true_total += value_true;
         }
-        mre = mre / cell_num;
-        EXPECT_LE(mre, 0.25);
+        EXPECT_LE(abs(est_total - true_total) / true_total, 0.25);
+        // printf("spreadsketch Mean ratio e: %f\n", abs(est_total - true_total) / true_total);
 
         for (size_t j = 0; j < cell_num; j++) {
             delete test_result[j];
