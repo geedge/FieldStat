@@ -12,11 +12,6 @@
 #include "hll_common.h"
 #include "exdata.h"
 
-
-// TODO: 适配swarm kv 时的问题：
-// 需要返回一个double，正常spread sketch 一定返回值（key 不在也更新hll），所以这里的查询怎么样比较好？
-
-
 struct entry {
     int ref_count;
     void *exdata;
@@ -673,6 +668,9 @@ struct spread_sketch *spread_sketch_deserialize(const char *blob, size_t blob_sz
         int64_t key_len;
         memcpy(&key_len, blob, sizeof(int64_t));
         blob += sizeof(int64_t);
+        if (key_len == 0) {
+            continue;
+        }
         const char *key = blob;
         blob += key_len;
 
