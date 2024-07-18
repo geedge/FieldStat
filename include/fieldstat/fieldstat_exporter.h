@@ -69,7 +69,8 @@ do not support fieldstat_json_exporter_enable_delta.
 
 if a cell has no metric record, the cell will not be exported. (The same as fieldstat_json_exporter_export_array) 
 */
-void fieldstat_json_exporter_export_flat(const struct fieldstat_json_exporter *exporter, const struct fieldstat *instance, const struct timeval *timestamp, char ***output, size_t *output_size);
+void fieldstat_json_exporter_export_flat_array(const struct fieldstat_json_exporter *exporter, const struct fieldstat *instance, const struct timeval *timestamp, char ***output, size_t *output_size);
+char *fieldstat_json_exporter_export_flat(const struct fieldstat_json_exporter *exporter, const struct fieldstat *instance, const struct timeval *timestamp);
 /*
     let json exporter output delta value by the side of the original value(accumulated). If a cell / metric is new, the delta value is the same as the original value.
     Outputting delta value is disabled by default.

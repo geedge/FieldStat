@@ -876,7 +876,7 @@ char *fieldstat_json_exporter_export(const struct fieldstat_json_exporter *expor
 
     int buf_len = 4096;
     char *cjson_str_arr = (char *)malloc(buf_len);
-    // cjson is so slow, so we construct the json array manually, the reason why we don't use json_writer is simply because I wrote this before implementing json_writer
+    // cjson is so slow, so we construct the json array manually
     int used_len = add_object_to_json_array_start(cjson_str_arr, buf_len);
     for (int i = 0; i < n_pair; i++) {
         used_len = add_object_to_json_array(&cjson_str_arr, &buf_len, used_len, str_arr[i]);
@@ -1040,7 +1040,7 @@ void fieldstat_json_exporter_enable_delta(struct fieldstat_json_exporter *export
     exporter->history = counter_history_new();
 }
 
-void fieldstat_json_exporter_export_flat(const struct fieldstat_json_exporter *exporter, const struct fieldstat *instance, const struct timeval *timestamp, char ***output, size_t *output_size) {
+void fieldstat_json_exporter_export_flat_array(const struct fieldstat_json_exporter *exporter, const struct fieldstat *instance, const struct timeval *timestamp, char ***output, size_t *output_size) {
     long long timestamp_ms = cal_ms_time(timestamp);
 
     size_t n_pair;
@@ -1090,4 +1090,30 @@ void fieldstat_json_exporter_export_flat(const struct fieldstat_json_exporter *e
     }
 
     free(tag_field_pair);
+}
+
+char *fieldstat_json_exporter_export_flat(const struct fieldstat_json_exporter *exporter, const struct fieldstat *instance, const struct timeval *timestamp)
+{
+    char **str_arr = NULL;
+    size_t n_pair = 0;
+    fieldstat_json_exporter_export_flat_array(exporter, instance, timestamp, &str_arr, &n_pair);
+    if (str_arr == NULL || n_pair == 0) {
+        return NULL;
+    }
+
+    int buf_len = 4096;
+    char *cjson_str_arr = (char *)malloc(buf_len);
+    // cjson is so slow, so we construct the json array manually
+    int used_len = add_object_to_json_array_start(cjson_str_arr, buf_len);
+    for (int i = 0; i < n_pair; i++) {
+        used_len = add_object_to_json_array(&cjson_str_arr, &buf_len, used_len, str_arr[i]);
+    }
+    add_object_to_json_array_end(&cjson_str_arr, buf_len, used_len);
+
+    for (int i = 0; i < n_pair; i++) {
+        free(str_arr[i]);
+    }
+    free(str_arr);
+
+    return cjson_str_arr;
 }

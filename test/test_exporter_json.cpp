@@ -1024,7 +1024,7 @@ TEST(export_test, export_flat_null_with_only_global_tag) {
 
     char **out_array = NULL;
     size_t out_array_len = 0;
-    fieldstat_json_exporter_export_flat(fieldstat_json_exporter, instance, &TEST_TIMEVAL, &out_array, &out_array_len);
+    fieldstat_json_exporter_export_flat_array(fieldstat_json_exporter, instance, &TEST_TIMEVAL, &out_array, &out_array_len);
     EXPECT_EQ(out_array_len, 0);
     EXPECT_EQ(out_array, nullptr);
 
@@ -1047,7 +1047,7 @@ TEST(export_test, export_flat_many_tags_many_cell) {
 
     char **out_array = NULL;
     size_t out_array_len = 0;
-    fieldstat_json_exporter_export_flat(fieldstat_json_exporter, instance, &TEST_TIMEVAL, &out_array, &out_array_len);
+    fieldstat_json_exporter_export_flat_array(fieldstat_json_exporter, instance, &TEST_TIMEVAL, &out_array, &out_array_len);
     EXPECT_EQ(out_array_len, 2);
 
     cJSON *root = cJSON_Parse(out_array[0]);

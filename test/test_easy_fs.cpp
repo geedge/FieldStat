@@ -28,39 +28,10 @@ TEST(test_easy_fieldstat, output_to_buff)
     fieldstat_easy_output(fse, &buff, &buff_len);
     cJSON *root = cJSON_Parse(buff);
     cJSON *cell = cJSON_GetArrayItem(root, 0);
-    cJSON *metric = cJSON_GetObjectItem(cell, "fields");
-    long long value = cJSON_GetObjectItem(metric, "metric counter")->valueint;
+    long long value = cJSON_GetObjectItem(cell, "metric counter")->valueint;
     EXPECT_EQ(value, 1);
-    cJSON *tags = cJSON_GetObjectItem(cell, "tags");
-    EXPECT_EQ(cJSON_GetObjectItem(tags, TEST_TAG_INT.key)->valueint, TEST_TAG_INT.value_longlong);
-    EXPECT_STREQ(cJSON_GetObjectItem(tags, TEST_TAG_STRING.key)->valuestring, TEST_TAG_STRING.value_str);
-
-    cJSON_Delete(root);
-    free(buff);
-    fieldstat_easy_free(fse);
-}
-
-TEST(test_easy_fieldstat, output_to_buff_with_delta)
-{
-    struct fieldstat_easy *fse = fieldstat_easy_new(1, NULL, NULL, 0);
-    fieldstat_easy_enable_delta_in_active_output(fse);
-    fieldstat_easy_register_counter(fse, "metric counter");
-    fieldstat_easy_counter_incrby(fse, 0, 0, NULL, 0, 1);
-    char *buff = NULL;
-    size_t buff_len = 0;
-    fieldstat_easy_output(fse, &buff, &buff_len);
-    free(buff);
-    fieldstat_easy_counter_incrby(fse, 0, 0, NULL, 0, 1);
-    fieldstat_easy_output(fse, &buff, &buff_len);
-
-    cJSON *root = cJSON_Parse(buff);
-    cJSON *cell = cJSON_GetArrayItem(root, 0);
-    cJSON *metric = cJSON_GetObjectItem(cell, "fields");
-    long long value = cJSON_GetObjectItem(metric, "metric counter")->valueint;
-    EXPECT_EQ(value, 2);
-    cJSON *metric_delta = cJSON_GetObjectItem(cell, "fields_delta");
-    long long value_delta = cJSON_GetObjectItem(metric_delta, "metric counter")->valueint;
-    EXPECT_EQ(value_delta, 1);
+    EXPECT_EQ(cJSON_GetObjectItem(cell, TEST_TAG_INT.key)->valueint, TEST_TAG_INT.value_longlong);
+    EXPECT_STREQ(cJSON_GetObjectItem(cell, TEST_TAG_STRING.key)->valuestring, TEST_TAG_STRING.value_str);
 
     cJSON_Delete(root);
     free(buff);
@@ -250,8 +221,7 @@ TEST(test_easy_fieldstat, reset)
 
 long long get_value(const char *input, const char *key) {
     cJSON *root = cJSON_Parse(input);
-    cJSON *metric = cJSON_GetObjectItem(root, "fields");
-    long long value = cJSON_GetObjectItem(metric, key)->valueint;
+    long long value = cJSON_GetObjectItem(root, key)->valueint;
     cJSON_Delete(root);
     return value;
 }

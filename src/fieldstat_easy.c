@@ -275,7 +275,7 @@ void fieldstat_easy_output(struct fieldstat_easy *fse, char **buff, size_t *buff
     struct fieldstat *dest = merge_all_instance(fse);
     struct timeval timestamp = get_current_timestamp();
 
-    *buff = fieldstat_json_exporter_export(fse->exporter, dest, &timestamp);
+    *buff = fieldstat_json_exporter_export_flat(fse->exporter, dest, &timestamp);
     if (*buff == NULL) {
         *buff = strdup("[]");
     }
@@ -289,7 +289,7 @@ void fieldstat_easy_output_array(struct fieldstat_easy *fse, char ***json_object
     struct timeval timestamp = get_current_timestamp();
     struct fieldstat *dest = merge_all_instance(fse);
 
-    fieldstat_json_exporter_export_array(fse->exporter, dest, &timestamp, json_objects, n_object);
+    fieldstat_json_exporter_export_flat_array(fse->exporter, dest, &timestamp, json_objects, n_object);
     fieldstat_free(dest);
 }
 
@@ -307,7 +307,7 @@ int fieldstat_easy_output_array_and_reset(struct fieldstat_easy *fse, char ***js
     }
 
     struct timeval timestamp = get_current_timestamp();
-    fieldstat_json_exporter_export_array(fse->exporter, dest, &timestamp, json_objects, n_object);
+    fieldstat_json_exporter_export_flat_array(fse->exporter, dest, &timestamp, json_objects, n_object);
     fieldstat_free(dest);
 
     return 0;
@@ -359,9 +359,4 @@ int fieldstat_easy_histogram_record(struct fieldstat_easy *fse, int thread_id, i
     pthread_spin_unlock(&fse->fsu[thread_id].lock);
 
     return ret;
-}
-
-void fieldstat_easy_enable_delta_in_active_output(struct fieldstat_easy *fse)
-{
-    fieldstat_json_exporter_enable_delta(fse->exporter);
 }
