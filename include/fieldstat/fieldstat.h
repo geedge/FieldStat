@@ -71,16 +71,6 @@ int fieldstat_cube_create(struct fieldstat *instance, const struct field *cube_d
 int fieldstat_cube_set_sampling(struct fieldstat *instance, int cube_id, enum sampling_mode mode, int max_n_cell, int primary_metric_id);
 
 /*
-    @brief Change the topk cube primary metric id. When fieldstat_counter_add or fieldstat_counter_set are called on the primary metric, the topk record of such cell will be updated.
-            the default primary metric id is 0.
-    @return FS_OK, FS_ERR_NULL_HANDLER or FS_ERR_INVALID_CUBE_ID.
-            FS_ERR_INVALID_METRIC_ID when the metric is not registered to instance.
-            FS_ERR_INVALID_PARAM when the cube is not a topk sampling cube, or the metric is not a counter. 
-
-*/
-int fieldstat_cube_set_primary_metric(struct fieldstat *instance, int cube_id, int metric_id);
-
-/*
     * @brief Delete the cube of cube_id. All the cells and metrics are deleted. The cube_id may be reused by other new cubes. Increase the corresponding cube_version by 1.
     * @return FS_OK, FS_ERR_NULL_HANDLER or FS_ERR_INVALID_CUBE_ID
 */
