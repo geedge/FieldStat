@@ -344,6 +344,17 @@ struct spread_sketch *duplicate_and_step(const struct spread_sketch *ss, const s
     return duplicate;
 }
 
+double spread_sketch_query(const struct spread_sketch *ss, const char *key, size_t key_length, struct timeval now) {    
+    if (ss->time_window_ms!=0 && hll_should_slide(ss->precision, ss->time_window_ms, now, ss->reset_time)) {
+        struct spread_sketch *duplicate = duplicate_and_step(ss, &now);
+        double ret = spread_sketch_point_query(duplicate, key, key_length);
+        spread_sketch_free(duplicate);
+        return ret;
+    } else {
+        return spread_sketch_point_query(ss, key, key_length);
+    }
+}
+
 void spread_sketch_free(struct spread_sketch *ss) {
     if (ss == NULL) {
         return;

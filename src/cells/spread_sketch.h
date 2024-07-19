@@ -34,6 +34,9 @@ double spread_sketch_get_cardinality(const struct spread_sketch *ss, const char 
 // query a hyperloglog 's base64 serialization. The serialization format is [1,precision,register...] and then encoded by base64
 char *spread_sketch_get_hll_base64_serialization(const struct spread_sketch *ss, const char *key, size_t key_len);
 void *spread_sketch_get0_exdata(const struct spread_sketch *ss, const char *key, size_t key_len);
+// in most cases, it has the same output as `spread_sketch_get_cardinality`, but it will perform more like an ordinary spread sketch query. 
+// Will always return a value, even if the key is not present in the spread sketch. Must pass a `now` value required by Stagger hll query.
+double spread_sketch_query(const struct spread_sketch *ss, const char *key, size_t key_length, struct timeval now);
 
 void spread_sketch_merge(struct spread_sketch *dest, const struct spread_sketch *src);
 struct spread_sketch *spread_sketch_copy(const struct spread_sketch *src);
