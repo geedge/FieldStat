@@ -269,7 +269,9 @@ TEST(test_register, ensure_recovery_more_faster_spreadsketch) {
     int cube_id = fieldstat_cube_create(instance, &TEST_SHARED_TAG, 1);
     int metric_id = fieldstat_register_hll(instance, cube_id, "counter", 6);
     fieldstat_cube_set_sampling(instance, cube_id, SAMPLING_MODE_TOP_CARDINALITY, cell_num, metric_id);
-    struct field test_tag_long = TEST_TAG_INT;
+    char long_string[1000];
+    memset(long_string, 'a', 1000);
+    struct field test_tag_long = {long_string, FIELD_VALUE_INTEGER, {.value_longlong = 0}};
 
     clock_t start = clock();
     for (int i = 0; i < cell_num; i++) {
