@@ -13,9 +13,15 @@ extern "C"
 #define FS_ERR_NULL_HANDLER -2
 #define FS_ERR_INVALID_CUBE_ID -3
 #define FS_ERR_INVALID_METRIC_ID -4
-#define FS_ERR_INVALID_TAG -5
+#define FS_ERR_INVALID_DIMENSION -5
 #define FS_ERR_INVALID_PARAM -6
-#define FS_ERR_INVALID_KEY -7
+#define FS_ERR_INVALID_METRIC_TYPE -8
+#define FS_ERR_MAX_N_CELL_LESS_THAN_ZERO -9
+#define FS_ERR_DIMENSION_ALREADY_EXISTS -10
+#define FS_ERR_METRIC_NAME_ALREADY_EXISTS -11
+#define FS_ERR_CUBE_SAMPLING_NOT_INITIALIZED -12
+#define FS_ERR_OPERATION_NOT_SUPPORTED_FOR_PRIMARY_METRIC -13
+#define FS_ERR_DIFFERENT_CONFIGURATION_FOR_SAME_CUBE -14
 
 enum metric_type
 {
@@ -58,7 +64,7 @@ struct fieldstat *fieldstat_fork(const struct fieldstat *instance);
  * the configurations will be kept as much as possible, like cells in the same cube will be kept, but the cells in different cubes will be deleted.
  * @ return FS_OK or FS_ERR_NULL_HANDLER 
 */
-int fieldstat_calibrate(const struct fieldstat *master, struct fieldstat *replica);
+void fieldstat_calibrate(const struct fieldstat *master, struct fieldstat *replica);
 /*
     * @brief add an cube to this instance. Cube represents an template with a user-defined set of cells and metrics.
     * @param cube_dimensions: tags that are shared by all cells in this cube. This is the key of the cube. Can be NULL. Must be unique. Shared_tags are ordered, which means that {"TAG_KEY": "123", "TAG_KEY2": "456"} and {"TAG_KEY2": "456", "TAG_KEY": "123"} are map to different cube.
@@ -190,7 +196,9 @@ void fieldstat_cube_get_cells(const struct fieldstat *instance, int cube_id, str
     get the field of fieldstat_cube_create. User free them by calling fieldstat_tag_list_arr_free(struct field_list *, 1)
     return NULL when ID is invalid.
 */
+// todo: tags
 struct field_list *fieldstat_cube_get_tags(const struct fieldstat *instance, int cube_id);
+
 
 /*
     return a cube id corresponding to `cube_dimensions`. FS_ERR_INVALID_KEY is returned if the cube is not found.

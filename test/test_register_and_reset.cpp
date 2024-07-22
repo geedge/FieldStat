@@ -34,7 +34,7 @@ TEST(test_register, delete_comprehensive_cube_with_cells_and_metrics)
     struct field_list *tag_list = fieldstat_cube_get_tags(instance, cube_id);
     EXPECT_EQ(tag_list, nullptr);
     int cube_id_ret = fieldstat_find_cube(instance, &TEST_SHARED_TAG, 1);
-    EXPECT_EQ(cube_id_ret, FS_ERR_INVALID_KEY);
+    EXPECT_EQ(cube_id_ret, FS_ERR_INVALID_DIMENSION);
 
     fieldstat_free(instance);
 }
@@ -51,7 +51,7 @@ TEST(test_register, delete_topk_cube_with_cells_and_metrics)
     struct field_list *tag_list = fieldstat_cube_get_tags(instance, cube_id);
     EXPECT_EQ(tag_list, nullptr);
     int cube_id_ret = fieldstat_find_cube(instance, &TEST_SHARED_TAG, 1);
-    EXPECT_EQ(cube_id_ret, FS_ERR_INVALID_KEY);
+    EXPECT_EQ(cube_id_ret, FS_ERR_INVALID_DIMENSION);
 
     fieldstat_free(instance);
 }
@@ -71,7 +71,7 @@ TEST(test_register, delete_spreadsketch_cube_with_cells_and_metrics)
     struct field_list *tag_list = fieldstat_cube_get_tags(instance, cube_id);
     EXPECT_EQ(tag_list, nullptr);
     int cube_id_ret = fieldstat_find_cube(instance, &TEST_SHARED_TAG, 1);
-    EXPECT_EQ(cube_id_ret, FS_ERR_INVALID_KEY);
+    EXPECT_EQ(cube_id_ret, FS_ERR_INVALID_DIMENSION);
 
     fieldstat_free(instance);
 }
@@ -94,7 +94,7 @@ TEST(test_register, reset_and_try_to_query_cell_comprehensive)
 
     fieldstat_reset(instance);
     long long value;
-    EXPECT_EQ(fieldstat_counter_get(instance, cube_id, &TEST_TAG_LIST_INT, metric_id, &value), FS_ERR_INVALID_TAG);
+    EXPECT_EQ(fieldstat_counter_get(instance, cube_id, &TEST_TAG_LIST_INT, metric_id, &value), FS_ERR_INVALID_DIMENSION);
 
     size_t n_cell;
     struct field_list *tag_list;
@@ -115,7 +115,7 @@ TEST(test_register, reset_and_try_to_query_cell_topk)
 
     fieldstat_reset(instance);
     long long value;
-    EXPECT_EQ(fieldstat_counter_get(instance, cube_id, &TEST_TAG_LIST_INT, metric_id, &value), FS_ERR_INVALID_TAG);
+    EXPECT_EQ(fieldstat_counter_get(instance, cube_id, &TEST_TAG_LIST_INT, metric_id, &value), FS_ERR_INVALID_DIMENSION);
 
     size_t n_cell;
     struct field_list *tag_list;
@@ -135,7 +135,7 @@ TEST(test_register, reset_and_try_to_query_cell_spreadsketch)
 
     fieldstat_reset(instance);
     double value;
-    EXPECT_EQ(fieldstat_hll_get(instance, cube_id, &TEST_TAG_LIST_INT, metric_id, &value), FS_ERR_INVALID_TAG);
+    EXPECT_EQ(fieldstat_hll_get(instance, cube_id, &TEST_TAG_LIST_INT, metric_id, &value), FS_ERR_INVALID_DIMENSION);
 
     size_t n_cell;
     struct field_list *tag_list;
@@ -496,7 +496,7 @@ TEST(test_register, register_cube_twice) {
     struct fieldstat *instance = fieldstat_new();
     test_fieldstat_cube_create(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
     int cube_id2 = test_fieldstat_cube_create(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
-    EXPECT_EQ(cube_id2, FS_ERR_INVALID_KEY);
+    EXPECT_EQ(cube_id2, FS_ERR_DIMENSION_ALREADY_EXISTS);
     fieldstat_free(instance);
 }
 
@@ -507,7 +507,19 @@ TEST(test_register, find_cube) {
     int find_cube_id = fieldstat_find_cube(instance, &TEST_SHARED_TAG, 1);
     EXPECT_EQ(cube_id, find_cube_id);
     int find_cube_id2 = fieldstat_find_cube(instance, &TEST_TAG_DOUBLE, 1);
-    EXPECT_EQ(find_cube_id2, FS_ERR_INVALID_KEY);
+    EXPECT_EQ(find_cube_id2, FS_ERR_INVALID_DIMENSION);
+    
+    fieldstat_free(instance);
+}
+
+TEST(test_register, set_sampling_error) {
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_cube_create(instance, &TEST_SHARED_TAG, 1);
+    int ret = fieldstat_cube_set_sampling(instance, cube_id, SAMPLING_MODE_TOPK, 10, 0);
+    EXPECT_EQ(ret, FS_ERR_INVALID_METRIC_ID);
+    int metric_id = fieldstat_register_hll(instance, cube_id, "hll", 5);
+    ret = fieldstat_cube_set_sampling(instance, cube_id, SAMPLING_MODE_TOPK, 10, metric_id);
+    EXPECT_EQ(ret, FS_ERR_INVALID_METRIC_TYPE);
     
     fieldstat_free(instance);
 }
@@ -518,7 +530,7 @@ TEST(test_register, register_metric_twice) {
 
     fieldstat_register_counter(instance, cube_id, "counter");
     int metric_id2 = fieldstat_register_counter(instance, cube_id, "counter");
-    EXPECT_EQ(metric_id2, FS_ERR_INVALID_KEY);
+    EXPECT_EQ(metric_id2, FS_ERR_METRIC_NAME_ALREADY_EXISTS);
     fieldstat_free(instance);
 }
 
@@ -527,7 +539,7 @@ TEST(test_register, add_on_uninitialized_cube) {
     int cube_id = fieldstat_cube_create(instance, &TEST_SHARED_TAG, 1);
     int metric_id = fieldstat_register_counter(instance, cube_id, "counter");
     // fieldstat_counter_incrby(instance, cube_id, metric_id, &TEST_TAG_INT, 1, 1);
-    EXPECT_DEATH(fieldstat_counter_incrby(instance, cube_id, metric_id, &TEST_TAG_INT, 1, 1), ".*");
+    EXPECT_EQ(fieldstat_counter_incrby(instance, cube_id, metric_id, &TEST_TAG_INT, 1, 1), FS_ERR_CUBE_SAMPLING_NOT_INITIALIZED);
     
     fieldstat_free(instance);
 }
@@ -621,7 +633,7 @@ TEST(calibrate, target_more_cube)
     EXPECT_STREQ(tag_list->field[0].key, TEST_SHARED_TAG.key);
 
     EXPECT_EQ(fieldstat_find_cube(target, &TEST_SHARED_TAG, 1), 0);
-    EXPECT_EQ(fieldstat_find_cube(target, &TEST_TAG_STRING, 1), FS_ERR_INVALID_KEY);
+    EXPECT_EQ(fieldstat_find_cube(target, &TEST_TAG_STRING, 1), FS_ERR_INVALID_DIMENSION);
 
     fieldstat_free(master);
     fieldstat_free(target);
@@ -748,7 +760,7 @@ TEST(calibrate, issue_calibrate_wrong)
     int n_cubes = 0;
     fieldstat_get_cubes(target, &cubes_id_ret, &n_cubes);
     EXPECT_EQ(n_cubes, 1);
-    EXPECT_EQ(fieldstat_find_cube(target, tag_A, 1), FS_ERR_INVALID_KEY);
+    EXPECT_EQ(fieldstat_find_cube(target, tag_A, 1), FS_ERR_INVALID_DIMENSION);
     EXPECT_EQ(fieldstat_find_cube(target, tag_B, 1), cubes_id_ret[0]);
 
     struct field_list *tag_list = fieldstat_cube_get_tags(target, cubes_id_ret[0]);
@@ -780,7 +792,7 @@ TEST(calibrate, delete_first_cube)
     EXPECT_EQ(cubes_id_ret[0], cube_idB);
     free(cubes_id_ret);
 
-    EXPECT_EQ(fieldstat_find_cube(target, tag_A, 1), FS_ERR_INVALID_KEY);
+    EXPECT_EQ(fieldstat_find_cube(target, tag_A, 1), FS_ERR_INVALID_DIMENSION);
     EXPECT_EQ(fieldstat_find_cube(target, tag_B, 1), 1);
 
     struct field_list *tag_list = fieldstat_cube_get_tags(target, 1);

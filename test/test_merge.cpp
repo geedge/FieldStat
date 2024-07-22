@@ -502,7 +502,7 @@ TEST(unit_test_merge, primary_metric_id_different)
     int metric_primary_dst = fieldstat_register_counter(instance_dst, cube_id_dst, "primary");
     fieldstat_cube_set_sampling(instance_dst, cube_id_dst, SAMPLING_MODE_TOPK, 2, metric_primary_dst);
 
-    EXPECT_EQ(fieldstat_merge(instance_dst, instance), FS_ERR_INVALID_PARAM);
+    EXPECT_EQ(fieldstat_merge(instance_dst, instance), FS_ERR_DIFFERENT_CONFIGURATION_FOR_SAME_CUBE);
 
     fieldstat_free(instance);
     fieldstat_free(instance_dst);

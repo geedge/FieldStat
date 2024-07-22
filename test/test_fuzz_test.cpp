@@ -532,7 +532,7 @@ TEST(Fuzz_test, add_and_reset_with_randomly_generated_flows_and_randomly_chosen_
             tag_list_tmp.field = (struct field *)tag_list_wrapper[i]->get_tag();
             tag_list_tmp.n_field = tag_list_wrapper[i]->get_tag_count();
             int counter_exist = fieldstat_counter_get(instance, cube_id, &tag_list_tmp, using_id,  &value);
-            ASSERT_EQ(counter_exist, FS_ERR_INVALID_TAG); // the field is not added to the cube
+            ASSERT_EQ(counter_exist, FS_ERR_INVALID_DIMENSION); // the field is not added to the cube
             fieldstat_tag_list_arr_free(tag_list, n_cell);
         }
 

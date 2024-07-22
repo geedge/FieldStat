@@ -534,7 +534,7 @@ int cube_set_sampling_mode(struct cube *cube, enum sampling_mode mode, int max_n
     }
     if ((mode == SAMPLING_MODE_TOPK && manifest->type != METRIC_TYPE_COUNTER) ||
         (mode == SAMPLING_MODE_TOP_CARDINALITY && manifest->type != METRIC_TYPE_HLL)) {
-        return FS_ERR_INVALID_PARAM;
+        return FS_ERR_INVALID_METRIC_TYPE;
     }
 
     if (cube->primary_metric_id != -1) {
@@ -630,20 +630,6 @@ void cube_reset(struct cube *cube) {
         assert(0);
         break;
     }
-}
-
-int cube_set_primary_metric(struct cube *cube, int metric_id) {
-    const struct metric_manifest *manifest = metric_manifest_manager_get_by_id(cube->manifest_manager, metric_id);
-    if (manifest == NULL) {
-        return FS_ERR_INVALID_METRIC_ID;
-    }
-    if (cube->sampling_mode == SAMPLING_MODE_COMPREHENSIVE ||
-        (cube->sampling_mode == SAMPLING_MODE_TOPK && manifest->type != METRIC_TYPE_COUNTER) ||
-        (cube->sampling_mode == SAMPLING_MODE_TOP_CARDINALITY && manifest->type != METRIC_TYPE_HLL)) {
-        return FS_ERR_INVALID_PARAM;
-    }
-    cube->primary_metric_id = metric_id;
-    return FS_OK;
 }
 
 struct cell *get_cell_in_comprehensive_cube(struct cube *cube, const struct field *dimensions, size_t n_dimension) {
@@ -761,7 +747,7 @@ int cube_register_counter(struct cube *cube, const char *metric_name) {
         free(metric->name);
         free(metric->parameters);
         free(metric);
-        return FS_ERR_INVALID_KEY;
+        return FS_ERR_METRIC_NAME_ALREADY_EXISTS;
     }
 
     metric->id = id;
@@ -783,7 +769,7 @@ int cube_register_hll(struct cube *cube,const char *metric_name, unsigned char p
         free(metric->name);
         free(metric->parameters);
         free(metric);
-        return FS_ERR_INVALID_KEY;
+        return FS_ERR_METRIC_NAME_ALREADY_EXISTS;
     }
 
     metric->id = id;
@@ -813,7 +799,7 @@ int cube_register_hist(struct cube *cube,const char *metric_name, long long lowe
         free(metric->name);
         free(metric->parameters);
         free(metric);
-        return FS_ERR_INVALID_KEY;
+        return FS_ERR_METRIC_NAME_ALREADY_EXISTS;
     }
     metric->id = id;
 
@@ -821,6 +807,9 @@ int cube_register_hist(struct cube *cube,const char *metric_name, long long lowe
 }
 
 int cube_histogram_record(struct cube *cube, int metric_id, const struct field *dimensions, size_t n_dimensions, long long value) {
+    if (cube->primary_metric_id == -1) {
+        return FS_ERR_CUBE_SAMPLING_NOT_INITIALIZED;
+    }
     assert(cube->sampling_mode == SAMPLING_MODE_COMPREHENSIVE || (cube->primary_metric_id != metric_id));
 
     const struct metric_manifest *manifest = metric_manifest_manager_get_by_id(cube->manifest_manager, metric_id);
@@ -857,6 +846,10 @@ int cube_histogram_record(struct cube *cube, int metric_id, const struct field *
 }
 
 int cube_hll_add(struct cube *cube, int metric_id, const struct field *dimensions, size_t n_dimensions, const char *key, size_t key_len) {
+    if (cube->primary_metric_id == -1) {
+        return FS_ERR_CUBE_SAMPLING_NOT_INITIALIZED;
+    }
+
     assert(cube->sampling_mode != SAMPLING_MODE_TOPK || cube->primary_metric_id != metric_id);
 
     const struct metric_manifest *manifest = metric_manifest_manager_get_by_id(cube->manifest_manager, metric_id);
@@ -920,6 +913,9 @@ uint64_t field_array_to_hash(const struct field *field, size_t n_dimensions) {
 
 int cube_hll_add_field(struct cube *cube, int metric_id, const struct field *dimensions, size_t n_dimensions, const struct field *tags_key, size_t n_tag_key) 
 {
+    if (cube->primary_metric_id == -1) {
+        return FS_ERR_CUBE_SAMPLING_NOT_INITIALIZED;
+    }
     assert(cube->sampling_mode != SAMPLING_MODE_TOPK || (cube->primary_metric_id != metric_id));
     const struct metric_manifest *manifest = metric_manifest_manager_get_by_id(cube->manifest_manager, metric_id);
     if (manifest == NULL || manifest->type != METRIC_TYPE_HLL) {
@@ -970,9 +966,14 @@ int cube_hll_add_field(struct cube *cube, int metric_id, const struct field *dim
 }
 
 int cube_counter_incrby(struct cube *cube, int metric_id, const struct field *dimensions, size_t n_dimensions, long long increment) {
-    assert(cube->primary_metric_id != -1);
+    if (cube->primary_metric_id == -1) {
+        return FS_ERR_CUBE_SAMPLING_NOT_INITIALIZED;
+    }
+    if (cube->sampling_mode == SAMPLING_MODE_TOPK && cube->primary_metric_id == metric_id && increment < 0) {
+        return FS_ERR_OPERATION_NOT_SUPPORTED_FOR_PRIMARY_METRIC;
+    }
     assert(cube->sampling_mode == SAMPLING_MODE_COMPREHENSIVE || 
-          (cube->sampling_mode == SAMPLING_MODE_TOPK && (cube->primary_metric_id != metric_id || increment >= 0)) ||
+          (cube->sampling_mode == SAMPLING_MODE_TOPK)  ||
           (cube->sampling_mode == SAMPLING_MODE_TOP_CARDINALITY && cube->primary_metric_id != metric_id)
           );
 
@@ -1026,7 +1027,12 @@ int cube_counter_incrby(struct cube *cube, int metric_id, const struct field *di
 }
 
 int cube_counter_set(struct cube *cube, int metric_id, const struct field *dimensions, size_t n_dimensions, long long value) {
-    assert(cube->sampling_mode == SAMPLING_MODE_COMPREHENSIVE || (cube->primary_metric_id != metric_id));
+    if (cube->primary_metric_id == -1) {
+        return FS_ERR_CUBE_SAMPLING_NOT_INITIALIZED;
+    }
+    if (cube->sampling_mode == SAMPLING_MODE_TOPK && cube->primary_metric_id == metric_id) {
+        return FS_ERR_OPERATION_NOT_SUPPORTED_FOR_PRIMARY_METRIC;
+    }
 
     const struct metric_manifest *manifest = metric_manifest_manager_get_by_id(cube->manifest_manager, metric_id);
     if (manifest == NULL || manifest->type != METRIC_TYPE_COUNTER) {
@@ -1088,7 +1094,7 @@ struct cube *cube_copy(const struct cube *cube)
 int cube_merge(struct cube *dest, const struct cube *src)
 {
     if (dest->sampling_mode != src->sampling_mode) {
-        return FS_ERR_INVALID_PARAM;
+        return FS_ERR_DIFFERENT_CONFIGURATION_FOR_SAME_CUBE;
     }
 
     size_t n_metric_src = 0;
@@ -1098,10 +1104,10 @@ int cube_merge(struct cube *dest, const struct cube *src)
     int len_min = n_metric_src < n_metric_dst ? n_metric_src : n_metric_dst;
     for (int i = 0; i < len_min; i++) {
         if (list_src[i]->type != list_dst[i]->type) {
-            return FS_ERR_INVALID_PARAM;
+            return FS_ERR_DIFFERENT_CONFIGURATION_FOR_SAME_CUBE;
         }
         if (strcmp(list_src[i]->name, list_dst[i]->name) != 0) {
-            return FS_ERR_INVALID_PARAM;
+            return FS_ERR_DIFFERENT_CONFIGURATION_FOR_SAME_CUBE;
         }
     }
     for (int i = n_metric_dst; i < n_metric_src; i++) {
@@ -1292,7 +1298,7 @@ const struct metric *get_metric_by_tag_list(const struct cube *cube, const struc
     const struct cell *data = get_cell_by_tag_list(cube, fields);
     
     if (data == NULL) {
-        *ret = FS_ERR_INVALID_TAG;
+        *ret = FS_ERR_INVALID_DIMENSION;
         return NULL;
     }
 
@@ -1318,7 +1324,7 @@ int cube_counter_get(const struct cube *cube, int metric_id, const struct field_
         *value = count;
 
         free(dimension_in_string);
-        return count == 0 ? FS_ERR_INVALID_TAG : FS_OK;
+        return count == 0 ? FS_ERR_INVALID_DIMENSION : FS_OK;
     }
 
     int ret;
@@ -1344,7 +1350,7 @@ int cube_hll_get(const struct cube *cube, int metric_id, const struct field_list
         double hll_value = spread_sketch_get_cardinality(cube->spread_sketch, dimension_in_string, dimension_string_len);
         free(dimension_in_string);
         if (hll_value < 0) {
-            return FS_ERR_INVALID_TAG;
+            return FS_ERR_INVALID_DIMENSION;
         }
 
         *value = hll_value;

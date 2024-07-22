@@ -80,9 +80,10 @@ void fieldstat_free_tag_array(struct field *fields, size_t n_tags)
 int fieldstat_cube_set_sampling(struct fieldstat *instance, int cube_id, enum sampling_mode mode, int max_n_cell, int primary_metric_id) {
     if (max_n_cell <= 0) {
         if (mode != SAMPLING_MODE_COMPREHENSIVE) {
-            return FS_ERR_INVALID_PARAM;
+            return FS_ERR_MAX_N_CELL_LESS_THAN_ZERO;
+        } else {
+            max_n_cell = INT32_MAX;
         }
-        max_n_cell = INT32_MAX;
     }
 
     struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
@@ -108,7 +109,7 @@ int fieldstat_cube_create(struct fieldstat *instance, const struct field *cube_d
     int ret = cube_manager_add(instance->cube_manager, cube);
     if (ret < 0) {
         cube_free(cube);
-        return FS_ERR_INVALID_KEY;
+        return FS_ERR_DIMENSION_ALREADY_EXISTS;
     }
 
     return ret; //ret is the cube_id
@@ -226,7 +227,7 @@ struct fieldstat *fieldstat_fork(const struct fieldstat *instance)
     return new_instance;
 }
 
-int fieldstat_calibrate(const struct fieldstat *master, struct fieldstat *replica)
+void fieldstat_calibrate(const struct fieldstat *master, struct fieldstat *replica)
 {
     cube_manager_calibrate(replica->cube_manager, master->cube_manager);
 
@@ -376,7 +377,7 @@ int fieldstat_find_cube(const struct fieldstat *instance, const struct field *cu
 
     int cube_id = cube_manager_find(instance->cube_manager, cube_dimensions, n_dimensions);
     if (cube_id == -1) {
-        return FS_ERR_INVALID_KEY;
+        return FS_ERR_INVALID_DIMENSION;
     }
 
     return cube_id;

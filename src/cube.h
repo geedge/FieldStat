@@ -43,7 +43,6 @@ enum sampling_mode cube_get_sampling_mode(const struct cube *cube);
 void cube_get_cells(const struct cube *cube, struct field_list **tag_list, size_t *n_cell);
 void cube_get_metrics(const struct cube *cube, int **metric_id_out, size_t *n_metric);
 void cube_get_metrics_in_cell(const struct cube *cube, const struct field_list *dimensions, int **metric_id_out, size_t *n_metric_out);
-int cube_set_primary_metric(struct cube *cube, int metric_id);
 struct field_list *cube_get_identifier(const struct cube *cube);
 const char *cube_get_metric_name(const struct cube *cube, int metric_id);
 enum metric_type cube_get_metric_type(const struct cube *cube, int metric_id);
