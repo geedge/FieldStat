@@ -616,12 +616,6 @@ class LocalExporter:
         hll_value = FieldstatAPI.libfieldstat.fieldstat_hll_base64_to_count(value.encode('utf-8'))
         self.hlltable.add_table_column(tags, key, "{:.2f}".format(hll_value), 0)
 
-    def __append_app_name_to_tags(self, json_object):
-        tags_dict = copy.deepcopy(json_object["tags"])
-        tags_dict.update({"app_name": json_object["name"]})
-        return json.dumps(tags_dict)
-
-
     def __is_tags_matched(self, tags):
         if len(self.match_tags) == 0:
             return True
@@ -689,7 +683,8 @@ class LocalExporter:
             else:
                 fields_delta = item["fields_delta"]
 
-            tags_new           = self.__append_app_name_to_tags(item)
+            tags_new = item["tags"]
+            tags_new = json.dumps(tags_new)
 
             for key,value in item["fields"].items():
                 value_delta = None
@@ -726,11 +721,13 @@ class LocalExporter:
             self.objects_matched = self.read_match_tags_json_objects(objects)
             self.fields_untagged = [item for item in objects if len(item["tags"]) == 0] if len(self.match_tags) == 0 else []
 
+            exporter_name = objects[0]["name"] if len(objects) > 0 else None
+
             if len(self.template) > 0:
                 self.export_templates()
             else:
-                self.build_not_table_format_exporter(self.objects_matched)
-            self.print_local_exporter()
+                self.build_not_table_format_exporter(self.objects_matched + self.fields_untagged)
+            self.print_local_exporter(exporter_name)
 
     def print_table_format(self, groupby, columns, verbose=False):
         parser = JsonParser(self.objects_matched)
@@ -819,12 +816,15 @@ class LocalExporter:
         return "".join(str_tables)
 
 
-    def print_local_exporter(self):
+    def print_local_exporter(self, exporter_name):
         #The top edge
         timestamp      = datetime.datetime.now().timestamp()
-        formatted_time = datetime.datetime.fromtimestamp(timestamp).strftime('%a %b %d %H:%M:%S %Y')
-        num_of_equals  = (self.terminal_size - len(formatted_time)) // 2
-        print('=' * num_of_equals + formatted_time + '=' * num_of_equals)
+        head_line = datetime.datetime.fromtimestamp(timestamp).strftime('%a %b %d %H:%M:%S %Y')
+        if exporter_name is not None:
+            head_line += "  " + exporter_name
+        
+        num_of_equals  = (self.terminal_size - len(head_line)) // 2
+        print('=' * num_of_equals + head_line + '=' * num_of_equals)
 
         if self.display_notagged:
             if len(self.fields_untagged) > 0:
