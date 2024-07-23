@@ -170,7 +170,7 @@ TEST(test_performance, merge_performance_one_instance_topk_counter_full_dest)
 struct fieldstat *construct_fs_with_many_empty_cubes(int cube_num, int metric_num, enum sampling_mode mode)
 {
     struct fieldstat *instance = fieldstat_new();
-    struct field tmp_tag = TEST_TAG_INT;
+    struct field tmp_tag = TEST_FIELD_INT;
     for (int i = 0; i < cube_num; i++) {
         tmp_tag.value_longlong = i;
         int cube_id = fieldstat_cube_create(instance, &tmp_tag, 1);
@@ -226,12 +226,12 @@ TEST(test_performance, performance_test_add_cells_comprehensive)
     size_t cell_count = 100000;
     struct field fields[cell_count];
     for (size_t i = 0; i < cell_count; i++) {
-        fields[i] = TEST_TAG_INT;
+        fields[i] = TEST_FIELD_INT;
         fields[i].value_longlong = i;
     }
     // getchar();
     struct fieldstat *instance = fieldstat_new();
-    test_fieldstat_cube_create(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, cell_count);
+    test_fieldstat_cube_create(instance, &TEST_FIELD_INT_2, 1, SAMPLING_MODE_COMPREHENSIVE, cell_count);
     fieldstat_register_counter(instance, 0, "test");
 
     clock_t start = clock();
@@ -250,7 +250,7 @@ TEST(test_performance, performance_test_add_cells_topk)
     size_t cell_count = 100000;
     struct field fields[cell_count];
     for (size_t i = 0; i < cell_count; i++) {
-        fields[i] = TEST_TAG_INT;
+        fields[i] = TEST_FIELD_INT;
         // fields[i].value_longlong = rand() % 10000;
         if (rand()%2)
             fields[i].value_longlong = i;
@@ -258,7 +258,7 @@ TEST(test_performance, performance_test_add_cells_topk)
             fields[i].value_longlong = rand() % 1000;
     }
     struct fieldstat *instance = fieldstat_new();
-    fieldstat_cube_create(instance, &TEST_TAG_INT_collided, 1);
+    fieldstat_cube_create(instance, &TEST_FIELD_INT_2, 1);
     fieldstat_register_counter(instance, 0, "test");
     fieldstat_cube_set_sampling(instance, 0, SAMPLING_MODE_TOPK, 1000, 0);
 
@@ -280,7 +280,7 @@ TEST(test_performance, performance_test_add_cells_topk)
 TEST(test_performance, performance_test_add_cells_histogram_record)
 {
     struct fieldstat *instance = fieldstat_new();
-    test_fieldstat_cube_create(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    test_fieldstat_cube_create(instance, &TEST_FIELD_INT_2, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
     fieldstat_register_histogram(instance, 0, "test", 1, 100000, 3);
     size_t test_num = 100000;
     long long vals[test_num];
@@ -289,7 +289,7 @@ TEST(test_performance, performance_test_add_cells_histogram_record)
     }
     clock_t start = clock();
     for (size_t i = 0; i < test_num; i++) {
-        fieldstat_histogram_record(instance, 0, 0, &TEST_TAG_INT, 1, vals[i]);
+        fieldstat_histogram_record(instance, 0, 0, &TEST_FIELD_INT, 1, vals[i]);
     }
     clock_t end = clock();
     double seconds = (double)(end - start) / test_num;
@@ -301,7 +301,7 @@ TEST(test_performance, performance_test_add_cells_histogram_record)
 TEST(test_performance, performance_test_add_cells_hll_add)
 {
     struct fieldstat *instance = fieldstat_new();
-    test_fieldstat_cube_create(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    test_fieldstat_cube_create(instance, &TEST_FIELD_INT_2, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
     fieldstat_register_hll(instance, 0, "test", 6);
     size_t test_num = 100000;
     std::string vals[test_num];
@@ -311,7 +311,7 @@ TEST(test_performance, performance_test_add_cells_hll_add)
 
     clock_t start = clock();
     for (size_t i = 0; i < test_num; i++) {
-        fieldstat_hll_add(instance, 0, 0, &TEST_TAG_INT, 1, vals[i].c_str(), vals[i].length());
+        fieldstat_hll_add(instance, 0, 0, &TEST_FIELD_INT, 1, vals[i].c_str(), vals[i].length());
     }
     clock_t end = clock();
     double seconds = (double)(end - start) / test_num;
@@ -327,18 +327,18 @@ TEST(test_performance, performance_test_add_cells_comprehensive_5_tags)
     for (size_t i = 0; i < cell_count; i++) {
         struct field *fields = (struct field *)malloc(sizeof(struct field) * 5);
 
-        fields[0] = TEST_TAG_INT;
-        fields[1] = TEST_TAG_INT;
-        fields[2] = TEST_TAG_INT;
-        fields[3] = TEST_TAG_INT;
-        fields[4] = TEST_TAG_INT;
+        fields[0] = TEST_FIELD_INT;
+        fields[1] = TEST_FIELD_INT;
+        fields[2] = TEST_FIELD_INT;
+        fields[3] = TEST_FIELD_INT;
+        fields[4] = TEST_FIELD_INT;
         fields[0].value_longlong = i;
 
         tag_v[i] = fields;
     }
     // getchar();
     struct fieldstat *instance = fieldstat_new();
-    test_fieldstat_cube_create(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, cell_count);
+    test_fieldstat_cube_create(instance, &TEST_FIELD_INT_2, 1, SAMPLING_MODE_COMPREHENSIVE, cell_count);
     fieldstat_register_counter(instance, 0, "test");
 
     clock_t start = clock();
@@ -359,7 +359,7 @@ TEST(test_performance, performance_test_add_cells_comprehensive_5_tags)
 TEST(test_performance, performance_test_add_cells_histogram_record_5tags)
 {
     struct fieldstat *instance = fieldstat_new();
-    test_fieldstat_cube_create(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    test_fieldstat_cube_create(instance, &TEST_FIELD_INT_2, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
     fieldstat_register_histogram(instance, 0, "test", 1, 100000, 3);
     size_t test_num = 100000;
     long long vals[test_num];
@@ -368,11 +368,11 @@ TEST(test_performance, performance_test_add_cells_histogram_record_5tags)
     }
 
     struct field fields[5];
-    fields[0] = TEST_TAG_INT;
-    fields[1] = TEST_TAG_STRING;
-    fields[2] = TEST_TAG_DOUBLE;
-    fields[3] = TEST_TAG_INT;
-    fields[4] = TEST_TAG_INT;
+    fields[0] = TEST_FIELD_INT;
+    fields[1] = TEST_FIELD_STRING;
+    fields[2] = TEST_FIELD_DOUBLE;
+    fields[3] = TEST_FIELD_INT;
+    fields[4] = TEST_FIELD_INT;
     clock_t start = clock();
     for (size_t i = 0; i < test_num; i++) {
         fieldstat_histogram_record(instance, 0, 0, fields, 5, vals[i]);
@@ -387,7 +387,7 @@ TEST(test_performance, performance_test_add_cells_histogram_record_5tags)
 TEST(test_performance, performance_test_add_cells_hll_add_5tags)
 {
     struct fieldstat *instance = fieldstat_new();
-    test_fieldstat_cube_create(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    test_fieldstat_cube_create(instance, &TEST_FIELD_INT_2, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
     fieldstat_register_hll(instance, 0, "test", 6);
     size_t test_num = 100000;
     std::string vals[test_num];
@@ -396,11 +396,11 @@ TEST(test_performance, performance_test_add_cells_hll_add_5tags)
     }
 
     struct field fields[5];
-    fields[0] = TEST_TAG_INT;
-    fields[1] = TEST_TAG_STRING;
-    fields[2] = TEST_TAG_DOUBLE;
-    fields[3] = TEST_TAG_INT;
-    fields[4] = TEST_TAG_INT;
+    fields[0] = TEST_FIELD_INT;
+    fields[1] = TEST_FIELD_STRING;
+    fields[2] = TEST_FIELD_DOUBLE;
+    fields[3] = TEST_FIELD_INT;
+    fields[4] = TEST_FIELD_INT;
     clock_t start = clock();
     for (size_t i = 0; i < test_num; i++) {
         fieldstat_hll_add(instance, 0, 0, fields, 5, vals[i].c_str(), vals[i].length());
@@ -509,9 +509,9 @@ TEST(test_performance, callibrate_unchanged)
 struct fieldstat *construct_fs_with_many_cells(int cell_num)
 {
     struct fieldstat *instance = fieldstat_new();
-    test_fieldstat_cube_create(instance, &TEST_TAG_INT, 1, SAMPLING_MODE_COMPREHENSIVE, cell_num);
+    test_fieldstat_cube_create(instance, &TEST_FIELD_INT, 1, SAMPLING_MODE_COMPREHENSIVE, cell_num);
     fieldstat_register_counter(instance, 0, "test");
-    struct field tmp_tag = TEST_TAG_INT;
+    struct field tmp_tag = TEST_FIELD_INT;
     for (int i = 0; i < cell_num; i++) {
         tmp_tag.value_longlong = i;
         fieldstat_counter_incrby(instance, 0, 0, &tmp_tag, 1, 1);

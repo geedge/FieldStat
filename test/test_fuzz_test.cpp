@@ -176,7 +176,7 @@ TEST(Fuzz_test, many_instance_random_flow_unregister_calibrate_reset_fork_merge_
     struct fieldstat *instance_in_focus = dest;
     fieldstat_get_cubes(instance_in_focus, &cube_ids, &cube_num);
     for (int i = 0; i < cube_num; i++) {
-        struct field_list *shared_tag_out = fieldstat_cube_get_tags(instance_in_focus, cube_ids[i]);
+        struct field_list *shared_tag_out = fieldstat_cube_get_dimensions(instance_in_focus, cube_ids[i]);
 
         size_t cell_num0;
         struct field_list *tags0;
@@ -194,8 +194,8 @@ TEST(Fuzz_test, many_instance_random_flow_unregister_calibrate_reset_fork_merge_
             EXPECT_EQ(comp_count[cell_key], fuzz_fieldstat_counter_get(instance_in_focus, cube_ids[i], 0, &tags0[j]));
         }
 
-        fieldstat_tag_list_arr_free(tags0, cell_num0);
-        fieldstat_tag_list_arr_free(shared_tag_out, 1);
+        fieldstat_field_list_arr_free(tags0, cell_num0);
+        fieldstat_field_list_arr_free(shared_tag_out, 1);
     }
     free(cube_ids);
 
@@ -306,7 +306,7 @@ TEST(Fuzz_test, many_instance_random_flow_unregister_calibrate_reset_fork_merge_
     struct fieldstat *instance_in_focus = dest;
     fieldstat_get_cubes(instance_in_focus, &cube_ids, &cube_num);
     for (int i = 0; i < cube_num; i++) {
-        struct field_list *shared_tag_out = fieldstat_cube_get_tags(instance_in_focus, cube_ids[i]);
+        struct field_list *shared_tag_out = fieldstat_cube_get_dimensions(instance_in_focus, cube_ids[i]);
 
         size_t cell_num;
         struct field_list *fields;
@@ -339,8 +339,8 @@ TEST(Fuzz_test, many_instance_random_flow_unregister_calibrate_reset_fork_merge_
             delete test_result[j];
         }
 
-        fieldstat_tag_list_arr_free(fields, cell_num);
-        fieldstat_tag_list_arr_free(shared_tag_out, 1);
+        fieldstat_field_list_arr_free(fields, cell_num);
+        fieldstat_field_list_arr_free(shared_tag_out, 1);
     }
     free(cube_ids);
 
@@ -446,7 +446,7 @@ TEST(Fuzz_test, many_instance_random_flow_unregister_calibrate_reset_fork_merge_
     fieldstat_get_cubes(instance_in_focus, &cube_ids, &cube_num);
     double sum_accuracy = 0;
     for (int i = 0; i < cube_num; i++) {
-        struct field_list *shared_tag_out = fieldstat_cube_get_tags(instance_in_focus, cube_ids[i]);
+        struct field_list *shared_tag_out = fieldstat_cube_get_dimensions(instance_in_focus, cube_ids[i]);
 
         size_t cell_num;
         struct field_list *cells;
@@ -482,8 +482,8 @@ TEST(Fuzz_test, many_instance_random_flow_unregister_calibrate_reset_fork_merge_
             delete test_result[j];
         }
 
-        fieldstat_tag_list_arr_free(cells, cell_num);
-        fieldstat_tag_list_arr_free(shared_tag_out, 1);
+        fieldstat_field_list_arr_free(cells, cell_num);
+        fieldstat_field_list_arr_free(shared_tag_out, 1);
     }
     double mean_accuracy = sum_accuracy / cube_num;
     EXPECT_GE(mean_accuracy, 0.7);
@@ -533,7 +533,7 @@ TEST(Fuzz_test, add_and_reset_with_randomly_generated_flows_and_randomly_chosen_
             tag_list_tmp.n_field = tag_list_wrapper[i]->get_tag_count();
             int counter_exist = fieldstat_counter_get(instance, cube_id, &tag_list_tmp, using_id,  &value);
             ASSERT_EQ(counter_exist, FS_ERR_INVALID_DIMENSION); // the field is not added to the cube
-            fieldstat_tag_list_arr_free(tag_list, n_cell);
+            fieldstat_field_list_arr_free(tag_list, n_cell);
         }
 
         if (i % 1000 == 0) {
@@ -610,7 +610,7 @@ TEST(perf, simple_one_for_perf_spreadsketch)
     const int TEST_ROUND = 500000;
     struct fieldstat *instance = fieldstat_new();
     
-    int cube_id = fieldstat_cube_create(instance, &TEST_TAG_STRING, 1);
+    int cube_id = fieldstat_cube_create(instance, &TEST_FIELD_STRING, 1);
     fieldstat_register_hll(instance, cube_id, "hll", 6);
     fieldstat_cube_set_sampling(instance, cube_id, SAMPLING_MODE_TOP_CARDINALITY, CELL_MAX, 0);
 

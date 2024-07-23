@@ -64,18 +64,6 @@ int fieldstat_cube_destroy(struct fieldstat *instance, int cube_id)
 /*                                    cube                                    */
 /* -------------------------------------------------------------------------- */
 
-void fieldstat_free_tag_array(struct field *fields, size_t n_tags)
-{
-    for (size_t i = 0; i < n_tags; i++) {
-        struct field *field = &fields[i];
-        free((char *)field->key);
-        if (field->type == FIELD_VALUE_CSTRING) {
-            free((char *)field->value_str);
-        }
-    }
-    free(fields);
-}
-
 // cppcheck-suppress [constParameterPointer, unmatchedSuppression]
 int fieldstat_cube_set_sampling(struct fieldstat *instance, int cube_id, enum sampling_mode mode, int max_n_cell, int primary_metric_id) {
     if (max_n_cell <= 0) {
@@ -230,8 +218,6 @@ struct fieldstat *fieldstat_fork(const struct fieldstat *instance)
 void fieldstat_calibrate(const struct fieldstat *master, struct fieldstat *replica)
 {
     cube_manager_calibrate(replica->cube_manager, master->cube_manager);
-
-    return FS_OK;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -242,7 +228,7 @@ void fieldstat_get_cubes(const struct fieldstat *instance, int **cube_ids, int *
     cube_manager_list(instance->cube_manager, cube_ids, n_cube);
 }
 
-struct field_list *fieldstat_cube_get_tags(const struct fieldstat *instance, int cube_id)
+struct field_list *fieldstat_cube_get_dimensions(const struct fieldstat *instance, int cube_id)
 {
     const struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
     if (cube == NULL) {
@@ -315,15 +301,22 @@ void fieldstat_metric_get_serialization_as_base64(const struct fieldstat *instan
     cube_get_serialization_as_base64(cube, metric_id, cell_dimensions, blob, blob_size);
 }
 
-void fieldstat_tag_list_arr_free(struct field_list *tag_list, size_t n_cell)
+void fieldstat_field_list_arr_free(struct field_list *field_lists, size_t n_field_list)
 {
-    if (tag_list == NULL) {
+    if (field_lists == NULL) {
         return;
     }
-    for (int i = 0; i < n_cell; i++) {
-        fieldstat_free_tag_array(tag_list[i].field, tag_list[i].n_field);
+    for (int i = 0; i < n_field_list; i++) {
+        for (size_t j = 0; j < field_lists[i].n_field; j++) {
+            struct field *field = &(field_lists[i].field[j]);
+            free((char *)field->key);
+            if (field->type == FIELD_VALUE_CSTRING) {
+                free((char *)field->value_str);
+            }
+        }
+        free(field_lists[i].field);
     }
-    free(tag_list);
+    free(field_lists);
 }
 
 const char *fieldstat_get_metric_name(const struct fieldstat *instance, int cube_id, int metric_id)

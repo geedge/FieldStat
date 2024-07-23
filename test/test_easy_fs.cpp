@@ -13,15 +13,15 @@
 
 TEST(test_easy_fieldstat, new_and_free)
 {
-    struct fieldstat_easy *fse = fieldstat_easy_new(10, "instance name1231231231", &TEST_TAG_STRING, 1);
+    struct fieldstat_easy *fse = fieldstat_easy_new(10, "instance name1231231231", &TEST_FIELD_STRING, 1);
     fieldstat_easy_free(fse);
 }
 
 TEST(test_easy_fieldstat, output_to_buff)
 {
-    struct fieldstat_easy *fse = fieldstat_easy_new(10, NULL, &TEST_TAG_STRING, 1);
+    struct fieldstat_easy *fse = fieldstat_easy_new(10, NULL, &TEST_FIELD_STRING, 1);
     fieldstat_easy_register_counter(fse, "metric counter");
-    fieldstat_easy_counter_incrby(fse, 0, 0, &TEST_TAG_INT, 1, 1);
+    fieldstat_easy_counter_incrby(fse, 0, 0, &TEST_FIELD_INT, 1, 1);
     // read file, should be empty
     char *buff = NULL;
     size_t buff_len = 0;
@@ -30,8 +30,8 @@ TEST(test_easy_fieldstat, output_to_buff)
     cJSON *cell = cJSON_GetArrayItem(root, 0);
     long long value = cJSON_GetObjectItem(cell, "metric counter")->valueint;
     EXPECT_EQ(value, 1);
-    EXPECT_EQ(cJSON_GetObjectItem(cell, TEST_TAG_INT.key)->valueint, TEST_TAG_INT.value_longlong);
-    EXPECT_STREQ(cJSON_GetObjectItem(cell, TEST_TAG_STRING.key)->valuestring, TEST_TAG_STRING.value_str);
+    EXPECT_EQ(cJSON_GetObjectItem(cell, TEST_FIELD_INT.key)->valueint, TEST_FIELD_INT.value_longlong);
+    EXPECT_STREQ(cJSON_GetObjectItem(cell, TEST_FIELD_STRING.key)->valuestring, TEST_FIELD_STRING.value_str);
 
     cJSON_Delete(root);
     free(buff);
@@ -63,9 +63,9 @@ TEST(test_easy_fieldstat, output_to_file)
     EXPECT_EQ(cJSON_GetArraySize(root), 0); // is empty and valid
     cJSON_Delete(root);
 
-    fieldstat_easy_counter_incrby(fse, 0, counter_id, &TEST_TAG_INT, 1, 1);
-    fieldstat_easy_counter_incrby(fse, 1, counter_id, &TEST_TAG_INT, 1, 10);
-    fieldstat_easy_counter_incrby(fse, 2, counter_id, &TEST_TAG_INT, 1, 100);
+    fieldstat_easy_counter_incrby(fse, 0, counter_id, &TEST_FIELD_INT, 1, 1);
+    fieldstat_easy_counter_incrby(fse, 1, counter_id, &TEST_FIELD_INT, 1, 10);
+    fieldstat_easy_counter_incrby(fse, 2, counter_id, &TEST_FIELD_INT, 1, 100);
     sleep(2);
 
     // 2nd interval: merge 3 thread's data, and output
@@ -94,7 +94,7 @@ TEST(test_easy_fieldstat, output_to_file)
     cJSON_Delete(root);
 
     // 4th interval: new data, output again
-    fieldstat_easy_counter_incrby(fse, 0, counter_id, &TEST_TAG_DOUBLE, 1, 10086);
+    fieldstat_easy_counter_incrby(fse, 0, counter_id, &TEST_FIELD_DOUBLE, 1, 10086);
     sleep(2);
     printf("4th interval\n");
     root = read_file();
@@ -153,9 +153,9 @@ TEST(test_easy_fieldstat, output_interval_ok)
 
     struct fieldstat_easy *fse = fieldstat_easy_new(10, NULL, NULL, 0);
     fieldstat_easy_register_histogram(fse, "metric histogram", 1, 10000, 3); // a pretty time consuming metric
-    fieldstat_easy_histogram_record(fse, 0, 0, &TEST_TAG_INT, 1, 1);
-    fieldstat_easy_histogram_record(fse, 0, 0, &TEST_TAG_DOUBLE, 1, 10);
-    fieldstat_easy_histogram_record(fse, 0, 0, &TEST_TAG_STRING, 1, 110);
+    fieldstat_easy_histogram_record(fse, 0, 0, &TEST_FIELD_INT, 1, 1);
+    fieldstat_easy_histogram_record(fse, 0, 0, &TEST_FIELD_DOUBLE, 1, 10);
+    fieldstat_easy_histogram_record(fse, 0, 0, &TEST_FIELD_STRING, 1, 110);
 
     fieldstat_easy_enable_auto_output(fse, FILENAME, 1);
 
@@ -184,8 +184,8 @@ TEST(test_easy_fieldstat, ensure_data_racing_of_two_output_and_of_incyby)
     for (int thread_id = 0; thread_id < N_THREADS; thread_id++) {
         threads[thread_id] = std::thread([fse, counter_id, hdr_id, thread_id]() {
             for (int i = 0; i < 1000000; i++) { // loop million times to ensure no core dump
-                fieldstat_easy_counter_incrby(fse, thread_id, counter_id, &TEST_TAG_INT, 1, 1);
-                fieldstat_easy_histogram_record(fse, thread_id, hdr_id, &TEST_TAG_INT, 1, rand() % 10000);
+                fieldstat_easy_counter_incrby(fse, thread_id, counter_id, &TEST_FIELD_INT, 1, 1);
+                fieldstat_easy_histogram_record(fse, thread_id, hdr_id, &TEST_FIELD_INT, 1, rand() % 10000);
                 usleep(1); // 1us * 1000000 = 1s, just long enough to output
             }
         });
@@ -202,8 +202,8 @@ TEST(test_easy_fieldstat, reset)
 {
     struct fieldstat_easy *fse = fieldstat_easy_new(3, NULL, NULL, 0);
     int counter_id = fieldstat_easy_register_counter(fse, "metric counter");
-    fieldstat_easy_counter_incrby(fse, 0, counter_id, &TEST_TAG_INT, 1, 1);
-    fieldstat_easy_counter_incrby(fse, 1, counter_id, &TEST_TAG_INT, 1, 1);
+    fieldstat_easy_counter_incrby(fse, 0, counter_id, &TEST_FIELD_INT, 1, 1);
+    fieldstat_easy_counter_incrby(fse, 1, counter_id, &TEST_FIELD_INT, 1, 1);
     
     char **objects = NULL;
     size_t n_objects = 0;
@@ -238,7 +238,7 @@ TEST(test_easy_fieldstat, accuracy_in_multithread)
     for (int thread_id = 0; thread_id < N_THREADS; thread_id++) {
         threads[thread_id] = std::thread([fse, counter_id, thread_id]() {
             for (size_t i = 0; i < 2000000ULL; i++) { // 1 million times
-                fieldstat_easy_counter_incrby(fse, thread_id, counter_id, &TEST_TAG_INT, 1, 1);
+                fieldstat_easy_counter_incrby(fse, thread_id, counter_id, &TEST_FIELD_INT, 1, 1);
             }
         });
     }

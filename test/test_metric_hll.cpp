@@ -45,7 +45,7 @@ void test_assert_standard_instance(const struct fieldstat *instance)
     fieldstat_cube_get_cells(instance, 0, &tag_list, &n_cell);
     EXPECT_EQ(n_cell, 1);
     EXPECT_EQ(tag_list->n_field, 1);
-    EXPECT_STREQ(tag_list->field[0].key, TEST_TAG_INT.key);
+    EXPECT_STREQ(tag_list->field[0].key, TEST_FIELD_INT.key);
     
     int *metric_id = NULL;
     size_t n_metric = 0;
@@ -54,13 +54,13 @@ void test_assert_standard_instance(const struct fieldstat *instance)
     EXPECT_EQ(metric_id[0], 0);
     free(metric_id);
 
-    fieldstat_tag_list_arr_free(tag_list, n_cell);
+    fieldstat_field_list_arr_free(tag_list, n_cell);
 }
 
 double my_fieldstat_hll_get(const struct fieldstat *instance, int cube_id, int metric_id)
 {
     double ret = 0;
-    fieldstat_hll_get(instance, cube_id, &TEST_TAG_LIST_INT, metric_id,  &ret);
+    fieldstat_hll_get(instance, cube_id, &TEST_FIELD_LIST_INT, metric_id,  &ret);
     return ret;
 }
 
@@ -68,9 +68,9 @@ TEST(metric_test_hll, simple_register_and_query)
 {
     struct fieldstat *instance = test_init_standard_instance_one_cube_one_metric_one_cell_hll();
 
-    fieldstat_hll_add(instance, 0, 0, &TEST_TAG_INT, 1, "hello", 5);
-    fieldstat_hll_add(instance, 0, 0, &TEST_TAG_INT, 1, "wor", 3);
-    fieldstat_hll_add(instance, 0, 0, &TEST_TAG_INT, 1, "world", 5);
+    fieldstat_hll_add(instance, 0, 0, &TEST_FIELD_INT, 1, "hello", 5);
+    fieldstat_hll_add(instance, 0, 0, &TEST_FIELD_INT, 1, "wor", 3);
+    fieldstat_hll_add(instance, 0, 0, &TEST_FIELD_INT, 1, "world", 5);
 
     test_assert_standard_instance(instance);
     EXPECT_NEAR(my_fieldstat_hll_get(instance, 0, 0), 3, 0.5);
@@ -81,9 +81,9 @@ TEST(metric_test_hll, simple_register_and_query)
 TEST(metric_test_hll, add_with_tags) {
     struct fieldstat *instance = test_init_standard_instance_one_cube_one_metric_one_cell_hll();
 
-    fieldstat_hll_add_field(instance, 0, 0, &TEST_TAG_INT, 1, &TEST_TAG_INT, 1);
-    fieldstat_hll_add_field(instance, 0, 0, &TEST_TAG_INT, 1, &TEST_TAG_DOUBLE, 1);
-    fieldstat_hll_add_field(instance, 0, 0, &TEST_TAG_INT, 1, &TEST_TAG_STRING, 1);
+    fieldstat_hll_add_field(instance, 0, 0, &TEST_FIELD_INT, 1, &TEST_FIELD_INT, 1);
+    fieldstat_hll_add_field(instance, 0, 0, &TEST_FIELD_INT, 1, &TEST_FIELD_DOUBLE, 1);
+    fieldstat_hll_add_field(instance, 0, 0, &TEST_FIELD_INT, 1, &TEST_FIELD_STRING, 1);
     
     test_assert_standard_instance(instance);
     EXPECT_NEAR(my_fieldstat_hll_get(instance, 0, 0), 3, 0.5);
@@ -94,9 +94,9 @@ TEST(metric_test_hll, add_with_tags) {
 TEST(metric_test_hll, merge)
 {
     struct fieldstat *instance = test_init_standard_instance_one_cube_one_metric_one_cell_hll();
-    fieldstat_hll_add(instance, 0, 0, &TEST_TAG_INT, 1, "hello", 5);
-    fieldstat_hll_add(instance, 0, 0, &TEST_TAG_INT, 1, "wor", 3);
-    fieldstat_hll_add(instance, 0, 0, &TEST_TAG_INT, 1, "world", 5);
+    fieldstat_hll_add(instance, 0, 0, &TEST_FIELD_INT, 1, "hello", 5);
+    fieldstat_hll_add(instance, 0, 0, &TEST_FIELD_INT, 1, "wor", 3);
+    fieldstat_hll_add(instance, 0, 0, &TEST_FIELD_INT, 1, "world", 5);
 
     struct fieldstat *instance_total = fieldstat_new();
     fieldstat_merge(instance_total, instance);
@@ -113,14 +113,14 @@ TEST(metric_test_hll, merge)
 TEST(metric_test_hll, merge_twice_with_reset)
 {
     struct fieldstat *instance = test_init_standard_instance_one_cube_one_metric_one_cell_hll();
-    fieldstat_hll_add(instance, 0, 0, &TEST_TAG_INT, 1, "hello", 5);
-    fieldstat_hll_add(instance, 0, 0, &TEST_TAG_INT, 1, "wor", 3);
+    fieldstat_hll_add(instance, 0, 0, &TEST_FIELD_INT, 1, "hello", 5);
+    fieldstat_hll_add(instance, 0, 0, &TEST_FIELD_INT, 1, "wor", 3);
 
     struct fieldstat *instance_total = fieldstat_new();
     fieldstat_merge(instance_total, instance);
 
     fieldstat_reset(instance);
-    fieldstat_hll_add(instance, 0, 0, &TEST_TAG_INT, 1, "world", 5);
+    fieldstat_hll_add(instance, 0, 0, &TEST_FIELD_INT, 1, "world", 5);
     fieldstat_merge(instance_total, instance);
 
     test_assert_standard_instance(instance_total);
@@ -140,13 +140,13 @@ TEST(metric_test_hll, merge_twice_with_reset)
 TEST(metric_test_hll, serialize_with_b64_and_query)
 {
     struct fieldstat *instance = test_init_standard_instance_one_cube_one_metric_one_cell_hll();
-    fieldstat_hll_add(instance, 0, 0, &TEST_TAG_INT, 1, "hello", 5);
-    fieldstat_hll_add(instance, 0, 0, &TEST_TAG_INT, 1, "wor", 3);
-    fieldstat_hll_add(instance, 0, 0, &TEST_TAG_INT, 1, "world", 5);
+    fieldstat_hll_add(instance, 0, 0, &TEST_FIELD_INT, 1, "hello", 5);
+    fieldstat_hll_add(instance, 0, 0, &TEST_FIELD_INT, 1, "wor", 3);
+    fieldstat_hll_add(instance, 0, 0, &TEST_FIELD_INT, 1, "world", 5);
 
     char *blob = NULL;
     size_t blob_len = 0;
-    fieldstat_metric_get_serialization_as_base64(instance, 0, 0, &TEST_TAG_LIST_INT, &blob, &blob_len);
+    fieldstat_metric_get_serialization_as_base64(instance, 0, 0, &TEST_FIELD_LIST_INT, &blob, &blob_len);
     size_t dec_size = 0;
     unsigned char *dec = b64_decode_ex(blob, blob_len, &dec_size);
 
@@ -185,13 +185,13 @@ extern "C" {
 TEST(metric_test_hll, serialize_with_b64_and_query_with_python_api)
 {
     struct fieldstat *instance = test_init_standard_instance_one_cube_one_metric_one_cell_hll();
-    fieldstat_hll_add(instance, 0, 0, &TEST_TAG_INT, 1, "hello", 5);
-    fieldstat_hll_add(instance, 0, 0, &TEST_TAG_INT, 1, "wor", 3);
-    fieldstat_hll_add(instance, 0, 0, &TEST_TAG_INT, 1, "world", 5);
+    fieldstat_hll_add(instance, 0, 0, &TEST_FIELD_INT, 1, "hello", 5);
+    fieldstat_hll_add(instance, 0, 0, &TEST_FIELD_INT, 1, "wor", 3);
+    fieldstat_hll_add(instance, 0, 0, &TEST_FIELD_INT, 1, "world", 5);
 
     char *blob = NULL;
     size_t blob_len = 0;
-    fieldstat_metric_get_serialization_as_base64(instance, 0, 0, &TEST_TAG_LIST_INT, &blob, &blob_len);
+    fieldstat_metric_get_serialization_as_base64(instance, 0, 0, &TEST_FIELD_LIST_INT, &blob, &blob_len);
 
     bool flag = fieldstat_is_hll(blob);
     EXPECT_EQ(flag, true);
@@ -206,11 +206,11 @@ TEST(metric_test_hll, serialize_with_b64_and_query_with_python_api)
 TEST(metric_test_hll, add_with_wrong_cube_id_expecting_fail)
 {
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = test_fieldstat_cube_create(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    int cube_id = test_fieldstat_cube_create(instance, &TEST_FIELD_INT_2, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
 
-    int ret = fieldstat_hll_add(instance, cube_id + 1, 0, &TEST_TAG_INT, 1, "hello", 5);
+    int ret = fieldstat_hll_add(instance, cube_id + 1, 0, &TEST_FIELD_INT, 1, "hello", 5);
     EXPECT_EQ(ret, FS_ERR_INVALID_CUBE_ID);
-    ret = fieldstat_hll_add(instance, -1, 0, &TEST_TAG_INT, 1, "hello", 5);
+    ret = fieldstat_hll_add(instance, -1, 0, &TEST_FIELD_INT, 1, "hello", 5);
     EXPECT_EQ(ret, FS_ERR_INVALID_CUBE_ID);
 
     fieldstat_free(instance);
@@ -219,12 +219,12 @@ TEST(metric_test_hll, add_with_wrong_cube_id_expecting_fail)
 TEST(metric_test_hll, add_with_wrong_metric_id_expecting_fail)
 {
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = test_fieldstat_cube_create(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    int cube_id = test_fieldstat_cube_create(instance, &TEST_FIELD_INT_2, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
     int metric_id = fieldstat_register_hll(instance, cube_id, "czz_test hll metric", 10);
 
-    int ret = fieldstat_hll_add(instance, cube_id, metric_id + 1, &TEST_TAG_INT, 1, "hello", 5);
+    int ret = fieldstat_hll_add(instance, cube_id, metric_id + 1, &TEST_FIELD_INT, 1, "hello", 5);
     EXPECT_EQ(ret, FS_ERR_INVALID_METRIC_ID);
-    ret = fieldstat_hll_add(instance, cube_id, -1, &TEST_TAG_INT, 1, "hello", 5);
+    ret = fieldstat_hll_add(instance, cube_id, -1, &TEST_FIELD_INT, 1, "hello", 5);
     EXPECT_EQ(ret, FS_ERR_INVALID_METRIC_ID);
 
     fieldstat_free(instance);
@@ -234,7 +234,7 @@ TEST(metric_test_hll, spread_sketch_add_and_test_accuracy)
 {
     struct fieldstat *instance = fieldstat_new();
     int K = 10;
-    fieldstat_cube_create(instance, &TEST_TAG_INT_collided, 1);
+    fieldstat_cube_create(instance, &TEST_FIELD_INT_2, 1);
     fieldstat_register_hll(instance, 0, "testss", 6);
     fieldstat_cube_set_sampling(instance, 0, SAMPLING_MODE_TOP_CARDINALITY, K, 0);
 
@@ -286,7 +286,7 @@ TEST(metric_test_hll, spread_sketch_add_and_test_accuracy)
     printf("topk_add_and_test_accuracy Mean ratio e: %f\n", mre);
     EXPECT_LE(mre, 0.2);
 
-    fieldstat_tag_list_arr_free(tag_list, n_cell);
+    fieldstat_field_list_arr_free(tag_list, n_cell);
     fieldstat_free(instance);
     for (auto &ptr : test_result) {
         delete ptr;

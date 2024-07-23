@@ -67,7 +67,7 @@ struct fieldstat *fieldstat_fork(const struct fieldstat *instance);
 void fieldstat_calibrate(const struct fieldstat *master, struct fieldstat *replica);
 /*
     * @brief add an cube to this instance. Cube represents an template with a user-defined set of cells and metrics.
-    * @param cube_dimensions: tags that are shared by all cells in this cube. This is the key of the cube. Can be NULL. Must be unique. Shared_tags are ordered, which means that {"TAG_KEY": "123", "TAG_KEY2": "456"} and {"TAG_KEY2": "456", "TAG_KEY": "123"} are map to different cube.
+    * @param cube_dimensions: This is the key of the cube. Can be NULL. Must be unique. cube_dimensions are ordered, which means that {"KEY": "123", "KEY2": "456"} and {"KEY2": "456", "KEY": "123"} are map to different cube.
     * @param n_dimension: number of field in dimension.
     * @param mode: sampling mode. Refer to enum sampling_mode.
     * @param max_n_cell: max number of samplings(cells) in each cube. When mode is TOPK, max_n_cell > 0, while in COMPREHENSIVE mode, max_n_cell can be 0, meaning that there is no limit.
@@ -193,11 +193,10 @@ enum metric_type fieldstat_get_metric_type(const struct fieldstat *instance, int
 void fieldstat_cube_get_cells(const struct fieldstat *instance, int cube_id, struct field_list **cell_dimensions, size_t *n_cell);
 
 /*
-    get the field of fieldstat_cube_create. User free them by calling fieldstat_tag_list_arr_free(struct field_list *, 1)
+    get the field of fieldstat_cube_create. User free them by calling fieldstat_field_list_arr_free(struct field_list *, 1)
     return NULL when ID is invalid.
 */
-// todo: tags
-struct field_list *fieldstat_cube_get_tags(const struct fieldstat *instance, int cube_id);
+struct field_list *fieldstat_cube_get_dimensions(const struct fieldstat *instance, int cube_id);
 
 
 /*
@@ -231,7 +230,7 @@ long long fieldstat_histogram_count_le_value(const struct fieldstat *instance, i
 // get the base 64 encoded string of the serialized blob of a cell
 void fieldstat_metric_get_serialization_as_base64(const struct fieldstat *instance, int cube_id, int metric_id, const struct field_list *cell_dimensions, char **blob, size_t *blob_size);
 
-void fieldstat_tag_list_arr_free(struct field_list *tag_list, size_t n_cell);
+void fieldstat_field_list_arr_free(struct field_list *field_lists, size_t n_field_list);
 
 
 #ifdef __cplusplus

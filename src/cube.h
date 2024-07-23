@@ -27,7 +27,7 @@ int cube_register_hist(struct cube *cube,const char *metric_name, long long lowe
 
 int cube_histogram_record(struct cube *cube, int metric_id, const struct field *dimensions, size_t n_dimensions, long long value);
 int cube_hll_add(struct cube *cube, int metric_id, const struct field *dimensions, size_t n_dimensions, const char *key, size_t key_len);
-int cube_hll_add_field(struct cube *cube, int metric_id, const struct field *dimensions, size_t n_dimensions, const struct field *tags_key, size_t n_tag_key);
+int cube_hll_add_field(struct cube *cube, int metric_id, const struct field *dimensions, size_t n_dimensions, const struct field *item_fields, size_t n_item);
 int cube_counter_incrby(struct cube *cube, int metric_id, const struct field *dimensions, size_t n_dimensions, long long increment);
 int cube_counter_set(struct cube *cube, int metric_id, const struct field *dimensions, size_t n_dimensions, long long value);
 
@@ -40,7 +40,7 @@ int cube_get_serialization_as_base64(const struct cube *cube, int metric_id, con
 
 int cube_get_cell_count(const struct cube *cube);
 enum sampling_mode cube_get_sampling_mode(const struct cube *cube);
-void cube_get_cells(const struct cube *cube, struct field_list **tag_list, size_t *n_cell);
+void cube_get_cells(const struct cube *cube, struct field_list **cell_dimensions, size_t *n_cell);
 void cube_get_metrics(const struct cube *cube, int **metric_id_out, size_t *n_metric);
 void cube_get_metrics_in_cell(const struct cube *cube, const struct field_list *dimensions, int **metric_id_out, size_t *n_metric_out);
 struct field_list *cube_get_identifier(const struct cube *cube);

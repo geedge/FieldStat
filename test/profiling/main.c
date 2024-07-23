@@ -11,7 +11,7 @@
 // #define ADD_OPER_NUM 1
 #define MAX_STRING_KEY_LEN 10
 
-const struct field TEST_TAG_INT = {"INT key_", FIELD_VALUE_INTEGER, {.value_longlong = 100}};
+const struct field TEST_FIELD_INT = {"INT key_", FIELD_VALUE_INTEGER, {.value_longlong = 100}};
 
 
 int main () {

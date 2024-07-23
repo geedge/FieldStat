@@ -10,7 +10,7 @@
 #include "fieldstat.h"
 #include "exdata.h"
 
-struct tag_exdata_item {
+struct entry {
     char *key;
     size_t key_len;
     void *exdata;
@@ -19,7 +19,7 @@ struct tag_exdata_item {
 };
 
 struct hash_table {
-    struct tag_exdata_item *tag_id_map;
+    struct entry *key_exdata_map;
     int current_cell_num;
     int max_cell_num;
 
@@ -67,9 +67,9 @@ void hash_table_free(struct hash_table *pthis) {
     if (pthis == NULL) {
         return;
     }
-    struct tag_exdata_item *item, *tmp;
-    HASH_ITER(hh, pthis->tag_id_map, item, tmp) {
-        HASH_DEL(pthis->tag_id_map, item);
+    struct entry *item, *tmp;
+    HASH_ITER(hh, pthis->key_exdata_map, item, tmp) {
+        HASH_DEL(pthis->key_exdata_map, item);
         free(item->key);
         pthis->free_fn(item->exdata);
         free(item);
@@ -78,14 +78,14 @@ void hash_table_free(struct hash_table *pthis) {
 }
 
 void hash_table_reset(struct hash_table *pthis) {
-    struct tag_exdata_item *node, *tmp;
-    HASH_ITER(hh, pthis->tag_id_map, node, tmp) {
+    struct entry *node, *tmp;
+    HASH_ITER(hh, pthis->key_exdata_map, node, tmp) {
         if (!node->dying) {
             node->dying = true;
             pthis->reset_fn(node->exdata);
             continue;
         }
-        HASH_DEL(pthis->tag_id_map, node);
+        HASH_DEL(pthis->key_exdata_map, node);
         free(node->key);
         pthis->free_fn(node->exdata);
         free(node);
@@ -101,8 +101,8 @@ static char *my_keydup(const char *key, size_t key_len) {
 }
 
 int hash_table_add(struct hash_table *pthis, const char *key, size_t key_len, void *arg) {
-    struct tag_exdata_item *item;
-    HASH_FIND(hh, pthis->tag_id_map, key, key_len, item);
+    struct entry *item;
+    HASH_FIND(hh, pthis->key_exdata_map, key, key_len, item);
     if (item != NULL && !item->dying) {
         return 1;
     }
@@ -118,12 +118,12 @@ int hash_table_add(struct hash_table *pthis, const char *key, size_t key_len, vo
         return 1;
     }
 
-    item = calloc(1, sizeof(struct tag_exdata_item));
+    item = calloc(1, sizeof(struct entry));
     item->key = my_keydup(key, key_len);
     item->key_len = key_len;
     item->exdata = pthis->new_fn(arg);
     item->dying = false;
-    HASH_ADD_KEYPTR(hh, pthis->tag_id_map, item->key, key_len, item);
+    HASH_ADD_KEYPTR(hh, pthis->key_exdata_map, item->key, key_len, item);
 
     pthis->current_cell_num++;
     return 1;
@@ -138,8 +138,8 @@ void hash_table_set_exdata_schema(struct hash_table *pthis, exdata_new_cb new_fn
 }
 
 void *hash_table_get0_exdata(struct hash_table *pthis, const char *key, size_t key_len) {
-    struct tag_exdata_item *item;
-    HASH_FIND(hh, pthis->tag_id_map, key, key_len, item);
+    struct entry *item;
+    HASH_FIND(hh, pthis->key_exdata_map, key, key_len, item);
     if (item == NULL || item->dying) {
         return NULL;
     }
@@ -156,9 +156,9 @@ size_t hash_table_list(const struct hash_table *pthis, void **exdatas, size_t n_
         return 0;
     }
 
-    struct tag_exdata_item *item, *tmp;
+    struct entry *item, *tmp;
     size_t i = 0;
-    HASH_ITER(hh, pthis->tag_id_map, item, tmp) {
+    HASH_ITER(hh, pthis->key_exdata_map, item, tmp) {
         if (item->dying) {
             continue;
         }
@@ -172,14 +172,14 @@ size_t hash_table_list(const struct hash_table *pthis, void **exdatas, size_t n_
 }
 
 int hash_table_merge(struct hash_table *dest, struct hash_table *src) {
-    struct tag_exdata_item *item_src, *tmp;
-    struct tag_exdata_item *item_dst;
-    HASH_ITER(hh, src->tag_id_map, item_src, tmp) {
+    struct entry *item_src, *tmp;
+    struct entry *item_dst;
+    HASH_ITER(hh, src->key_exdata_map, item_src, tmp) {
         if (item_src->dying) {
             continue;
         }
 
-        HASH_FIND(hh, dest->tag_id_map, item_src->key, item_src->key_len, item_dst);
+        HASH_FIND(hh, dest->key_exdata_map, item_src->key, item_src->key_len, item_dst);
         if (item_dst != NULL && !item_dst->dying) {
             dest->merge_fn(item_dst->exdata, item_src->exdata);
             continue;
@@ -190,12 +190,12 @@ int hash_table_merge(struct hash_table *dest, struct hash_table *src) {
         }
 
         if (item_dst == NULL) {
-            item_dst = calloc(1, sizeof(struct tag_exdata_item));
+            item_dst = calloc(1, sizeof(struct entry));
             item_dst->key = my_keydup(item_src->key, item_src->key_len);
             item_dst->key_len = item_src->key_len;
             item_dst->dying = false;
             item_dst->exdata = dest->copy_fn(item_src->exdata);
-            HASH_ADD_KEYPTR(hh, dest->tag_id_map, item_dst->key, item_dst->key_len, item_dst);
+            HASH_ADD_KEYPTR(hh, dest->key_exdata_map, item_dst->key, item_dst->key_len, item_dst);
             dest->current_cell_num++;
         } else {
             assert(item_dst->dying);
@@ -217,17 +217,17 @@ struct hash_table *hash_table_copy(const struct hash_table *src) {
     pthis->reset_fn = src->reset_fn;
     pthis->copy_fn = src->copy_fn;
 
-    struct tag_exdata_item *item, *tmp;
-    HASH_ITER(hh, src->tag_id_map, item, tmp) {
+    struct entry *item, *tmp;
+    HASH_ITER(hh, src->key_exdata_map, item, tmp) {
         if (item->dying) {
             continue;
         }
-        struct tag_exdata_item *new_item = calloc(1, sizeof(struct tag_exdata_item));
+        struct entry *new_item = calloc(1, sizeof(struct entry));
         new_item->key = my_keydup(item->key, item->key_len);
         new_item->key_len = item->key_len;
         new_item->exdata = pthis->copy_fn(item->exdata);
         new_item->dying = false;
-        HASH_ADD_KEYPTR(hh, pthis->tag_id_map, new_item->key, new_item->key_len, new_item);
+        HASH_ADD_KEYPTR(hh, pthis->key_exdata_map, new_item->key, new_item->key_len, new_item);
     }
     return pthis;
 }

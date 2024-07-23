@@ -46,6 +46,7 @@
     ]
 */
 #define DEFAULT_EXPORTER_NAME "-"
+#define NIL_TAG_JSON "\anil"
 
 struct counter_history;
 struct export_kv_pair {
@@ -69,9 +70,9 @@ struct cell_iter {
     int *cube_ids;
     int n_cube;
     int curr_cube_idx;
-    struct field_list *shared_tag;
+    struct field_list *cube_dimension;
 
-    struct field_list *tag_list;
+    struct field_list *cell_dimension;
     size_t n_cell;
     size_t curr_cell_idx;
 
@@ -79,7 +80,7 @@ struct cell_iter {
 };
 
 struct cellwise_rec_for_export {
-    struct json_writer *cjson_tags;
+    struct json_writer *tag_json_obj;
     struct export_kv_pair **metric_pairs;
     size_t n_metric;
 };
@@ -123,7 +124,7 @@ void kv_pair_free(struct export_kv_pair *pair) {
     free(pair);
 }
 
-void kv_pair_fill_with_tags(struct export_kv_pair *dest, const struct field *src)
+void kv_pair_fill_with_fields(struct export_kv_pair *dest, const struct field *src)
 {
     dest->key = strdup(src->key);
     dest->type = src->type;
@@ -208,13 +209,13 @@ void counter_history_free(struct counter_history *history)
     free(history->exporter_name);
 
     if (history->global_tag_list != NULL) {
-        fieldstat_tag_list_arr_free(history->global_tag_list, 1);
+        fieldstat_field_list_arr_free(history->global_tag_list, 1);
     }
 
     free(history);
 }
 
-bool fieldstat_tag_list_cmp(const struct field_list *a, const struct field_list *b)
+bool field_list_cmp(const struct field_list *a, const struct field_list *b)
 {
     if (a->n_field != b->n_field) {
         return false;
@@ -252,7 +253,7 @@ bool fieldstat_tag_list_cmp(const struct field_list *a, const struct field_list 
     return true;
 }
 
-struct field_list *my_copy_fs_tag_list(const struct field_list *src)
+struct field_list *field_list_dup(const struct field_list *src)
 {
     struct field_list *dest = malloc(sizeof(struct field_list));
     dest->n_field = src->n_field;
@@ -303,7 +304,7 @@ bool counter_history_check_if_need_to_update(const struct fieldstat_json_exporte
         return false;
     }
     // global field cant be deleted, so no need to check if cur_global_tag_list == NULL && history->global_tag_list != NULL
-    if (fieldstat_tag_list_cmp(cur_global_tag_list, history->global_tag_list) == false) {
+    if (field_list_cmp(cur_global_tag_list, history->global_tag_list) == false) {
         return true;
     }
 
@@ -318,7 +319,7 @@ void counter_history_fill_version_info(struct counter_history *history, struct f
     free(history->exporter_name);
     history->exporter_name = strdup(cur_exporter_name);
     if (cur_global_tag_list != NULL) {
-        history->global_tag_list = my_copy_fs_tag_list(cur_global_tag_list);
+        history->global_tag_list = field_list_dup(cur_global_tag_list);
     }
 }
 
@@ -337,9 +338,9 @@ void fieldstat_json_exporter_update_history(struct fieldstat_json_exporter *expo
 void write_delta_to_json(struct fieldstat_json_exporter *exporter, struct cellwise_rec_for_export *tag_field_pair, struct json_writer *field_json)
 {
     // for every tag_field_pair, get the field json string
-    const char *tag_json = json_writer_unwrap(tag_field_pair->cjson_tags);
+    const char *tag_json = json_writer_unwrap(tag_field_pair->tag_json_obj);
     if (tag_json == NULL) {
-        tag_json = "\a\t\a"; // just a dummy string
+        tag_json = NIL_TAG_JSON;
     }
     for (int j = 0; j < tag_field_pair->n_metric; j++) {
         if (tag_field_pair->metric_pairs[j]->type != FIELD_VALUE_INTEGER) { // only counter type need to write delta
@@ -407,14 +408,12 @@ void couple_export_table_free(struct couple_export_table *tbl)
     free(tbl);
 }
 
-#define NIL_TAG_JSON "\anil"
-
 // align delta fields to acc fields by matching field json string, return an array with length n_acc, each of whose element match the corresponding acc element by both field and index
 const struct cellwise_rec_for_export **rearrange_metric_delta(const struct cellwise_rec_for_export *acc, size_t n_acc, const struct cellwise_rec_for_export *delta, size_t n_delta)
 {
     struct couple_export_table *map = couple_export_table_new();
     for (int i = 0; i < n_delta; i++) {
-        const char *tag_json = json_writer_unwrap(delta[i].cjson_tags);
+        const char *tag_json = json_writer_unwrap(delta[i].tag_json_obj);
         if (tag_json == NULL) { // field might be empty, give it a dummy name
             tag_json = NIL_TAG_JSON;
         }
@@ -424,7 +423,7 @@ const struct cellwise_rec_for_export **rearrange_metric_delta(const struct cellw
     const struct cellwise_rec_for_export **ret = calloc(n_acc, sizeof(struct cellwise_rec_for_export *));
 
     for (int id_acc = 0; id_acc < n_acc; id_acc++) {
-        const char *tag_str_acc = json_writer_unwrap(acc[id_acc].cjson_tags);
+        const char *tag_str_acc = json_writer_unwrap(acc[id_acc].tag_json_obj);
         if (tag_str_acc == NULL) { // field might be empty, give it a dummy name
             tag_str_acc = NIL_TAG_JSON;
         }
@@ -454,8 +453,8 @@ struct cell_iter *cell_iter_new(const struct fieldstat *instance) {
 }
 
 void cell_iter_free_cell_records(struct cell_iter *iter) {
-    fieldstat_tag_list_arr_free(iter->tag_list, iter->n_cell);
-    iter->tag_list = NULL;
+    fieldstat_field_list_arr_free(iter->cell_dimension, iter->n_cell);
+    iter->cell_dimension = NULL;
     iter->n_cell = 0;
     iter->curr_cell_idx = 0;
 }
@@ -463,8 +462,8 @@ void cell_iter_free_cell_records(struct cell_iter *iter) {
 void cell_iter_free(struct cell_iter *iter) {
     cell_iter_free_cell_records(iter);
 
-    if (iter->shared_tag != NULL) {
-        fieldstat_tag_list_arr_free(iter->shared_tag, 1);
+    if (iter->cube_dimension != NULL) {
+        fieldstat_field_list_arr_free(iter->cube_dimension, 1);
     }
     free(iter->cube_ids);
 
@@ -476,12 +475,12 @@ int cell_iter_next_cube(struct cell_iter *iter) {
     while (iter->curr_cube_idx < iter->n_cube - 1) {
         int cube_id_next = iter->cube_ids[++iter->curr_cube_idx];
 
-        fieldstat_cube_get_cells(instance, cube_id_next, &iter->tag_list, &iter->n_cell);
+        fieldstat_cube_get_cells(instance, cube_id_next, &iter->cell_dimension, &iter->n_cell);
         if (iter->n_cell == 0) {
             continue;
         }
 
-        iter->shared_tag = fieldstat_cube_get_tags(iter->instance, iter->cube_ids[iter->curr_cube_idx]);
+        iter->cube_dimension = fieldstat_cube_get_dimensions(iter->instance, iter->cube_ids[iter->curr_cube_idx]);
         iter->curr_cell_idx = 0;
         return 1;
     }
@@ -510,8 +509,8 @@ int cell_iter_next(struct cell_iter *iter) {
     }
 
     cell_iter_free_cell_records(iter);
-    fieldstat_tag_list_arr_free(iter->shared_tag, 1);
-    iter->shared_tag = NULL;
+    fieldstat_field_list_arr_free(iter->cube_dimension, 1);
+    iter->cube_dimension = NULL;
 
     if (cell_iter_next_cube(iter)) {
         return 1;
@@ -529,7 +528,7 @@ struct export_kv_pair *cell_query_with_iter(const struct cell_iter *iter, int me
     struct export_kv_pair *ret = NULL;
     if (type == METRIC_TYPE_COUNTER) {
         long long value;
-        int tmp_ret = fieldstat_counter_get(iter->instance, cube_id, &iter->tag_list[iter->curr_cell_idx], metric_id, &value);
+        int tmp_ret = fieldstat_counter_get(iter->instance, cube_id, &iter->cell_dimension[iter->curr_cell_idx], metric_id, &value);
         if (tmp_ret < 0) {
             return NULL;
         }
@@ -542,7 +541,7 @@ struct export_kv_pair *cell_query_with_iter(const struct cell_iter *iter, int me
     if (type == METRIC_TYPE_HLL || type == METRIC_TYPE_HISTOGRAM) {
         char *value;
         size_t len;
-        fieldstat_metric_get_serialization_as_base64(iter->instance, cube_id, metric_id, &iter->tag_list[iter->curr_cell_idx], &value, &len);
+        fieldstat_metric_get_serialization_as_base64(iter->instance, cube_id, metric_id, &iter->cell_dimension[iter->curr_cell_idx], &value, &len);
         if (value == NULL) {
             return NULL;
         }
@@ -574,52 +573,51 @@ void kv_pair_write_to_json(const struct export_kv_pair *pairs, struct json_write
     }
 }
 
-void tag_list_append_to_tag_object(const struct field_list *tag_list, struct json_writer *cjson_tags)
+void field_list_write_to_json(const struct field_list *field_list, struct json_writer *json_obj)
 {
-    size_t tag_list_len = tag_list->n_field;
     struct export_kv_pair pairs = {0};
 
-    for (int i = 0; i < tag_list_len; i++) {
-        if (tag_list->n_field == 0) {
+    for (int i = 0; i < field_list->n_field; i++) {
+        if (field_list->n_field == 0) {
             continue;
         }
         memset(&pairs, 0, sizeof(struct export_kv_pair));
-        pairs.key = (char *)tag_list->field[i].key;
-        pairs.type = tag_list->field[i].type;
+        pairs.key = (char *)field_list->field[i].key;
+        pairs.type = field_list->field[i].type;
         switch (pairs.type)
         {
             case FIELD_VALUE_INTEGER:
-                pairs.value_longlong = tag_list->field[i].value_longlong;
+                pairs.value_longlong = field_list->field[i].value_longlong;
                 break;
             case FIELD_VALUE_DOUBLE:
-                pairs.value_double = tag_list->field[i].value_double;
+                pairs.value_double = field_list->field[i].value_double;
                 break;
             case FIELD_VALUE_CSTRING:
-                pairs.value_str = (char *)tag_list->field[i].value_str;
+                pairs.value_str = (char *)field_list->field[i].value_str;
                 break;
             default:
                 break;
         }
-        kv_pair_write_to_json(&pairs, cjson_tags);
+        kv_pair_write_to_json(&pairs, json_obj);
     }
 }
 
-void cell_iter_read_tag_list(const struct cell_iter *iter, struct export_kv_pair **exported_tags, size_t *len_out)
+void cell_iter_read_dimensions(const struct cell_iter *iter, struct export_kv_pair **exported_dimensions, size_t *n_dimension_out)
 {
-    struct field_list *tag_list_cell = &iter->tag_list[iter->curr_cell_idx];
-    struct field_list *tag_arr_shared = iter->shared_tag;
+    struct field_list *field_list_cell = &iter->cell_dimension[iter->curr_cell_idx];
+    struct field_list *field_list_cube = iter->cube_dimension;
 
-    size_t ret_tag_list_len = tag_list_cell->n_field + tag_arr_shared->n_field;
+    size_t ret_n_dimension = field_list_cell->n_field + field_list_cube->n_field;
 
-    struct export_kv_pair *tag_list = malloc(sizeof(struct export_kv_pair) * ret_tag_list_len);
-    *exported_tags = tag_list;
-    *len_out = ret_tag_list_len;
+    struct export_kv_pair *ret = malloc(sizeof(struct export_kv_pair) * ret_n_dimension);
+    *exported_dimensions = ret;
+    *n_dimension_out = ret_n_dimension;
 
-    for (int i = 0; i < tag_list_cell->n_field; i++) {
-        kv_pair_fill_with_tags(tag_list++, &tag_list_cell->field[i]);
+    for (int i = 0; i < field_list_cell->n_field; i++) {
+        kv_pair_fill_with_fields(ret++, &field_list_cell->field[i]);
     }
-    for (int i = 0; i < tag_arr_shared->n_field; i++) {
-        kv_pair_fill_with_tags(tag_list++, &tag_arr_shared->field[i]);
+    for (int i = 0; i < field_list_cube->n_field; i++) {
+        kv_pair_fill_with_fields(ret++, &field_list_cube->field[i]);
     }
 }
 
@@ -636,12 +634,12 @@ void kv_pair_free_list(struct export_kv_pair *pairs, size_t len)
 }
 
 // return 1 if added, 0 if not added
-int cjson_map_add(struct cellwise_rec_for_export *tag_field_pair, const struct cell_iter *iter)
+int json_obj_add(struct cellwise_rec_for_export *tag_field_pair, const struct cell_iter *iter)
 {
     struct export_kv_pair **fields = NULL;
     int *metric_ids = NULL;
     size_t n_metric = 0;
-    fieldstat_get_metric_in_cell(iter->instance, iter->cube_ids[iter->curr_cube_idx], &iter->tag_list[iter->curr_cell_idx], &metric_ids, &n_metric);
+    fieldstat_get_metric_in_cell(iter->instance, iter->cube_ids[iter->curr_cube_idx], &iter->cell_dimension[iter->curr_cell_idx], &metric_ids, &n_metric);
     if (n_metric == 0) {
         // printf("cannot get metric in cell\n");
         return 0;
@@ -665,15 +663,15 @@ int cjson_map_add(struct cellwise_rec_for_export *tag_field_pair, const struct c
     tag_field_pair->metric_pairs = fields;
     tag_field_pair->n_metric = n_nonempty_metrics;
 
-    struct export_kv_pair *tag_list;
-    size_t tag_list_len;
-    cell_iter_read_tag_list(iter, &tag_list, &tag_list_len);
+    struct export_kv_pair *dimensions;
+    size_t n_pair;
+    cell_iter_read_dimensions(iter, &dimensions, &n_pair);
     struct json_writer *writer_tag = json_writer_init();
-    for (int i = 0; i < tag_list_len; i++) {
-        kv_pair_write_to_json(&tag_list[i], writer_tag);
+    for (int i = 0; i < n_pair; i++) {
+        kv_pair_write_to_json(&dimensions[i], writer_tag);
     }
-    kv_pair_free_list(tag_list, tag_list_len);
-    tag_field_pair->cjson_tags = writer_tag;
+    kv_pair_free_list(dimensions, n_pair);
+    tag_field_pair->tag_json_obj = writer_tag;
 
     return 1;
 }
@@ -703,7 +701,7 @@ struct cellwise_rec_for_export *read_tag_and_field(const struct fieldstat *insta
     int i = 0;
     while (cell_iter_next(iter)) {
         // next_num++;
-        if (cjson_map_add(&tag_field_pair[i], iter) == 0) {
+        if (json_obj_add(&tag_field_pair[i], iter) == 0) {
             continue;
         }
         i++;
@@ -722,7 +720,7 @@ void fieldstat_json_exporter_write_global_tags(const struct fieldstat_json_expor
     }
     
     for (int i = 0; i < arr_len; i++) {
-        tag_list_append_to_tag_object(exporter->global_tag_list, tag_field_pair_arr[i].cjson_tags);
+        field_list_write_to_json(exporter->global_tag_list, tag_field_pair_arr[i].tag_json_obj);
     }
 }
 
@@ -832,7 +830,7 @@ void fieldstat_json_exporter_export_array(const struct fieldstat_json_exporter *
 
         json_writer_start_map(root);
         json_writer_str_field(root, "name", tmp_name, strlen(tmp_name));
-        json_writer_object_item(root, "tags", current->cjson_tags);
+        json_writer_object_item(root, "tags", current->tag_json_obj);
         json_writer_object_item(root, "fields", field_json);
         if (exporter->history != NULL) {
             json_writer_object_item(root, "fields_delta", field_json_delta);
@@ -927,7 +925,7 @@ char *fieldstat_json_exporter_export_with_delta(const struct fieldstat_json_expo
 
         json_writer_start_map(root);
         json_writer_str_field(root, "name", tmp_name, strlen(tmp_name));
-        json_writer_object_item(root, "tags", current->cjson_tags);
+        json_writer_object_item(root, "tags", current->tag_json_obj);
         json_writer_object_item(root, "fields", field_json);
         json_writer_object_item(root, "fields_delta", field_json_delta);
         json_writer_longlong_field(root, "timestamp_ms", cal_ms_time(timestamp));
@@ -956,7 +954,7 @@ char *fieldstat_json_exporter_export_with_delta(const struct fieldstat_json_expo
         free(expair_delta[i].metric_pairs);
         char *dummy_s;
         size_t dummy_len;
-        json_writer_finish(expair_delta[i].cjson_tags, &dummy_s, &dummy_len); // the field json is not added to the root json, so we need to free it manually
+        json_writer_finish(expair_delta[i].tag_json_obj, &dummy_s, &dummy_len); // the field json is not added to the root json, so we need to free it manually
         free(dummy_s);
     }
     free(expair_delta);
@@ -1022,7 +1020,7 @@ void fieldstat_json_exporter_free(struct fieldstat_json_exporter *exporter)
         free(exporter->name);
     }
     if (exporter->global_tag_list != NULL) {
-        fieldstat_tag_list_arr_free(exporter->global_tag_list, 1);
+        fieldstat_field_list_arr_free(exporter->global_tag_list, 1);
     }
 
     if (exporter->history != NULL) {
@@ -1057,7 +1055,7 @@ void fieldstat_json_exporter_export_flat_array(const struct fieldstat_json_expor
     char **cjson_str_arr = (char **)malloc(sizeof(char *) * n_pair);
     for (int i = 0; i < n_pair; i++) {
         struct cellwise_rec_for_export *current = &tag_field_pair[i];
-        struct json_writer *root = current->cjson_tags;
+        struct json_writer *root = current->tag_json_obj;
         for (int j = 0; j < tag_field_pair[i].n_metric; j++) {
             kv_pair_write_to_json(tag_field_pair[i].metric_pairs[j], root);
         }

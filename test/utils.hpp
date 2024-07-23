@@ -3,15 +3,13 @@
 #include <unordered_map>
 #include "fieldstat.h"
 
-const struct field TEST_TAG_STRING = {"STRING KEY_", FIELD_VALUE_CSTRING, {.value_str = "100.1"}};
-const struct field_list TEST_TAG_LIST_STRING = {(struct field *)&TEST_TAG_STRING, 1};
-const struct field TEST_TAG_STRING_collided = {"collided", FIELD_VALUE_CSTRING, {.value_str = "2"}};
-const struct field TEST_TAG_INT = {"INT key_", FIELD_VALUE_INTEGER, {.value_longlong = 100}};
-const struct field_list TEST_TAG_LIST_INT = {(struct field *)&TEST_TAG_INT, 1};
-const struct field TEST_TAG_INT_collided = {"collided", FIELD_VALUE_INTEGER, {.value_longlong = 2}};
-const struct field TEST_TAG_DOUBLE = {"DOUBLE key_", FIELD_VALUE_DOUBLE, {.value_double = 100.1}};
-const struct field_list TEST_TAG_LIST_DOUBLE = {(struct field *)&TEST_TAG_DOUBLE, 1};
-const struct field TEST_FIELD_VALUE_DOUBLE_collided = {"collided", FIELD_VALUE_DOUBLE, {.value_double = 2.0}};
+const struct field TEST_FIELD_STRING = {"STRING KEY_", FIELD_VALUE_CSTRING, {.value_str = "100.1"}};
+const struct field_list TEST_FIELD_LIST_STRING = {(struct field *)&TEST_FIELD_STRING, 1};
+const struct field TEST_FIELD_INT = {"INT key_", FIELD_VALUE_INTEGER, {.value_longlong = 100}};
+const struct field_list TEST_FIELD_LIST_INT = {(struct field *)&TEST_FIELD_INT, 1};
+const struct field TEST_FIELD_INT_2 = {"collided", FIELD_VALUE_INTEGER, {.value_longlong = 2}};
+const struct field TEST_FIELD_DOUBLE = {"DOUBLE key_", FIELD_VALUE_DOUBLE, {.value_double = 100.1}};
+const struct field_list TEST_FIELD_LIST_DOUBLE = {(struct field *)&TEST_FIELD_DOUBLE, 1};
 const struct field TEST_SHARED_TAG = {"shared", FIELD_VALUE_INTEGER, {.value_longlong = 1}};
 const struct timeval TEST_TIMEVAL = {100, 10000};
 const long long TEST_TIMEVAL_LONG = 100010; // 100s * 1000 + 10000us / 1000 = 100010ms
