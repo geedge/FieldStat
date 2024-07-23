@@ -104,6 +104,32 @@ TEST(test_register, reset_and_try_to_query_cell_comprehensive)
     fieldstat_free(instance);
 }
 
+TEST(test_register, reset_and_try_to_query_metric)
+{
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = test_fieldstat_cube_create(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    int metric_counter = fieldstat_register_counter(instance, cube_id, "counter");
+    int metric_hll = fieldstat_register_hll(instance, cube_id, "hll", 5);
+    int metric_hist = fieldstat_register_histogram(instance, cube_id, "hist", 0, 10000, 5);
+    int metric_operated_after_reset = fieldstat_register_counter(instance, cube_id, "counter_after_reset");
+
+    fieldstat_counter_incrby(instance, cube_id, metric_counter, &TEST_FIELD_INT, 1, 1);
+    fieldstat_hll_add(instance, cube_id, metric_counter, &TEST_FIELD_INT, 1, "1", 1);
+    fieldstat_histogram_record(instance, cube_id, metric_hist, &TEST_FIELD_INT, 1, 1000);
+
+    fieldstat_reset(instance);
+    fieldstat_counter_incrby(instance, cube_id, metric_operated_after_reset, &TEST_FIELD_INT, 1, 1);
+
+    long long value;
+    double value_hll;
+    EXPECT_EQ(fieldstat_counter_get(instance, cube_id, &TEST_FIELD_LIST_INT, metric_counter, &value), FS_ERR_INVALID_METRIC_ID);
+    EXPECT_EQ(fieldstat_hll_get(instance, cube_id, &TEST_FIELD_LIST_INT, metric_hll, &value_hll), FS_ERR_INVALID_METRIC_ID);
+    EXPECT_EQ(fieldstat_histogram_value_at_percentile(instance, cube_id, &TEST_FIELD_LIST_INT, metric_hist, 0.5), FS_ERR_INVALID_METRIC_ID);
+    EXPECT_EQ(fieldstat_counter_get(instance, cube_id, &TEST_FIELD_LIST_INT, metric_operated_after_reset, &value), FS_OK);
+
+    fieldstat_free(instance);
+}
+
 TEST(test_register, reset_and_try_to_query_cell_topk)
 {
     struct fieldstat *instance = fieldstat_new();

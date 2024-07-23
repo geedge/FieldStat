@@ -13,6 +13,7 @@ struct metric *metric_copy(const struct metric *src);
 struct metric *metric_new(const struct metric_manifest *manifest);
 int metric_merge(struct metric *dest, const struct metric *src);
 void metric_serialize(const struct metric *pthis, char **blob, size_t *blob_size);
+bool metric_check_if_cleared(const struct metric *pthis);
 
 void metric_counter_incrby(struct metric *pthis, long long value);
 void metric_counter_set(struct metric *pthis, long long value);

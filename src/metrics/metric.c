@@ -45,6 +45,7 @@ struct metric_data {
 struct metric {
     enum metric_type type;
     struct metric_data *data;
+    bool operated_after_reset;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -278,18 +279,23 @@ void metric_free(struct metric *pthis)
 
 void metric_reset(struct metric *pthis) {
     g_metric_scheme_table[pthis->type].reset(pthis->data);
+    pthis->operated_after_reset = false;
 }
 
 struct metric *metric_copy(const struct metric *src) {
     struct metric *dest = (struct metric *)malloc(sizeof(struct metric));
     dest->type = src->type;
     dest->data = g_metric_scheme_table[dest->type].copy(src->data);
+    dest->operated_after_reset = src->operated_after_reset;
 
     return dest;
 }
 
 //return -1 when merge error. 0 when success. 1 when src has no cell.
 int metric_merge(struct metric *dest, const struct metric *src) {
+    if (src->operated_after_reset) {
+        dest->operated_after_reset = true;
+    }
     return g_metric_scheme_table[dest->type].merge(dest->data, src->data);
 }
 
@@ -307,6 +313,10 @@ void metric_serialize(const struct metric *pthis, char **blob, size_t *blob_size
     g_metric_scheme_table[type].serialize(data, blob, blob_size);
 }
 
+bool metric_check_if_cleared(const struct metric *pthis) {
+    return !pthis->operated_after_reset;
+}
+
 /* -------------------------------------------------------------------------- */
 /*                          specific metric operations                                */ 
 /* -------------------------------------------------------------------------- */
@@ -314,11 +324,15 @@ void metric_serialize(const struct metric *pthis, char **blob, size_t *blob_size
 void metric_counter_incrby(struct metric *pthis, long long value) {
     struct metric_counter_or_gauge *counter = pthis->data->counter;
     counter->value += value;
+
+    pthis->operated_after_reset = true;
 }
 
 void metric_counter_set(struct metric *pthis, long long value) {
     struct metric_counter_or_gauge *counter = pthis->data->counter;
     counter->value = value;
+
+    pthis->operated_after_reset = true;
 }
 
 long long metric_counter_get(const struct metric *pthis) {
@@ -327,10 +341,14 @@ long long metric_counter_get(const struct metric *pthis) {
 
 void metric_hll_add(struct metric *pthis, const char *key, size_t key_len) {
     hyperloglog_add(pthis->data->hll, key, key_len);
+
+    pthis->operated_after_reset = true;
 }
 
 void metric_hll_add_hash(struct metric *pthis, unsigned long long hash) {
     hyperloglog_add_hash(pthis->data->hll, hash);
+
+    pthis->operated_after_reset = true;
 }
 
 double metric_hll_get(const struct metric *pthis) {
@@ -345,6 +363,8 @@ int metric_histogram_record(struct metric *pthis, long long value) {
     if (!ret) {
         return -1;
     }
+
+    pthis->operated_after_reset = true;
     return 0;
 }
 

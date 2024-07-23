@@ -1289,22 +1289,28 @@ const struct cell *get_cell_by_dimension(const struct cube *cube, const struct f
     return ret;
 }
 
-const struct metric *cube_find_metric_in_cell(const struct cube *cube, const struct field_list *fields, int metric_id,int *ret)
+const struct metric *cube_find_uncleared_metric_in_cell(const struct cube *cube, const struct field_list *fields, int metric_id,int *ret_code)
 {
     const struct cell *data = get_cell_by_dimension(cube, fields);
     
     if (data == NULL) {
-        *ret = FS_ERR_INVALID_DIMENSION;
+        *ret_code = FS_ERR_INVALID_DIMENSION;
         return NULL;
     }
 
     if (metric_id < 0 || metric_id >= data->next_index) {
-        *ret = FS_ERR_INVALID_METRIC_ID;
+        *ret_code = FS_ERR_INVALID_METRIC_ID;
         return NULL;
     }
-    *ret = FS_OK;
+    *ret_code = FS_OK;
 
-    return data->slots[metric_id];
+    const struct metric *ret_metric = data->slots[metric_id];
+    if (ret_metric == NULL || metric_check_if_cleared(ret_metric)) {
+        *ret_code = FS_ERR_INVALID_METRIC_ID;
+        return NULL;
+    }
+
+    return ret_metric;
 }
 
 int cube_counter_get(const struct cube *cube, int metric_id, const struct field_list *fields, long long *value)
@@ -1324,7 +1330,7 @@ int cube_counter_get(const struct cube *cube, int metric_id, const struct field_
     }
 
     int ret;
-    const struct metric *metric = cube_find_metric_in_cell(cube, fields, metric_id, &ret);
+    const struct metric *metric = cube_find_uncleared_metric_in_cell(cube, fields, metric_id, &ret);
     if (ret != FS_OK) {
         return ret;
     }
@@ -1354,7 +1360,7 @@ int cube_hll_get(const struct cube *cube, int metric_id, const struct field_list
     }
 
     int ret;
-    const struct metric *metric = cube_find_metric_in_cell(cube, fields, metric_id, &ret);
+    const struct metric *metric = cube_find_uncleared_metric_in_cell(cube, fields, metric_id, &ret);
     if (ret != FS_OK) {
         return ret;
     }
@@ -1369,7 +1375,7 @@ int cube_hll_get(const struct cube *cube, int metric_id, const struct field_list
 int cube_histogram_value_at_percentile(const struct cube *cube, int metric_id, const struct field_list *fields, double percentile, long long *value)
 {
     int ret;
-    const struct metric *metric = cube_find_metric_in_cell(cube, fields, metric_id, &ret);
+    const struct metric *metric = cube_find_uncleared_metric_in_cell(cube, fields, metric_id, &ret);
     if (ret != FS_OK) {
         return ret;
     }
@@ -1383,7 +1389,7 @@ int cube_histogram_value_at_percentile(const struct cube *cube, int metric_id, c
 
 int cube_histogram_count_le_value(const struct cube *cube, int metric_id, const struct field_list *fields, long long value, long long *count) {
     int ret;
-    const struct metric *metric = cube_find_metric_in_cell(cube, fields, metric_id, &ret);
+    const struct metric *metric = cube_find_uncleared_metric_in_cell(cube, fields, metric_id, &ret);
     if (ret != FS_OK) {
         return ret;
     }
@@ -1407,7 +1413,7 @@ int cube_get_serialization_as_base64(const struct cube *cube, int metric_id, con
     }
 
     int ret;
-    const struct metric *metric = cube_find_metric_in_cell(cube, fields, metric_id, &ret);
+    const struct metric *metric = cube_find_uncleared_metric_in_cell(cube, fields, metric_id, &ret);
     if (ret != FS_OK) {
         return ret;
     }
@@ -1449,7 +1455,7 @@ void cube_get_metrics_in_cell(const struct cube *cube, const struct field_list *
     }
 
     for (int i = 0; i < cell_data->next_index; i++) {
-        if (cell_data->slots[i] != NULL) {
+        if (cell_data->slots[i] != NULL && !metric_check_if_cleared(cell_data->slots[i])) {
             (*metric_id_out)[n_metric] = i;
             n_metric++;
         }
