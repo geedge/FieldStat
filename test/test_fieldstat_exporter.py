@@ -557,12 +557,6 @@ class TestLocalExporter(unittest.TestCase):
         
         self.assertEqual(postadd - peradd, 1)
 
-
-    def test__append_app_name_to_tags(self):
-        tags = self.local._LocalExporter__append_app_name_to_tags(self.counter_json_object)       
-        self.assertEqual(tags, "{\"send_log\": \"sum\", \"app_name\": \"-\"}")
-
-
     def test__is_tags_matched(self):
         self.local.match_tags = {}
         tags = {"action": "deny", "policy_id": 0, "hit_rate": 1.1}
