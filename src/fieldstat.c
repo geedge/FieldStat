@@ -79,7 +79,7 @@ int fieldstat_cube_set_sampling(struct fieldstat *instance, int cube_id, enum sa
         return FS_ERR_INVALID_CUBE_ID;
     }
     
-    return cube_set_sampling_mode(cube, mode, max_n_cell, primary_metric_id);
+    return cube_set_sampling(cube, mode, max_n_cell, primary_metric_id);
 }
 
 int fieldstat_cube_create(struct fieldstat *instance, const struct field *cube_dimensions, size_t n_dimension)

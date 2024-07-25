@@ -152,7 +152,7 @@ static void field_array_to_key(const struct field fields[], size_t n_fields, cha
 {
     if (n_fields == 0) {
         // use a default dummy key
-        *out_key = strdup("no fields");
+        *out_key = strdup("\a\tN");
         *out_key_size = strlen(*out_key);
         return;
     }
@@ -161,8 +161,8 @@ static void field_array_to_key(const struct field fields[], size_t n_fields, cha
 	struct field *field = NULL;
 
     size_t alloced_every_time = 1024;
-    size_t remain_key_size = 4096 + 1024;
-    size_t total_key_size = 4096 + 1024;
+    size_t remain_key_size = 1024;
+    size_t total_key_size = 1024;
     char *dynamic_mem = (char *)malloc(total_key_size);
     void *val_position = NULL;
 
@@ -313,7 +313,6 @@ void cube_manager_calibrate(struct cube_manager *pthis, const struct cube_manage
             cube_manager_add(pthis, cube_fork(node_in_master));
         }
     }
-
 }
 
 struct cube_manager *cube_manager_fork(const struct cube_manager *src)
@@ -512,7 +511,7 @@ struct cube *cube_new(const struct field *dimensions, size_t n_dimensions)
     return cube;
 }
 
-int cube_set_sampling_mode(struct cube *cube, enum sampling_mode mode, int max_n_cell, int primary_metric_id) {
+int cube_set_sampling(struct cube *cube, enum sampling_mode mode, int max_n_cell, int primary_metric_id) {
     if (cube->sampling_mode == mode && cube->max_n_cell == max_n_cell && cube->primary_metric_id == primary_metric_id) {
         return FS_OK;
     }
@@ -606,11 +605,6 @@ void cube_free(struct cube *cube) {
 }
 
 void cube_reset(struct cube *cube) {
-    // if (cube->sampling_mode == SAMPLING_MODE_TOPK) {
-    //     heavy_keeper_reset(cube->topk);
-    // } else {
-    //     hash_table_reset(cube->comprehensive);
-    // }
     switch (cube->sampling_mode)
     {
     case SAMPLING_MODE_TOPK:
@@ -628,84 +622,52 @@ void cube_reset(struct cube *cube) {
     }
 }
 
-struct cell *get_cell_in_comprehensive_cube(struct cube *cube, const struct field *dimensions, size_t n_dimension) {
-    char *key;
-    size_t key_len;
-    field_array_to_key(dimensions, n_dimension, &key, &key_len);
+struct cell *get_cell_in_cube_generic(struct cube *cube, const struct field *dimensions, size_t n_dimensions) {
+    char *compound_dimension;
+    size_t compound_dimension_len;
+    field_array_to_key(dimensions, n_dimensions, &compound_dimension, &compound_dimension_len);
 
     struct exdata_new_args args;
     args.cell_dimensions = dimensions;
-    args.n_dimensions = n_dimension;
+    args.n_dimensions = n_dimensions;
 
     struct cell *cell_data = NULL;
-    assert(cube->sampling_mode == SAMPLING_MODE_COMPREHENSIVE);
-    
-    cell_data = hash_table_get0_exdata(cube->table, key, key_len);
-    if (cell_data == NULL) {
-        int tmp_ret = hash_table_add(cube->table, key, key_len, (void *)&args);
-        if (tmp_ret == 1) {
-            cell_data = hash_table_get0_exdata(cube->table, key, key_len);
-        }
-    }
-
-    free(key);
-    return cell_data;
-}
-
-struct cell *get_cell_in_topk_cube(struct cube *cube, const struct field *dimensions, size_t n_dimension, long long increment, int metric_id) {
-    char *key;
-    size_t key_len;
-    field_array_to_key(dimensions, n_dimension, &key, &key_len);
-
-    struct exdata_new_args args;
-    args.cell_dimensions = dimensions;
-    args.n_dimensions = n_dimension;
-
-    struct cell *cell_data = NULL;
-    assert(cube->sampling_mode == SAMPLING_MODE_TOPK);
-    if (cube->primary_metric_id != metric_id) {
-        cell_data = heavy_keeper_get0_exdata(cube->heavykeeper, key, key_len);
+    int tmp_ret;
+    switch (cube->sampling_mode)
+    {
+    case SAMPLING_MODE_COMPREHENSIVE: {
+        cell_data = hash_table_get0_exdata(cube->table, compound_dimension, compound_dimension_len);
         if (cell_data == NULL) {
-            int tmp_ret = heavy_keeper_add(cube->heavykeeper, key, key_len, 0, (void *)&args);
+            tmp_ret = hash_table_add(cube->table, compound_dimension, compound_dimension_len, (void *)&args);
             if (tmp_ret == 1) {
-                cell_data = heavy_keeper_get0_exdata(cube->heavykeeper, key, key_len);
+                cell_data = hash_table_get0_exdata(cube->table, compound_dimension, compound_dimension_len);
             }
         }
-    } else {
-        // heavy_keeper_add should be called anyway, to let the topk record update.
-        int tmp_ret = heavy_keeper_add(cube->heavykeeper, key, key_len, increment, (void *)&args);
-        if (tmp_ret == 1) {
-            cell_data = heavy_keeper_get0_exdata(cube->heavykeeper, key, key_len);
-        }
-    }
-
-    free(key);
-    return cell_data;
-}
-
-struct cell *get_cell_in_spread_sketch_cube(struct cube *cube, const struct field *dimensions, size_t n_dimension, uint64_t item_hash, int metric_id) {
-    char *key;
-    size_t key_len;
-    field_array_to_key(dimensions, n_dimension, &key, &key_len);
-
-    struct exdata_new_args args;
-    args.cell_dimensions = dimensions;
-    args.n_dimensions = n_dimension;
-
-    struct cell *cell_data = NULL;
-    assert(cube->sampling_mode == SAMPLING_MODE_TOP_CARDINALITY);
-    
-    if (cube->primary_metric_id != metric_id) {
-        cell_data = spread_sketch_get0_exdata(cube->spread_sketch, key, key_len);
+        break;}
+    case SAMPLING_MODE_TOPK: {
+        cell_data = heavy_keeper_get0_exdata(cube->heavykeeper, compound_dimension, compound_dimension_len);
         if (cell_data == NULL) {
-            int tmp_ret = spread_sketch_add_hash(cube->spread_sketch,  key, key_len, DUMMY_ITEM_HASH, (void *)&args, DUMMY_TIME_VAL);
+            tmp_ret = heavy_keeper_add(cube->heavykeeper, compound_dimension, compound_dimension_len, 0, (void *)&args);
             if (tmp_ret == 1) {
-                cell_data = spread_sketch_get0_exdata(cube->spread_sketch,  key, key_len);
+                cell_data = heavy_keeper_get0_exdata(cube->heavykeeper, compound_dimension, compound_dimension_len);
             }
         }
+        break;}
+    case SAMPLING_MODE_TOP_CARDINALITY: {
+        cell_data = spread_sketch_get0_exdata(cube->spread_sketch, compound_dimension, compound_dimension_len);
+        if (cell_data == NULL) {
+            tmp_ret = spread_sketch_add_hash(cube->spread_sketch,  compound_dimension, compound_dimension_len, DUMMY_ITEM_HASH, (void *)&args, DUMMY_TIME_VAL);
+            if (tmp_ret == 1) {
+                cell_data = spread_sketch_get0_exdata(cube->spread_sketch,  compound_dimension, compound_dimension_len);
+            }
+        }
+        break;}
+    default:
+        assert(0);
+        break;
     }
 
-    free(key);
+    free(compound_dimension);
     return cell_data;
 }
 
@@ -813,21 +775,7 @@ int cube_histogram_record(struct cube *cube, int metric_id, const struct field *
         return FS_ERR_INVALID_METRIC_ID;
     }
 
-    struct cell *cell_data = NULL;
-    switch (cube->sampling_mode)  {
-    case SAMPLING_MODE_COMPREHENSIVE: {
-        cell_data = get_cell_in_comprehensive_cube(cube, dimensions, n_dimensions);
-        break;}
-    case SAMPLING_MODE_TOPK: {
-        cell_data = get_cell_in_topk_cube(cube, dimensions, n_dimensions, 0, metric_id);
-        break;}
-    case SAMPLING_MODE_TOP_CARDINALITY: {
-        cell_data = get_cell_in_spread_sketch_cube(cube, dimensions, n_dimensions, 0, metric_id);
-        break;}
-    default:
-        assert(0);
-        break;
-    }
+    struct cell *cell_data = get_cell_in_cube_generic(cube, dimensions, n_dimensions);
     if (cell_data == NULL) {
         return FS_ERR_TOO_MANY_CELLS;
     }
@@ -854,34 +802,20 @@ int cube_hll_add(struct cube *cube, int metric_id, const struct field *dimension
     }
 
     if (cube->sampling_mode == SAMPLING_MODE_TOP_CARDINALITY && cube->primary_metric_id == metric_id) {
-        char *dimension_as_string;
-        size_t dimension_string_len;
-        field_array_to_key(dimensions, n_dimensions, &dimension_as_string, &dimension_string_len);
+        char *compound_dimension;
+        size_t compound_dimension_len;
+        field_array_to_key(dimensions, n_dimensions, &compound_dimension, &compound_dimension_len);
 
         struct exdata_new_args args;
         args.cell_dimensions = dimensions;
         args.n_dimensions = n_dimensions;
 
-        int tmp_ret = spread_sketch_add(cube->spread_sketch,  dimension_as_string, dimension_string_len, key, key_len, (void *)&args, DUMMY_TIME_VAL);
-        free(dimension_as_string);
+        int tmp_ret = spread_sketch_add(cube->spread_sketch,  compound_dimension, compound_dimension_len, key, key_len, (void *)&args, DUMMY_TIME_VAL);
+        free(compound_dimension);
         return tmp_ret == 1 ? FS_OK : FS_ERR_TOO_MANY_CELLS;
     }
 
-    struct cell *cell_data = NULL;
-    switch (cube->sampling_mode) {
-    case SAMPLING_MODE_COMPREHENSIVE: {
-        cell_data = get_cell_in_comprehensive_cube(cube, dimensions, n_dimensions);
-        break;}
-    case SAMPLING_MODE_TOPK: {
-        cell_data = get_cell_in_topk_cube(cube, dimensions, n_dimensions, 0, metric_id);
-        break;}
-    case SAMPLING_MODE_TOP_CARDINALITY: {
-        cell_data = get_cell_in_spread_sketch_cube(cube, dimensions, n_dimensions, 0, metric_id);
-        break;}
-    default:
-        assert(0);
-        break;
-    }        
+    struct cell *cell_data = get_cell_in_cube_generic(cube, dimensions, n_dimensions);
     if (cell_data == NULL) {
         return FS_ERR_TOO_MANY_CELLS;
     }
@@ -918,45 +852,29 @@ int cube_hll_add_field(struct cube *cube, int metric_id, const struct field *dim
         return FS_ERR_INVALID_METRIC_ID;
     }
 
-    uint64_t hash = 0; // just any value, if we do not need to update the primary metric of spread sketch cube, hash value is not used
     if (cube->sampling_mode == SAMPLING_MODE_TOP_CARDINALITY && cube->primary_metric_id == metric_id) {
-        char *key;
-        size_t key_len;
-        field_array_to_key(dimensions, n_dimensions, &key, &key_len);
+        char *compound_dimension;
+        size_t compound_dimension_len;
+        field_array_to_key(dimensions, n_dimensions, &compound_dimension, &compound_dimension_len);
 
         struct exdata_new_args args;
         args.cell_dimensions = dimensions;
         args.n_dimensions = n_dimensions;
-        hash = field_array_to_hash(item_fields, n_item);
 
-        int tmp_ret = spread_sketch_add_hash(cube->spread_sketch, key, key_len, hash, (void *)&args, DUMMY_TIME_VAL);
-        free(key);
+        uint64_t hash = field_array_to_hash(item_fields, n_item);
+
+        int tmp_ret = spread_sketch_add_hash(cube->spread_sketch, compound_dimension, compound_dimension_len, hash, (void *)&args, DUMMY_TIME_VAL);
+        free(compound_dimension);
         return tmp_ret == 1 ? FS_OK : FS_ERR_TOO_MANY_CELLS;
     }
 
-    struct cell *cell_data = NULL;
-    switch (cube->sampling_mode) {
-    case SAMPLING_MODE_COMPREHENSIVE: {
-        cell_data = get_cell_in_comprehensive_cube(cube, dimensions, n_dimensions);
-        break;}
-    case SAMPLING_MODE_TOPK: {
-        cell_data = get_cell_in_topk_cube(cube, dimensions, n_dimensions, 0, metric_id);
-        break;}
-    case SAMPLING_MODE_TOP_CARDINALITY: {
-        cell_data = get_cell_in_spread_sketch_cube(cube, dimensions, n_dimensions, hash, metric_id);
-        break;}
-    default:
-        assert(0);
-        break;
-    }
+    struct cell *cell_data = get_cell_in_cube_generic(cube, dimensions, n_dimensions);
     if (cell_data == NULL) {
         return FS_ERR_TOO_MANY_CELLS;
     }
     struct metric *metric = add_or_find_metric_in_cell(manifest, cell_data);
     
-    if (hash == 0) { // hash is not calculated yet.
-        hash = field_array_to_hash(item_fields, n_item);
-    }
+    uint64_t hash = field_array_to_hash(item_fields, n_item);
     metric_hll_add_hash(metric, hash);
     return FS_OK;
 }
@@ -983,35 +901,20 @@ int cube_counter_incrby(struct cube *cube, int metric_id, const struct field *di
             return FS_ERR_INVALID_PARAM;
         }
 
-        char *key;
-        size_t key_len;
-        field_array_to_key(dimensions, n_dimensions, &key, &key_len);
+        char *compound_dimension;
+        size_t compound_dimension_len;
+        field_array_to_key(dimensions, n_dimensions, &compound_dimension, &compound_dimension_len);
 
         struct exdata_new_args args;
         args.cell_dimensions = dimensions;
         args.n_dimensions = n_dimensions;
 
-        int tmp_ret = heavy_keeper_add(cube->heavykeeper, key, key_len, increment, (void *)&args);
-        free(key);
+        int tmp_ret = heavy_keeper_add(cube->heavykeeper, compound_dimension, compound_dimension_len, increment, (void *)&args);
+        free(compound_dimension);
         return tmp_ret == 1 ? FS_OK : FS_ERR_TOO_MANY_CELLS;
     }
     
-    struct cell *cell_data = NULL;
-    switch (cube->sampling_mode)  {
-    case SAMPLING_MODE_COMPREHENSIVE: {
-        cell_data = get_cell_in_comprehensive_cube(cube, dimensions, n_dimensions);
-        break;}
-    case SAMPLING_MODE_TOPK: {
-        cell_data = get_cell_in_topk_cube(cube, dimensions, n_dimensions, increment, metric_id);
-        break;}
-    case SAMPLING_MODE_TOP_CARDINALITY: {
-        cell_data = get_cell_in_spread_sketch_cube(cube, dimensions, n_dimensions, 0, metric_id);
-        break;}
-    default:
-        assert(0);
-        break;
-    }
-    
+    struct cell *cell_data = get_cell_in_cube_generic(cube, dimensions, n_dimensions);
     if (cell_data == NULL) {
         return FS_ERR_TOO_MANY_CELLS;
     }
@@ -1035,21 +938,7 @@ int cube_counter_set(struct cube *cube, int metric_id, const struct field *dimen
         return FS_ERR_INVALID_METRIC_ID;
     }
 
-    struct cell *cell_data = NULL;
-    switch (cube->sampling_mode)  {
-    case SAMPLING_MODE_COMPREHENSIVE: {
-        cell_data = get_cell_in_comprehensive_cube(cube, dimensions, n_dimensions);
-        break;}
-    case SAMPLING_MODE_TOPK: {
-        cell_data = get_cell_in_topk_cube(cube, dimensions, n_dimensions, 0, metric_id);
-        break;}
-    case SAMPLING_MODE_TOP_CARDINALITY: {
-        cell_data = get_cell_in_spread_sketch_cube(cube, dimensions, n_dimensions, 0, metric_id);
-        break;}
-    default:
-        assert(0);
-        break;
-    }
+    struct cell *cell_data = get_cell_in_cube_generic(cube, dimensions, n_dimensions);
     if (cell_data == NULL) {
         return FS_ERR_TOO_MANY_CELLS;
     }
@@ -1180,21 +1069,7 @@ static int compare_tmp_sorted_data_spread_sketch_cell(const void *a, const void 
 }
 void cube_get_cells(const struct cube *cube, struct field_list **cell_dimensions, size_t *n_cell)
 {
-    size_t n_cell_tmp = 0;
-    switch (cube->sampling_mode) {
-        case SAMPLING_MODE_COMPREHENSIVE:
-            n_cell_tmp = hash_table_get_count(cube->table);
-            break;
-        case SAMPLING_MODE_TOPK:
-            n_cell_tmp = heavy_keeper_get_count(cube->heavykeeper);
-            break;
-        case SAMPLING_MODE_TOP_CARDINALITY:
-            n_cell_tmp = spread_sketch_get_count(cube->spread_sketch);
-            break;
-        default:
-            assert(0);
-    }
-
+    size_t n_cell_tmp = cube_get_cell_count(cube);
     if (n_cell_tmp == 0) {
         *cell_dimensions = NULL;
         *n_cell = 0;
@@ -1203,8 +1078,6 @@ void cube_get_cells(const struct cube *cube, struct field_list **cell_dimensions
 
     char **spread_sketch_keys = NULL;
     size_t *spread_sketch_keys_lens = NULL;
-    long long *heavy_keeper_counts = NULL;
-
     struct cell **cell_datas = (struct cell **)malloc(sizeof(struct cell *) * n_cell_tmp);
     switch (cube->sampling_mode) {
         case SAMPLING_MODE_COMPREHENSIVE:
@@ -1257,12 +1130,11 @@ void cube_get_cells(const struct cube *cube, struct field_list **cell_dimensions
     }
 
     free(cell_datas);
-    free(heavy_keeper_counts);
     free(spread_sketch_keys);
     free(spread_sketch_keys_lens);
 }
 
-const struct cell *get_cell_by_dimension(const struct cube *cube, const struct field_list *fields)
+const struct cell *cube_find_cell_by_dimension(const struct cube *cube, const struct field_list *fields)
 {
     const struct cell *ret = NULL;
     char *compound_dimension;
@@ -1291,7 +1163,7 @@ const struct cell *get_cell_by_dimension(const struct cube *cube, const struct f
 
 const struct metric *cube_find_uncleared_metric_in_cell(const struct cube *cube, const struct field_list *fields, int metric_id,int *ret_code)
 {
-    const struct cell *data = get_cell_by_dimension(cube, fields);
+    const struct cell *data = cube_find_cell_by_dimension(cube, fields);
     
     if (data == NULL) {
         *ret_code = FS_ERR_INVALID_DIMENSION;
@@ -1306,6 +1178,7 @@ const struct metric *cube_find_uncleared_metric_in_cell(const struct cube *cube,
 
     const struct metric *ret_metric = data->slots[metric_id];
     if (ret_metric == NULL || metric_check_if_cleared(ret_metric)) {
+        printf("metric is: %p, name: %s\n", ret_metric, metric_manifest_manager_get_by_id(cube->manifest_manager, metric_id)->name);
         *ret_code = FS_ERR_INVALID_METRIC_ID;
         return NULL;
     }
@@ -1409,6 +1282,7 @@ int cube_get_serialization_as_base64(const struct cube *cube, int metric_id, con
 
         *blob = spread_sketch_get_hll_base64_serialization(cube->spread_sketch, dimension_in_string, dimension_string_len);
         *blob_size = strlen(*blob);
+        free(dimension_in_string);
         return FS_OK;
     }
 
@@ -1440,7 +1314,7 @@ int cube_get_cell_count(const struct cube *cube) {
 }
 
 void cube_get_metrics_in_cell(const struct cube *cube, const struct field_list *fields, int **metric_id_out, size_t *n_metric_out) {
-    const struct cell *cell_data = get_cell_by_dimension(cube, fields);
+    const struct cell *cell_data = cube_find_cell_by_dimension(cube, fields);
     if (cell_data == NULL) {
         *metric_id_out = NULL;
         *n_metric_out = 0;
