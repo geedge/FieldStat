@@ -981,7 +981,12 @@ int cube_merge(struct cube *dest, const struct cube *src)
     if (dest->sampling_mode != src->sampling_mode) {
         return FS_ERR_DIFFERENT_CONFIGURATION_FOR_SAME_CUBE;
     }
-
+    if (dest->primary_metric_id == -1 || src->primary_metric_id == -1) {
+        return FS_ERR_CUBE_SAMPLING_NOT_INITIALIZED;
+    }
+    if (dest->primary_metric_id != src->primary_metric_id) {
+        return FS_ERR_DIFFERENT_CONFIGURATION_FOR_SAME_CUBE;
+    }
     size_t n_metric_src = 0;
     const struct metric_manifest **list_src = metric_manifest_manager_list(src->manifest_manager, &n_metric_src);
     size_t n_metric_dst = 0;
@@ -995,6 +1000,7 @@ int cube_merge(struct cube *dest, const struct cube *src)
             return FS_ERR_DIFFERENT_CONFIGURATION_FOR_SAME_CUBE;
         }
     }
+    
     for (int i = n_metric_dst; i < n_metric_src; i++) {
         metric_manifest_manager_add(dest->manifest_manager, metric_manifest_copy(list_src[i]));
     }
@@ -1178,7 +1184,6 @@ const struct metric *cube_find_uncleared_metric_in_cell(const struct cube *cube,
 
     const struct metric *ret_metric = data->slots[metric_id];
     if (ret_metric == NULL || metric_check_if_cleared(ret_metric)) {
-        printf("metric is: %p, name: %s\n", ret_metric, metric_manifest_manager_get_by_id(cube->manifest_manager, metric_id)->name);
         *ret_code = FS_ERR_INVALID_METRIC_ID;
         return NULL;
     }

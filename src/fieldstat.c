@@ -319,11 +319,12 @@ void fieldstat_field_list_arr_free(struct field_list *field_lists, size_t n_fiel
     free(field_lists);
 }
 
+//uninitialized
+
 const char *fieldstat_get_metric_name(const struct fieldstat *instance, int cube_id, int metric_id)
 {
     const struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
     if (cube == NULL) {
-        printf("cube is NULL\n");
         return NULL;
     }
     return cube_get_metric_name(cube, metric_id);
