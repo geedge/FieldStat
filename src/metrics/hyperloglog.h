@@ -30,30 +30,30 @@ extern "C"
 
 #define REGISTER_SIZE(precision) INT_WIDTH*INT_CEIL(NUM_REG(precision), REG_PER_WORD)
 
-struct ST_HLL_configuration
+struct HLL_configuration
 {
     unsigned char precision;
 };
-struct ST_hyperloglog
+struct hyperloglog
 {
-    struct ST_HLL_configuration cfg;
+    struct HLL_configuration cfg;
     uint32_t *registers;
 };
 
-struct ST_hyperloglog *ST_hyperloglog_new(unsigned char precision);
-void ST_hyperloglog_free(struct ST_hyperloglog *h);
+struct hyperloglog *hyperloglog_new(unsigned char precision);
+void hyperloglog_free(struct hyperloglog *h);
 //Return 1 if at least 1 ST HyperLogLog internal register was altered. 0 otherwise.
-int ST_hyperloglog_add(struct ST_hyperloglog *h, const char *key, size_t keylen);
-void ST_hyperloglog_reset(struct ST_hyperloglog *h);
-double ST_hyperloglog_count(const struct ST_hyperloglog *h);
-size_t ST_hyperloglog_serialized_size(const struct ST_hyperloglog *h);
-void ST_hyperloglog_serialize(const struct ST_hyperloglog *h, char **blob, size_t *blob_sz);
-void ST_hyperloglog_serialize_for_networking(const struct ST_hyperloglog *h, char **blob, size_t *blob_sz);
-struct ST_hyperloglog *ST_hyperloglog_deserialize(const char *blob, size_t blob_sz);
-int ST_hyperloglog_merge(struct ST_hyperloglog *dst, const struct ST_hyperloglog *src);
-void ST_hyperloglog_merge_blob(struct ST_hyperloglog *dst, const char *blob, size_t blob_sz);
-double ST_hyperloglog_error_for_precision(unsigned char precision);
-void ST_hyperloglog_configure(struct ST_hyperloglog *h, unsigned char precision, int time_window_seconds, const struct timeval now);
+int hyperloglog_add(struct hyperloglog *h, const char *key, size_t keylen);
+int hyperloglog_add_hash(struct hyperloglog *h, uint64_t hash);
+void hyperloglog_reset(struct hyperloglog *h);
+double hyperloglog_count(const struct hyperloglog *h);
+size_t hyperloglog_serialized_size(const struct hyperloglog *h);
+void hyperloglog_serialize(const struct hyperloglog *h, char **blob, size_t *blob_sz);
+void hyperloglog_serialize_into_base64(const struct hyperloglog *h, char **blob, size_t *blob_sz);
+struct hyperloglog *hyperloglog_deserialize(const char *blob, size_t blob_sz);
+int hyperloglog_merge(struct hyperloglog *dest, const struct hyperloglog *src);
+void hyperloglog_merge_blob(struct hyperloglog *dest, const char *blob, size_t blob_sz);
+double hyperloglog_error_for_precision(unsigned char precision);
 #ifdef __cplusplus
 }
 #endif

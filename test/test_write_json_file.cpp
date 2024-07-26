@@ -22,23 +22,23 @@ extern "C" {
     extern char *fs_easy_output_to_json(struct fieldstat_easy *fs, const struct timeval *timestamp, const struct timeval *timestamp_delta);
 }
 
-static struct fieldstat_easy *get_hist_fieldstat_easy()
+[[gnu::unused]] static struct fieldstat_easy *get_hist_fieldstat_easy()
 {
-    struct fieldstat_tag global_tags[2];
-    struct fieldstat_tag cell_tags[2];
+    struct field global_tags[2];
+    struct field cell_tags[2];
 
     global_tags[0].key  = "rule_id";
-    global_tags[0].type = TAG_INTEGER;
+    global_tags[0].type = FIELD_VALUE_INTEGER;
     global_tags[0].value_longlong = 1;
     global_tags[1].key  = "action";
-    global_tags[1].type = TAG_CSTRING;
+    global_tags[1].type = FIELD_VALUE_CSTRING;
     global_tags[1].value_str = "deny";
 
     cell_tags[0].key  = "thread_id";
-    cell_tags[0].type = TAG_INTEGER;
+    cell_tags[0].type = FIELD_VALUE_INTEGER;
     cell_tags[0].value_longlong = 1;
     cell_tags[1].key  = "hit_rate";
-    cell_tags[1].type = TAG_DOUBLE;
+    cell_tags[1].type = FIELD_VALUE_DOUBLE;
     cell_tags[1].value_double = 1.1;
 
     const char *hist_names[] = {"list_num", "max_wt_ms", "ivt_nx_itv_ms", 
@@ -58,24 +58,28 @@ static struct fieldstat_easy *get_hist_fieldstat_easy()
     return fse;
 }
 
-static struct fieldstat *get_hll_fieldsstat()
+int test_fieldstat_cube_create(struct fieldstat *instance, const struct field *dimensions, size_t n_dimensions, enum sampling_mode mode, int k)
 {
-    struct fieldstat_tag shared_tags[1];
+    assert(mode == SAMPLING_MODE_COMPREHENSIVE);
+    int ret = fieldstat_cube_create(instance, dimensions, n_dimensions);
+    fieldstat_cube_set_sampling(instance, ret, mode, k, 0);
+    return ret;
+}
+
+static void write_hll(struct fieldstat *instance) {
+    struct field shared_tags[1];
 
     shared_tags[0].key  = "rule_id";
-    shared_tags[0].type = TAG_INTEGER;
+    shared_tags[0].type = FIELD_VALUE_INTEGER;
     shared_tags[0].value_longlong = 1;
 
     const char *hll_name[] = {"external_ip", "internal_ip", "acc_ip"};
-
-    struct fieldstat *instance = fieldstat_new();
-    EXPECT_NE(nullptr, instance);
-    int cube_id = fieldstat_create_cube(instance, shared_tags, 1, 
+    int cube_id = test_fieldstat_cube_create(instance, shared_tags, 1, 
                                           SAMPLING_MODE_COMPREHENSIVE, 100);
 
     for(unsigned int i = 0; i < sizeof(hll_name) / sizeof(hll_name[0]); i++)
     {
-        int hll_id  = fieldstat_register_hll(instance, hll_name[i], 5);
+        int hll_id  = fieldstat_register_hll(instance, cube_id, hll_name[i], 5);
 
         for(int j = 0; j < 100; j++)
         {
@@ -85,30 +89,25 @@ static struct fieldstat *get_hll_fieldsstat()
             int ret = fieldstat_hll_add(instance, cube_id, hll_id, NULL, 0, ip_str, strlen(ip_str));
             EXPECT_EQ(0, ret);
         }
-
     }
-
-    return instance;
 }
 
-
-static struct fieldstat *get_hist_fieldstat()
-{
-    struct fieldstat_tag shared_tags[2];
-    struct fieldstat_tag cell_tags[2];
+void write_histogram(struct fieldstat *instance) {
+    struct field shared_tags[2];
+    struct field cell_tags[2];
 
     shared_tags[0].key  = "rule_id";
-    shared_tags[0].type = TAG_INTEGER;
+    shared_tags[0].type = FIELD_VALUE_INTEGER;
     shared_tags[0].value_longlong = 1;
     shared_tags[1].key  = "action";
-    shared_tags[1].type = TAG_CSTRING;
+    shared_tags[1].type = FIELD_VALUE_CSTRING;
     shared_tags[1].value_str = "deny";
 
     cell_tags[0].key  = "thread_id";
-    cell_tags[0].type = TAG_INTEGER;
+    cell_tags[0].type = FIELD_VALUE_INTEGER;
     cell_tags[0].value_longlong = 1;
     cell_tags[1].key  = "hit_rate";
-    cell_tags[1].type = TAG_DOUBLE;
+    cell_tags[1].type = FIELD_VALUE_DOUBLE;
     cell_tags[1].value_double = 1.1;
 
     const char *hist_names[] = {"list_num", "max_wt_ms", "ivt_nx_itv_ms", 
@@ -116,35 +115,30 @@ static struct fieldstat *get_hist_fieldstat()
                                 "bye/udp", "oth_mtd/udp"};
 
 
-    struct fieldstat *instance = fieldstat_new();
-    EXPECT_NE(nullptr, instance);
-    int cube_id = fieldstat_create_cube(instance, shared_tags, 2, 
+    int cube_id = test_fieldstat_cube_create(instance, shared_tags, 2, 
                                           SAMPLING_MODE_COMPREHENSIVE, 100);
-    EXPECT_EQ(0, cube_id);
 
     for(unsigned int i = 0; i < sizeof(hist_names)/sizeof(hist_names[0]); i++)
     {
-        int hist_id = fieldstat_register_hist(instance, hist_names[i], 1, 600000, 3);
+        int hist_id = fieldstat_register_histogram(instance, cube_id, hist_names[i], 1, 600000, 3);
 
         for(int j = 0; j < 100; j++)
         {
-            fieldstat_hist_record(instance, cube_id, hist_id, cell_tags, 2, i*100 + j);
+            fieldstat_histogram_record(instance, cube_id, hist_id, cell_tags, 2, i*100 + j);
         }
     }
-
-    return instance;
 }
 
 // static struct fieldstat_easy *get_table_fieldstat_easy()
 // {
-//     struct fieldstat_tag global_tags[2];
-//     struct fieldstat_tag cell_tags;
+//     struct field global_tags[2];
+//     struct field cell_tags;
 
 //     global_tags[0].key  = "policy_id";
-//     global_tags[0].type = TAG_INTEGER;
+//     global_tags[0].type = FIELD_VALUE_INTEGER;
 //     global_tags[0].value_longlong = 1;
 //     global_tags[1].key  = "quanlity";
-//     global_tags[1].type = TAG_DOUBLE;
+//     global_tags[1].type = FIELD_VALUE_DOUBLE;
 //     global_tags[1].value_double = 0.5;
 
 //     const char *cell_tag_value[] = {
@@ -154,7 +148,7 @@ static struct fieldstat *get_hist_fieldstat()
 //         "STATISTICS-RULE-METRIC", "OBJECT-STATISTICS-METRIC"};
 
 //     cell_tags.key  = "send_log";
-//     cell_tags.type = TAG_CSTRING;
+//     cell_tags.type = FIELD_VALUE_CSTRING;
 //     cell_tags.value_str = "true";
 
 //     struct fieldstat_easy *fse = fieldstat_easy_new(N_THREAD, NULL, global_tags, 2);
@@ -179,14 +173,13 @@ void fieldstat_easy_to_file(struct fieldstat_easy *fse, const char *file_path)
     fieldstat_easy_free(fse); // only by free to stop exporting
 }
 
-static struct fieldstat *get_table_fieldstat()
-{
-    struct fieldstat_tag shared_tags[2];   
+void write_table(struct fieldstat *instance) {
+    struct field shared_tags[2];   
     shared_tags[0].key  = "policy_id";
-    shared_tags[0].type = TAG_INTEGER;
+    shared_tags[0].type = FIELD_VALUE_INTEGER;
     shared_tags[0].value_longlong = 1;
     shared_tags[1].key  = "quanlity";
-    shared_tags[1].type = TAG_DOUBLE;
+    shared_tags[1].type = FIELD_VALUE_DOUBLE;
     shared_tags[1].value_double = 0.5;
 
     const char *cell_tag_value[] = {
@@ -195,21 +188,17 @@ static struct fieldstat *get_table_fieldstat()
         "GTPC-RECORD", "BGP-RECORD", "PROXY-EVENT", "DOS-SKETCH-RECORD",
         "STATISTICS-RULE-METRIC", "OBJECT-STATISTICS-METRIC"};
 
-    struct fieldstat_tag cell_tags;
+    struct field cell_tags;
     cell_tags.key = "send_log";
-    cell_tags.type = TAG_CSTRING;
+    cell_tags.type = FIELD_VALUE_CSTRING;
     cell_tags.value_str = "true";
 
-    struct fieldstat *instance = fieldstat_new();
-    EXPECT_NE(nullptr, instance);
-
-    int cube_id = fieldstat_create_cube(instance, shared_tags, 2, 
+    int cube_id = test_fieldstat_cube_create(instance, shared_tags, 2, 
                                           SAMPLING_MODE_COMPREHENSIVE, 100);
-    EXPECT_EQ(0, cube_id);
 
-    int counter_id_0 = fieldstat_register_counter(instance, "T_success_log");
+    int counter_id_0 = fieldstat_register_counter(instance, cube_id, "T_success_log");
 
-    int counter_id_1 = fieldstat_register_counter(instance, "T_fail_log");
+    int counter_id_1 = fieldstat_register_counter(instance, cube_id, "T_fail_log");
 
     for(unsigned int i = 0; i < sizeof(cell_tag_value)/sizeof(cell_tag_value[0]); i++)
     {
@@ -218,8 +207,6 @@ static struct fieldstat *get_table_fieldstat()
         if(i < 5)
             fieldstat_counter_incrby(instance, cube_id, counter_id_1, &cell_tags, 1, 2);
     }
-
-    return instance;
 }
 
 static int write_json_to_file(const char *filename, char *json_str) 
@@ -239,13 +226,11 @@ TEST(ExporterLocal, TableBuild)
 {
     struct timeval current   = {100, 10000};
     struct fieldstat *merger = fieldstat_new();
-    struct fieldstat *hll    = get_hll_fieldsstat();
-    struct fieldstat *hist   = get_hist_fieldstat();
-    struct fieldstat *table  = get_table_fieldstat();
 
-    fieldstat_merge(merger, hll);
-    fieldstat_merge(merger, hist);
-    fieldstat_merge(merger, table);
+    write_hll(merger);
+    write_histogram(merger);
+    write_table(merger);
+
     struct fieldstat_json_exporter *exporter = fieldstat_json_exporter_new();
     fieldstat_json_exporter_enable_delta(exporter);
     char *str_json = fieldstat_json_exporter_export(exporter, merger, &current);

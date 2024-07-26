@@ -25,11 +25,11 @@ class FieldstatAPI:
 
     libfieldstat.fieldstat_histogram_free.argtypes                = [ctypes.c_void_p]
 
-    libfieldstat.fieldstat_histogram_value_at_percentile.argtypes = [ctypes.c_void_p, ctypes.c_double]
-    libfieldstat.fieldstat_histogram_value_at_percentile.restype  =  ctypes.c_longlong
+    libfieldstat.fieldstat_histogram_value_at_percentile_api.argtypes = [ctypes.c_void_p, ctypes.c_double]
+    libfieldstat.fieldstat_histogram_value_at_percentile_api.restype  =  ctypes.c_longlong
 
-    libfieldstat.fieldstat_histogram_count_le_value.argtypes      = [ctypes.c_void_p, ctypes.c_longlong]
-    libfieldstat.fieldstat_histogram_count_le_value.restype       =  ctypes.c_longlong
+    libfieldstat.fieldstat_histogram_count_le_value_api.argtypes      = [ctypes.c_void_p, ctypes.c_longlong]
+    libfieldstat.fieldstat_histogram_count_le_value_api.restype       =  ctypes.c_longlong
 
     libfieldstat.fieldstat_histogram_value_total_count.argtypes   = [ctypes.c_void_p]
     libfieldstat.fieldstat_histogram_value_total_count.restype    =  ctypes.c_longlong
@@ -134,7 +134,7 @@ class PrometheusExporter:
         metrics = ""
 
         for i in self.hist_bins:
-            value   = FieldstatAPI.libfieldstat.fieldstat_histogram_count_le_value(c_hist, int(i))
+            value   = FieldstatAPI.libfieldstat.fieldstat_histogram_count_le_value_api(c_hist, int(i))
             metric  = name + "_bucket" + "{" + tags + ",le=\"{:.2f}\"".format(i) + "}" + ' ' + str(value) + '\n'
             metrics += metric
             self.n_lines += 1
@@ -144,7 +144,7 @@ class PrometheusExporter:
     def __build_summary_format(self, name, tags, c_hist):
         metrics = ""
         for i in self.hist_bins:
-            value   = FieldstatAPI.libfieldstat.fieldstat_histogram_value_at_percentile(c_hist, float(i * 100))
+            value   = FieldstatAPI.libfieldstat.fieldstat_histogram_value_at_percentile_api(c_hist, float(i * 100))
             metric  = name + "{" + tags +  ",quantile=\"{:.2f}%\"".format(i * 100) + "}" + ' ' + str(value) + '\n'
             metrics += metric
             self.n_lines += 1
@@ -365,10 +365,10 @@ class HistogramTable:
         row_values = []
         for i in self.bins:
             if self.format == "summary":
-                value = FieldstatAPI.libfieldstat.fieldstat_histogram_value_at_percentile(c_hist, float(i * 100))
+                value = FieldstatAPI.libfieldstat.fieldstat_histogram_value_at_percentile_api(c_hist, float(i * 100))
                 row_values.append(str(value))
             if self.format == "histogram":
-                value = FieldstatAPI.libfieldstat.fieldstat_histogram_count_le_value(c_hist, int(i))
+                value = FieldstatAPI.libfieldstat.fieldstat_histogram_count_le_value_api(c_hist, int(i))
                 row_values.append(str(value))
         shared_values = self.__get_row_shared_values(c_hist)
         row_values   += shared_values
@@ -930,7 +930,7 @@ class FieldstatExporter:
         parser.add_argument("-m", "--match-tags", type = str,           default = "",
                             help = "Display the tags match metrics")
         parser.add_argument("-t", "--template",   type = str,           default = "",
-                            help = "Specify the print template with jinja2. For specific usage, try -th") # todo，在打印错误后给一个具体的帮助信息
+                            help = "Specify the print template with jinja2. For specific usage, try -th")
         parser.add_argument("-e", "--no-tagged",      action = 'store_true', default = False,
                     help = "Print all counter metrics without tags in one list.")
 

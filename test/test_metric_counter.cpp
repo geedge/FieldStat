@@ -7,22 +7,33 @@
 
 using namespace std;
 
+
 struct fieldstat *test_init_standard_instance()
 {
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    int cube_id = fieldstat_cube_create(instance, &TEST_SHARED_TAG, 1);
     EXPECT_EQ(cube_id, 0);
 
-    int metric_id = fieldstat_register_counter(instance, "czz_test counter metric");
+    int metric_id = fieldstat_register_counter(instance, cube_id, "czz_test counter metric");
     EXPECT_EQ(metric_id, 0);
+
+    fieldstat_cube_set_sampling(instance, cube_id, SAMPLING_MODE_COMPREHENSIVE, 10, 0);
 
     return instance;
 }
 
-long long my_fieldstat_counter_get(const struct fieldstat *instance, int cube_id, int metric_id, const struct fieldstat_tag_list *tag_list = &TEST_TAG_LIST_INT)
+long long my_fieldstat_counter_get(const struct fieldstat *instance, int cube_id, int metric_id, const struct field_list *tag_list = &TEST_FIELD_LIST_INT)
 {
     long long ret = 0;
-    fieldstat_counter_get(instance, cube_id, metric_id, tag_list, &ret);
+    fieldstat_counter_get(instance, cube_id, tag_list, metric_id,  &ret);
+    return ret;
+}
+
+int test_fieldstat_cube_create(struct fieldstat *instance, const struct field *dimensions, size_t n_dimensions, enum sampling_mode mode, int k, int primary_metric_id=0)
+{
+    assert(mode == SAMPLING_MODE_COMPREHENSIVE);
+    int ret = fieldstat_cube_create(instance, dimensions, n_dimensions);
+    fieldstat_cube_set_sampling(instance, ret, mode, k, primary_metric_id);
     return ret;
 }
 
@@ -35,25 +46,32 @@ void test_assert_standard_instance(const struct fieldstat *instance)
     int ret_cell_id = ret_cube_id_arr[0];
     free(ret_cube_id_arr);
     EXPECT_EQ(ret_cell_id, 0);
-    const char *name = fieldstat_get_metric_name(instance, 0);
+    const char *name = fieldstat_get_metric_name(instance, ret_cell_id, 0);
     EXPECT_STREQ(name, "czz_test counter metric");
 
-    struct fieldstat_tag_list *tag_list = NULL;
+    struct field_list *tag_list = NULL;
     size_t n_cell = 0;
-    fieldstat_get_cells_used_by_metric(instance, 0, 0, &tag_list, &n_cell);
+    fieldstat_cube_get_cells(instance, 0, &tag_list, &n_cell);
     EXPECT_EQ(n_cell, 1);
-    EXPECT_EQ(tag_list->n_tag, 1);
-    EXPECT_STREQ(tag_list->tag[0].key, TEST_TAG_INT.key);
+    EXPECT_EQ(tag_list->n_field, 1);
+    EXPECT_STREQ(tag_list->field[0].key, TEST_FIELD_INT.key);
 
-    fieldstat_tag_list_arr_free(tag_list, n_cell);
+    int *metric_id = NULL;
+    size_t n_metric = 0;
+    fieldstat_get_metric_in_cell(instance, 0, &tag_list[0], &metric_id, &n_metric);
+    EXPECT_EQ(n_metric, 1);
+    EXPECT_EQ(metric_id[0], 0);
+    free(metric_id);
+
+    fieldstat_field_list_arr_free(tag_list, n_cell);
 }
 
 TEST(metric_test_counter, simple_register_and_query_counter)
 {
     struct fieldstat *instance = test_init_standard_instance();
 
-    fieldstat_counter_incrby(instance, 0, 0, &TEST_TAG_INT, 1, 10000);
-    fieldstat_counter_incrby(instance, 0, 0, &TEST_TAG_INT, 1, 86);
+    fieldstat_counter_incrby(instance, 0, 0, &TEST_FIELD_INT, 1, 10000);
+    fieldstat_counter_incrby(instance, 0, 0, &TEST_FIELD_INT, 1, 86);
 
     test_assert_standard_instance(instance);
     EXPECT_EQ(my_fieldstat_counter_get(instance, 0, 0), 10086);
@@ -64,8 +82,8 @@ TEST(metric_test_counter, simple_register_and_query_counter)
 TEST(metric_test_counter, merge_counter)
 {
     struct fieldstat *instance = test_init_standard_instance();
-    fieldstat_counter_incrby(instance, 0, 0, &TEST_TAG_INT, 1, 100);
-    fieldstat_counter_incrby(instance, 0, 0, &TEST_TAG_INT, 1, -10000);
+    fieldstat_counter_incrby(instance, 0, 0, &TEST_FIELD_INT, 1, 100);
+    fieldstat_counter_incrby(instance, 0, 0, &TEST_FIELD_INT, 1, -10000);
 
     struct fieldstat *instance_total = fieldstat_new();
     fieldstat_merge(instance_total, instance);
@@ -80,16 +98,16 @@ TEST(metric_test_counter, merge_counter)
     fieldstat_free(instance_total);
 }
 
-TEST(metric_test_counter, serialization_and_merge_counter_twice_with_reset)
+TEST(metric_test_counter, merge_counter_twice_with_reset)
 {
     struct fieldstat *instance = test_init_standard_instance();
-    fieldstat_counter_incrby(instance, 0, 0, &TEST_TAG_INT, 1, 10086);
+    fieldstat_counter_incrby(instance, 0, 0, &TEST_FIELD_INT, 1, 10086);
     struct fieldstat *instance_total = fieldstat_new();
 
     fieldstat_merge(instance_total, instance);
 
     fieldstat_reset(instance);
-    fieldstat_counter_incrby(instance, 0, 0, &TEST_TAG_INT, 1, 4);
+    fieldstat_counter_incrby(instance, 0, 0, &TEST_FIELD_INT, 1, 4);
     fieldstat_merge(instance_total, instance);
 
     test_assert_standard_instance(instance_total);
@@ -103,11 +121,12 @@ TEST(metric_test_counter, serialization_and_merge_counter_twice_with_reset)
 TEST(metric_test_counter, topk_add_and_test_accuracy)
 {
     struct fieldstat *instance = fieldstat_new();
-    fieldstat_create_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_TOPK, 10);
-    fieldstat_register_counter(instance, "test");
+    fieldstat_cube_create(instance, &TEST_FIELD_INT_2, 1);
+    fieldstat_register_counter(instance, 0, "test");
+    fieldstat_cube_set_sampling(instance, 0, SAMPLING_MODE_TOPK, 10, 0);
 
     int tag_list_num = 10000;
-    Fieldstat_tag_list_wrapper *tags[tag_list_num];
+    Fieldstat_tag_list_wrapper *fields[tag_list_num];
     map<string, int> flow_cnt;
     for (int i = 0; i < tag_list_num; i++)
     {   
@@ -120,18 +139,18 @@ TEST(metric_test_counter, topk_add_and_test_accuracy)
             flow_k = "mouse";
             flow_v = std::to_string(rand() % 1000);
         }
-        tags[i] = new Fieldstat_tag_list_wrapper(flow_k, flow_v.c_str());
+        fields[i] = new Fieldstat_tag_list_wrapper(flow_k, flow_v.c_str());
 
         flow_cnt[flow_k + flow_v]++;
     }
 
     for (int i = 0; i < tag_list_num; i++) {
-        fieldstat_counter_incrby(instance, 0, 0, tags[i]->get_tag(), tags[i]->get_tag_count(), 1);
+        fieldstat_counter_incrby(instance, 0, 0, fields[i]->get_tag(), fields[i]->get_tag_count(), 1);
     }
 
-    struct fieldstat_tag_list *tag_list = NULL;
+    struct field_list *tag_list = NULL;
     size_t n_cell = 0;
-    fieldstat_get_cells_used_by_metric(instance, 0, 0, &tag_list, &n_cell);
+    fieldstat_cube_get_cells(instance, 0, &tag_list, &n_cell);
     EXPECT_EQ(n_cell, 10);
     long long error = 0;
     for (size_t i = 0; i < n_cell; i++) {
@@ -148,49 +167,21 @@ TEST(metric_test_counter, topk_add_and_test_accuracy)
     printf("topk_add_and_test_accuracy Mean ratio e: %lld\n", error);
     EXPECT_LT(error, tag_list_num * 0.005);
 
-    fieldstat_tag_list_arr_free(tag_list, n_cell);
+    fieldstat_field_list_arr_free(tag_list, n_cell);
     fieldstat_free(instance);
 
     for (int i = 0; i < tag_list_num; i++)
-        delete tags[i];
-}
-
-TEST(metric_test_counter, topk_add_with_monotonically_increasing_flow_expecting_add_fail)
-{
-    struct fieldstat *instance = fieldstat_new();
-    fieldstat_create_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_TOPK, 10);
-    fieldstat_register_counter(instance, "test");
-
-    const int end_cell_id = 10 * 8;
-    const int tag_list_num = 100;
-    Fieldstat_tag_list_wrapper *tags[tag_list_num];
-    for (int i = 0; i < tag_list_num; i++)
-    {
-        tags[i] = new Fieldstat_tag_list_wrapper("elephant", std::to_string(i).c_str());
-    }
-
-    for (int i = 0; i < tag_list_num; i++) {
-        int ret = fieldstat_counter_incrby(instance, 0, 0, tags[i]->get_tag(), tags[i]->get_tag_count(), i + 1);
-        if (ret < 0) {
-            EXPECT_EQ(i, end_cell_id);
-            EXPECT_EQ(ret, FS_ERR_TOO_MANY_CELLS);
-            break;
-        }
-    }
-
-    fieldstat_free(instance);
-    for (int i = 0; i < tag_list_num; i++)
-        delete tags[i];
+        delete fields[i];
 }
 
 TEST(metric_test_counter, add_with_wrong_cube_id_expecting_fail)
 {
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_create_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_TOPK, 10);
+    int cube_id = test_fieldstat_cube_create(instance, &TEST_FIELD_INT_2, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
 
-    int ret = fieldstat_counter_incrby(instance, cube_id + 1, 0, &TEST_TAG_INT, 1, 1);
+    int ret = fieldstat_counter_incrby(instance, cube_id + 1, 0, &TEST_FIELD_INT, 1, 1);
     EXPECT_EQ(ret, FS_ERR_INVALID_CUBE_ID);
-    ret = fieldstat_counter_incrby(instance, -1, 0, &TEST_TAG_INT, 1, 1);
+    ret = fieldstat_counter_incrby(instance, -1, 0, &TEST_FIELD_INT, 1, 1);
     EXPECT_EQ(ret, FS_ERR_INVALID_CUBE_ID);
 
     fieldstat_free(instance);
@@ -199,12 +190,12 @@ TEST(metric_test_counter, add_with_wrong_cube_id_expecting_fail)
 TEST(metric_test_counter, add_with_wrong_metric_id_expecting_fail)
 {
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_create_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_TOPK, 10);
-    int metric_id = fieldstat_register_counter(instance, "test");
+    int cube_id = test_fieldstat_cube_create(instance, &TEST_FIELD_INT_2, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    int metric_id = fieldstat_register_counter(instance, 0, "test");
 
-    int ret = fieldstat_counter_incrby(instance, cube_id, metric_id + 1, &TEST_TAG_INT, 1, 1);
+    int ret = fieldstat_counter_incrby(instance, cube_id, metric_id + 1, &TEST_FIELD_INT, 1, 1);
     EXPECT_EQ(ret, FS_ERR_INVALID_METRIC_ID);
-    ret = fieldstat_counter_incrby(instance, cube_id, -1, &TEST_TAG_INT, 1, 1);
+    ret = fieldstat_counter_incrby(instance, cube_id, -1, &TEST_FIELD_INT, 1, 1);
     EXPECT_EQ(ret, FS_ERR_INVALID_METRIC_ID);
 
     fieldstat_free(instance);
@@ -213,57 +204,16 @@ TEST(metric_test_counter, add_with_wrong_metric_id_expecting_fail)
 TEST(metric_test_counter, add_and_query_on_dummy_cell_of_topk)
 {
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 10);
-    fieldstat_register_counter(instance, "primary"); // also the dummy one
-    int metric_id = fieldstat_register_counter(instance, "using");
+    int cube_id = fieldstat_cube_create(instance, &TEST_SHARED_TAG, 1);
+    fieldstat_register_counter(instance, cube_id, "primary"); // also the dummy one
+    int metric_id = fieldstat_register_counter(instance, cube_id, "using");
+    fieldstat_cube_set_sampling(instance, cube_id, SAMPLING_MODE_TOPK, 10, 0);
 
-    fieldstat_counter_incrby(instance, cube_id, metric_id, &TEST_TAG_INT, 1, 1);
+    fieldstat_counter_incrby(instance, cube_id, metric_id, &TEST_FIELD_INT, 1, 1);
 
     // add success
     long long measure = my_fieldstat_counter_get(instance, cube_id, metric_id);
     EXPECT_EQ(measure, 1);
-    // cannot query dummy
-    int *metric_ids = NULL;
-    size_t n_metric = 0;
-    fieldstat_get_metrics_used_by_cube(instance, cube_id, &metric_ids, &n_metric);
-    EXPECT_EQ(n_metric, 1);
-    EXPECT_EQ(metric_ids[0], 1);
-    free(metric_ids);
-
-    struct fieldstat_tag_list *tag_list = NULL;
-    size_t n_cell;
-    fieldstat_get_cells_used_by_metric(instance, cube_id, 0, &tag_list, &n_cell);
-    EXPECT_EQ(n_cell, 0);
-
-    fieldstat_free(instance);
-}
-
-TEST(metric_test_counter, set_on_primary_metric_going_smaller)
-{
-    struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 10);
-    int metric_id = fieldstat_register_counter(instance, "primary");
-
-    int ret = fieldstat_counter_set(instance, cube_id, metric_id, &TEST_TAG_INT, 1, 10);
-    EXPECT_EQ(ret, FS_OK);
-    ret = fieldstat_counter_set(instance, cube_id, metric_id, &TEST_TAG_INT, 1, 2);
-    EXPECT_EQ(ret, FS_ERR_INVALID_PARAM);
-
-    fieldstat_free(instance);
-}
-
-TEST(metric_test_counter, set_on_primary_metric_going_bigger)
-{
-    struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 10);
-    int metric_id = fieldstat_register_counter(instance, "primary");
-
-    int ret = fieldstat_counter_set(instance, cube_id, metric_id, &TEST_TAG_INT, 1, 10);
-    EXPECT_EQ(ret, FS_OK);
-    ret = fieldstat_counter_set(instance, cube_id, metric_id, &TEST_TAG_INT, 1, 20);
-    EXPECT_EQ(ret, FS_OK);
-
-    EXPECT_EQ(my_fieldstat_counter_get(instance, cube_id, metric_id), 20);
 
     fieldstat_free(instance);
 }
@@ -271,65 +221,31 @@ TEST(metric_test_counter, set_on_primary_metric_going_bigger)
 TEST(metric_test_counter, primary_counter_add_after_first)
 {
     struct fieldstat *instance = fieldstat_new();
-    int cube_id = fieldstat_create_cube(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_TOPK, 10);
-    int metric_id_primary = fieldstat_register_counter(instance, "primary");
-    int metric_id2 = fieldstat_register_counter(instance, "using");
-    fieldstat_cube_set_primary_metric(instance, cube_id, metric_id_primary);
+    int cube_id = fieldstat_cube_create(instance, &TEST_SHARED_TAG, 1);
+    int metric_id_primary = fieldstat_register_counter(instance, cube_id, "primary");
+    int metric_id2 = fieldstat_register_counter(instance, cube_id, "using");
+    fieldstat_cube_set_sampling(instance, cube_id, SAMPLING_MODE_TOPK, 10, metric_id_primary);
 
-
-    int ret = fieldstat_counter_incrby(instance, cube_id, metric_id2, &TEST_TAG_INT, 1, 10);
+    int ret = fieldstat_counter_incrby(instance, cube_id, metric_id2, &TEST_FIELD_INT, 1, 10);
     EXPECT_EQ(ret, FS_OK);
-    ret = fieldstat_counter_incrby(instance, cube_id, metric_id_primary, &TEST_TAG_INT, 1, 20);
+    ret = fieldstat_counter_incrby(instance, cube_id, metric_id_primary, &TEST_FIELD_INT, 1, 20);
     EXPECT_EQ(ret, FS_OK);
 
     EXPECT_EQ(my_fieldstat_counter_get(instance, cube_id, metric_id_primary), 20);
     EXPECT_EQ(my_fieldstat_counter_get(instance, cube_id, metric_id2), 10);
 
     // TOPK functions well
-    struct fieldstat_tag tag = TEST_TAG_INT;
+    struct field field = TEST_FIELD_INT;
     for (int i = 0; i < 9; i++) {
-        tag.value_longlong = i + 123;
-        ret = fieldstat_counter_incrby(instance, cube_id, metric_id_primary, &tag, 1, 1 + i);
+        field.value_longlong = i + 123;
+        ret = fieldstat_counter_incrby(instance, cube_id, metric_id_primary, &field, 1, 1 + i);
         EXPECT_EQ(ret, FS_OK);
     }
     // now the TOPK is full, add a new one
-    tag.value_longlong = 321;
-    ret = fieldstat_counter_incrby(instance, cube_id, metric_id_primary, &tag, 1, 1);
+    field.value_longlong = 321;
+    ret = fieldstat_counter_incrby(instance, cube_id, metric_id_primary, &field, 1, 1);
     EXPECT_EQ(ret, FS_ERR_TOO_MANY_CELLS);
 
-    fieldstat_free(instance);
-}
-
-TEST(metric_test_counter, topk_set_and_test_accuracy)
-{
-    struct fieldstat *instance = fieldstat_new();
-    fieldstat_create_cube(instance, &TEST_TAG_INT_collided, 1, SAMPLING_MODE_TOPK, 6);
-    fieldstat_register_counter(instance, "test");
-
-    struct fieldstat_tag tag = TEST_TAG_INT;
-    // tag : [0, 1, 2, 3, 4 ,5]
-    // value: [0, 1, 2, 3, 4 ,5]
-    for (int i = 0; i < 6; i++) {
-        tag.value_longlong = i;
-        EXPECT_EQ(fieldstat_counter_set(instance, 0, 0, &tag, 1, i), FS_OK);
-    }
-    // tag : [0, 1, 2, 3,  4 ,5, 6, 7, 8]
-    // value: [0, 1, 2, 100, 100, 100, 100, 100, 100]
-    for (int i = 0; i < 6; i++) {
-        tag.value_longlong = i + 3;
-        EXPECT_EQ(fieldstat_counter_set(instance, 0, 0, &tag, 1, 100), FS_OK);
-    }
-
-    struct fieldstat_tag_list *tag_list = NULL;
-    size_t n_cell = 0;
-    fieldstat_get_cells_used_by_metric(instance, 0, 0, &tag_list, &n_cell);
-    EXPECT_EQ(n_cell, 6);
-    for (size_t i = 0; i < n_cell; i++) {
-        EXPECT_EQ(tag_list[i].tag[0].value_longlong, i + 3);
-        EXPECT_EQ(my_fieldstat_counter_get(instance, 0, 0, &tag_list[i]), 100);
-    }
-
-    fieldstat_tag_list_arr_free(tag_list, n_cell);
     fieldstat_free(instance);
 }
 

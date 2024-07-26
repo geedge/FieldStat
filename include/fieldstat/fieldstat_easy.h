@@ -13,9 +13,9 @@ struct fieldstat_easy;
  * new a fieldstat_easy instance.
     * @param max_thread_num: max thread number of this instance.
     * @param name: name of this instance. Will appear in output json. Can be NULL.
-    * @param tags: tags of this instance. Will appear in output json. Can be NULL.
+    * @param dimensions: dimensions of this instance. Will appear in output json. Can be NULL.
 */
-struct fieldstat_easy *fieldstat_easy_new(int max_thread_num, const char *name, const struct fieldstat_tag *tags, size_t n_tag);
+struct fieldstat_easy *fieldstat_easy_new(int max_thread_num, const char *name, const struct field *global_dimensions, size_t n_dimension);
 /*
     * free a fieldstat_easy instance.
 */
@@ -27,16 +27,6 @@ void fieldstat_easy_free(struct fieldstat_easy *fse);
     * @return: 0 if success, -1 if failed to open file. -2 if the output is already enabled.
 */
 int fieldstat_easy_enable_auto_output(struct fieldstat_easy *pthis, const char *output_path, int interval_second);
-
-/*
-    affect the output of fieldstat_easy_output and fieldstat_easy_output_array.
-    let json exporter output delta value by the side of the original value(accumulated). If a cell / metric is new, the delta value is the same as the original value.
-    Outputting delta value is disabled by default.
-    When the fieldstat instance is reset, the delta value will be reset. (next output will be the original value)
-    Only affects the metrics of counter type.
-    Outputting delta value is time-consuming. Be cautious when enabling it.
-*/
-void fieldstat_easy_enable_delta_in_active_output(struct fieldstat_easy *fse);
 
 /*
     * @brief add a metric to the cube of cube_id. One metric may be associated with different cells.
@@ -67,19 +57,25 @@ void fieldstat_easy_output_array(struct fieldstat_easy *fse, char ***json_object
 */
 int fieldstat_easy_output_array_and_reset(struct fieldstat_easy *fse, char ***json_objects, size_t *n_object);
 /*
-    * @brief let the value of counter metric of tags increase by `increment`.
+    * @brief let the value of counter metric of dimensions increase by `increment`.
     * @param thread_id: thread id. Must be in [0, max_thread_num).
     * @param metric_id: metric id, previously returned by fieldstat_easy_register_counter.
     * @param increment: increment of the counter metric. Can be negative.
     * return -1 also when the thread_id is out of range.FS_ERR_INVALID_METRIC_ID metric_id is not registered.
 */
-int fieldstat_easy_counter_incrby(struct fieldstat_easy *fse, int thread_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long increment);
+
+int fieldstat_easy_counter_incrby(struct fieldstat_easy *fse, int thread_id, int metric_id, const struct field *dimensions, size_t n_dimensions, long long increment);
+
+// TODO: easy 的加速使用，跟其他人对接一下。包括如何在不改变fieldstat.h 的基础上再来一套接口。
+// int fieldstat_easy_counter_incrby(struct fieldstat_easy *fse, int thread_id, int metric_id, int cell_id, long long increment);
+// int fieldstat_easy_add_cell(struct fieldstat_easy *fse,const struct field *dimensions, size_t n_dimensions);
+
 /*
-    * @brief let the value of counter metric of tags equal to `value`.
+    * @brief let the value of counter metric of dimensions equal to `value`.
     *    for other notes, see fieldstat_easy_counter_incrby.
     * The value will be output by summing each ones in different threads, exactly the same as values set by fieldstat_easy_counter_incrby.
 */
-int fieldstat_easy_counter_set(struct fieldstat_easy *fse, int thread_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long value);
+int fieldstat_easy_counter_set(struct fieldstat_easy *fse, int thread_id, int metric_id, const struct field *dimensions, size_t n_dimensions, long long value);
 /* 
     * @brief Add a value to the histogram metric of cell_id. Histogram will record the distribution of the values.
              The value bigger than highest_trackable_value will be set to highest_trackable_value. The value less than lowest_trackable_value will be tried to record, and, if succeed, remains in the record as -inf(most of the time) or 0(if value == 0)
@@ -87,7 +83,7 @@ int fieldstat_easy_counter_set(struct fieldstat_easy *fse, int thread_id, int me
     * @return FS_OK if success. FS_ERR_NULL_HANDLER, FS_ERR_INVALID_CUBE_ID, FS_ERR_INVALID_METRIC_ID if fail.
     * return -1 also when the thread_id is out of range.
 */
-int fieldstat_easy_histogram_record(struct fieldstat_easy *fse, int thread_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long value);
+int fieldstat_easy_histogram_record(struct fieldstat_easy *fse, int thread_id, int metric_id, const struct field *dimensions, size_t n_dimensions, long long value);
 
 #ifdef __cplusplus
 }

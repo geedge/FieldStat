@@ -23,7 +23,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_MACOSX_RPATH 0)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -fPIC -Wall -lm -lz --std=gnu11")
-set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} -Wall)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall")
 
 # set(C_INCLUDE_PATH ${C_INCLUDE_PATH} /opt/MESA/include)
 # set(CPLUS_INCLUDE_PATH ${CPLUS_INCLUDE_PATH} /opt/MESA/include)
@@ -98,14 +98,14 @@ include_directories(${PROJECT_SOURCE_DIR}/vendors)
 include_directories(${PROJECT_SOURCE_DIR}/src)
 include_directories(${PROJECT_SOURCE_DIR}/include/fieldstat)
 include_directories(${PROJECT_SOURCE_DIR}/src/metrics)
-include_directories(${PROJECT_SOURCE_DIR}/src/tags)
+include_directories(${PROJECT_SOURCE_DIR}/src/cells)
 include_directories(${PROJECT_SOURCE_DIR}/src/utils)
 
 
 file(GLOB SRC
     "src/*.c"
     "src/metrics/*.c"
-    "src/tags/*.c"
+    "src/cells/*.c"
     "src/exporter/*.c"
     "src/utils/*.c"
     "vendors/cjson/*.c"

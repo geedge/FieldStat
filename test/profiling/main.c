@@ -4,36 +4,34 @@
 #include <string.h>
 
 #include "fieldstat.h"
-#include "tags/my_ut_hash.h"
-#include "tags/my_ut_hash_inner.h"
+#include "fields/my_ut_hash.h"
+#include "fields/my_ut_hash_inner.h"
 
 #define ADD_OPER_NUM 5000000ULL
 // #define ADD_OPER_NUM 1
 #define MAX_STRING_KEY_LEN 10
 
-const struct fieldstat_tag TEST_TAG_INT = {"INT key_", TAG_INTEGER, {.value_longlong = 100}};
+const struct field TEST_FIELD_INT = {"INT key_", FIELD_VALUE_INTEGER, {.value_longlong = 100}};
 
-
-// todo: 问一下贺岚风，tag是什么样子的
 
 int main () {
     printf("Start profiling...\n");
     clock_t start, end;
-    // struct fieldstat_tag TAG[4] = {
-    //     {"INT key_", TAG_INTEGER, {.value_longlong = 100}},
-    //     {"STRING key_", TAG_CSTRING, {.value_str = "10012312312312"}},
-    //     {"STRING key_", TAG_CSTRING, {.value_str = "100adsffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"}},
-    //     {"FLOAT key_", TAG_INTEGER, {.value_double = 100.0}},
+    // struct field TAG[4] = {
+    //     {"INT key_", FIELD_VALUE_INTEGER, {.value_longlong = 100}},
+    //     {"STRING key_", FIELD_VALUE_CSTRING, {.value_str = "10012312312312"}},
+    //     {"STRING key_", FIELD_VALUE_CSTRING, {.value_str = "100adsffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"}},
+    //     {"FLOAT key_", FIELD_VALUE_INTEGER, {.value_double = 100.0}},
     // };
-    struct fieldstat_tag TAG[4] = {
-        {"object_id", TAG_INTEGER, {.value_longlong = 20}},
-        {"item_id", TAG_INTEGER, {.value_longlong = 16916397}},
-        {"chart_id", TAG_INTEGER, {.value_longlong = 1}},
-        {"version", TAG_INTEGER, {.value_longlong = 1}},
+    struct field TAG[4] = {
+        {"object_id", FIELD_VALUE_INTEGER, {.value_longlong = 20}},
+        {"item_id", FIELD_VALUE_INTEGER, {.value_longlong = 16916397}},
+        {"chart_id", FIELD_VALUE_INTEGER, {.value_longlong = 1}},
+        {"version", FIELD_VALUE_INTEGER, {.value_longlong = 1}},
     };
 
     struct fieldstat *instance = fieldstat_new();
-    fieldstat_create_cube(instance, NULL, 0, SAMPLING_MODE_COMPREHENSIVE, 0);
+    fieldstat_cube_create(instance, NULL, 0, SAMPLING_MODE_COMPREHENSIVE, 0);
     fieldstat_register_counter(instance, "counter");
 
     start = clock();

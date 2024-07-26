@@ -5,7 +5,7 @@
 
 #include "histogram_encoder.h"
 #include "base64/b64.h"
-#include "st_hyperloglog.h"
+#include "hyperloglog.h"
 
 // user must free the buf after use
 void *fieldstat_histogram_base64_decode(char *buf)
@@ -16,12 +16,12 @@ void *fieldstat_histogram_base64_decode(char *buf)
     return hdr;
 }
 
-long long fieldstat_histogram_value_at_percentile(void* h, double percentile)
+long long fieldstat_histogram_value_at_percentile_api(void* h, double percentile)
 {
     return hdr_value_at_percentile((const struct hdr_histogram *)h, percentile);
 }
 
-long long fieldstat_histogram_count_le_value(void* h, long long value)
+long long fieldstat_histogram_count_le_value_api(void* h, long long value)
 {
 	return hdr_count_le_value((const struct hdr_histogram *)h, value);
 }
@@ -75,9 +75,9 @@ void fieldstat_histogram_free(void *h)
 void *hll_base64_decode(char *buf);
 double fieldstat_hll_base64_to_count(char *buf)
 {
-    struct ST_hyperloglog *hll = hll_base64_decode(buf);
-    double count = ST_hyperloglog_count(hll);
-    ST_hyperloglog_free(hll);
+    struct hyperloglog *hll = hll_base64_decode(buf);
+    double count = hyperloglog_count(hll);
+    hyperloglog_free(hll);
     return count;
 }
 
@@ -101,7 +101,7 @@ void *hll_base64_decode(char *buf)
     unsigned char precision;
     memcpy(&precision, dec + sizeof(unsigned char), sizeof(unsigned char));
 
-    struct ST_hyperloglog *hll_from_blob = ST_hyperloglog_new(precision);
+    struct hyperloglog *hll_from_blob = hyperloglog_new(precision);
 
     int num_reg = NUM_REG(precision);
     int words = INT_CEIL(num_reg, REG_PER_WORD);
@@ -120,7 +120,7 @@ void *hll_base64_decode(char *buf)
 
 void fieldstat_hll_free(void *hll)
 {
-    ST_hyperloglog_free((struct ST_hyperloglog *)hll);
+    hyperloglog_free((struct hyperloglog *)hll);
 }
 
 // cppcheck-suppress [constParameterPointer, unmatchedSuppression]

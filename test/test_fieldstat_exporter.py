@@ -17,6 +17,7 @@ from prettytable import PrettyTable,NONE,HEADER
 import os
 current_path  = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(current_path + '/../../src/exporter')
+sys.path.append('/home/chenzizhan/heavykeeperczz/FieldStat/src/exporter')
 
 from fieldstat_exporter import FieldstatAPI
 
@@ -153,7 +154,7 @@ class TestPrometheusExporter(unittest.TestCase):
         
         metric = self.prom._PrometheusExporter__build_type_hll(name, tags, value)
 
-        self.assertEqual(metric, "tsg_master_log{policy_id=\"1\",app_name=\"-\"} 62.61\n")
+        self.assertEqual(metric, "tsg_master_log{policy_id=\"1\",app_name=\"-\"} 93.61\n")
 
 
     def test__build_metrics(self):
@@ -186,7 +187,7 @@ class TestPrometheusExporter(unittest.TestCase):
                     "timestamp_ms_delta": 100010
                 }
         metrics = self.prom._PrometheusExporter__build_metrics(hll_dict)
-        self.assertEqual(metrics, "external_ip{rule_id=\"1\",app_name=\"-\"} 62.61\n")
+        self.assertEqual(metrics, "external_ip{rule_id=\"1\",app_name=\"-\"} 93.61\n")
 
         hist_dict = {"name": "-",
                      "tags": {

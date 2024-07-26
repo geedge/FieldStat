@@ -114,7 +114,7 @@ void *fs_easy_output_thread(void *arg) // return void * for pthread_create check
     return NULL; // return void * for pthread_create check only
 }
 
-struct fieldstat_easy *fieldstat_easy_new(int max_thread_num, const char *name, const struct fieldstat_tag *tags, size_t n_tag) {
+struct fieldstat_easy *fieldstat_easy_new(int max_thread_num, const char *name, const struct field *global_dimensions, size_t n_dimension) {
     if (max_thread_num <= 0) {
         return NULL;
     }
@@ -122,12 +122,13 @@ struct fieldstat_easy *fieldstat_easy_new(int max_thread_num, const char *name, 
     fse->fsu = malloc(sizeof(struct fs_easy_thread) * max_thread_num);
     fse->max_thread_num = max_thread_num;
     fse->delta = fieldstat_new();
-    fieldstat_create_cube(fse->delta, NULL, 0, SAMPLING_MODE_COMPREHENSIVE, 0);
+    fieldstat_cube_create(fse->delta, NULL, 0);
+    fieldstat_cube_set_sampling(fse->delta, 0, SAMPLING_MODE_COMPREHENSIVE, 0, 0);
 
     fse->accumulate = fieldstat_fork(fse->delta);
     fse->exporter = fieldstat_json_exporter_new();
-    if (tags != NULL && n_tag > 0) {
-        fieldstat_json_exporter_set_global_tag(fse->exporter, tags, n_tag);
+    if (global_dimensions != NULL && n_dimension > 0) {
+        fieldstat_json_exporter_set_global_tag(fse->exporter, global_dimensions, n_dimension);
     }
     if (name != NULL) {
         fieldstat_json_exporter_set_name(fse->exporter, name);
@@ -192,17 +193,17 @@ int fieldstat_easy_register_counter(struct fieldstat_easy *fse, const char *name
         pthread_spin_lock(&fse->fsu[i].lock);
     }
 
-    int ret = fieldstat_register_counter(fse->fsu[0].active, name); // try to register
+    int ret = fieldstat_register_counter(fse->fsu[0].active, 0, name); // try to register
     if (ret < 0) {
         for (int i = 0; i < fse->max_thread_num; i++) {
             pthread_spin_unlock(&fse->fsu[i].lock);
         }
         return ret;
     }
-    fieldstat_register_counter(fse->fsu[0].read_only, name);
+    fieldstat_register_counter(fse->fsu[0].read_only, 0, name);
     for (int i = 1; i < fse->max_thread_num; i++) {
-        fieldstat_register_counter(fse->fsu[i].active, name);
-        fieldstat_register_counter(fse->fsu[i].read_only, name);
+        fieldstat_register_counter(fse->fsu[i].active, 0, name);
+        fieldstat_register_counter(fse->fsu[i].read_only, 0, name);
     }
 
     for (int i = 0; i < fse->max_thread_num; i++) {
@@ -218,17 +219,17 @@ int fieldstat_easy_register_histogram(struct fieldstat_easy *fse, const char *na
         pthread_spin_lock(&fse->fsu[i].lock);
     }
 
-    int ret = fieldstat_register_hist(fse->fsu[0].active, name, lowest_trackable_value, highest_trackable_value, significant_figures); // try to register
+    int ret = fieldstat_register_histogram(fse->fsu[0].active, 0, name, lowest_trackable_value, highest_trackable_value, significant_figures); // try to register
     if (ret < 0) {
         for (int i = 0; i < fse->max_thread_num; i++) {
             pthread_spin_unlock(&fse->fsu[i].lock);
         }
         return ret;
     }
-    fieldstat_register_hist(fse->fsu[0].read_only, name, lowest_trackable_value, highest_trackable_value, significant_figures);
+    fieldstat_register_histogram(fse->fsu[0].read_only, 0, name, lowest_trackable_value, highest_trackable_value, significant_figures);
     for (int i = 1; i < fse->max_thread_num; i++) {
-        fieldstat_register_hist(fse->fsu[i].active, name, lowest_trackable_value, highest_trackable_value, significant_figures);
-        fieldstat_register_hist(fse->fsu[i].read_only, name, lowest_trackable_value, highest_trackable_value, significant_figures);
+        fieldstat_register_histogram(fse->fsu[i].active, 0, name, lowest_trackable_value, highest_trackable_value, significant_figures);
+        fieldstat_register_histogram(fse->fsu[i].read_only, 0, name, lowest_trackable_value, highest_trackable_value, significant_figures);
     }
 
     for (int i = 0; i < fse->max_thread_num; i++) {
@@ -250,35 +251,35 @@ struct timeval get_current_timestamp()
 
 struct fieldstat *merge_all_instance(struct fieldstat_easy *fse)
 {
-    struct fieldstat *dst = fieldstat_new();
+    struct fieldstat *dest = fieldstat_new();
     // collect all the data recorded since last passive output, if passive output happened. Otherwise, its the data since the program started.
     for (int i = 0; i < fse->max_thread_num; i++) {
         pthread_spin_lock(&fse->fsu[i].lock);
-        fieldstat_merge(dst, fse->fsu[i].active);
+        fieldstat_merge(dest, fse->fsu[i].active);
         pthread_spin_unlock(&fse->fsu[i].lock);
     }
 
     // add the outputted data
     if (fse->output_thread_running) {
         pthread_spin_lock(&fse->outputting_lock);
-        fieldstat_merge(dst, fse->accumulate);
+        fieldstat_merge(dest, fse->accumulate);
         pthread_spin_unlock(&fse->outputting_lock);
     }
 
-    return dst;
+    return dest;
 }
 
 // output an json string for accumulated data
 void fieldstat_easy_output(struct fieldstat_easy *fse, char **buff, size_t *buff_len)
 {
-    struct fieldstat *dst = merge_all_instance(fse);
+    struct fieldstat *dest = merge_all_instance(fse);
     struct timeval timestamp = get_current_timestamp();
 
-    *buff = fieldstat_json_exporter_export(fse->exporter, dst, &timestamp);
+    *buff = fieldstat_json_exporter_export_flat(fse->exporter, dest, &timestamp);
     if (*buff == NULL) {
         *buff = strdup("[]");
     }
-    fieldstat_free(dst);
+    fieldstat_free(dest);
     *buff_len = strlen(*buff);
 }
 
@@ -286,10 +287,10 @@ void fieldstat_easy_output(struct fieldstat_easy *fse, char **buff, size_t *buff
 void fieldstat_easy_output_array(struct fieldstat_easy *fse, char ***json_objects, size_t *n_object)
 {
     struct timeval timestamp = get_current_timestamp();
-    struct fieldstat *dst = merge_all_instance(fse);
+    struct fieldstat *dest = merge_all_instance(fse);
 
-    fieldstat_json_exporter_export_array(fse->exporter, dst, &timestamp, json_objects, n_object);
-    fieldstat_free(dst);
+    fieldstat_json_exporter_export_flat_array(fse->exporter, dest, &timestamp, json_objects, n_object);
+    fieldstat_free(dest);
 }
 
 int fieldstat_easy_output_array_and_reset(struct fieldstat_easy *fse, char ***json_objects, size_t *n_object)
@@ -299,20 +300,20 @@ int fieldstat_easy_output_array_and_reset(struct fieldstat_easy *fse, char ***js
         return -1;
     }
 
-    struct fieldstat *dst = fieldstat_new();
+    struct fieldstat *dest = fieldstat_new();
     for (int i = 0; i < fse->max_thread_num; i++) {
         rcu_reclaim_handler(fse->fsu + i);
-        fieldstat_merge(dst, fse->fsu[i].read_only);
+        fieldstat_merge(dest, fse->fsu[i].read_only);
     }
 
     struct timeval timestamp = get_current_timestamp();
-    fieldstat_json_exporter_export_array(fse->exporter, dst, &timestamp, json_objects, n_object);
-    fieldstat_free(dst);
+    fieldstat_json_exporter_export_flat_array(fse->exporter, dest, &timestamp, json_objects, n_object);
+    fieldstat_free(dest);
 
     return 0;
 }
 
-int fieldstat_easy_counter_incrby(struct fieldstat_easy *fse, int thread_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long increment)
+int fieldstat_easy_counter_incrby(struct fieldstat_easy *fse, int thread_id, int metric_id, const struct field *dimensions, size_t n_dimensions, long long increment)
 {
     if (thread_id < 0) {
         return -1;
@@ -322,13 +323,13 @@ int fieldstat_easy_counter_incrby(struct fieldstat_easy *fse, int thread_id, int
     }
 
     pthread_spin_lock(&fse->fsu[thread_id].lock);
-    int ret = fieldstat_counter_incrby(fse->fsu[thread_id].active, 0, metric_id, tags, n_tag, increment);
+    int ret = fieldstat_counter_incrby(fse->fsu[thread_id].active, 0, metric_id, dimensions, n_dimensions, increment);
     pthread_spin_unlock(&fse->fsu[thread_id].lock);
 
     return ret;
 }
 
-int fieldstat_easy_counter_set(struct fieldstat_easy *fse, int thread_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long value)
+int fieldstat_easy_counter_set(struct fieldstat_easy *fse, int thread_id, int metric_id, const struct field *dimensions, size_t n_dimensions, long long value)
 {
     if (thread_id < 0) {
         return -1;
@@ -338,13 +339,13 @@ int fieldstat_easy_counter_set(struct fieldstat_easy *fse, int thread_id, int me
     }
 
     pthread_spin_lock(&fse->fsu[thread_id].lock);
-    int ret = fieldstat_counter_set(fse->fsu[thread_id].active, 0, metric_id, tags, n_tag, value);
+    int ret = fieldstat_counter_set(fse->fsu[thread_id].active, 0, metric_id, dimensions, n_dimensions, value);
     pthread_spin_unlock(&fse->fsu[thread_id].lock);
 
     return ret;
 }
 
-int fieldstat_easy_histogram_record(struct fieldstat_easy *fse, int thread_id, int metric_id, const struct fieldstat_tag *tags, size_t n_tag, long long value)
+int fieldstat_easy_histogram_record(struct fieldstat_easy *fse, int thread_id, int metric_id, const struct field *dimensions, size_t n_dimensions, long long value)
 {
     if (thread_id < 0) {
         return -1;
@@ -354,13 +355,8 @@ int fieldstat_easy_histogram_record(struct fieldstat_easy *fse, int thread_id, i
     }
 
     pthread_spin_lock(&fse->fsu[thread_id].lock);
-    int ret = fieldstat_hist_record(fse->fsu[thread_id].active, 0, metric_id, tags, n_tag, value);
+    int ret = fieldstat_histogram_record(fse->fsu[thread_id].active, 0, metric_id, dimensions, n_dimensions, value);
     pthread_spin_unlock(&fse->fsu[thread_id].lock);
 
     return ret;
-}
-
-void fieldstat_easy_enable_delta_in_active_output(struct fieldstat_easy *fse)
-{
-    fieldstat_json_exporter_enable_delta(fse->exporter);
 }
