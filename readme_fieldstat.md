@@ -8,18 +8,22 @@ Field Stat is a library for outputting and statistics of running states. Compare
 - Cell: A cube is composed of multiple cells. A cell is a data set tagged with specific tags.
 - Metric: Each metric corresponds to a column of data in the database. Currently, there are three types of metric statistics: counter, Hyper Log Log, and Histogram.
 
-Compared to version 3.0, version 4.0 introduces the concepts of cube. The concept of field has been removed (a combination of tag information and metric)。In version 4.0, tags and metrics are managed independently and dynamically. This change simplifies the interface usage and improves the speed of batch statistics for the same tag. Cube is a collection of metrics for the same purpose, and is also the unit of metric management. 
+Compared to version 3.0, version 4.0 introduces the concepts of cube. Cube is a collection of metrics for the same purpose, and is also the unit of metric management. 
 
 Version 4.0 no longer supports multithreading. In version 3.0, the metric of type "counter" could be shared and operated on by multiple threads. However, in version 4.0, each instance is written by only one thread. The fieldstat version 4.0 provides support for distributed statistics through methods like serialize and merge. It is the responsibility of the caller to aggregate statistics from different instances. For simplified multi-threaded support, refer to [fieldstat easy](readme_fieldstat_easy.md).
 
 ### sampling mode
 
-Although the addition of cells is dynamic, there is a maximum limit on the number of cells per cube. Currently, there are two modes of limitation known as sampling modes:
+Although the addition of cells is dynamic, there is a maximum limit on the number of cells per cube. Currently, there are 3 modes of limitation known as sampling modes:
 - SAMPLING_MODE_COMPREHENSIVE
 - SAMPLING_MODE_TOPK
+- SAMPLING_MODE_TOP_CADINALITY
   
 In the Comprehensive mode, once the maximum number of cells is reached in a cube, no new cells can be added under the current cube. Any subsequent new cells will be discarded.
+
 In the top-K mode, the Heavy Keeper algorithm is used to retain the complete sorting information of cells based on a primary metric. Even after reaching the maximum number of cells, new cells will still be accepted. A new cell with a higher ranking will be added while removing a cell with a lower ranking.
+
+In the top-cardinality mode, the cell sorting behavior is similar to the top-K mode. However, the maximum number of cells is determined by the cardinality of the primary metric of HyperLogLog. [SpreadSketch](https://ieeexplore.ieee.org/abstract/document/9858870) algorithm is used to sort out entries of higher cardinality.
 
 ### metrics
 #### Counter
@@ -40,25 +44,36 @@ Download fieldstat4 rpm from https://repo.geedge.net/pulp/content/ and install r
 #include "fieldstat.h"
 
 struct fieldstat *instance = fieldstat_new();
-int cube_id = fieldstat_cube_create(instance, YOUR_SHARED_TAG, YOUR_SHARED_TAG_LENGTH, SAMPLING_MODE_TOPK, MAX_CELL_NUMBER);
+int cube_id = fieldstat_cube_create(instance, YOUR_DIMENSION, YOUR_DIMENSION_LENGTH);
 int metric_counter_id = fieldstat_register_counter(instance, cube_id, "any metric name", 0/1);
 int metric_histogram_id = fieldstat_register_histogramogram(instance, cube_id, "any metric name", THE_MINIMUM_NUMBER_TO_RECORD, THE_MAXIMUM_NUMBER_TO_RECORD, PRECISION);
 int metric_hll_id = fieldstat_register_hll(instance, cube_id, "any metric name", PRECISION);
-int cell_id = fieldstat_cube_add(instance, cube_id, YOUR_TAG, YOUR_TAG_LENGTH, THE_PRIMARY_METRIC);
-if (cell_id != -1) {
-    fieldstat_counter_incrby(instance, cube_id, metric_counter_id, cell_id, VALUE);
-    fieldstat_histogram_record(instance, cube_id, metric_counter_id, cell_id, VALUE);
-    fieldstat_hll_add(instance, cube_id, metric_counter_id, cell_id, VALUE, VALUE_STR_LENGTH);
-}
+fieldstat_cube_set_sampling(instance, cube_id, SAMPLING_MODE_COMPREHENSIVE/SAMPLING_MODE_TOPK/SAMPLING_MODE_TOP_CARDINALITY, max_cell_number);
+
+fieldstat_counter_incrby(instance, cube_id, metric_counter_id, cell_id, VALUE);
+fieldstat_histogram_record(instance, cube_id, metric_counter_id, cell_id, VALUE);
+fieldstat_hll_add(instance, cube_id, metric_counter_id, cell_id, VALUE, VALUE_STR_LENGTH);
 
 fieldstat_free(instance);
 ```
 
-### Merge
+### 多实例使用
 ```
-fieldstat_merge(instance_dest, instance_deserialized);
-free(blob);
-fieldstat_free(instance_deserialized);
+struct fieldstat *master = fieldstat_new();
+// other operations like cube_create and metric_register
+for (int i = 0; i < INSTANCE_NUM; i++) {
+    if (instances[i] == NULL) {
+        struct fieldstat *instance = fieldstat_fork(master); // new a instance with the same configuration as master
+    } else {
+        fieldstat_calibrate(master, instances[i]); // sync the changes cube and metric to instance[i] without changing the data
+    }
+}
+
+// After operations on these instance, to sum up result:
+struct fieldstat *dest = fieldstat_new();
+for (int i = 0; i < INSTANCE_NUM; i++) {
+    fieldstat_merge(dest, instances[i]);
+}
 ```
 
 ### Export
@@ -70,7 +85,7 @@ fieldstat_json_exporter_set_global_tag(fieldstat_json_exporter, YOUR_GLOBAL_TAG,
 // optional
 fieldstat_json_exporter_set_name(fieldstat_json_exporter, "any name for this exporter");
 
-char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter);
+char *json_string = fieldstat_json_exporter_export_flat(fieldstat_json_exporter);
 printf("test, fieldstat_json_exporter_export json_string: %s\n", json_string);
 free(json_string);
 fieldstat_json_exporter_free(fieldstat_json_exporter);
@@ -86,7 +101,7 @@ The memory is calculated on 64-bit system, with unit of Byte if not specified.
 The memory are consumed by:
 - the array and hash table to store tags of every cells
 - Metrics
-- Heavy Keeper instance if top-K sampling mode
+- Heavy Keeper instance if top-K sampling mode or Spread Sketch instance if top-cardinality sampling mode
 
 Note that every cell will have its only metric, so the memory cost by metrics should be multiplied by cell number.
 
@@ -106,7 +121,7 @@ $$ 2 sizeof(tag) + 112$$
 
 
 #### Heavy Keeper
-As shown in table. For K above 1000, the size of sketch will hardly increase, the marginal memory cost will be storing cells. Table entry Memory is the memory cost of a initialed cube, while Memory_max is that after cube is full.
+As shown in table. For K above 1000, the size of sketch will hardly increase, the marginal memory cost will be storing cells. Memory is the memory cost of a initialed heavykeeper(Sketch memory cost), while Memory_max is that after cube is full(adding keys and hash handles in sorted set).
 
 | K    | w    | d   | Memory(kB) | Memory_max(kB) |
 | ---- | ---- | --- | ---------- | -------------- |
@@ -115,19 +130,16 @@ As shown in table. For K above 1000, the size of sketch will hardly increase, th
 | 500  | 1125 | 3   | 27.168     | 90.168         |
 | 1000 | 1951 | 3   | 46.992     | 172.992        |
 
-#### Memory used when merge
-The instance used for merge will allocate a hash table to store all cube tags and a hash table to store all metric names, which costs extra memory. 
+#### Spread Sketch
+Spread Sketch memory cost constists of two parts: the memory cost of a initialed Spread Sketch(sketch memory cost), and the memory cost of storing cells in a hash list. The memory cost of hash list is quite unstable, but can be estimated by K * 1.7 * 7 Bytes, where 1.7 is the ratio of actually stored entries number to the maximum number of entries, and 7 bytes is the size of a hash handle and 2 pointers.
 
-$$ (numM + numC) * (88 + \bar{namelen})$$
+| K    | w    | d   | Precision |Memory(kB) |  Memory_max(kB) |  
+| ---- | ---- | --- | ---------- | ---------- | ---------- | 
+| 10   | 40   | 3   | 6       | 1.75      | 1.82     |
+| 100  | 150  | 3   | 6      | 6.60     | 7.76     |
+| 500  | 550  | 3   | 6     | 24.16     | 29.97 |
+| 1000 | 1050 | 3   | 6    | 46.14     | 57.76 |
 
-#### Memory used when export
-It is hard to calculate memory usage of CJSON. By experiment, RSS to different cell numbers are shown below.
-
-| cell number | RSS(kB) |
-| ----------- | ------- |
-| 10000       | 2648    |
-| 20000       | 5136    |
-| 40000       | 9540    |
 
 ## performance
 ### environment
