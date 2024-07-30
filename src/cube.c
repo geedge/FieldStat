@@ -556,7 +556,7 @@ int cube_set_sampling(struct cube *cube, enum sampling_mode mode, int max_n_cell
     case SAMPLING_MODE_TOP_CARDINALITY: {
         int width, depth;
         unsigned char precision;
-        spread_sketch_get_parameter_recommendation(max_n_cell, &depth, &width, &precision);
+        spread_sketch_recommend_parameters(max_n_cell, &depth, &width, &precision);
         cube->spread_sketch = spread_sketch_new(depth, width, precision, 0, DUMMY_TIME_VAL);
         spread_sketch_set_exdata_schema(cube->spread_sketch, exdata_new_i, exdata_free_i, exdata_merge_i, exdata_reset_i, exdata_copy_i);
         break; }
@@ -1093,7 +1093,7 @@ void cube_get_cells(const struct cube *cube, struct field_list **cell_dimensions
             heavy_keeper_list(cube->heavykeeper, (void **)cell_datas, n_cell_tmp);
             break;
         case SAMPLING_MODE_TOP_CARDINALITY: {
-            spread_sketch_list_keys(cube->spread_sketch, &spread_sketch_keys, &spread_sketch_keys_lens, &n_cell_tmp);
+            spread_sketch_list_entries(cube->spread_sketch, &spread_sketch_keys, &spread_sketch_keys_lens, &n_cell_tmp);
             for (int i = 0; i < n_cell_tmp; i++) {
                 cell_datas[i] = spread_sketch_get0_exdata(cube->spread_sketch, spread_sketch_keys[i], spread_sketch_keys_lens[i]);
             }

@@ -201,7 +201,7 @@ struct entry_table *smart_ptr_table_new() {
 }
 
 struct spread_sketch *spread_sketch_new(int depth, int width, unsigned char precision, int time_window_ms, struct timeval now) {
-    struct spread_sketch *pthis = malloc(sizeof(struct spread_sketch));
+    struct spread_sketch *pthis = calloc(1, sizeof(struct spread_sketch));
 
     pthis->depth = depth;
     pthis->width = width;
@@ -240,7 +240,7 @@ void move_registers_forward(struct spread_sketch *ss, const struct timeval *now)
 }
 
 // return 0 if not added, return 1 if added
-int spread_sketch_add_hash(struct spread_sketch *ss, const char *key, size_t key_length, uint64_t item_hash, void *arg, struct timeval now) {
+int spread_sketch_add_hash(struct spread_sketch *ss, const char *entry, size_t entry_length, uint64_t item_hash, void *arg, struct timeval now) {
     uint32_t level = (uint32_t)__builtin_clzll(item_hash) + 1;
     long long now_ms = now.tv_sec * 1000 + now.tv_usec / 1000;
 
@@ -254,7 +254,7 @@ int spread_sketch_add_hash(struct spread_sketch *ss, const char *key, size_t key
     // https://www.eecs.harvard.edu/~michaelm/postscripts/tr-02-05.pdf
     // A technique from the hashing literature is to use two hash functions h1(x) and h2(x) to simulate additional hash functions of the form gi(x) = h1(x) + ih2(x)
     // Assuming that the 128-bit xxhash function is perfect, we can view it as a combination of two 64-bit hash functions.
-    uint64_t hash_x_tmp = XXH3_64bits_withSeed(key, key_length, 171);
+    uint64_t hash_x_tmp = XXH3_64bits_withSeed(entry, entry_length, 171);
     uint32_t hash_x1 = (uint32_t) (hash_x_tmp >> 32);
     uint32_t hash_x2 = (uint32_t) hash_x_tmp;
 
@@ -265,7 +265,7 @@ int spread_sketch_add_hash(struct spread_sketch *ss, const char *key, size_t key
         int bucket_idx = (hash_x % ss->width) + i * ss->width;
         struct bucket *bucket = &ss->buckets[bucket_idx];
 
-        if (bucket->content != NULL && key_equal(bucket->content->key, bucket->content->key_len, key, key_length)) {
+        if (bucket->content != NULL && key_equal(bucket->content->key, bucket->content->key_len, entry, entry_length)) {
             bucket->content->dying = false;
             bucket->last_update_ms = now_ms;
 
@@ -289,7 +289,7 @@ int spread_sketch_add_hash(struct spread_sketch *ss, const char *key, size_t key
                 if (content_old != NULL) {
                     smart_ptr_table_release(ss->table, content_old->key, content_old->key_len);
                 }
-                struct entry *content_new = smart_ptr_table_get(ss->table, key, key_length, arg);
+                struct entry *content_new = smart_ptr_table_get(ss->table, entry, entry_length, arg);
                 bucket->content = content_new;
 
                 bucket->last_update_ms = now_ms;
@@ -304,13 +304,13 @@ int spread_sketch_add_hash(struct spread_sketch *ss, const char *key, size_t key
     return in_sketch ? 1 : 0;
 }
 
-int spread_sketch_add(struct spread_sketch *ss, const char *key, size_t key_length, const char* item, size_t item_len, void *arg, struct timeval now) {
+int spread_sketch_add(struct spread_sketch *ss, const char *entry, size_t entry_length, const char* item, size_t item_len, void *arg, struct timeval now) {
     uint64_t hash = XXH3_64bits(item, item_len);
-    return spread_sketch_add_hash(ss, key, key_length, hash, arg, now);
+    return spread_sketch_add_hash(ss, entry, entry_length, hash, arg, now);
 }
 
-double spread_sketch_point_query(const struct spread_sketch *ss, const char *key, size_t key_length) {
-    uint64_t hash_x_tmp = XXH3_64bits_withSeed(key, key_length, 171);
+double spread_sketch_point_query(const struct spread_sketch *ss, const char *entry, size_t entry_length) {
+    uint64_t hash_x_tmp = XXH3_64bits_withSeed(entry, entry_length, 171);
     uint32_t hash_x1 = (uint32_t) (hash_x_tmp >> 32);
     uint32_t hash_x2 = (uint32_t) hash_x_tmp;
 
@@ -344,14 +344,14 @@ struct spread_sketch *duplicate_and_step(const struct spread_sketch *ss, const s
     return duplicate;
 }
 
-double spread_sketch_query(const struct spread_sketch *ss, const char *key, size_t key_length, struct timeval now) {    
+double spread_sketch_query(const struct spread_sketch *ss, const char *entry, size_t entry_length, struct timeval now) {    
     if (ss->time_window_ms!=0 && hll_should_slide(ss->precision, ss->time_window_ms, now, ss->reset_time)) {
         struct spread_sketch *duplicate = duplicate_and_step(ss, &now);
-        double ret = spread_sketch_point_query(duplicate, key, key_length);
+        double ret = spread_sketch_point_query(duplicate, entry, entry_length);
         spread_sketch_free(duplicate);
         return ret;
     } else {
-        return spread_sketch_point_query(ss, key, key_length);
+        return spread_sketch_point_query(ss, entry, entry_length);
     }
 }
 
@@ -494,12 +494,12 @@ size_t spread_sketch_list(const struct spread_sketch *ss, void **exdatas, size_t
     return count;
 }
 
-void spread_sketch_list_keys(const struct spread_sketch *ss, char ***keys, size_t **key_lens, size_t *n_keys) {
+void spread_sketch_list_entries(const struct spread_sketch *ss, char ***entries, size_t **entry_lens, size_t *n_entry) {
     size_t count_max = HASH_COUNT(ss->table->entry);
     size_t count = 0;
 
-    *keys = malloc(count_max * sizeof(char *));
-    *key_lens = malloc(count_max * sizeof(size_t));
+    *entries = malloc(count_max * sizeof(char *));
+    *entry_lens = malloc(count_max * sizeof(size_t));
 
     struct entry *content, *tmp;
     HASH_ITER(hh, ss->table->entry, content, tmp) {
@@ -507,12 +507,12 @@ void spread_sketch_list_keys(const struct spread_sketch *ss, char ***keys, size_
             continue;
         }
 
-        (*keys)[count] = content->key;
-        (*key_lens)[count] = content->key_len;
+        (*entries)[count] = content->key;
+        (*entry_lens)[count] = content->key_len;
         count++;
     }
 
-    *n_keys = count;
+    *n_entry = count;
 }
 
 double spread_sketch_get_cardinality(const struct spread_sketch *ss, const char *key, size_t key_len) {
@@ -524,8 +524,8 @@ double spread_sketch_get_cardinality(const struct spread_sketch *ss, const char 
     return est;
 }
 
-char *spread_sketch_get_hll_base64_serialization(const struct spread_sketch *ss, const char *key, size_t key_len) {
-    uint64_t hash_x_tmp = XXH3_64bits_withSeed(key, key_len, 171);
+char *spread_sketch_get_hll_base64_serialization(const struct spread_sketch *ss, const char *entry, size_t entry_len) {
+    uint64_t hash_x_tmp = XXH3_64bits_withSeed(entry, entry_len, 171);
     uint32_t hash_x1 = (uint32_t) (hash_x_tmp >> 32);
     uint32_t hash_x2 = (uint32_t) hash_x_tmp;
     uint32_t *register_ret = NULL;
@@ -572,7 +572,7 @@ struct spread_sketch *spread_sketch_copy(const struct spread_sketch *src) {
     return dst;
 }
 
-void spread_sketch_get_parameter_recommendation(int expected_super_spreader_number, int *depth_out, int *width_out, unsigned char *precision_out)
+void spread_sketch_recommend_parameters(int expected_super_spreader_number, int *depth_out, int *width_out, unsigned char *precision_out)
 {
     int logk = expected_super_spreader_number >= 3200 ? 4 : 3; // lg3200 = 3.51,round up to 4
     *depth_out = logk;
@@ -699,16 +699,18 @@ void spread_sketch_merge_blob(struct spread_sketch *dst, const char *blob, size_
     spread_sketch_free(src);
 }
 
+struct spread_sketch *spread_sketch_replicate(uuid_t uuid, const char *blob, size_t blob_sz) {
+    return spread_sketch_deserialize(blob, blob_sz);
+}
+
 size_t spread_sketch_calculate_memory_usage(const struct spread_sketch *ss)
 {
     size_t ret = 0;
     ret += sizeof(struct spread_sketch);
 
     size_t bucket_size = sizeof(struct bucket) + hll_size(ss->precision);
-    printf("every bucket size: %zu\n", bucket_size);
     ret += ss->depth * ss->width * bucket_size;
 
-    printf("the number of content: %u\n", HASH_COUNT(ss->table->entry));
     struct entry *content, *tmp;
     HASH_ITER(hh, ss->table->entry, content, tmp) {
         ret += sizeof(struct entry);
