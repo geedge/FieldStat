@@ -165,7 +165,7 @@ All the metrics in fieldstat easy are dynamic, which means that the metrics has 
 
 ## Example 
 ### coding
-```
+``` C
 #include "fieldstat_easy.h"
 
 const int N_THREADS = 3;
@@ -205,7 +205,7 @@ fieldstat_easy_free(fse);
 ```
 
 ### raw output
-```
+``` json
 [
     {
         "name": "-",
@@ -220,7 +220,7 @@ fieldstat_easy_free(fse);
         "fields_delta": {
             "bytes": 31689,
             "delay": "HISTEwAAAOgAAAAAAAAAAQAAAAAAAAABAAAAAAAAJxA/8AAAAAAAAAQEAQYKCgIEAggECgYECgQGBAYIDgoMAgQBCgQECAICEAIUDBIUEg4ECAwKDBQGFCAWFBYYFBIcIhogGhYiEhg6JDQ4NDw+GjouOC4oMC4ufGZidGhaYGBMXGJYYk5eXugBrAHYAdQB7AHeAcoB3AHAAfIBwAHYAdgBwgG+Ae4BzgOqA6QDsAOUA64DrAOMA4gD5gL4ArAD4AKYA44DtAOCBvgFkgaiBrIG1AasBswG0ga2BqAGpAaKBrYGpAamBvAM3AzWDI4NgA2mDKIMkg2uDIANiA3gDMQMlA2ODfIM2hikGf4XjA0AAAAAAAAA"
-        }
+        },
         "timestamp_ms": 5507527913,
         "timestamp_ms_delta": 1002
     },
@@ -234,20 +234,22 @@ fieldstat_easy_free(fse);
             "bytes": 5857,
             "delay": "HISTEwAAAUYAAAAAAAAAAQAAAAAAAAABAAAAAAAAJxA/8AAAAAAAAJABbHh8ZnZccHp2gAFUaIABdmaCAXx0YoQBdGyMAXhsggF6eowBggGCAfAB6AGWAvQB9AHyAdYB4AHoAeoB3gHEAcwBrgKKAtgB5gPQA7QD5APIA8wD4gO+A+YDxAO2A8ADwgPAA8QD5gOEB5wHhAfQB9gHvAfwB6QHuAe6B/QGxAecB7QHqAfeB/INsA+ODtIO2g2QDo4OrA7WDtYN/A7qDcQN9A6WDpYP3h7OHqwdnhyeHYge7B2EHaQesB7QHaId+B2MHaYejh3gOvI6jDuyOqI7qjqMOpo7mDqeOvI6iDuiOrQ7lDqKOpZztHDuc+x2onbkdoR0hnSAdZR03naWdK5z6nX8dZh1vugBvOcBqusB2OsBkOgB+OkB3OoBxOoB9ukB9uwBqOwBnuoB8OkBxusBsugB7OoBptMD5tEDpNUDivcBAAAAAAAAAA==",
         },
-        "fields_delta: {
-        }
+        "fields_delta": {
+        },
         "timestamp_ms": 5507527913,
         "timestamp_ms_delta": 1002
-    }****
+    }
 ]
 ```
 
-Another way to output is to use the `fieldstat_easy_output` function, the output of which is a c-string in json format. The output format is *different* from the above. `fieldstat_easy_output` is stateless and constant, and will only output accumulated data.
 
 Explaination of the output format:
  - `name` Always `-`. Just omit it.
  - `tags` The tags of the fields. It contains the global tags and the tags of the metrics. The tags of the metrics are the same as the arguments of `fieldstat_easy_counter_incrby` and `fieldstat_easy_histogram_record`.
  - `fields` The fields of the metrics. The fields of the counter (`bytes` in example) are of integer type, and the fields of the histogram (`delay` in example) are of string type(in base64 format). Those with key ending with `_delta` are metrics recording the values of the current output interval, while the value of the fields is the value of all time. For example, when the metric is to record packet sum, time interval set to 1, the field "sum_delta" records speed.
+
+
+Another way to output is to use the `fieldstat_easy_output` function, the output of which is a c-string in json format. The output format is *different* from the above, following the "flag" format restriction, as is in `fieldstat_json_exporter_export_flat` .`fieldstat_easy_output` is stateless and constant, and will only output accumulated data.
 
 The output histogram is a base64 encoded string. For the formatted output, use python command lines.
 

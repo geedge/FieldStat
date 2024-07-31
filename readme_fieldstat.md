@@ -40,7 +40,7 @@ Uses statistical techniques to estimate the number of elements in a set that con
 Download fieldstat4 rpm from https://repo.geedge.net/pulp/content/ and install rpm package.
 
 ### Statistic
-```
+``` C
 #include "fieldstat.h"
 
 struct fieldstat *instance = fieldstat_new();
@@ -58,7 +58,7 @@ fieldstat_free(instance);
 ```
 
 ### 多实例使用
-```
+``` C
 struct fieldstat *master = fieldstat_new();
 // other operations like cube_create and metric_register
 for (int i = 0; i < INSTANCE_NUM; i++) {
@@ -77,11 +77,11 @@ for (int i = 0; i < INSTANCE_NUM; i++) {
 ```
 
 ### Export
-```
+``` C
 
 struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new(instance);
 // optional
-fieldstat_json_exporter_set_global_tag(fieldstat_json_exporter, YOUR_GLOBAL_TAG, YOUR_GLOBAL_TAG_LENGTH);
+fieldstat_json_exporter_set_global_dimension(fieldstat_json_exporter, YOUR_GLOBAL_TAG, YOUR_GLOBAL_TAG_LENGTH);
 // optional
 fieldstat_json_exporter_set_name(fieldstat_json_exporter, "any name for this exporter");
 
