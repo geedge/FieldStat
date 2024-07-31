@@ -120,7 +120,7 @@ void fill_random_tag(Fieldstat_tag_list_wrapper *fields[], int tag_list_num)
 cJSON *test_exporter_extract_results_with_standard_global(const struct fieldstat *instance)
 {
     struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new();
-    fieldstat_json_exporter_set_global_tag(fieldstat_json_exporter, TEST_TAG_GLOBAL, 3);
+    fieldstat_json_exporter_set_global_dimension(fieldstat_json_exporter, TEST_TAG_GLOBAL, 3);
 
     char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, instance, &TEST_TIMEVAL);
     cJSON *root_arr = cJSON_Parse(json_string);
@@ -744,7 +744,7 @@ TEST(export_test, enable_delta_and_export_instance_with_many_cells_with_global_t
 
     // export test
     struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new();
-    fieldstat_json_exporter_set_global_tag(fieldstat_json_exporter, TEST_TAG_GLOBAL, 3);
+    fieldstat_json_exporter_set_global_dimension(fieldstat_json_exporter, TEST_TAG_GLOBAL, 3);
     fieldstat_json_exporter_set_name(fieldstat_json_exporter, "test_instance");
     fieldstat_json_exporter_enable_delta(fieldstat_json_exporter);
     char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, instance, &TEST_TIMEVAL);
@@ -874,7 +874,7 @@ TEST(export_test, enable_delta_and_reset_on_change_exporter_name) {
 
 TEST(export_test, enable_delta_and_reset_on_change_exporter_tag) {
     auto trigger = [](struct fieldstat *instance, struct fieldstat_json_exporter *fieldstat_json_exporter) {
-        fieldstat_json_exporter_set_global_tag(fieldstat_json_exporter, TEST_TAG_GLOBAL, 3);
+        fieldstat_json_exporter_set_global_dimension(fieldstat_json_exporter, TEST_TAG_GLOBAL, 3);
     };
 
     test_reset_one_round(trigger);
@@ -1020,7 +1020,7 @@ TEST(export_test, delta_with_two_instance_different_cell)
 TEST(export_test, export_flat_null_with_only_global_tag) {
     struct fieldstat *instance = fieldstat_new();
     struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new();
-    fieldstat_json_exporter_set_global_tag(fieldstat_json_exporter, TEST_TAG_GLOBAL, 3);
+    fieldstat_json_exporter_set_global_dimension(fieldstat_json_exporter, TEST_TAG_GLOBAL, 3);
 
     char **out_array = NULL;
     size_t out_array_len = 0;
@@ -1043,7 +1043,7 @@ TEST(export_test, export_flat_many_tags_many_cell) {
     fieldstat_counter_incrby(instance, cube_id, metric_id, &TEST_FIELD_DOUBLE, 1, 321);  
 
     struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new();
-    fieldstat_json_exporter_set_global_tag(fieldstat_json_exporter, TEST_TAG_GLOBAL, 3);
+    fieldstat_json_exporter_set_global_dimension(fieldstat_json_exporter, TEST_TAG_GLOBAL, 3);
 
     char **out_array = NULL;
     size_t out_array_len = 0;

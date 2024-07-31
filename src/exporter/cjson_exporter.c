@@ -974,7 +974,7 @@ struct fieldstat_json_exporter *fieldstat_json_exporter_new()
     return exporter;
 }
 
-void fieldstat_json_exporter_set_global_tag(struct fieldstat_json_exporter *exporter, const struct field tag_list[], size_t n_field)
+void fieldstat_json_exporter_set_global_dimension(struct fieldstat_json_exporter *exporter, const struct field tag_list[], size_t n_field)
 {
     if (exporter->global_tag_list != NULL) {
         free(exporter->global_tag_list->field);

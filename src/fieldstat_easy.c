@@ -128,7 +128,7 @@ struct fieldstat_easy *fieldstat_easy_new(int max_thread_num, const char *name, 
     fse->accumulate = fieldstat_fork(fse->delta);
     fse->exporter = fieldstat_json_exporter_new();
     if (global_dimensions != NULL && n_dimension > 0) {
-        fieldstat_json_exporter_set_global_tag(fse->exporter, global_dimensions, n_dimension);
+        fieldstat_json_exporter_set_global_dimension(fse->exporter, global_dimensions, n_dimension);
     }
     if (name != NULL) {
         fieldstat_json_exporter_set_name(fse->exporter, name);
