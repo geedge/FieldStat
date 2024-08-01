@@ -127,13 +127,23 @@ struct fieldstat_easy *fieldstat_easy_new(int max_thread_num, const char *name, 
 
     fse->accumulate = fieldstat_fork(fse->delta);
     fse->exporter = fieldstat_json_exporter_new();
-    if (global_dimensions != NULL && n_dimension > 0) {
-        fieldstat_json_exporter_set_global_dimension(fse->exporter, global_dimensions, n_dimension);
-    }
+
     if (name != NULL) {
-        fieldstat_json_exporter_set_name(fse->exporter, name);
+        struct field *global_dimension_more = malloc(sizeof(struct field) * (n_dimension + 1));
+        global_dimension_more[0].key = "__name__";
+        global_dimension_more[0].value_str = name;
+        global_dimension_more[0].type = FIELD_VALUE_CSTRING;
+        for (size_t i = 0; i < n_dimension; i++) {
+            global_dimension_more[i + 1] = global_dimensions[i];
+        }
+        fieldstat_json_exporter_set_global_dimension(fse->exporter, global_dimension_more, n_dimension + 1);
+        free(global_dimension_more);
+    } else {
+        if (global_dimensions != NULL && n_dimension > 0) {
+            fieldstat_json_exporter_set_global_dimension(fse->exporter, global_dimensions, n_dimension);
+        }
     }
-    
+
     pthread_spin_init(&fse->outputting_lock, PTHREAD_PROCESS_PRIVATE);
 
     for (int i = 0; i < max_thread_num; i++) {

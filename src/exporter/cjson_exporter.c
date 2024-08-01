@@ -19,7 +19,6 @@
     An example: 
     [
        {
-        "name":"exporter_name",
         "tags":[
             {"device ID":123},
             {"CLIENT IP":"123.1.1.1"}
@@ -32,7 +31,6 @@
         "timestamp_ms":123456789
        }.
       {
-        "name":"exporter_name",
         "tags":[
             {"device ID":123},
             {"CLIENT IP":"1.2.3.4"}
@@ -45,7 +43,6 @@
        }
     ]
 */
-#define DEFAULT_EXPORTER_NAME "-"
 #define NIL_TAG_JSON "\anil"
 
 struct counter_history;
@@ -60,7 +57,6 @@ struct export_kv_pair {
 };
 
 struct fieldstat_json_exporter {
-    char *name;
     struct field_list *global_tag_list;
     struct counter_history *history;
     long long last_ts;
@@ -101,7 +97,6 @@ struct counter_history {
     struct tag_metric_map *rec;
     long long ts;
 
-    char *exporter_name;
     struct field_list *global_tag_list;
 };
 
@@ -156,7 +151,6 @@ long long cal_ms_time(const struct timeval *ts)
 struct counter_history *counter_history_new()
 {
     struct counter_history *history = calloc(1, sizeof(struct counter_history));
-    history->exporter_name = strdup(DEFAULT_EXPORTER_NAME);
     return history;
 }
 
@@ -205,8 +199,6 @@ void counter_history_free(struct counter_history *history)
         free(tag_node->key);
         free(tag_node);
     }
-
-    free(history->exporter_name);
 
     if (history->global_tag_list != NULL) {
         fieldstat_field_list_arr_free(history->global_tag_list, 1);
@@ -286,16 +278,8 @@ bool counter_history_check_if_need_to_update(const struct fieldstat_json_exporte
     if (history == NULL) {
         return false; // delta export disabled
     }
-    if (history->exporter_name == NULL) { // first time
-        return true;
-    }
 
-    const char *cur_exporter_name = exporter->name ? exporter->name : DEFAULT_EXPORTER_NAME;
     const struct field_list *cur_global_tag_list = exporter->global_tag_list;
-
-    if (strcmp(history->exporter_name, cur_exporter_name) != 0) {
-        return true;
-    }
 
     if (history->global_tag_list == NULL && cur_global_tag_list != NULL) {
         return true;
@@ -313,11 +297,8 @@ bool counter_history_check_if_need_to_update(const struct fieldstat_json_exporte
 
 void counter_history_fill_version_info(struct counter_history *history, struct fieldstat_json_exporter *exporter, const struct fieldstat *instance)
 {
-    const char *cur_exporter_name = exporter->name ? exporter->name : DEFAULT_EXPORTER_NAME;
     const struct field_list *cur_global_tag_list = exporter->global_tag_list;
 
-    free(history->exporter_name);
-    history->exporter_name = strdup(cur_exporter_name);
     if (cur_global_tag_list != NULL) {
         history->global_tag_list = field_list_dup(cur_global_tag_list);
     }
@@ -770,7 +751,6 @@ int add_object_to_json_array(char **buf, int *buf_len, int start, const char *st
 }
 /*
     {
-        "name":<exporter name>
         "tags": {
             "device_id":<>
             "IP":<>
@@ -826,10 +806,7 @@ void fieldstat_json_exporter_export_array(const struct fieldstat_json_exporter *
             write_delta_to_json((struct fieldstat_json_exporter *)exporter, &tag_field_pair[i], field_json_delta);
         }
 
-        const char *tmp_name = exporter->name ? exporter->name : DEFAULT_EXPORTER_NAME;
-
         json_writer_start_map(root);
-        json_writer_str_field(root, "name", tmp_name, strlen(tmp_name));
         json_writer_object_item(root, "tags", current->tag_json_obj);
         json_writer_object_item(root, "fields", field_json);
         if (exporter->history != NULL) {
@@ -909,8 +886,6 @@ char *fieldstat_json_exporter_export_with_delta(const struct fieldstat_json_expo
     for (int i = 0; i < n_pair_acc; i++) {
         struct cellwise_rec_for_export *current = &expair_acc[i];
 
-        const char *tmp_name = exporter->name ? exporter->name : DEFAULT_EXPORTER_NAME;
-
         struct json_writer *field_json = json_writer_init();
         for (int j = 0; j < expair_acc[i].n_metric; j++) {
             kv_pair_write_to_json(expair_acc[i].metric_pairs[j], field_json);
@@ -924,7 +899,6 @@ char *fieldstat_json_exporter_export_with_delta(const struct fieldstat_json_expo
         }
 
         json_writer_start_map(root);
-        json_writer_str_field(root, "name", tmp_name, strlen(tmp_name));
         json_writer_object_item(root, "tags", current->tag_json_obj);
         json_writer_object_item(root, "fields", field_json);
         json_writer_object_item(root, "fields_delta", field_json_delta);
@@ -967,7 +941,6 @@ char *fieldstat_json_exporter_export_with_delta(const struct fieldstat_json_expo
 struct fieldstat_json_exporter *fieldstat_json_exporter_new()
 {
     struct fieldstat_json_exporter *exporter = (struct fieldstat_json_exporter *)malloc(sizeof(struct fieldstat_json_exporter));
-    exporter->name = NULL;
     exporter->global_tag_list = NULL;
     exporter->history = NULL;
     exporter->last_ts = 0;
@@ -1006,19 +979,8 @@ void fieldstat_json_exporter_set_global_dimension(struct fieldstat_json_exporter
     }
 }
 
-void fieldstat_json_exporter_set_name(struct fieldstat_json_exporter *exporter, const char *name)
-{
-    if (exporter->name != NULL) {
-        free(exporter->name);
-    }
-    exporter->name = strdup(name);
-}
-
 void fieldstat_json_exporter_free(struct fieldstat_json_exporter *exporter)
 {
-    if (exporter->name != NULL) {
-        free(exporter->name);
-    }
     if (exporter->global_tag_list != NULL) {
         fieldstat_field_list_arr_free(exporter->global_tag_list, 1);
     }
@@ -1060,8 +1022,6 @@ void fieldstat_json_exporter_export_flat_array(const struct fieldstat_json_expor
             kv_pair_write_to_json(tag_field_pair[i].metric_pairs[j], root);
         }
 
-        const char *tmp_name = exporter->name ? exporter->name : DEFAULT_EXPORTER_NAME;
-        json_writer_str_field(root, "name", tmp_name, strlen(tmp_name));
         json_writer_longlong_field(root, "timestamp_ms", timestamp_ms);
 
         char *cjson_str;

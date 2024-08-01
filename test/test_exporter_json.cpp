@@ -745,7 +745,6 @@ TEST(export_test, enable_delta_and_export_instance_with_many_cells_with_global_t
     // export test
     struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new();
     fieldstat_json_exporter_set_global_dimension(fieldstat_json_exporter, TEST_TAG_GLOBAL, 3);
-    fieldstat_json_exporter_set_name(fieldstat_json_exporter, "test_instance");
     fieldstat_json_exporter_enable_delta(fieldstat_json_exporter);
     char *json_string = fieldstat_json_exporter_export(fieldstat_json_exporter, instance, &TEST_TIMEVAL);
     cJSON *root_arr = cJSON_Parse(json_string);
@@ -862,14 +861,6 @@ void test_reset_one_round(std::function<void(struct fieldstat *, struct fieldsta
 
     fieldstat_json_exporter_free(fieldstat_json_exporter);
     fieldstat_free(instance);
-}
-
-TEST(export_test, enable_delta_and_reset_on_change_exporter_name) {
-    auto trigger = [](struct fieldstat *instance, struct fieldstat_json_exporter *fieldstat_json_exporter) {
-        fieldstat_json_exporter_set_name(fieldstat_json_exporter, "test_instance");
-    };
-
-    test_reset_one_round(trigger);
 }
 
 TEST(export_test, enable_delta_and_reset_on_change_exporter_tag) {
