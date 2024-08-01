@@ -461,7 +461,7 @@ int cell_iter_next_cube(struct cell_iter *iter) {
             continue;
         }
 
-        iter->cube_dimension = fieldstat_cube_get_dimensions(iter->instance, iter->cube_ids[iter->curr_cube_idx]);
+        iter->cube_dimension = fieldstat_cube_get_dimension(iter->instance, iter->cube_ids[iter->curr_cube_idx]);
         iter->curr_cell_idx = 0;
         return 1;
     }
@@ -505,7 +505,7 @@ int cell_iter_next(struct cell_iter *iter) {
 
 struct export_kv_pair *cell_query_with_iter(const struct cell_iter *iter, int metric_id) {
     int cube_id = iter->cube_ids[iter->curr_cube_idx];
-    enum metric_type type = fieldstat_get_metric_type(iter->instance, cube_id, metric_id);
+    enum metric_type type = fieldstat_metric_get_type(iter->instance, cube_id, metric_id);
     struct export_kv_pair *ret = NULL;
     if (type == METRIC_TYPE_COUNTER) {
         long long value;
@@ -514,7 +514,7 @@ struct export_kv_pair *cell_query_with_iter(const struct cell_iter *iter, int me
             return NULL;
         }
         ret = malloc(sizeof(struct export_kv_pair));
-        ret->key = strdup(fieldstat_get_metric_name(iter->instance, cube_id, metric_id));
+        ret->key = strdup(fieldstat_metric_get_name(iter->instance, cube_id, metric_id));
         ret->type = FIELD_VALUE_INTEGER;
         ret->value_longlong = value;
         return ret;
@@ -527,7 +527,7 @@ struct export_kv_pair *cell_query_with_iter(const struct cell_iter *iter, int me
             return NULL;
         }
         ret = malloc(sizeof(struct export_kv_pair));
-        ret->key = strdup(fieldstat_get_metric_name(iter->instance, cube_id, metric_id));
+        ret->key = strdup(fieldstat_metric_get_name(iter->instance, cube_id, metric_id));
         ret->type = FIELD_VALUE_CSTRING;
         ret->value_str = value;
         return ret;
@@ -620,7 +620,7 @@ int json_obj_add(struct cellwise_rec_for_export *tag_field_pair, const struct ce
     struct export_kv_pair **fields = NULL;
     int *metric_ids = NULL;
     size_t n_metric = 0;
-    fieldstat_get_metric_in_cell(iter->instance, iter->cube_ids[iter->curr_cube_idx], &iter->cell_dimension[iter->curr_cell_idx], &metric_ids, &n_metric);
+    fieldstat_cell_get_metrics(iter->instance, iter->cube_ids[iter->curr_cube_idx], &iter->cell_dimension[iter->curr_cell_idx], &metric_ids, &n_metric);
     if (n_metric == 0) {
         // printf("cannot get metric in cell\n");
         return 0;
@@ -670,7 +670,7 @@ struct cellwise_rec_for_export *read_tag_and_field(const struct fieldstat *insta
 
     size_t n_cell_total = 0;
     for (int i = 0; i < cube_id_len; i++) {
-        n_cell_total += fieldstat_get_used_sampling(instance, cube_id[i]);
+        n_cell_total += fieldstat_cube_get_cell_number(instance, cube_id[i]);
     }
     free(cube_id);
     if (n_cell_total == 0) {

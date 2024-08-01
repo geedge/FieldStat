@@ -106,7 +106,7 @@ TEST(unit_test_merge, new_cube_and_metric_to_empty_comprehensive)
     int n_cube;
     fieldstat_get_cubes(instance_dest, &cube_id_dest, &n_cube);
     EXPECT_TRUE(n_cube == 1);
-    EXPECT_STREQ(fieldstat_get_metric_name(instance_dest, cube_id_dest[0], 0), "metric_name");
+    EXPECT_STREQ(fieldstat_metric_get_name(instance_dest, cube_id_dest[0], 0), "metric_name");
 
     fieldstat_free(instance);
     fieldstat_free(instance_dest);
@@ -128,7 +128,7 @@ TEST(unit_test_merge, new_cell_on_existing_cube_and_metric_comprehensive)
     int n_cube;
     fieldstat_get_cubes(instance_dest, &cube_id_dest, &n_cube);
     EXPECT_TRUE(n_cube == 1);
-    EXPECT_STREQ(fieldstat_get_metric_name(instance_dest, cube_id_dest[0], 0), "metric_name");
+    EXPECT_STREQ(fieldstat_metric_get_name(instance_dest, cube_id_dest[0], 0), "metric_name");
     free(cube_id_dest);
     long long measure = merge_test_fieldstat_counter_get(instance, cube_id, metric_id);
     EXPECT_EQ(measure, 10086);
@@ -156,7 +156,7 @@ TEST(unit_test_merge, merge_existing_cell_on_existing_cube_and_metric_comprehens
 
     fieldstat_merge(instance_dest, instance);
 
-    EXPECT_STREQ(fieldstat_get_metric_name(instance_dest, cube_id, 0), "metric_name");
+    EXPECT_STREQ(fieldstat_metric_get_name(instance_dest, cube_id, 0), "metric_name");
     long long measure = merge_test_fieldstat_counter_get(instance_dest, cube_id, metric_id);
     EXPECT_EQ(measure, 10);
 
@@ -210,17 +210,17 @@ TEST(unit_test_merge, new_too_many_cells_on_multiple_metric_given_source_cube_re
 
     int *metric_ids = NULL;
     size_t n_metrics = 0;
-    fieldstat_get_metric_in_cell(instance_dest, 0, &TEST_FIELD_LIST_STRING, &metric_ids, &n_metrics);
+    fieldstat_cell_get_metrics(instance_dest, 0, &TEST_FIELD_LIST_STRING, &metric_ids, &n_metrics);
     EXPECT_EQ(n_metrics, 1);
-    EXPECT_STREQ(fieldstat_get_metric_name(instance_dest, 0, metric_ids[0]), "metric name1");
+    EXPECT_STREQ(fieldstat_metric_get_name(instance_dest, 0, metric_ids[0]), "metric name1");
     free(metric_ids);
 
-    fieldstat_get_metric_in_cell(instance_dest, 0, &TEST_FIELD_LIST_INT, &metric_ids, &n_metrics);
+    fieldstat_cell_get_metrics(instance_dest, 0, &TEST_FIELD_LIST_INT, &metric_ids, &n_metrics);
     EXPECT_EQ(n_metrics, 1);
-    EXPECT_STREQ(fieldstat_get_metric_name(instance_dest, 0, metric_ids[0]), "metric name3");
+    EXPECT_STREQ(fieldstat_metric_get_name(instance_dest, 0, metric_ids[0]), "metric name3");
     free(metric_ids);
      // 3nd cell failed to merge, because max sampling is 2
-    fieldstat_get_metric_in_cell(instance_dest, 0, &TEST_FIELD_LIST_DOUBLE, &metric_ids, &n_metrics);
+    fieldstat_cell_get_metrics(instance_dest, 0, &TEST_FIELD_LIST_DOUBLE, &metric_ids, &n_metrics);
     EXPECT_EQ(n_metrics, 0);
 
     fieldstat_free(instance);
@@ -242,7 +242,7 @@ TEST(unit_test_merge, new_cube_and_metric_to_empty_topk)
     int n_cube;
     fieldstat_get_cubes(instance_dest, &cube_id_dest, &n_cube);
     EXPECT_TRUE(n_cube == 1);
-    EXPECT_STREQ(fieldstat_get_metric_name(instance_dest, cube_id_dest[0], 0), "metric_name");
+    EXPECT_STREQ(fieldstat_metric_get_name(instance_dest, cube_id_dest[0], 0), "metric_name");
 
     fieldstat_free(instance);
     fieldstat_free(instance_dest);
@@ -265,7 +265,7 @@ TEST(unit_test_merge, new_cell_on_existing_cube_and_metric_topk)
     int n_cube;
     fieldstat_get_cubes(instance_dest, &cube_id_dest, &n_cube);
     EXPECT_TRUE(n_cube == 1);
-    EXPECT_STREQ(fieldstat_get_metric_name(instance_dest,cube_id_dest[0], 0), "metric_name");
+    EXPECT_STREQ(fieldstat_metric_get_name(instance_dest,cube_id_dest[0], 0), "metric_name");
     free(cube_id_dest);
     long long measure = merge_test_fieldstat_counter_get(instance, cube_id, metric_id);
     EXPECT_EQ(measure, 10086);
@@ -299,7 +299,7 @@ TEST(unit_test_merge, merge_existing_cell_on_existing_cube_and_metric_topk)
     fieldstat_get_cubes(instance_dest, &cube_id_dest, &n_cube);
     EXPECT_TRUE(n_cube == 1);
     int ret_cube_id = cube_id_dest[0];
-    EXPECT_STREQ(fieldstat_get_metric_name(instance_dest,cube_id_dest[0], 0), "metric_name");
+    EXPECT_STREQ(fieldstat_metric_get_name(instance_dest,cube_id_dest[0], 0), "metric_name");
     free(cube_id_dest);
 
     struct field_list *tag_list = NULL;
@@ -521,7 +521,7 @@ TEST(unit_test_merge, new_cube_and_metric_to_empty_spreadsketch) {
     int n_cube;
     fieldstat_get_cubes(instance_dest, &cube_id_dest, &n_cube);
     EXPECT_TRUE(n_cube == 1);
-    EXPECT_STREQ(fieldstat_get_metric_name(instance_dest, cube_id_dest[0], 0), "metric");
+    EXPECT_STREQ(fieldstat_metric_get_name(instance_dest, cube_id_dest[0], 0), "metric");
 
     free(cube_id_dest);
     fieldstat_free(instance);
@@ -544,7 +544,7 @@ TEST(unit_test_merge, new_cell_on_existing_cube_and_metric_spreadsketch) {
     int n_cube;
     fieldstat_get_cubes(instance_dest, &cube_id_dest, &n_cube);
     EXPECT_TRUE(n_cube == 1);
-    EXPECT_STREQ(fieldstat_get_metric_name(instance_dest, cube_id_dest[0], 0), "metric");
+    EXPECT_STREQ(fieldstat_metric_get_name(instance_dest, cube_id_dest[0], 0), "metric");
     long long measure = merge_test_fieldstat_hll_get(instance, cube_id, metric_id);
     EXPECT_NEAR(measure, 2, 0.3);
 

@@ -31,7 +31,7 @@ TEST(test_register, delete_comprehensive_cube_with_cells_and_metrics)
 
     fieldstat_cube_destroy(instance, cube_id);
 
-    struct field_list *tag_list = fieldstat_cube_get_dimensions(instance, cube_id);
+    struct field_list *tag_list = fieldstat_cube_get_dimension(instance, cube_id);
     EXPECT_EQ(tag_list, nullptr);
     int cube_id_ret = fieldstat_find_cube(instance, &TEST_SHARED_TAG, 1);
     EXPECT_EQ(cube_id_ret, FS_ERR_INVALID_DIMENSION);
@@ -48,7 +48,7 @@ TEST(test_register, delete_topk_cube_with_cells_and_metrics)
     fieldstat_counter_incrby(instance, cube_id, metric_id, &TEST_FIELD_INT, 1, 1);
 
     fieldstat_cube_destroy(instance, cube_id);
-    struct field_list *tag_list = fieldstat_cube_get_dimensions(instance, cube_id);
+    struct field_list *tag_list = fieldstat_cube_get_dimension(instance, cube_id);
     EXPECT_EQ(tag_list, nullptr);
     int cube_id_ret = fieldstat_find_cube(instance, &TEST_SHARED_TAG, 1);
     EXPECT_EQ(cube_id_ret, FS_ERR_INVALID_DIMENSION);
@@ -68,7 +68,7 @@ TEST(test_register, delete_spreadsketch_cube_with_cells_and_metrics)
     fieldstat_hll_add_field(instance, cube_id, metric_primary, &TEST_FIELD_INT, 1, &TEST_FIELD_DOUBLE, 1);
 
     fieldstat_cube_destroy(instance, cube_id);
-    struct field_list *tag_list = fieldstat_cube_get_dimensions(instance, cube_id);
+    struct field_list *tag_list = fieldstat_cube_get_dimension(instance, cube_id);
     EXPECT_EQ(tag_list, nullptr);
     int cube_id_ret = fieldstat_find_cube(instance, &TEST_SHARED_TAG, 1);
     EXPECT_EQ(cube_id_ret, FS_ERR_INVALID_DIMENSION);
@@ -433,21 +433,21 @@ TEST(test_register, fork_registered_info_with_cube_and_metric)
     EXPECT_EQ(cube_num, 2);
     struct field_list *tag_list = NULL;
     
-    tag_list = fieldstat_cube_get_dimensions(dup, cube_ids[0]);
+    tag_list = fieldstat_cube_get_dimension(dup, cube_ids[0]);
     EXPECT_STREQ(tag_list->field[0].key, TEST_SHARED_TAG.key);
     fieldstat_field_list_arr_free(tag_list, 1);
     size_t n_cell = 0;
     fieldstat_cube_get_cells(dup, cube_ids[0], &tag_list, &n_cell);
     EXPECT_EQ(n_cell, 0);
 
-    tag_list = fieldstat_cube_get_dimensions(dup, cube_ids[1]);
+    tag_list = fieldstat_cube_get_dimension(dup, cube_ids[1]);
     EXPECT_STREQ(tag_list->field[0].key, TEST_FIELD_DOUBLE.key);
     
     fieldstat_field_list_arr_free(tag_list, 1);
 
-    EXPECT_STREQ(fieldstat_get_metric_name(dup, cube_ids[0], metric_id), "counter");
-    EXPECT_STREQ(fieldstat_get_metric_name(dup, cube_ids[0], metric_id2), "counter2");
-    EXPECT_EQ(fieldstat_get_metric_name(dup, cube_ids[1], metric_id), nullptr);
+    EXPECT_STREQ(fieldstat_metric_get_name(dup, cube_ids[0], metric_id), "counter");
+    EXPECT_STREQ(fieldstat_metric_get_name(dup, cube_ids[0], metric_id2), "counter2");
+    EXPECT_EQ(fieldstat_metric_get_name(dup, cube_ids[1], metric_id), nullptr);
 
     free(cube_ids);
     fieldstat_free(dup);
@@ -574,10 +574,10 @@ TEST(calibrate, target_one_more_metric)
 
     fieldstat_calibrate(master, target);
 
-    EXPECT_STREQ(fieldstat_get_metric_name(target, cube_id, 0), "counter");
+    EXPECT_STREQ(fieldstat_metric_get_name(target, cube_id, 0), "counter");
     EXPECT_EQ(fieldstat_cube_get_metric_id_by_name(target, cube_id, "counter"), 0);
     EXPECT_EQ(fieldstat_cube_get_metric_id_by_name(target, cube_id, "counter2"), FS_ERR_INVALID_METRIC_NAME);
-    struct field_list *tag_list = fieldstat_cube_get_dimensions(target, cube_id);
+    struct field_list *tag_list = fieldstat_cube_get_dimension(target, cube_id);
     EXPECT_STREQ(tag_list->field[0].key, TEST_SHARED_TAG.key);
 
     fieldstat_free(master);
@@ -595,11 +595,11 @@ TEST(calibrate, master_one_more_metric)
 
     fieldstat_calibrate(master, target);
 
-    EXPECT_STREQ(fieldstat_get_metric_name(target, cube_id,0), "counter");
-    EXPECT_STREQ(fieldstat_get_metric_name(target, cube_id,1), "counter2");
+    EXPECT_STREQ(fieldstat_metric_get_name(target, cube_id,0), "counter");
+    EXPECT_STREQ(fieldstat_metric_get_name(target, cube_id,1), "counter2");
     EXPECT_EQ(fieldstat_cube_get_metric_id_by_name(target, cube_id, "counter"), 0);
     EXPECT_EQ(fieldstat_cube_get_metric_id_by_name(target, cube_id, "counter2"), 1);
-    struct field_list *tag_list = fieldstat_cube_get_dimensions(target, cube_id);
+    struct field_list *tag_list = fieldstat_cube_get_dimension(target, cube_id);
     EXPECT_STREQ(tag_list->field[0].key, TEST_SHARED_TAG.key);
 
     fieldstat_free(master);
@@ -619,13 +619,13 @@ TEST(calibrate, different_metric)
 
     fieldstat_calibrate(master, target);
 
-    EXPECT_STREQ(fieldstat_get_metric_name(target, cube_id, 0), "counter");
-    EXPECT_STREQ(fieldstat_get_metric_name(target, cube_id, 1), "hi i am master new");
+    EXPECT_STREQ(fieldstat_metric_get_name(target, cube_id, 0), "counter");
+    EXPECT_STREQ(fieldstat_metric_get_name(target, cube_id, 1), "hi i am master new");
     EXPECT_EQ(fieldstat_cube_get_metric_id_by_name(target, cube_id, "counter2"), FS_ERR_INVALID_METRIC_NAME);
     EXPECT_EQ(fieldstat_cube_get_metric_id_by_name(target, cube_id, "counter"), 0);
     EXPECT_EQ(fieldstat_cube_get_metric_id_by_name(target, cube_id, "hi i am master new"), 1);
 
-    struct field_list *tag_list = fieldstat_cube_get_dimensions(target, cube_id);
+    struct field_list *tag_list = fieldstat_cube_get_dimension(target, cube_id);
     EXPECT_STREQ(tag_list->field[0].key, TEST_SHARED_TAG.key);
 
     fieldstat_free(master);
@@ -652,8 +652,8 @@ TEST(calibrate, target_more_cube)
     EXPECT_EQ(cube_ids[0], cube_id);
     free(cube_ids);
 
-    EXPECT_STREQ(fieldstat_get_metric_name(target, cube_id, 0), "counter");
-    struct field_list *tag_list = fieldstat_cube_get_dimensions(target, cube_id);
+    EXPECT_STREQ(fieldstat_metric_get_name(target, cube_id, 0), "counter");
+    struct field_list *tag_list = fieldstat_cube_get_dimension(target, cube_id);
     EXPECT_STREQ(tag_list->field[0].key, TEST_SHARED_TAG.key);
 
     EXPECT_EQ(fieldstat_find_cube(target, &TEST_SHARED_TAG, 1), 0);
@@ -681,9 +681,9 @@ TEST(calibrate, master_more_cube)
     EXPECT_EQ(cube_ids[1], cube_id2);
     free(cube_ids);
 
-    struct field_list *tag_list = fieldstat_cube_get_dimensions(target, cube_id);
+    struct field_list *tag_list = fieldstat_cube_get_dimension(target, cube_id);
     EXPECT_STREQ(tag_list->field[0].key, TEST_SHARED_TAG.key);
-    struct field_list *tag_list2 = fieldstat_cube_get_dimensions(target, cube_id2);
+    struct field_list *tag_list2 = fieldstat_cube_get_dimension(target, cube_id2);
     EXPECT_STREQ(tag_list2->field[0].key, TEST_FIELD_STRING.key);
 
     EXPECT_EQ(fieldstat_find_cube(target, &TEST_FIELD_STRING, 1), 1);
@@ -705,7 +705,7 @@ TEST(calibrate, master_change_cube)
 
     fieldstat_calibrate(master, target);
 
-    struct field_list *tag_list = fieldstat_cube_get_dimensions(target, cube_id);
+    struct field_list *tag_list = fieldstat_cube_get_dimension(target, cube_id);
     EXPECT_STREQ(tag_list->field[0].key, TEST_FIELD_STRING.key);
 
     EXPECT_EQ(fieldstat_find_cube(target, &TEST_FIELD_STRING, 1), 0);
@@ -787,7 +787,7 @@ TEST(calibrate, issue_calibrate_wrong)
     EXPECT_EQ(fieldstat_find_cube(target, tag_A, 1), FS_ERR_INVALID_DIMENSION);
     EXPECT_EQ(fieldstat_find_cube(target, tag_B, 1), cubes_id_ret[0]);
 
-    struct field_list *tag_list = fieldstat_cube_get_dimensions(target, cubes_id_ret[0]);
+    struct field_list *tag_list = fieldstat_cube_get_dimension(target, cubes_id_ret[0]);
     EXPECT_STREQ(tag_list->field[0].key, tag_B->key);
     fieldstat_field_list_arr_free(tag_list, 1);
 
@@ -819,7 +819,7 @@ TEST(calibrate, delete_first_cube)
     EXPECT_EQ(fieldstat_find_cube(target, tag_A, 1), FS_ERR_INVALID_DIMENSION);
     EXPECT_EQ(fieldstat_find_cube(target, tag_B, 1), 1);
 
-    struct field_list *tag_list = fieldstat_cube_get_dimensions(target, 1);
+    struct field_list *tag_list = fieldstat_cube_get_dimension(target, 1);
     EXPECT_STREQ(tag_list->field[0].key, tag_B->key);
     fieldstat_field_list_arr_free(tag_list, 1);
 

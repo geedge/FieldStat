@@ -175,26 +175,24 @@ struct field_list
 */
 void fieldstat_get_cubes(const struct fieldstat *instance, int **cube_ids, int *n_cube);
 
-void fieldstat_get_metric_in_cell(const struct fieldstat *instance, int cube_id, const struct field_list *cell_dimensions, int **metric_id_out, size_t *n_metric_out);
+void fieldstat_cell_get_metrics(const struct fieldstat *instance, int cube_id, const struct field_list *cell_dimensions, int **metric_id_out, size_t *n_metric_out);
 
 // query the name of the metric, return NULL if metric_id is invalid.
-const char *fieldstat_get_metric_name(const struct fieldstat *instance, int cube_id, int metric_id);
+const char *fieldstat_metric_get_name(const struct fieldstat *instance, int cube_id, int metric_id);
 
 // query the type of the metric. return (enum metric_type)-1 if metric_id is invalid.
-enum metric_type fieldstat_get_metric_type(const struct fieldstat *instance, int cube_id, int metric_id);
+enum metric_type fieldstat_metric_get_type(const struct fieldstat *instance, int cube_id, int metric_id);
 
 /*
     get the cell_dimensions added to cube when calling fieldstat_counter_incrby, fieldstat_counter_set, fieldstat_hll_add, fieldstat_histogram_record.
 */
 void fieldstat_cube_get_cells(const struct fieldstat *instance, int cube_id, struct field_list **cell_dimensions, size_t *n_cell);
-//todo: topk 的输出应该是有序的，总不能外面再排一遍
-// todo：_cube_删了，因为其实所有的都跟cube有关
 
 /*
     get the field of fieldstat_cube_create. User free them by calling fieldstat_field_list_arr_free(struct field_list *, 1)
     return NULL when ID is invalid.
 */
-struct field_list *fieldstat_cube_get_dimensions(const struct fieldstat *instance, int cube_id);
+struct field_list *fieldstat_cube_get_dimension(const struct fieldstat *instance, int cube_id);
 
 int fieldstat_cube_get_metric_id_by_name(const struct fieldstat *instance, int cube_id, const char *metric_name);
 
@@ -206,7 +204,7 @@ int fieldstat_find_cube(const struct fieldstat *instance, const struct field *cu
 /* 
     get the cell numbers in a cube. Return FS_ERR_INVALID_CUBE_ID if cube_id is invalid.
 */
-int fieldstat_get_used_sampling(const struct fieldstat *instance, int cube_id);
+int fieldstat_cube_get_cell_number(const struct fieldstat *instance, int cube_id);
 
 /*
     * @brief Get the value of a metric of a cell.

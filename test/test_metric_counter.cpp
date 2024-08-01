@@ -46,7 +46,7 @@ void test_assert_standard_instance(const struct fieldstat *instance)
     int ret_cell_id = ret_cube_id_arr[0];
     free(ret_cube_id_arr);
     EXPECT_EQ(ret_cell_id, 0);
-    const char *name = fieldstat_get_metric_name(instance, ret_cell_id, 0);
+    const char *name = fieldstat_metric_get_name(instance, ret_cell_id, 0);
     EXPECT_STREQ(name, "czz_test counter metric");
 
     struct field_list *tag_list = NULL;
@@ -58,7 +58,7 @@ void test_assert_standard_instance(const struct fieldstat *instance)
 
     int *metric_id = NULL;
     size_t n_metric = 0;
-    fieldstat_get_metric_in_cell(instance, 0, &tag_list[0], &metric_id, &n_metric);
+    fieldstat_cell_get_metrics(instance, 0, &tag_list[0], &metric_id, &n_metric);
     EXPECT_EQ(n_metric, 1);
     EXPECT_EQ(metric_id[0], 0);
     free(metric_id);

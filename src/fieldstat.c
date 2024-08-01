@@ -228,7 +228,7 @@ void fieldstat_get_cubes(const struct fieldstat *instance, int **cube_ids, int *
     cube_manager_list(instance->cube_manager, cube_ids, n_cube);
 }
 
-struct field_list *fieldstat_cube_get_dimensions(const struct fieldstat *instance, int cube_id)
+struct field_list *fieldstat_cube_get_dimension(const struct fieldstat *instance, int cube_id)
 {
     const struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
     if (cube == NULL) {
@@ -321,7 +321,7 @@ void fieldstat_field_list_arr_free(struct field_list *field_lists, size_t n_fiel
 
 //uninitialized
 
-const char *fieldstat_get_metric_name(const struct fieldstat *instance, int cube_id, int metric_id)
+const char *fieldstat_metric_get_name(const struct fieldstat *instance, int cube_id, int metric_id)
 {
     const struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
     if (cube == NULL) {
@@ -330,7 +330,7 @@ const char *fieldstat_get_metric_name(const struct fieldstat *instance, int cube
     return cube_get_metric_name(cube, metric_id);
 }
 
-enum metric_type fieldstat_get_metric_type(const struct fieldstat *instance, int cube_id, int metric_id)
+enum metric_type fieldstat_metric_get_type(const struct fieldstat *instance, int cube_id, int metric_id)
 {
     const struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
     if (cube == NULL) {
@@ -349,7 +349,7 @@ void fieldstat_cube_get_cells(const struct fieldstat *instance, int cube_id, str
     cube_get_cells(cube, cell_dimensions, n_cell);
 }
 
-int fieldstat_get_used_sampling(const struct fieldstat *instance, int cube_id)
+int fieldstat_cube_get_cell_number(const struct fieldstat *instance, int cube_id)
 {
     if (instance == NULL) {
         return FS_ERR_NULL_HANDLER;
@@ -377,7 +377,7 @@ int fieldstat_find_cube(const struct fieldstat *instance, const struct field *cu
     return cube_id;
 }
 
-void fieldstat_get_metric_in_cell(const struct fieldstat *instance, int cube_id, const struct field_list *cell_dimensions, int **metric_id_out, size_t *n_metric_out)
+void fieldstat_cell_get_metrics(const struct fieldstat *instance, int cube_id, const struct field_list *cell_dimensions, int **metric_id_out, size_t *n_metric_out)
 {
     const struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
     return cube_get_metrics_in_cell(cube, cell_dimensions, metric_id_out, n_metric_out);
