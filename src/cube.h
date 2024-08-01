@@ -41,11 +41,11 @@ int cube_get_serialization_as_base64(const struct cube *cube, int metric_id, con
 int cube_get_cell_count(const struct cube *cube);
 enum sampling_mode cube_get_sampling_mode(const struct cube *cube);
 void cube_get_cells(const struct cube *cube, struct field_list **cell_dimensions, size_t *n_cell);
-void cube_get_metrics(const struct cube *cube, int **metric_id_out, size_t *n_metric);
 void cube_get_metrics_in_cell(const struct cube *cube, const struct field_list *dimensions, int **metric_id_out, size_t *n_metric_out);
 struct field_list *cube_get_identifier(const struct cube *cube);
 const char *cube_get_metric_name(const struct cube *cube, int metric_id);
 enum metric_type cube_get_metric_type(const struct cube *cube, int metric_id);
+int cube_get_metric_id_by_name(const struct cube *cube, const char *metric_name);
 
 /* -------------------------------------------------------------------------- */
 /*                                cube manager                                */

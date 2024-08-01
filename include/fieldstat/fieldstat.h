@@ -15,6 +15,7 @@ extern "C"
 #define FS_ERR_INVALID_METRIC_ID -4
 #define FS_ERR_INVALID_DIMENSION -5
 #define FS_ERR_INVALID_PARAM -6
+#define FS_ERR_INVALID_METRIC_NAME -7
 #define FS_ERR_INVALID_METRIC_TYPE -8
 #define FS_ERR_MAX_N_CELL_LESS_THAN_ZERO -9
 #define FS_ERR_DIMENSION_ALREADY_EXISTS -10
@@ -174,11 +175,6 @@ struct field_list
 */
 void fieldstat_get_cubes(const struct fieldstat *instance, int **cube_ids, int *n_cube);
 
-/*
-    * @brief Get all the registered metrics by fieldstat_register_counter, fieldstat_register_hll, fieldstat_register_histogram.
-*/
-void fieldstat_cube_get_metrics(const struct fieldstat *instance, int cube_id, int **metric_id_out, size_t *n_metric);
-
 void fieldstat_get_metric_in_cell(const struct fieldstat *instance, int cube_id, const struct field_list *cell_dimensions, int **metric_id_out, size_t *n_metric_out);
 
 // query the name of the metric, return NULL if metric_id is invalid.
@@ -191,6 +187,8 @@ enum metric_type fieldstat_get_metric_type(const struct fieldstat *instance, int
     get the cell_dimensions added to cube when calling fieldstat_counter_incrby, fieldstat_counter_set, fieldstat_hll_add, fieldstat_histogram_record.
 */
 void fieldstat_cube_get_cells(const struct fieldstat *instance, int cube_id, struct field_list **cell_dimensions, size_t *n_cell);
+//todo: topk 的输出应该是有序的，总不能外面再排一遍
+// todo：_cube_删了，因为其实所有的都跟cube有关
 
 /*
     get the field of fieldstat_cube_create. User free them by calling fieldstat_field_list_arr_free(struct field_list *, 1)
@@ -198,6 +196,7 @@ void fieldstat_cube_get_cells(const struct fieldstat *instance, int cube_id, str
 */
 struct field_list *fieldstat_cube_get_dimensions(const struct fieldstat *instance, int cube_id);
 
+int fieldstat_cube_get_metric_id_by_name(const struct fieldstat *instance, int cube_id, const char *metric_name);
 
 /*
     return a cube id corresponding to `cube_dimensions`. FS_ERR_INVALID_KEY is returned if the cube is not found.

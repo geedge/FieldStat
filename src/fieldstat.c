@@ -383,7 +383,12 @@ void fieldstat_get_metric_in_cell(const struct fieldstat *instance, int cube_id,
     return cube_get_metrics_in_cell(cube, cell_dimensions, metric_id_out, n_metric_out);
 }
 
-void fieldstat_cube_get_metrics(const struct fieldstat *instance, int cube_id, int **metric_id_out, size_t *n_metric) {
+int fieldstat_cube_get_metric_id_by_name(const struct fieldstat *instance, int cube_id, const char *metric_name) 
+{
     const struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
-    cube_get_metrics(cube, metric_id_out, n_metric);
+    if (cube == NULL) {
+        return FS_ERR_INVALID_CUBE_ID;
+    }
+
+    return cube_get_metric_id_by_name(cube, metric_name);
 }

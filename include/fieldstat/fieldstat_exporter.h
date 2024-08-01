@@ -16,6 +16,7 @@ struct fieldstat_json_exporter;
 struct fieldstat_json_exporter *fieldstat_json_exporter_new();
 void fieldstat_json_exporter_set_global_dimension(struct fieldstat_json_exporter *exporter, const struct field tag_list[], size_t n_field);
 void fieldstat_json_exporter_set_name(struct fieldstat_json_exporter *exporter, const char *name);
+// todo: 这个删除，对于easy，额外记录下，其实就是单独给奇怪的global tag 开个后门，python 和 .c 之间达成约定
 void fieldstat_json_exporter_free(struct fieldstat_json_exporter *exporter);
 
 /*

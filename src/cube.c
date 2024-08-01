@@ -1376,18 +1376,12 @@ enum metric_type cube_get_metric_type(const struct cube *cube, int metric_id) {
     return metric->type;
 }
 
-void cube_get_metrics(const struct cube *cube, int **metric_id_out, size_t *n_metric)
+int cube_get_metric_id_by_name(const struct cube *cube, const char *metric_name) 
 {
-    const struct metric_manifest **list = metric_manifest_manager_list(cube->manifest_manager, n_metric);
-    if (*n_metric == 0) {
-        *metric_id_out = NULL;
-        return;
+    const struct metric_manifest *metric = metric_manifest_manager_get_by_name(cube->manifest_manager, metric_name);
+    if (metric == NULL) {
+        return FS_ERR_INVALID_METRIC_NAME;
     }
 
-    int *tmp_ids = (int *)malloc(sizeof(int) * (*n_metric));
-    *metric_id_out = tmp_ids;
-
-    for (int i = 0; i < *n_metric; i++) {
-        tmp_ids[i] = list[i]->id;
-    }
+    return metric->id;
 }

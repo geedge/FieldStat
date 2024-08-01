@@ -76,15 +76,6 @@ TEST(test_register, delete_spreadsketch_cube_with_cells_and_metrics)
     fieldstat_free(instance);
 }
 
-int test_get_max_metric_id(const struct fieldstat *instance)
-{
-    int *metric_id_out;
-    size_t n_metric;
-    (void)fieldstat_cube_get_metrics(instance, 0, &metric_id_out, &n_metric);
-    free(metric_id_out);
-    return n_metric - 1;
-}
-
 TEST(test_register, reset_and_try_to_query_cell_comprehensive)
 {
     struct fieldstat *instance = fieldstat_new();
@@ -583,8 +574,9 @@ TEST(calibrate, target_one_more_metric)
 
     fieldstat_calibrate(master, target);
 
-    EXPECT_EQ(test_get_max_metric_id(target), 0);
     EXPECT_STREQ(fieldstat_get_metric_name(target, cube_id, 0), "counter");
+    EXPECT_EQ(fieldstat_cube_get_metric_id_by_name(target, cube_id, "counter"), 0);
+    EXPECT_EQ(fieldstat_cube_get_metric_id_by_name(target, cube_id, "counter2"), FS_ERR_INVALID_METRIC_NAME);
     struct field_list *tag_list = fieldstat_cube_get_dimensions(target, cube_id);
     EXPECT_STREQ(tag_list->field[0].key, TEST_SHARED_TAG.key);
 
@@ -603,9 +595,10 @@ TEST(calibrate, master_one_more_metric)
 
     fieldstat_calibrate(master, target);
 
-    EXPECT_EQ(test_get_max_metric_id(target), 1);
     EXPECT_STREQ(fieldstat_get_metric_name(target, cube_id,0), "counter");
     EXPECT_STREQ(fieldstat_get_metric_name(target, cube_id,1), "counter2");
+    EXPECT_EQ(fieldstat_cube_get_metric_id_by_name(target, cube_id, "counter"), 0);
+    EXPECT_EQ(fieldstat_cube_get_metric_id_by_name(target, cube_id, "counter2"), 1);
     struct field_list *tag_list = fieldstat_cube_get_dimensions(target, cube_id);
     EXPECT_STREQ(tag_list->field[0].key, TEST_SHARED_TAG.key);
 
@@ -626,9 +619,12 @@ TEST(calibrate, different_metric)
 
     fieldstat_calibrate(master, target);
 
-    EXPECT_EQ(test_get_max_metric_id(target), 1);
     EXPECT_STREQ(fieldstat_get_metric_name(target, cube_id, 0), "counter");
     EXPECT_STREQ(fieldstat_get_metric_name(target, cube_id, 1), "hi i am master new");
+    EXPECT_EQ(fieldstat_cube_get_metric_id_by_name(target, cube_id, "counter2"), FS_ERR_INVALID_METRIC_NAME);
+    EXPECT_EQ(fieldstat_cube_get_metric_id_by_name(target, cube_id, "counter"), 0);
+    EXPECT_EQ(fieldstat_cube_get_metric_id_by_name(target, cube_id, "hi i am master new"), 1);
+
     struct field_list *tag_list = fieldstat_cube_get_dimensions(target, cube_id);
     EXPECT_STREQ(tag_list->field[0].key, TEST_SHARED_TAG.key);
 
@@ -656,7 +652,6 @@ TEST(calibrate, target_more_cube)
     EXPECT_EQ(cube_ids[0], cube_id);
     free(cube_ids);
 
-    EXPECT_EQ(test_get_max_metric_id(target), 0);
     EXPECT_STREQ(fieldstat_get_metric_name(target, cube_id, 0), "counter");
     struct field_list *tag_list = fieldstat_cube_get_dimensions(target, cube_id);
     EXPECT_STREQ(tag_list->field[0].key, TEST_SHARED_TAG.key);

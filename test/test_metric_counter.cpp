@@ -167,6 +167,11 @@ TEST(metric_test_counter, topk_add_and_test_accuracy)
     printf("topk_add_and_test_accuracy Mean ratio e: %lld\n", error);
     EXPECT_LT(error, tag_list_num * 0.005);
 
+    // test sorting
+    for (size_t i = 0; i < n_cell - 1; i++) {
+        EXPECT_GE(my_fieldstat_counter_get(instance, 0, 0, &tag_list[i]), my_fieldstat_counter_get(instance, 0, 0, &tag_list[i + 1]));
+    }
+
     fieldstat_field_list_arr_free(tag_list, n_cell);
     fieldstat_free(instance);
 
