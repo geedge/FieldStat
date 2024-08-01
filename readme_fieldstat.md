@@ -1,16 +1,16 @@
 # Fieldstat 4.0 
 
 ## design 
-Field Stat is a library for outputting and statistics of running states. Compared to the previous version, fieldstat3.0, this version provides support for new functionalities. The following are the concepts used in this program:
+Field Stat is a library for outputting and statistics of running states. Compared to the previous version, fieldstat3.0, this version provides support for new functionalities. The following are the concepts are borrowed from OLAP (Online Analytical Processing) and are used in fieldstat4.0:
+
 
 - Instance: Corresponds to the `struct fieldstat` and represents the instance handle on a thread.
-- Cube: An instance is composed of multiple cubes. A cube is a collection of various statistical measures.
-- Cell: A cube is composed of multiple cells. A cell is a data set tagged with specific tags.
-- Metric: Each metric corresponds to a column of data in the database. Currently, there are three types of metric statistics: counter, Hyper Log Log, and Histogram.
+- Cube: A cube is a multi-dimensional dataset that allows for complex analysis of data. It represents data through the use of dimensions, the categorical attributes by which data is analyzed, and metrics. The cube structure allows users to view data from different perspectives, slice and dice data along various dimensions, and perform advanced analytical operations. 
+- Cell: Each cell represents the intersection of all the dimensions in the cube. Cells contain the actual data values that are being analyzed.
+- Metric: The numerical data points that are being analyzed. Each metric corresponds to a data value in cell. Currently, there are three types of metric statistics: counter, Hyper Log Log, and Histogram.
 
-Compared to version 3.0, version 4.0 introduces the concepts of cube. Cube is a collection of metrics for the same purpose, and is also the unit of metric management. 
+![cube](./OLAP_example.png)
 
-Version 4.0 no longer supports multithreading. In version 3.0, the metric of type "counter" could be shared and operated on by multiple threads. However, in version 4.0, each instance is written by only one thread. The fieldstat version 4.0 provides support for distributed statistics through methods like serialize and merge. It is the responsibility of the caller to aggregate statistics from different instances. For simplified multi-threaded support, refer to [fieldstat easy](readme_fieldstat_easy.md).
 
 ### sampling mode
 
@@ -35,6 +35,11 @@ Outputs the distribution of numerical values for events, such as latency or file
 #### Hyper Log Log
 Uses statistical techniques to estimate the number of elements in a set that contains a large number of values. For example, it can be used to estimate the number of unique client IP addresses in a set of network flows.
 
+### Why not fieldstat 3
+Compared to version 3.0, version 4.0 introduces the concepts of cube. Cube is a collection of metrics for the same purpose, and is also the unit of metric management. 
+
+Version 4.0 no longer supports multithreading. In version 3.0, the metric of type "counter" could be shared and operated on by multiple threads. However, in version 4.0, each instance is written by only one thread. The fieldstat version 4.0 provides support for distributed statistics through methods like serialize and merge. It is the responsibility of the caller to aggregate statistics from different instances. For simplified multi-threaded support, refer to [fieldstat easy](readme_fieldstat_easy.md).
+
 ## Usage
 ### installation 
 Download fieldstat4 rpm from https://repo.geedge.net/pulp/content/ and install rpm package.
@@ -57,7 +62,7 @@ fieldstat_hll_add(instance, cube_id, metric_counter_id, cell_id, VALUE, VALUE_ST
 fieldstat_free(instance);
 ```
 
-### 多实例使用
+### Used in multi-threading
 ``` C
 struct fieldstat *master = fieldstat_new();
 // other operations like cube_create and metric_register
@@ -82,8 +87,6 @@ for (int i = 0; i < INSTANCE_NUM; i++) {
 struct fieldstat_json_exporter *fieldstat_json_exporter = fieldstat_json_exporter_new(instance);
 // optional
 fieldstat_json_exporter_set_global_dimension(fieldstat_json_exporter, YOUR_GLOBAL_TAG, YOUR_GLOBAL_TAG_LENGTH);
-// optional
-fieldstat_json_exporter_set_name(fieldstat_json_exporter, "any name for this exporter");
 
 char *json_string = fieldstat_json_exporter_export_flat(fieldstat_json_exporter);
 printf("test, fieldstat_json_exporter_export json_string: %s\n", json_string);
