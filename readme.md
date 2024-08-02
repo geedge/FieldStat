@@ -160,7 +160,7 @@ int ret = fieldstat_set_local_output(instance, "/tmp/fieldstat3.txt", "default")
 ```c
 int ret = -1;
 const char *columns[]          = {"column0", "column1", "column2", "column3"};
-enum field_type columns_type[] = {FIELD_TYPE_COUNTER,FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+enum field_type columns_type[] = {FIELD_METRIC_TYPE_COUNTER,FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER};
 int table_id = fieldstat_register_table(instance, "table_name", columns, columns_type, sizeof(columns)/sizeof(column[0]));
 
 int output_metrics_id[4];
@@ -175,7 +175,7 @@ ret = fieldstat_value_set(instance, output_metric_ids[0], 1);
 #### Register and Operate Counter
 ```c
 int ret = 0;
-int mid = fieldstat_register(instance, FIELD_TYPE_COUNTER, "counter00", NULL, 0);
+int mid = fieldstat_register(instance, FIELD_METRIC_TYPE_COUNTER, "counter00", NULL, 0);
 //Incrby
 ret = fieldstat_value_incrby(instance, mid, 10);
 //Decrby
@@ -186,7 +186,7 @@ ret = fieldstat_value_set(instance, mid, 10);
 #### Register and Operate Gague
 ```c
 int ret = 0;
-int mid = fieldstat_register(instance, FIELD_TYPE_GAUGE,   "gauge00",   NULL, 0);
+int mid = fieldstat_register(instance, FIELD_METRIC_TYPE_GAUGE,   "gauge00",   NULL, 0);
 //Incrby
 ret = fieldstat_value_incrby(instance, mid, 10);
 //Decrby
@@ -230,7 +230,7 @@ int thread_id = 0;
 int out_column_ids[4];
 
 const char *columns[]          = {"column0", "column1", "column2", "column3"};
-enum field_type columns_type[] = {FIELD_TYPE_COUNTER,FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+enum field_type columns_type[] = {FIELD_METRIC_TYPE_COUNTER,FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER};
 int table_id = fieldstat_register_dynamic_table(instance, "table_name", columns, columns_type, sizeof(columns)/sizeof(columns[0]), out_column_ids);
 //Incrby
 ret = fieldstat_dynamic_table_metric_value_incrby(instance, table_id, out_column_ids[0], "table_name", 1, NULL, 0, thread_id);
@@ -244,22 +244,22 @@ ret = fieldstat_dynamic_table_metric_value_set(instance, table_id, out_column_id
 int ret = 0;
 int thread_id = 0;
 //Incrby
-ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_TYPE_COUNTER, "counter00", 1, NULL, 0, thread_id);
+ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_METRIC_TYPE_COUNTER, "counter00", 1, NULL, 0, thread_id);
 //Decrby
-ret = fieldstat_dynamic_metric_value_decrby(instance, FIELD_TYPE_COUNTER, "counter00", 1, NULL, 0, thread_id);
+ret = fieldstat_dynamic_metric_value_decrby(instance, FIELD_METRIC_TYPE_COUNTER, "counter00", 1, NULL, 0, thread_id);
 //Set
-ret = fieldstat_dynamic_metric_value_set(instance,    FIELD_TYPE_COUNTER, "counter00", 1, NULL, 0, thread_id);
+ret = fieldstat_dynamic_metric_value_set(instance,    FIELD_METRIC_TYPE_COUNTER, "counter00", 1, NULL, 0, thread_id);
 ```
 #### Register and Operate Gauge
 ```c
 int ret = 0;
 int thread_id = 0;
 //Incrby
-ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_TYPE_GAUGE, "counter00", 1, NULL, 0, thread_id);
+ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_METRIC_TYPE_GAUGE, "counter00", 1, NULL, 0, thread_id);
 //Decrby
-ret = fieldstat_dynamic_metric_value_decrby(instance, FIELD_TYPE_GAUGE, "counter00", 1, NULL, 0, thread_id);
+ret = fieldstat_dynamic_metric_value_decrby(instance, FIELD_METRIC_TYPE_GAUGE, "counter00", 1, NULL, 0, thread_id);
 //Set
-ret = fieldstat_dynamic_metric_value_set(instance,    FIELD_TYPE_GAUGE, "counter00", 1, NULL, 0, thread_id);
+ret = fieldstat_dynamic_metric_value_set(instance,    FIELD_METRIC_TYPE_GAUGE, "counter00", 1, NULL, 0, thread_id);
 ``` 
 
 #### Start Fieldstat Instance

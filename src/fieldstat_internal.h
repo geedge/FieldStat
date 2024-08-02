@@ -123,7 +123,7 @@ struct table_metric
 {
 	char *name;
 	char *column_name[TABLE_COLUMN_SIZE];
-	enum field_type column_type[TABLE_COLUMN_SIZE];
+	enum field_metric_type column_type[TABLE_COLUMN_SIZE];
 	int column_invisible[TABLE_COLUMN_SIZE];
 	int column_cnt;
 
@@ -135,7 +135,7 @@ struct table_metric
 struct metric
 {
 	char *field_name;
-	enum field_type field_type;
+	enum field_metric_type field_type;
 	size_t n_tag;
 	char *tag_key[N_TAG_MAX];
 	char *tag_value[N_TAG_MAX];
@@ -289,7 +289,7 @@ long long read_metric_current_value(struct metric *metric);
 int is_valid_field_name(const char* name);
 int is_valid_tags(const struct field_tag *tags, size_t n_tags);
 struct metric ** read_metric_slot(struct fieldstat_instance *instance, int metric_id);
-struct metric * metric_new(enum field_type type, const char *field_name, const struct field_tag tags[], size_t n_tag);
+struct metric * metric_new(enum field_metric_type type, const char *field_name, const struct field_tag tags[], size_t n_tag);
 void metric_free(struct metric *metric);
 int file_output(struct fieldstat_instance *instance,long long interval_ms);
 struct table_line * read_table_line(struct table_metric *table, int line_id);
@@ -299,7 +299,7 @@ void get_current_table_line_cnt(struct fieldstat_instance *instance, int n_table
 int startup_udp();
 
 void metric_value_operate(struct metric *metric, enum field_op op, long long value);
-struct table_metric* table_metric_new(const char *name, const char *column_name[], enum field_type column_type[], size_t n_column);
+struct table_metric* table_metric_new(const char *name, const char *column_name[], enum field_metric_type column_type[], size_t n_column);
 void table_metric_free(struct table_metric *table);
 
 struct table_line *table_line_new(const char *name, const struct field_tag tags[],size_t n_tag);

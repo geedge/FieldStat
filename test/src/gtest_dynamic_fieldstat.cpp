@@ -144,7 +144,7 @@ TEST(FeildStatDynamicAPI, FieldStatRegisterDynamicTable)
 {
 	int ret = 0;
 	const char *column_name[] = {"in_pkts", "in_bytes", "out_pkts", "out_bytes"};
-	enum field_type column_type[] = {FIELD_TYPE_GAUGE, FIELD_TYPE_COUNTER, FIELD_TYPE_GAUGE, FIELD_TYPE_COUNTER};
+	enum field_metric_type column_type[] = {FIELD_METRIC_TYPE_GAUGE, FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_GAUGE, FIELD_METRIC_TYPE_COUNTER};
 	unsigned int out_column_ids[4];
 	char table_name[32];
 
@@ -215,9 +215,9 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicMetricValueIncrby)
 
 	for(int i = 0; i < n_thread; i++)
 	{
-		ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_TYPE_GAUGE, "Active_sessions", 100 + i, tags, sizeof(tags)/sizeof(tags[0]), i); 
+		ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_METRIC_TYPE_GAUGE, "Active_sessions", 100 + i, tags, sizeof(tags)/sizeof(tags[0]), i); 
 		EXPECT_EQ(0, ret);
-		ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_TYPE_COUNTER, "Traffic_bytes", 10 + i, tags, sizeof(tags)/sizeof(tags[0]), i); 
+		ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_METRIC_TYPE_COUNTER, "Traffic_bytes", 10 + i, tags, sizeof(tags)/sizeof(tags[0]), i); 
 		EXPECT_EQ(0, ret);
 	}
 	
@@ -230,11 +230,11 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicMetricValueIncrby)
 			metric  = metrics[0];
 			switch(metric->field_type)
 			{
-				case FIELD_TYPE_COUNTER:
+				case FIELD_METRIC_TYPE_COUNTER:
 					value = get_metric_unit_val(metric, FS_CALC_SPEED, 0);
 					EXPECT_EQ(value, 10 + i);
 					break;
-				case FIELD_TYPE_GAUGE:
+				case FIELD_METRIC_TYPE_GAUGE:
 					value = get_metric_unit_val(metric, FS_CALC_CURRENT, 0);
 					EXPECT_EQ(value, 100 + i);
 					break;
@@ -277,9 +277,9 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicMetricValueSet)
 
 	for(int i = 0; i < n_thread; i++)
 	{
-		ret = fieldstat_dynamic_metric_value_set(instance, FIELD_TYPE_GAUGE, "Active_sessions", 100 + i, tags, sizeof(tags)/sizeof(tags[0]), i); 
+		ret = fieldstat_dynamic_metric_value_set(instance, FIELD_METRIC_TYPE_GAUGE, "Active_sessions", 100 + i, tags, sizeof(tags)/sizeof(tags[0]), i); 
 		EXPECT_EQ(0, ret);
-		ret = fieldstat_dynamic_metric_value_set(instance, FIELD_TYPE_COUNTER, "Traffic_bytes", 10 + i, tags, sizeof(tags)/sizeof(tags[0]), i); 
+		ret = fieldstat_dynamic_metric_value_set(instance, FIELD_METRIC_TYPE_COUNTER, "Traffic_bytes", 10 + i, tags, sizeof(tags)/sizeof(tags[0]), i); 
 		EXPECT_EQ(0, ret);
 	}
 	
@@ -292,11 +292,11 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicMetricValueSet)
 			metric  = metrics[0];
 			switch(metric->field_type)
 			{
-				case FIELD_TYPE_COUNTER:
+				case FIELD_METRIC_TYPE_COUNTER:
 					value = get_metric_unit_val(metric, FS_CALC_SPEED, 0);
 					EXPECT_EQ(value, 10 + i);
 					break;
-				case FIELD_TYPE_GAUGE:
+				case FIELD_METRIC_TYPE_GAUGE:
 					value = get_metric_unit_val(metric, FS_CALC_CURRENT, 0);
 					EXPECT_EQ(value, 100 + i);
 					break;
@@ -337,9 +337,9 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicMetricValueDecrby)
 
 	for(int i = 0; i < n_thread; i++)
 	{
-		ret = fieldstat_dynamic_metric_value_decrby(instance, FIELD_TYPE_GAUGE, "Active_sessions", 100 + i, tags, sizeof(tags)/sizeof(tags[0]), i); 
+		ret = fieldstat_dynamic_metric_value_decrby(instance, FIELD_METRIC_TYPE_GAUGE, "Active_sessions", 100 + i, tags, sizeof(tags)/sizeof(tags[0]), i); 
 		EXPECT_EQ(0, ret);
-		ret = fieldstat_dynamic_metric_value_decrby(instance, FIELD_TYPE_COUNTER, "Traffic_bytes", 10 + i, tags, sizeof(tags)/sizeof(tags[0]), i); 
+		ret = fieldstat_dynamic_metric_value_decrby(instance, FIELD_METRIC_TYPE_COUNTER, "Traffic_bytes", 10 + i, tags, sizeof(tags)/sizeof(tags[0]), i); 
 		EXPECT_EQ(0, ret);
 	}
 	
@@ -352,11 +352,11 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicMetricValueDecrby)
 			metric  = metrics[0];
 			switch(metric->field_type)
 			{
-				case FIELD_TYPE_COUNTER:
+				case FIELD_METRIC_TYPE_COUNTER:
 					value = get_metric_unit_val(metric, FS_CALC_SPEED, 0);
 					EXPECT_EQ(value, -(10 + i));
 					break;
-				case FIELD_TYPE_GAUGE:
+				case FIELD_METRIC_TYPE_GAUGE:
 					value = get_metric_unit_val(metric, FS_CALC_CURRENT, 0);
 					EXPECT_EQ(value, -(100 + i));
 					break;
@@ -394,7 +394,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicTableMetricValueIncrby)
 	long long value = 0;
 
 	const char *column_name[] = {"packages", "bytes"};
-	enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+	enum field_metric_type column_type[] = {FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER};
 	unsigned int out_column_ids[2];
 	int table_id = -1;
 
@@ -465,7 +465,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicTableMetricValueSet)
 	long long value = 0;
 
 	const char *column_name[] = {"packages", "bytes"};
-	enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+	enum field_metric_type column_type[] = {FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER};
 	unsigned int out_column_ids[2];
 	int table_id = -1;
 
@@ -536,7 +536,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicTableMetricValueDecrby)
 	long long value = 0;
 
 	const char *column_name[] = {"packages", "bytes"};
-	enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+	enum field_metric_type column_type[] = {FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER};
 	unsigned int out_column_ids[2];
 	int table_id = -1;
 
@@ -643,7 +643,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolNoTag)
 	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8700);
 	EXPECT_EQ(0, ret);
 
-	ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_TYPE_GAUGE, "Active_sessions", 10, NULL, 0, 0);
+	ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_METRIC_TYPE_GAUGE, "Active_sessions", 10, NULL, 0, 0);
 	ret = line_protocol_dynamic_metric_output(instance);
 	EXPECT_EQ(0, ret);
 	sleep(1);
@@ -669,7 +669,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolOneTag)
 
 	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8700);
 	EXPECT_EQ(0, ret);
-	ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_TYPE_GAUGE, "Active_sessions", 11, tags, 1, 0);
+	ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_METRIC_TYPE_GAUGE, "Active_sessions", 11, tags, 1, 0);
 	ret = line_protocol_dynamic_metric_output(instance);
 	EXPECT_EQ(0, ret);
 	sleep(1);
@@ -701,7 +701,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolTwoTags)
 	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8700);
 	EXPECT_EQ(0, ret);
 
-	ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_TYPE_GAUGE, "Active_sessions", 12, tags, 2, 0);
+	ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_METRIC_TYPE_GAUGE, "Active_sessions", 12, tags, 2, 0);
 	ret = line_protocol_dynamic_metric_output(instance);
 	EXPECT_EQ(0, ret);
 	sleep(1);
@@ -715,7 +715,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolTableMetricNoTag)
 	int ret = 0;
 	struct fieldstat_dynamic_instance *instance = NULL;
 	const char *column_name[] = {"packages", "bytes"};
-	enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+	enum field_metric_type column_type[] = {FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER};
 	unsigned int out_column_ids[2];
 	int table_id = -1;
 	const char *compare_zero_tag = "{\"fields\":{\"bytes\":30,\"packages\":30},\"name\":\"security_rule_hits\",\"tags\":{\"app_name\":\"firewall\",\"table_name\":\"shaping\"}}";
@@ -749,7 +749,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolTableMetricOneTag)
 	int ret = 0;
 	struct fieldstat_dynamic_instance *instance = NULL;
 	const char *column_name[] = {"packages", "bytes"};
-	enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+	enum field_metric_type column_type[] = {FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER};
 	unsigned int out_column_ids[2];
 	int table_id = -1;
 	struct field_tag tags[1];
@@ -788,7 +788,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolTableMetricTowTags)
 	int ret = 0;
 	struct fieldstat_dynamic_instance *instance = NULL;
 	const char *column_name[] = {"packages", "bytes"};
-	enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+	enum field_metric_type column_type[] = {FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER};
 	unsigned int out_column_ids[2];
 	int table_id = -1;
 	struct field_tag tags[2];
@@ -839,14 +839,14 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolTypeGauge)
 	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8700);
 	EXPECT_EQ(0, ret);
 
-	ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_TYPE_GAUGE, "Active_sessions", 12, NULL, 0, 0);
+	ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_METRIC_TYPE_GAUGE, "Active_sessions", 12, NULL, 0, 0);
 	EXPECT_EQ(0, ret);
 	ret = line_protocol_dynamic_metric_output(instance);
 	EXPECT_EQ(0, ret);
 	sleep(1);
 	parse_telegraf_cjson_output(compare_first_output);
 
-	ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_TYPE_GAUGE, "Active_sessions", 12, NULL, 0, 0);
+	ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_METRIC_TYPE_GAUGE, "Active_sessions", 12, NULL, 0, 0);
 	EXPECT_EQ(0, ret);
 	ret = line_protocol_dynamic_metric_output(instance);
 	EXPECT_EQ(0, ret);
@@ -872,14 +872,14 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolTypeCounter)
 	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8700);
 	EXPECT_EQ(0, ret);
 
-	ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_TYPE_COUNTER, "Active_sessions", 12, NULL, 0, 0);
+	ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_METRIC_TYPE_COUNTER, "Active_sessions", 12, NULL, 0, 0);
 	EXPECT_EQ(0, ret);
 	ret = line_protocol_dynamic_metric_output(instance);
 	EXPECT_EQ(0, ret);
 	sleep(1);
 	parse_telegraf_cjson_output(compare_first_output);
 
-	ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_TYPE_COUNTER, "Active_sessions", 12, NULL, 0, 0);
+	ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_METRIC_TYPE_COUNTER, "Active_sessions", 12, NULL, 0, 0);
 	EXPECT_EQ(0, ret);
 	ret = line_protocol_dynamic_metric_output(instance);
 	EXPECT_EQ(0, ret);
@@ -894,7 +894,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolTableMetricTypeAllCo
 	int ret = 0;
 	struct fieldstat_dynamic_instance *instance = NULL;
 	const char *column_name[] = {"packages", "bytes"};
-	enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+	enum field_metric_type column_type[] = {FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER};
 	unsigned int out_column_ids[2];
 	int table_id = -1;
 	const char *compare_update_column_0 = "{\"fields\":{\"bytes\":0,\"packages\":30},\"name\":\"security_rule_hits\",\"tags\":{\"app_name\":\"firewall\",\"table_name\":\"shaping\"}}";
@@ -941,7 +941,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolTableMetricTypeAllGa
 	int ret = 0;
 	struct fieldstat_dynamic_instance *instance = NULL;
 	const char *column_name[] = {"packages", "bytes"};
-	enum field_type column_type[] = {FIELD_TYPE_GAUGE, FIELD_TYPE_GAUGE};
+	enum field_metric_type column_type[] = {FIELD_METRIC_TYPE_GAUGE, FIELD_METRIC_TYPE_GAUGE};
 	unsigned int out_column_ids[2];
 	int table_id = -1;
 	const char *compare_update_column_0 = "{\"fields\":{\"bytes\":0,\"packages\":30},\"name\":\"security_rule_hits\",\"tags\":{\"app_name\":\"firewall\",\"table_name\":\"shaping\"}}";
@@ -987,7 +987,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolTableMetricTypeOneCo
 	int ret = 0;
 	struct fieldstat_dynamic_instance *instance = NULL;
 	const char *column_name[] = {"packages", "bytes"};
-	enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_GAUGE};
+	enum field_metric_type column_type[] = {FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_GAUGE};
 	unsigned int out_column_ids[2];
 	int table_id = -1;
 	const char *compare_update_column_0 = "{\"fields\":{\"bytes\":0,\"packages\":30},\"name\":\"security_rule_hits\",\"tags\":{\"app_name\":\"firewall\",\"table_name\":\"shaping\"}}";
@@ -1086,7 +1086,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolValueZero)
 	ret = fieldstat_dynamic_set_line_protocol_server(instance, "127.0.0.1", 8700);
 	EXPECT_EQ(0, ret);
 
-	ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_TYPE_GAUGE, "Active_sessions", 0, NULL, 0, 0);
+	ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_METRIC_TYPE_GAUGE, "Active_sessions", 0, NULL, 0, 0);
 	EXPECT_EQ(0, ret);
 	ret = line_protocol_dynamic_metric_output(instance);
 	EXPECT_EQ(0, ret);
@@ -1102,7 +1102,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolTableMetricValueZero
 	int ret = 0;
 	struct fieldstat_dynamic_instance *instance = NULL;
 	const char *column_name[] = {"packages", "bytes"};
-	enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+	enum field_metric_type column_type[] = {FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER};
 	unsigned int out_column_ids[2];
 	int table_id = -1;
 	const char *compare_column = "{\"fields\":{\"bytes\":0,\"packages\":0},\"name\":\"security_rule_hits\",\"tags\":{\"app_name\":\"firewall\",\"table_name\":\"shaping\"}}";
@@ -1165,7 +1165,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolMultiMetric)
 	{
 		memset(field_name, 0, sizeof(field_name));
 		snprintf(field_name, sizeof(field_name), "Active_sessions_%d", i);
-		ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_TYPE_GAUGE, (const char *)field_name, 12, NULL, 0, 0);
+		ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_METRIC_TYPE_GAUGE, (const char *)field_name, 12, NULL, 0, 0);
 		EXPECT_EQ(0, ret);
 	}
 	ret = system("cat /dev/null > /tmp/metrics.out");
@@ -1226,7 +1226,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicOutputLineProtocolMultiTableRow)
 
 
 	const char *column_name[] = {"packages", "bytes"};
-	enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+	enum field_metric_type column_type[] = {FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER};
 	unsigned int out_column_ids[2];
 	int table_id = -1;
 
@@ -1326,9 +1326,9 @@ void _worker_thread_multi_incrby(void *arg)
 
 	for(i = 0; i < loops; i++)
 	{
-		ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_TYPE_GAUGE, "Active_sessions", 10, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
+		ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_METRIC_TYPE_GAUGE, "Active_sessions", 10, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
 		EXPECT_EQ(0, ret);
-		ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_TYPE_COUNTER, "Traffic_bytes", 20, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
+		ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_METRIC_TYPE_COUNTER, "Traffic_bytes", 20, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
 		EXPECT_EQ(0, ret);
 	
 		ret = fieldstat_dynamic_table_metric_value_incrby(instance, table_id, out_column_ids[0], "security_rule_hits", 30, tags, sizeof(tags)/sizeof(tags[0]), thread_id);
@@ -1358,7 +1358,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicInstanceMultiIncrby)
 	long long value = 0;
 
 	const char *column_name[] = {"packages", "bytes"};
-	enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+	enum field_metric_type column_type[] = {FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER};
 	unsigned int out_column_ids[2];
 	int table_id = -1;
 
@@ -1414,11 +1414,11 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicInstanceMultiIncrby)
 			{
 				switch(metric->field_type)
 				{
-					case FIELD_TYPE_GAUGE:
+					case FIELD_METRIC_TYPE_GAUGE:
 						value = get_metric_unit_val(metric, FS_CALC_SPEED, 0);
 						EXPECT_EQ((10 * n_loops), value);
 						break;
-					case FIELD_TYPE_COUNTER:
+					case FIELD_METRIC_TYPE_COUNTER:
 						value = get_metric_unit_val(metric, FS_CALC_CURRENT, 0);
 						EXPECT_EQ((20 * n_loops), value);
 						break;
@@ -1463,9 +1463,9 @@ void _worker_thread_multi_decrby(void *arg)
 
 	for(i = 0; i < loops; i++)
 	{
-		ret = fieldstat_dynamic_metric_value_decrby(instance, FIELD_TYPE_GAUGE, "Active_sessions", 10, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
+		ret = fieldstat_dynamic_metric_value_decrby(instance, FIELD_METRIC_TYPE_GAUGE, "Active_sessions", 10, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
 		EXPECT_EQ(0, ret);
-		ret = fieldstat_dynamic_metric_value_decrby(instance, FIELD_TYPE_COUNTER, "Traffic_bytes", 20, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
+		ret = fieldstat_dynamic_metric_value_decrby(instance, FIELD_METRIC_TYPE_COUNTER, "Traffic_bytes", 20, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
 		EXPECT_EQ(0, ret);
 	
 		ret = fieldstat_dynamic_table_metric_value_decrby(instance, table_id, out_column_ids[0], "security_rule_hits", 30, tags, sizeof(tags)/sizeof(tags[0]), thread_id);
@@ -1495,7 +1495,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicInstanceMultiDecrby)
 	long long value = 0;
 
 	const char *column_name[] = {"packages", "bytes"};
-	enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+	enum field_metric_type column_type[] = {FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER};
 	unsigned int out_column_ids[2];
 	int table_id = -1;
 
@@ -1551,11 +1551,11 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicInstanceMultiDecrby)
 			{
 				switch(metric->field_type)
 				{
-					case FIELD_TYPE_GAUGE:
+					case FIELD_METRIC_TYPE_GAUGE:
 						value = get_metric_unit_val(metric, FS_CALC_SPEED, 0);
 						EXPECT_EQ((-10 * n_loops), value);
 						break;
-					case FIELD_TYPE_COUNTER:
+					case FIELD_METRIC_TYPE_COUNTER:
 						value = get_metric_unit_val(metric, FS_CALC_CURRENT, 0);
 						EXPECT_EQ((-20 * n_loops), value);
 						break;
@@ -1600,9 +1600,9 @@ void _worker_thread_multi_set(void *arg)
 
 	for(i = 0; i < loops; i++)
 	{
-		ret = fieldstat_dynamic_metric_value_set(instance, FIELD_TYPE_GAUGE, "Active_sessions", 10, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
+		ret = fieldstat_dynamic_metric_value_set(instance, FIELD_METRIC_TYPE_GAUGE, "Active_sessions", 10, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
 		EXPECT_EQ(0, ret);
-		ret = fieldstat_dynamic_metric_value_set(instance, FIELD_TYPE_COUNTER, "Traffic_bytes", 20, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
+		ret = fieldstat_dynamic_metric_value_set(instance, FIELD_METRIC_TYPE_COUNTER, "Traffic_bytes", 20, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
 		EXPECT_EQ(0, ret);
 	
 		ret = fieldstat_dynamic_table_metric_value_set(instance, table_id, out_column_ids[0], "security_rule_hits", 30, tags, sizeof(tags)/sizeof(tags[0]), thread_id);
@@ -1632,7 +1632,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicInstanceMultiSet)
 	long long value = 0;
 
 	const char *column_name[] = {"packages", "bytes"};
-	enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+	enum field_metric_type column_type[] = {FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER};
 	unsigned int out_column_ids[2];
 	int table_id = -1;
 
@@ -1688,11 +1688,11 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicInstanceMultiSet)
 			{
 				switch(metric->field_type)
 				{
-					case FIELD_TYPE_GAUGE:
+					case FIELD_METRIC_TYPE_GAUGE:
 						value = get_metric_unit_val(metric, FS_CALC_SPEED, 0);
 						EXPECT_EQ(10, value);
 						break;
-					case FIELD_TYPE_COUNTER:
+					case FIELD_METRIC_TYPE_COUNTER:
 						value = get_metric_unit_val(metric, FS_CALC_CURRENT, 0);
 						EXPECT_EQ(20, value);
 						break;
@@ -1743,9 +1743,9 @@ void _worker_thread_incrby_multi_metric(void *arg)
 		snprintf(gauge_name, sizeof(gauge_name), "Active_sessions_%d", i);
 		snprintf(counter_name, sizeof(gauge_name), "Traffic_bytes_%d", i);
 		snprintf(table_column_name, sizeof(gauge_name), "security_rule_hits_%d", i);
-		ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_TYPE_GAUGE, gauge_name, 10, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
+		ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_METRIC_TYPE_GAUGE, gauge_name, 10, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
 		EXPECT_EQ(0, ret);
-		ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_TYPE_COUNTER, counter_name, 20, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
+		ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_METRIC_TYPE_COUNTER, counter_name, 20, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
 		EXPECT_EQ(0, ret);
 	
 		ret = fieldstat_dynamic_table_metric_value_incrby(instance, table_id, out_column_ids[0], table_column_name, 30, tags, sizeof(tags)/sizeof(tags[0]), thread_id);
@@ -1774,7 +1774,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicInstanceIncrbyMultiMetric)
 	long long value = 0;
 
 	const char *column_name[] = {"packages", "bytes"};
-	enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+	enum field_metric_type column_type[] = {FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER};
 	unsigned int out_column_ids[2];
 	int table_id = -1;
 
@@ -1830,11 +1830,11 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicInstanceIncrbyMultiMetric)
 			{
 				switch(metric->field_type)
 				{
-					case FIELD_TYPE_GAUGE:
+					case FIELD_METRIC_TYPE_GAUGE:
 						value = get_metric_unit_val(metric, FS_CALC_SPEED, 0);
 						EXPECT_EQ(10, value);
 						break;
-					case FIELD_TYPE_COUNTER:
+					case FIELD_METRIC_TYPE_COUNTER:
 						value = get_metric_unit_val(metric, FS_CALC_CURRENT, 0);
 						EXPECT_EQ(20, value);
 						break;
@@ -1885,9 +1885,9 @@ void _worker_thread_decrby_multi_metric(void *arg)
 		snprintf(gauge_name, sizeof(gauge_name), "Active_sessions_%d", i);
 		snprintf(counter_name, sizeof(gauge_name), "Traffic_bytes_%d", i);
 		snprintf(table_column_name, sizeof(gauge_name), "security_rule_hits_%d", i);
-		ret = fieldstat_dynamic_metric_value_decrby(instance, FIELD_TYPE_GAUGE, gauge_name, 10, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
+		ret = fieldstat_dynamic_metric_value_decrby(instance, FIELD_METRIC_TYPE_GAUGE, gauge_name, 10, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
 		EXPECT_EQ(0, ret);
-		ret = fieldstat_dynamic_metric_value_decrby(instance, FIELD_TYPE_COUNTER, counter_name, 20, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
+		ret = fieldstat_dynamic_metric_value_decrby(instance, FIELD_METRIC_TYPE_COUNTER, counter_name, 20, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
 		EXPECT_EQ(0, ret);
 	
 		ret = fieldstat_dynamic_table_metric_value_decrby(instance, table_id, out_column_ids[0], table_column_name, 30, tags, sizeof(tags)/sizeof(tags[0]), thread_id);
@@ -1917,7 +1917,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicInstanceDecrbyMultiMetric)
 	long long value = 0;
 
 	const char *column_name[] = {"packages", "bytes"};
-	enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+	enum field_metric_type column_type[] = {FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER};
 	unsigned int out_column_ids[2];
 	int table_id = -1;
 
@@ -1973,11 +1973,11 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicInstanceDecrbyMultiMetric)
 			{
 				switch(metric->field_type)
 				{
-					case FIELD_TYPE_GAUGE:
+					case FIELD_METRIC_TYPE_GAUGE:
 						value = get_metric_unit_val(metric, FS_CALC_SPEED, 0);
 						EXPECT_EQ(-10, value);
 						break;
-					case FIELD_TYPE_COUNTER:
+					case FIELD_METRIC_TYPE_COUNTER:
 						value = get_metric_unit_val(metric, FS_CALC_CURRENT, 0);
 						EXPECT_EQ(-20, value);
 						break;
@@ -2029,9 +2029,9 @@ void _worker_thread_set_multi_metric(void *arg)
 		snprintf(gauge_name, sizeof(gauge_name), "Active_sessions_%d", i);
 		snprintf(counter_name, sizeof(gauge_name), "Traffic_bytes_%d", i);
 		snprintf(table_column_name, sizeof(gauge_name), "security_rule_hits_%d", i);
-		ret = fieldstat_dynamic_metric_value_set(instance, FIELD_TYPE_GAUGE, gauge_name, 10, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
+		ret = fieldstat_dynamic_metric_value_set(instance, FIELD_METRIC_TYPE_GAUGE, gauge_name, 10, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
 		EXPECT_EQ(0, ret);
-		ret = fieldstat_dynamic_metric_value_set(instance, FIELD_TYPE_COUNTER, counter_name, 20, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
+		ret = fieldstat_dynamic_metric_value_set(instance, FIELD_METRIC_TYPE_COUNTER, counter_name, 20, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
 		EXPECT_EQ(0, ret);
 	
 		ret = fieldstat_dynamic_table_metric_value_set(instance, table_id, out_column_ids[0], table_column_name, 30, tags, sizeof(tags)/sizeof(tags[0]), thread_id);
@@ -2061,7 +2061,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicInstanceSetMultiMetric)
 	long long value = 0;
 
 	const char *column_name[] = {"packages", "bytes"};
-	enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+	enum field_metric_type column_type[] = {FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER};
 	unsigned int out_column_ids[2];
 	int table_id = -1;
 
@@ -2117,11 +2117,11 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicInstanceSetMultiMetric)
 			{
 				switch(metric->field_type)
 				{
-					case FIELD_TYPE_GAUGE:
+					case FIELD_METRIC_TYPE_GAUGE:
 						value = get_metric_unit_val(metric, FS_CALC_SPEED, 0);
 						EXPECT_EQ(10, value);
 						break;
-					case FIELD_TYPE_COUNTER:
+					case FIELD_METRIC_TYPE_COUNTER:
 						value = get_metric_unit_val(metric, FS_CALC_CURRENT, 0);
 						EXPECT_EQ(20, value);
 						break;
@@ -2177,9 +2177,9 @@ void _worker_thread_multi_incrby_multi_metric(void *arg)
 
 		for(int j = 0; j < loops; j++)
 		{
-			ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_TYPE_GAUGE, (const char *)gauge_name, 10, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
+			ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_METRIC_TYPE_GAUGE, (const char *)gauge_name, 10, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
 			EXPECT_EQ(0, ret);
-			ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_TYPE_COUNTER, (const char *)counter_name, 20, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
+			ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_METRIC_TYPE_COUNTER, (const char *)counter_name, 20, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
 			EXPECT_EQ(0, ret);
 		
 			ret = fieldstat_dynamic_table_metric_value_incrby(instance, table_id, out_column_ids[0], (const char *)table_column_name, 30, tags, sizeof(tags)/sizeof(tags[0]), thread_id);
@@ -2210,7 +2210,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicInstanceMultiIncrbyMultiMetric)
 	long long value = 0;
 
 	const char *column_name[] = {"packages", "bytes"};
-	enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+	enum field_metric_type column_type[] = {FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER};
 	unsigned int out_column_ids[2];
 	int table_id = -1;
 
@@ -2266,11 +2266,11 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicInstanceMultiIncrbyMultiMetric)
 			{
 				switch(metric->field_type)
 				{
-					case FIELD_TYPE_GAUGE:
+					case FIELD_METRIC_TYPE_GAUGE:
 						value = get_metric_unit_val(metric, FS_CALC_SPEED, 0);
 						EXPECT_EQ((10 * n_loops), value);
 						break;
-					case FIELD_TYPE_COUNTER:
+					case FIELD_METRIC_TYPE_COUNTER:
 						value = get_metric_unit_val(metric, FS_CALC_CURRENT, 0);
 						EXPECT_EQ((20 * n_loops), value);
 						break;
@@ -2323,9 +2323,9 @@ void _worker_thread_multi_decrby_multi_metric(void *arg)
 
 		for(int j = 0; j < loops; j++)
 		{
-			ret = fieldstat_dynamic_metric_value_decrby(instance, FIELD_TYPE_GAUGE, (const char *)gauge_name, 10, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
+			ret = fieldstat_dynamic_metric_value_decrby(instance, FIELD_METRIC_TYPE_GAUGE, (const char *)gauge_name, 10, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
 			EXPECT_EQ(0, ret);
-			ret = fieldstat_dynamic_metric_value_decrby(instance, FIELD_TYPE_COUNTER, (const char *)counter_name, 20, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
+			ret = fieldstat_dynamic_metric_value_decrby(instance, FIELD_METRIC_TYPE_COUNTER, (const char *)counter_name, 20, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
 			EXPECT_EQ(0, ret);
 		
 			ret = fieldstat_dynamic_table_metric_value_decrby(instance, table_id, out_column_ids[0], (const char *)table_column_name, 30, tags, sizeof(tags)/sizeof(tags[0]), thread_id);
@@ -2356,7 +2356,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicInstanceMultiDecrbyMultiMetric)
 	long long value = 0;
 
 	const char *column_name[] = {"packages", "bytes"};
-	enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+	enum field_metric_type column_type[] = {FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER};
 	unsigned int out_column_ids[2];
 	int table_id = -1;
 
@@ -2412,11 +2412,11 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicInstanceMultiDecrbyMultiMetric)
 			{
 				switch(metric->field_type)
 				{
-					case FIELD_TYPE_GAUGE:
+					case FIELD_METRIC_TYPE_GAUGE:
 						value = get_metric_unit_val(metric, FS_CALC_SPEED, 0);
 						EXPECT_EQ((-1 * 10 * n_loops), value);
 						break;
-					case FIELD_TYPE_COUNTER:
+					case FIELD_METRIC_TYPE_COUNTER:
 						value = get_metric_unit_val(metric, FS_CALC_CURRENT, 0);
 						EXPECT_EQ((-1 * 20 * n_loops), value);
 						break;
@@ -2468,9 +2468,9 @@ void _worker_thread_multi_set_multi_metric(void *arg)
 
 		for(int j = 0; j < loops; j++)
 		{
-			ret = fieldstat_dynamic_metric_value_set(instance, FIELD_TYPE_GAUGE, (const char *)gauge_name, 10, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
+			ret = fieldstat_dynamic_metric_value_set(instance, FIELD_METRIC_TYPE_GAUGE, (const char *)gauge_name, 10, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
 			EXPECT_EQ(0, ret);
-			ret = fieldstat_dynamic_metric_value_set(instance, FIELD_TYPE_COUNTER, (const char *)counter_name, 20, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
+			ret = fieldstat_dynamic_metric_value_set(instance, FIELD_METRIC_TYPE_COUNTER, (const char *)counter_name, 20, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
 			EXPECT_EQ(0, ret);
 		
 			ret = fieldstat_dynamic_table_metric_value_set(instance, table_id, out_column_ids[0], (const char *)table_column_name, 30, tags, sizeof(tags)/sizeof(tags[0]), thread_id);
@@ -2501,7 +2501,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicInstanceMultiSetMultiMetric)
 	long long value = 0;
 
 	const char *column_name[] = {"packages", "bytes"};
-	enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+	enum field_metric_type column_type[] = {FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER};
 	unsigned int out_column_ids[2];
 	int table_id = -1;
 
@@ -2557,11 +2557,11 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicInstanceMultiSetMultiMetric)
 			{
 				switch(metric->field_type)
 				{
-					case FIELD_TYPE_GAUGE:
+					case FIELD_METRIC_TYPE_GAUGE:
 						value = get_metric_unit_val(metric, FS_CALC_SPEED, 0);
 						EXPECT_EQ(10, value);
 						break;
-					case FIELD_TYPE_COUNTER:
+					case FIELD_METRIC_TYPE_COUNTER:
 						value = get_metric_unit_val(metric, FS_CALC_CURRENT, 0);
 						EXPECT_EQ(20, value);
 						break;
@@ -2592,7 +2592,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicMetricValueGet)
 
 	fieldstat_dynamic_instance_start(instance);
 
-	ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_TYPE_GAUGE, "Active_sessions", 1000, NULL, 0, 0);
+	ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_METRIC_TYPE_GAUGE, "Active_sessions", 1000, NULL, 0, 0);
 	EXPECT_EQ(0, ret);
 	value = fieldstat_dynamic_metric_value_get(instance, "Active_sessions", NULL, 0, 0);
 	EXPECT_EQ(1000, value);
@@ -2611,7 +2611,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicTableMetricValueGet)
 	long long value = 0;
 
 	const char *column_name[] = {"packages", "bytes"};
-	enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+	enum field_metric_type column_type[] = {FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER};
 	unsigned int out_column_ids[2];
 
 	struct fieldstat_dynamic_instance *instance = NULL;
@@ -2658,7 +2658,7 @@ TEST(FeildStatDynamicAPI, TableRowMetricValueIncrby)
 	long long values[2] = {0, 0};
 
 	const char *column_name[] = {"packages", "bytes"};
-	enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+	enum field_metric_type column_type[] = {FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER};
 	unsigned int out_column_ids[2];
 
 	struct fieldstat_dynamic_instance *instance = NULL;
@@ -2693,7 +2693,7 @@ TEST(FeildStatDynamicAPI, TableRowMetricValueDecrby)
 	long long values[2] = {0, 0};
 
 	const char *column_name[] = {"packages", "bytes"};
-	enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+	enum field_metric_type column_type[] = {FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER};
 	unsigned int out_column_ids[2];
 
 	struct fieldstat_dynamic_instance *instance = NULL;
@@ -2729,7 +2729,7 @@ TEST(FeildStatDynamicAPI, TableRowMetricValueSet)
 	long long values[2] = {0, 0};
 
 	const char *column_name[] = {"packages", "bytes"};
-	enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+	enum field_metric_type column_type[] = {FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER};
 	unsigned int out_column_ids[2];
 
 	struct fieldstat_dynamic_instance *instance = NULL;
@@ -2772,7 +2772,7 @@ TEST(FeildStatDynamicAPI, SendLenEqualUDPPayload)
 								 "\"thread_id\":\"1\"}}";
 
 	const char *column_name[] = {"packages", "bytes"};
-	enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+	enum field_metric_type column_type[] = {FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER};
 	unsigned int out_column_ids[2];
 
 	struct field_tag tags[4];
@@ -2834,7 +2834,7 @@ TEST(FeildStatDynamicAPI, ReadPerThreadHtableInfo)
 
 	instance = fieldstat_dynamic_instance_new("firewall", n_thread);
 
-	enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+	enum field_metric_type column_type[] = {FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER};
 	const char *column_name[]     = {"packages", "bytes"};
 	
 	unsigned int column_ids[2];
@@ -2852,11 +2852,11 @@ TEST(FeildStatDynamicAPI, ReadPerThreadHtableInfo)
 
 	for(int i = 0; i < n_thread; i++)
 	{
-		ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_TYPE_GAUGE, 
+		ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_METRIC_TYPE_GAUGE, 
 													"Active_sessions", 100, 
 													NULL, 0, i); 
 		EXPECT_EQ(0, ret);
-		ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_TYPE_COUNTER, 
+		ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_METRIC_TYPE_COUNTER, 
 													"Traffic_bytes",   100, 
 													NULL, 0, i); 
 		EXPECT_EQ(0, ret);

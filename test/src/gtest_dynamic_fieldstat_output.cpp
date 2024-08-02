@@ -48,9 +48,9 @@ void _worker_thread_multi_incrby(void *arg)
 
 	for(i = 0; i < loops; i++)
 	{
-		ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_TYPE_GAUGE, "Active_sessions", 10, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
+		ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_METRIC_TYPE_GAUGE, "Active_sessions", 10, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
 		EXPECT_EQ(0, ret);
-		ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_TYPE_COUNTER, "Traffic_bytes", 20, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
+		ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_METRIC_TYPE_COUNTER, "Traffic_bytes", 20, tags, sizeof(tags)/sizeof(tags[0]), thread_id); 
 		EXPECT_EQ(0, ret);
 	
 		ret = fieldstat_dynamic_table_metric_value_incrby(instance, table_id, out_column_ids[0], "security_rule_hits", 30, tags, sizeof(tags)/sizeof(tags[0]), thread_id);
@@ -76,7 +76,7 @@ TEST(FeildStatDynamicAPI, FieldStatDynamicInstanceMultiIncrby)
 	int n_loops = 10000;
 
 	const char *column_name[] = {"packages", "bytes"};
-	enum field_type column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+	enum field_metric_type column_type[] = {FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER};
 	unsigned int out_column_ids[2];
 	int table_id = -1;
 
@@ -254,12 +254,12 @@ TEST(DynamicOutput, HashKeyOutOfSize)
 		"packages11", "packages12", "packages13", "packages14", "packages15",
 		"packages16", "packages17", "packages18", "packages19", "packages20"};
 
-	enum field_type column_type[] = {
-		FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER,
-		FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER,
-		FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER,
-		FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER,
-		FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+	enum field_metric_type column_type[] = {
+		FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER,
+		FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER,
+		FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER,
+		FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER,
+		FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER};
 
 
 	struct thread_para para[n_thread];

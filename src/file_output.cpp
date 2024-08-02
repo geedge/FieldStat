@@ -75,7 +75,7 @@ static int output_file_format_default_type_gauge(struct fieldstat_instance *inst
 		{
 			continue;
 		}
-		if(metric->field_type != FIELD_TYPE_GAUGE)
+		if(metric->field_type != FIELD_METRIC_TYPE_GAUGE)
 		{
 			continue;
 		}
@@ -153,7 +153,7 @@ static int output_file_format_default_type_counter(struct fieldstat_instance *in
 		{
 			continue;
 		}
-		if(metric->field_type != FIELD_TYPE_COUNTER)
+		if(metric->field_type != FIELD_METRIC_TYPE_COUNTER)
 		{
 			continue;
 		}
@@ -311,7 +311,7 @@ static int build_table_metrics_point(struct fieldstat_instance *instance, struct
 	}
 	switch(metric->field_type)
 	{
-		case FIELD_TYPE_GAUGE:
+		case FIELD_METRIC_TYPE_GAUGE:
 			if(metric->is_ratio == 0)
 			{
 				value = get_metric_unit_val(metric, FS_CALC_CURRENT, 0);
@@ -326,7 +326,7 @@ static int build_table_metrics_point(struct fieldstat_instance *instance, struct
 			}
 			break;
 
-		case FIELD_TYPE_COUNTER:
+		case FIELD_METRIC_TYPE_COUNTER:
 			if(metric->is_ratio == 0)
 			{
 				value = get_metric_unit_val(metric, FS_CALC_SPEED, 0);
@@ -413,30 +413,30 @@ static int output_file_print_hdr_head(struct metric *metric, char *print_buf, si
 	double * bins = metric->histogram.bins;
 	int bins_num  = metric->histogram.bins_num;
 
-	if(metric->field_type == FIELD_TYPE_SUMMARY)
+	if(metric->field_type == FIELD_METRIC_TYPE_SUMMARY)
 	{
 		snprintf(bin_format, sizeof(bin_format), "%%%d.2lf%%%%", HISTOGRAM_WIDTH-1);
 	}
-	if(metric->field_type == FILED_TYPE_HISTOGRAM)
+	if(metric->field_type == FILED_METRIC_TYPE_DISTRIBUTION)
 	{
 		snprintf(bin_format, sizeof(bin_format), "le=%%0.0f");
 	}
 	snprintf(str_format, sizeof(str_format), "%%%ds", HISTOGRAM_WIDTH);
-	if(metric->field_type == FIELD_TYPE_SUMMARY)
+	if(metric->field_type == FIELD_METRIC_TYPE_SUMMARY)
 	{
 		used_len += snprintf(print_buf + used_len, size - used_len, "%-8s\t", "summary");
 	}
-	if(metric->field_type == FILED_TYPE_HISTOGRAM)
+	if(metric->field_type == FILED_METRIC_TYPE_DISTRIBUTION)
 	{
 		used_len += snprintf(print_buf + used_len, size - used_len, "%-8s\t", "histogram");
 	}
 	for(i = 0;i < bins_num; i++)
 	{
-		if(metric->field_type == FIELD_TYPE_SUMMARY)
+		if(metric->field_type == FIELD_METRIC_TYPE_SUMMARY)
 		{
 			snprintf(buff, sizeof(buff), bin_format, bins[i]*100);
 		}
-		if(metric->field_type == FILED_TYPE_HISTOGRAM)
+		if(metric->field_type == FILED_METRIC_TYPE_DISTRIBUTION)
 		{
 			snprintf(buff, sizeof(buff), bin_format, bins[i]);
 		}
@@ -491,11 +491,11 @@ static int output_file_print_hdr_unit(struct metric *metric, char *print_buf, si
 
 	for(i = 0; i < bins_num; i++)
 	{
-		if(metric->field_type == FIELD_TYPE_SUMMARY)
+		if(metric->field_type == FIELD_METRIC_TYPE_SUMMARY)
 		{
 			value = (long long)hdr_value_at_percentile(h_out, bins[i]*100);
 		}
-		if(metric->field_type == FILED_TYPE_HISTOGRAM)
+		if(metric->field_type == FILED_METRIC_TYPE_DISTRIBUTION)
 		{
 			value = hdr_count_le_value(h_out, (long long)bins[i]);
 		}
@@ -544,8 +544,8 @@ static int output_file_format_default_type_histogram_and_summary(struct fieldsta
 		{
 			continue;
 		}
-		if(metric->field_type != FIELD_TYPE_SUMMARY 
-			&& metric->field_type != FILED_TYPE_HISTOGRAM)
+		if(metric->field_type != FIELD_METRIC_TYPE_SUMMARY 
+			&& metric->field_type != FILED_METRIC_TYPE_DISTRIBUTION)
 		{
 			continue;
 		}
@@ -637,8 +637,8 @@ int output_file_format_json(struct fieldstat_instance *instance, int n_cur_metri
 
 		switch(metric->field_type)
 		{
-			case FIELD_TYPE_COUNTER:
-			case FIELD_TYPE_GAUGE:
+			case FIELD_METRIC_TYPE_COUNTER:
+			case FIELD_METRIC_TYPE_GAUGE:
 				tmp_obj = cJSON_CreateObject();
 				cJSON_AddStringToObject(tmp_obj, "name", metric->field_name);
 				if(metric->table)
@@ -646,7 +646,7 @@ int output_file_format_json(struct fieldstat_instance *instance, int n_cur_metri
 					cJSON_AddStringToObject(tmp_obj, "table_name", metric->table->name);
 					cJSON_AddStringToObject(tmp_obj, "column_name", metric->table->column_name[metric->table_column_id]);	
 				}
-				metric->field_type ==  FIELD_TYPE_COUNTER 
+				metric->field_type ==  FIELD_METRIC_TYPE_COUNTER 
 					?cJSON_AddStringToObject(tmp_obj, "type", "counter")
 					:cJSON_AddStringToObject(tmp_obj, "type", "gauge");
 				value = get_metric_unit_val(metric, FS_CALC_CURRENT, 1);
@@ -655,19 +655,19 @@ int output_file_format_json(struct fieldstat_instance *instance, int n_cur_metri
 				cJSON_AddNumberToObject(tmp_obj, "diff", value);
 				cJSON_AddItemToArray(metrics_array_obj, tmp_obj);
 				break;
-			case FIELD_TYPE_SUMMARY:
-			case FILED_TYPE_HISTOGRAM:
+			case FIELD_METRIC_TYPE_SUMMARY:
+			case FILED_METRIC_TYPE_DISTRIBUTION:
 				struct hdr_histogram *h_out = read_hdr_unit_output(metric);
 				for(int j = 0; j < metric->histogram.bins_num; j++)
 				{
 					tmp_obj = cJSON_CreateObject();
-					if(metric->field_type == FIELD_TYPE_SUMMARY)
+					if(metric->field_type == FIELD_METRIC_TYPE_SUMMARY)
 					{
 						value = (long long)hdr_value_at_percentile(h_out, metric->histogram.bins[j]);
 						cJSON_AddStringToObject(tmp_obj, "type", "summary");
 						snprintf(tmp_output_name, sizeof(tmp_output_name), "%s.p%.2f", metric->field_name, metric->histogram.bins[j]);
 					}
-					if(metric->field_type == FILED_TYPE_HISTOGRAM)
+					if(metric->field_type == FILED_METRIC_TYPE_DISTRIBUTION)
 					{
 						value = hdr_count_le_value(h_out, (long long)metric->histogram.bins[j]);
 						cJSON_AddStringToObject(tmp_obj, "type", "histogram");
@@ -689,11 +689,11 @@ int output_file_format_json(struct fieldstat_instance *instance, int n_cur_metri
 					tmp_obj = cJSON_CreateObject();
 					snprintf(tmp_output_name, sizeof(tmp_output_name), "%s.%s", metric->field_name, extra[j]);
 					cJSON_AddStringToObject(tmp_obj, "name", tmp_output_name);
-					if(metric->field_type == FIELD_TYPE_SUMMARY)
+					if(metric->field_type == FIELD_METRIC_TYPE_SUMMARY)
 					{
 						cJSON_AddStringToObject(tmp_obj, "type", "summary");	
 					}
-					if(metric->field_type == FILED_TYPE_HISTOGRAM)
+					if(metric->field_type == FILED_METRIC_TYPE_DISTRIBUTION)
 					{
 						cJSON_AddStringToObject(tmp_obj, "type", "histogram");
 					}

@@ -205,7 +205,7 @@ void add_tags_to_metric(const struct field_tag tags[], size_t n_tag, char *tag_k
 	}
 }
 
-struct metric * metric_new(enum field_type type, const char *field_name, const struct field_tag tags[], size_t n_tag)
+struct metric * metric_new(enum field_metric_type type, const char *field_name, const struct field_tag tags[], size_t n_tag)
 {
 	struct metric *metric = (struct metric*)calloc(1, sizeof(struct metric));
 	metric->field_name = __str_dup(field_name);
@@ -242,8 +242,8 @@ void metric_free(struct metric *metric)
 	{
 		metric->table = NULL;
 	}
-	if(metric->field_type == FIELD_TYPE_SUMMARY || 
-	   metric->field_type == FILED_TYPE_HISTOGRAM)
+	if(metric->field_type == FIELD_METRIC_TYPE_SUMMARY || 
+	   metric->field_type == FILED_METRIC_TYPE_DISTRIBUTION)
 	{
 		h = &metric->histogram;
 		if(h->changing != NULL)
@@ -273,14 +273,14 @@ void metric_free(struct metric *metric)
 		{
 			switch(metric->field_type)
 			{
-				case FIELD_TYPE_COUNTER:
+				case FIELD_METRIC_TYPE_COUNTER:
 					if(metric->counter.changing != NULL)
 					{
 						free(metric->counter.changing);
 						metric->counter.changing = NULL;
 					}
 					break;
-				case FIELD_TYPE_GAUGE:
+				case FIELD_METRIC_TYPE_GAUGE:
 					if(metric->gauge.changing != NULL)
 					{
 						free(metric->gauge.changing);
@@ -507,7 +507,7 @@ int fieldstat_set_statsd_server(struct fieldstat_instance *instance, const char 
 	return 0;
 }
 
-int fieldstat_register(struct fieldstat_instance *instance, enum field_type type, const char *field_name, const struct field_tag tags[], size_t n_tag)
+int fieldstat_register(struct fieldstat_instance *instance, enum field_metric_type type, const char *field_name, const struct field_tag tags[], size_t n_tag)
 {
 	int metric_id = 0;
 	struct metric *metric = NULL;
@@ -532,11 +532,11 @@ int fieldstat_register(struct fieldstat_instance *instance, enum field_type type
 	metric->is_atomic_counter = 0;
 	switch(type)
 	{
-		case FIELD_TYPE_COUNTER:
+		case FIELD_METRIC_TYPE_COUNTER:
 			memset(&(metric->counter), 0, sizeof(metric->counter));
 			metric->counter.changing = (struct threadsafe_counter *)calloc(1, sizeof(struct threadsafe_counter));
 			break;
-		case FIELD_TYPE_GAUGE:
+		case FIELD_METRIC_TYPE_GAUGE:
 			memset(&(metric->gauge), 0, sizeof(metric->gauge));
 			metric->gauge.changing   = (struct threadsafe_counter *)calloc(1, sizeof(struct threadsafe_counter));
 			break;
@@ -553,10 +553,10 @@ long long get_metric_unit_val(struct metric *metric,enum field_calc_algo calc_ty
 	long long value = 0;
 	switch(metric->field_type)
 	{
-		case FIELD_TYPE_COUNTER:
+		case FIELD_METRIC_TYPE_COUNTER:
 			target = &(metric->counter);
 			break;
-		case FIELD_TYPE_GAUGE:
+		case FIELD_METRIC_TYPE_GAUGE:
 			target = &(metric->gauge);
 			break;
 		default:
@@ -600,10 +600,10 @@ long long read_metric_current_value(struct metric *metric)
 	long long value = 0;
 	switch(metric->field_type)
 	{
-		case FIELD_TYPE_COUNTER:
+		case FIELD_METRIC_TYPE_COUNTER:
 			target = &(metric->counter);
 			break;
-		case FIELD_TYPE_GAUGE:
+		case FIELD_METRIC_TYPE_GAUGE:
 			target = &(metric->gauge);
 			break;
 		default:
@@ -615,7 +615,7 @@ long long read_metric_current_value(struct metric *metric)
 	else
 	 	value = atomic_read(&(target->atomic_changing));
 
-	if(metric->field_type == FIELD_TYPE_GAUGE)
+	if(metric->field_type == FIELD_METRIC_TYPE_GAUGE)
 	{
 		value += target->accumulated;
 	}
@@ -774,7 +774,7 @@ void fieldstat_instance_free(struct fieldstat_instance *instance)
 }
 
 
-struct table_metric* table_metric_new(const char *name, const char *column_name[], enum field_type column_type[], size_t n_column)
+struct table_metric* table_metric_new(const char *name, const char *column_name[], enum field_metric_type column_type[], size_t n_column)
 {
 	int i = 0;
 	struct table_metric *table_metric = (struct table_metric *)calloc(1, sizeof(struct table_metric));
@@ -837,7 +837,7 @@ void table_metric_free(struct table_metric *table)
 }
 
 
- int fieldstat_register_table(struct fieldstat_instance *instance, const char *table_name, const char *column_name[], enum field_type column_type[], size_t n_column)
+ int fieldstat_register_table(struct fieldstat_instance *instance, const char *table_name, const char *column_name[], enum field_metric_type column_type[], size_t n_column)
  {
 	int table_id = 0;
 
@@ -854,7 +854,7 @@ void table_metric_free(struct table_metric *table)
 		{
 			return -1;
 		}
-		if(column_type[i] != FIELD_TYPE_GAUGE && column_type[i] != FIELD_TYPE_COUNTER)
+		if(column_type[i] != FIELD_METRIC_TYPE_GAUGE && column_type[i] != FIELD_METRIC_TYPE_COUNTER)
 		{
 			return -1;
 		}
@@ -997,14 +997,14 @@ void metric_value_operate(struct metric *metric, enum field_op op, long long val
 	struct stat_unit_t *target = NULL;
 	switch(metric->field_type)
 	{
-		case FIELD_TYPE_COUNTER:
+		case FIELD_METRIC_TYPE_COUNTER:
 			target = &(metric->counter);
 			break;
-		case FIELD_TYPE_GAUGE:
+		case FIELD_METRIC_TYPE_GAUGE:
 			target = &(metric->gauge);
 			break;
-		case FIELD_TYPE_SUMMARY:
-		case FILED_TYPE_HISTOGRAM: 
+		case FIELD_METRIC_TYPE_SUMMARY:
+		case FILED_METRIC_TYPE_DISTRIBUTION: 
 			hdr_record_value(metric->histogram.changing, (int64_t) value);
 			return;
 		default:
@@ -1075,7 +1075,7 @@ int fieldstat_value_decrby(struct fieldstat_instance *instance, int metric_id, l
 	return ret;
 }
 
-static int parse_histogram_bin_format(const char* format, double **output_bins, enum field_type type)
+static int parse_histogram_bin_format(const char* format, double **output_bins, enum field_metric_type type)
 {
 	char *token=NULL,*sub_token=NULL,*saveptr;
 	size_t i=0;
@@ -1096,7 +1096,7 @@ static int parse_histogram_bin_format(const char* format, double **output_bins, 
 		if (sub_token == NULL)
 			break;
 		ret=sscanf(sub_token,"%lf",bins+i);
-		if(type == FIELD_TYPE_SUMMARY)
+		if(type == FIELD_METRIC_TYPE_SUMMARY)
 		{
 			if(bins[i]>1.0)
 			{
@@ -1118,7 +1118,7 @@ error_out:
 }
 
 
-static int fieldstat_register_histogram(struct fieldstat_instance *instance, enum field_type type, const char *field_name, const struct field_tag tags[], size_t n_tag, 
+static int fieldstat_register_histogram(struct fieldstat_instance *instance, enum field_metric_type type, const char *field_name, const struct field_tag tags[], size_t n_tag, 
 		const char * bins, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures, int output_window)
 {
 	struct metric *metric = NULL;
@@ -1167,10 +1167,10 @@ static int fieldstat_register_histogram(struct fieldstat_instance *instance, enu
 
 	switch(type)
 	{
-		case FIELD_TYPE_SUMMARY:
+		case FIELD_METRIC_TYPE_SUMMARY:
 			atomic_inc(&instance->summary_cnt);
 			break;
-		case FILED_TYPE_HISTOGRAM:
+		case FILED_METRIC_TYPE_DISTRIBUTION:
 			atomic_inc(&instance->histogram_cnt);
 			break;
 		default:
@@ -1184,14 +1184,14 @@ static int fieldstat_register_histogram(struct fieldstat_instance *instance, enu
 int fieldstat_register_distribution(struct fieldstat_instance *instance, const char *field_name,const struct field_tag tags[], size_t n_tag, 
 		const char * bins, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures, int output_window)
 {
-	return fieldstat_register_histogram(instance, FILED_TYPE_HISTOGRAM, field_name, tags, n_tag, 
+	return fieldstat_register_histogram(instance, FILED_METRIC_TYPE_DISTRIBUTION, field_name, tags, n_tag, 
 		bins, lowest_trackable_value, highest_trackable_value, significant_figures, output_window);
 }
 
 int fieldstat_register_summary(struct fieldstat_instance *instance, const char *field_name, const struct field_tag tags[], size_t n_tag, 
 		const char * bins, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures, int output_window)
 {
-	return fieldstat_register_histogram(instance, FIELD_TYPE_SUMMARY, field_name, tags, n_tag, 
+	return fieldstat_register_histogram(instance, FIELD_METRIC_TYPE_SUMMARY, field_name, tags, n_tag, 
 		bins, lowest_trackable_value, highest_trackable_value, significant_figures, output_window);
 }
 
@@ -1247,17 +1247,17 @@ int fieldstat_set_metric_ratio_para(struct fieldstat_instance *instance, int met
 	metric_n = get_metric(instance, numerator_metric_id);
 	metric_d = get_metric(instance, denominator_metric_id);
 
-	if(metric->field_type != FIELD_TYPE_GAUGE && metric->field_type != FIELD_TYPE_COUNTER)
+	if(metric->field_type != FIELD_METRIC_TYPE_GAUGE && metric->field_type != FIELD_METRIC_TYPE_COUNTER)
 	{
 		return -1;
 	}
 
-	if(metric_n->field_type != FIELD_TYPE_GAUGE && metric_n->field_type != FIELD_TYPE_COUNTER)
+	if(metric_n->field_type != FIELD_METRIC_TYPE_GAUGE && metric_n->field_type != FIELD_METRIC_TYPE_COUNTER)
 	{
 		return -1;
 	}
 
-	if(metric_d->field_type != FIELD_TYPE_GAUGE && metric_d->field_type != FIELD_TYPE_COUNTER)
+	if(metric_d->field_type != FIELD_METRIC_TYPE_GAUGE && metric_d->field_type != FIELD_METRIC_TYPE_COUNTER)
 	{
 		return -1;
 	}

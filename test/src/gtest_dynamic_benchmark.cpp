@@ -255,7 +255,7 @@ void _worker_thread_one_metric(void *arg)
 	{
 		//memset(metric_name, 0, sizeof(metric_name));
 		//snprintf(metric_name, sizeof(metric_name), "Active_sessions_%d", i);
-		ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_TYPE_GAUGE,
+		ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_METRIC_TYPE_GAUGE,
 													"Active_sessions", 10, 
 													NULL, 0, thread_id); 
 		EXPECT_EQ(0, ret);
@@ -364,7 +364,7 @@ void build_Memory_benchmark(int n_thread, int n_metrics)
 			memset(metric_name, 0, sizeof(metric_name));
 			snprintf(metric_name, sizeof(metric_name), "Active_sessions_%d", j);
 
-			ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_TYPE_GAUGE, 
+			ret = fieldstat_dynamic_metric_value_incrby(instance, FIELD_METRIC_TYPE_GAUGE, 
 														metric_name, j, NULL, 0, i); 
 			EXPECT_EQ(0, ret);
 		}

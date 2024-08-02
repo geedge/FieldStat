@@ -184,19 +184,19 @@ TEST(FeildStatAPI, FieldStatRegister)
 	instance = fieldstat_instance_new("test");
 	EXPECT_STREQ("test", instance->name);
 
-	metric_id = fieldstat_register(instance, FIELD_TYPE_COUNTER, "Traffic_bytes",NULL,0);
+	metric_id = fieldstat_register(instance, FIELD_METRIC_TYPE_COUNTER, "Traffic_bytes",NULL,0);
 	EXPECT_EQ(0, metric_id);
 	EXPECT_EQ(1, instance->metric_cnt);
 	EXPECT_NE(nullptr, instance->metric_block_list[0]);
 	in_block_metric = instance->metric_block_list[0];
 	EXPECT_NE(nullptr, in_block_metric[0]);
 
-	metric_id = fieldstat_register(instance, FIELD_TYPE_GAUGE, "Active_sessions", NULL, 0);
+	metric_id = fieldstat_register(instance, FIELD_METRIC_TYPE_GAUGE, "Active_sessions", NULL, 0);
 	EXPECT_EQ(1, metric_id);
 	EXPECT_EQ(2, instance->metric_cnt);
 	EXPECT_NE(nullptr, in_block_metric[1]);
 
-	metric_id = fieldstat_register(instance, FIELD_TYPE_COUNTER, "New_sessions", tags, sizeof(tags)/sizeof(tags[0]));
+	metric_id = fieldstat_register(instance, FIELD_METRIC_TYPE_COUNTER, "New_sessions", tags, sizeof(tags)/sizeof(tags[0]));
 	EXPECT_EQ(2, metric_id);
 	EXPECT_EQ(3, instance->metric_cnt);
 	EXPECT_NE(nullptr, in_block_metric[2]);
@@ -211,10 +211,10 @@ TEST(FieldStatAPI, FieldStatRegisterTable)
 
 	const char *shaping_column_name[] = {"packets","bytes"};
 	const char *shaping_table_name = "shaping";
-	enum field_type shaping_column_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER};
+	enum field_metric_type shaping_column_type[] = {FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER};
 
 	const char *sc_column_name[] = {"sent_pkts", "send_bytes", "recv_pkts", "recv_bytes"};
-	enum field_type sc_column_type[] = {FIELD_TYPE_COUNTER,FIELD_TYPE_COUNTER,FIELD_TYPE_COUNTER,FIELD_TYPE_COUNTER};
+	enum field_metric_type sc_column_type[] = {FIELD_METRIC_TYPE_COUNTER,FIELD_METRIC_TYPE_COUNTER,FIELD_METRIC_TYPE_COUNTER,FIELD_METRIC_TYPE_COUNTER};
 	const char *sc_table_name = "service_chaining";
 
 	instance = fieldstat_instance_new("test");
@@ -248,7 +248,7 @@ TEST(FieldStatAPI, FieldStatRegisterTableMetrics)
 	int table_id = -1;
 
 	const char *sc_column_name[] = {"sent_pkts", "send_bytes", "recv_pkts", "recv_bytes"};
-	enum field_type sc_column_type[] = {FIELD_TYPE_COUNTER,FIELD_TYPE_COUNTER,FIELD_TYPE_COUNTER,FIELD_TYPE_COUNTER};
+	enum field_metric_type sc_column_type[] = {FIELD_METRIC_TYPE_COUNTER,FIELD_METRIC_TYPE_COUNTER,FIELD_METRIC_TYPE_COUNTER,FIELD_METRIC_TYPE_COUNTER};
 	const char *sc_table_name = "service_chaining";
 
 
@@ -270,7 +270,7 @@ TEST(FeildStatAPI, FieldStatLocalOutputFormatJson)
 	instance = fieldstat_instance_new("test");
 	EXPECT_STREQ("test", instance->name);
 
-	metric_id = fieldstat_register(instance, FIELD_TYPE_COUNTER, "Traffic_bytes",NULL,0);
+	metric_id = fieldstat_register(instance, FIELD_METRIC_TYPE_COUNTER, "Traffic_bytes",NULL,0);
 	EXPECT_EQ(0, metric_id);
 
 	ret_set_local_output = fieldstat_set_local_output(instance,"test.json","json");
@@ -323,7 +323,7 @@ TEST(FeildStatAPI, FieldStatLineProtocolOutputTableMetric)
 	"ipv4_out_bytes", "ipv6_in_packets", "ipv6_in_bytes", "ipv6_out_packets", "ipv6_out_bytes", "tcp_conn_num", "tcp_in_packets", "tcp_in_bytes",
 	"tcp_out_packets", "tcp_out_bytes", "udp_conn_num", "udp_in_packets", "udp_in_bytes", "udp_out_packets", "udp_out_bytes", "alert_bytes", "block_bytes",
 	"pinning_num", "maybe_pinning_num", "not_pinning_num"};
-	enum field_type table_column_type[54] = {FIELD_TYPE_COUNTER};
+	enum field_metric_type table_column_type[54] = {FIELD_METRIC_TYPE_COUNTER};
 
 	instance = fieldstat_instance_new("tsg_statistic");
 	EXPECT_STREQ("tsg_statistic", instance->name);
@@ -408,9 +408,9 @@ TEST(FeildStatAPI, SetMetricRatioPara)
 						  "\"name\":\"Sum\",\"tags\":{\"app_name\":\"maat\",\"table_name\":\"maat_info\"}}";
 
 
-	enum field_type table_column_type[10] = {
-		FIELD_TYPE_GAUGE,   FIELD_TYPE_GAUGE,   FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, 
-		FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER, FIELD_TYPE_COUNTER
+	enum field_metric_type table_column_type[10] = {
+		FIELD_METRIC_TYPE_GAUGE,   FIELD_METRIC_TYPE_GAUGE,   FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER, 
+		FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_COUNTER
 	};
 
 	instance = fieldstat_instance_new("maat");
@@ -507,17 +507,17 @@ TEST(FeildStatAPI, SetMetricInvisible)
 		"rule", "reg/v6", "stream", "IN_Bps", "cpu_us",
 		"PROC_Bps", "IN_Tps", "PROC_Tps","hit_cnt", "hit_rate"
 	};
-	enum field_type table_column_type[10] = {
-		FIELD_TYPE_GAUGE,
-		FIELD_TYPE_GAUGE,
-		FIELD_TYPE_COUNTER,
-		FIELD_TYPE_COUNTER,
-		FIELD_TYPE_COUNTER,
-		FIELD_TYPE_COUNTER,
-		FIELD_TYPE_COUNTER,
-		FIELD_TYPE_COUNTER,
-		FIELD_TYPE_COUNTER,
-		FIELD_TYPE_COUNTER
+	enum field_metric_type table_column_type[10] = {
+		FIELD_METRIC_TYPE_GAUGE,
+		FIELD_METRIC_TYPE_GAUGE,
+		FIELD_METRIC_TYPE_COUNTER,
+		FIELD_METRIC_TYPE_COUNTER,
+		FIELD_METRIC_TYPE_COUNTER,
+		FIELD_METRIC_TYPE_COUNTER,
+		FIELD_METRIC_TYPE_COUNTER,
+		FIELD_METRIC_TYPE_COUNTER,
+		FIELD_METRIC_TYPE_COUNTER,
+		FIELD_METRIC_TYPE_COUNTER
 	};
 	const char *compared_file_data_line = "Sum                   0"
 		"                   0            0.00e+00            5.00e+02"

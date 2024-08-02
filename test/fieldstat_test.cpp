@@ -90,11 +90,11 @@ static void* dynamic_register(void* arg)
 		loops--;
 		//fieldstat_value_incrby(instance,g_counter_id[i], i + 1);
 		snprintf(name, sizeof(name), "counter_%d_%d", loops, rand()%10000);
-		fieldstat_register(instance, FIELD_TYPE_COUNTER, name, tags, 1);
+		fieldstat_register(instance, FIELD_METRIC_TYPE_COUNTER, name, tags, 1);
 
 		memset(name, 0, sizeof(name));
 		snprintf(name, sizeof(name), "gauge_%d_%d", loops, rand()%10000);
-		fieldstat_register(instance,FIELD_TYPE_GAUGE, name, tags, 1);
+		fieldstat_register(instance,FIELD_METRIC_TYPE_GAUGE, name, tags, 1);
 
 		memset(name, 0, sizeof(name));
 		snprintf(name, sizeof(name), "summary_%d_%d", loops, rand()%10000);
@@ -175,7 +175,7 @@ int test_register_by_fieldstat_type(struct fieldstat_instance *instance)
 {
 	int ret = 0;
 //Register counter start
-	ret = fieldstat_register(instance, FIELD_TYPE_COUNTER, "counter_no_tags",NULL,0);
+	ret = fieldstat_register(instance, FIELD_METRIC_TYPE_COUNTER, "counter_no_tags",NULL,0);
 	if(ret == -1)
 	{
 		printf("Failed ot register counter_no_tags, type = counter\n");
@@ -188,7 +188,7 @@ int test_register_by_fieldstat_type(struct fieldstat_instance *instance)
 	tag_counter.value_str = "C_one_tag";
 	tag_counter.key = "C_one_tag_yes";
 
-	ret = fieldstat_register(instance, FIELD_TYPE_COUNTER,"counter_with_one_tag", &tag_counter, 1);
+	ret = fieldstat_register(instance, FIELD_METRIC_TYPE_COUNTER,"counter_with_one_tag", &tag_counter, 1);
 	if(ret == -1)
 	{
 		printf("Failed ot register counter_with_one_tag, type = counter\n");
@@ -210,7 +210,7 @@ int test_register_by_fieldstat_type(struct fieldstat_instance *instance)
 	tags_counter[2].key = "C_tags_2_yes";
 
 
-	ret = fieldstat_register(instance, FIELD_TYPE_COUNTER,"counter_with_tags", tags_counter, sizeof(tags_counter)/sizeof(tags_counter[0]));
+	ret = fieldstat_register(instance, FIELD_METRIC_TYPE_COUNTER,"counter_with_tags", tags_counter, sizeof(tags_counter)/sizeof(tags_counter[0]));
 	if(ret == -1)
 	{
 		printf("Failed ot register counter_with_tags, type = counter\n");
@@ -221,7 +221,7 @@ int test_register_by_fieldstat_type(struct fieldstat_instance *instance)
 
 //Register gauge start 
 
-	ret = fieldstat_register(instance, FIELD_TYPE_GAUGE, "gauge_no_tags",NULL,0);
+	ret = fieldstat_register(instance, FIELD_METRIC_TYPE_GAUGE, "gauge_no_tags",NULL,0);
 	if(ret == -1)
 	{
 		printf("Failed ot register gauge_no_tags, type = gauge\n");
@@ -234,7 +234,7 @@ int test_register_by_fieldstat_type(struct fieldstat_instance *instance)
 	tag_gauge.value_str = "G_one_tag";
 	tag_gauge.key = "G_one_tag_yes";
 
-	ret = fieldstat_register(instance, FIELD_TYPE_GAUGE,"gauge_with_one_tag", &tag_gauge, 1);
+	ret = fieldstat_register(instance, FIELD_METRIC_TYPE_GAUGE,"gauge_with_one_tag", &tag_gauge, 1);
 	if(ret == -1)
 	{
 		printf("Failed ot register gauge_with_one_tag, type = gauge\n");
@@ -255,7 +255,7 @@ int test_register_by_fieldstat_type(struct fieldstat_instance *instance)
 	tags_gauge[2].value_str = "G_tags_2";
 	tags_gauge[2].key = "G_tags_2_yes";
 
-	ret = fieldstat_register(instance, FIELD_TYPE_GAUGE, "gauge_with_tags", tags_gauge, sizeof(tags_gauge)/sizeof(tags_gauge[0]));
+	ret = fieldstat_register(instance, FIELD_METRIC_TYPE_GAUGE, "gauge_with_tags", tags_gauge, sizeof(tags_gauge)/sizeof(tags_gauge[0]));
 	if(ret == -1)
 	{
 		printf("Failed ot register gauge_with_tags, type = gauge\n");
@@ -286,7 +286,7 @@ int test_register_by_fieldstat_type(struct fieldstat_instance *instance)
 //Register table start
 	int table_id = -1;
 	const char *column[] = {"T_success_log","T_fail_log"};
-	enum field_type table_type[] = {FIELD_TYPE_COUNTER, FIELD_TYPE_GAUGE};
+	enum field_metric_type table_type[] = {FIELD_METRIC_TYPE_COUNTER, FIELD_METRIC_TYPE_GAUGE};
 	table_id = fieldstat_register_table(instance, "table_test", column, table_type, sizeof(column)/sizeof(column[0]));
 	if(table_id == -1)
 	{
@@ -343,10 +343,10 @@ int main(int argc, char *argv[])
 
 	struct thread_para para;
 	const char *shaping_column[] = {"in_rx_pkts","in_tx_pkts"};
-	enum field_type shaping_type[] = {FIELD_TYPE_COUNTER,FIELD_TYPE_GAUGE};
+	enum field_metric_type shaping_type[] = {FIELD_METRIC_TYPE_COUNTER,FIELD_METRIC_TYPE_GAUGE};
 	para.shaping_table_id = fieldstat_register_table(test_instance,"shaping",shaping_column,shaping_type,sizeof(shaping_column)/sizeof(shaping_column[0]));
 	const char *sce_column[] = {"sent_bytes","recv_pkts"};
-	enum field_type sce_type[] = {FIELD_TYPE_COUNTER,FIELD_TYPE_COUNTER};
+	enum field_metric_type sce_type[] = {FIELD_METRIC_TYPE_COUNTER,FIELD_METRIC_TYPE_COUNTER};
 	para.sce_table_id = fieldstat_register_table(test_instance, "sce", sce_column,sce_type, sizeof(sce_column)/sizeof(sce_column[0]));
 	para.loops=10;
 	para.instance= test_instance;

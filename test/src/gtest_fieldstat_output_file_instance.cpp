@@ -27,9 +27,9 @@ TEST(FeildStatOutput, OutputMaatTable)
 									 "                   0                   0                   0"
 									 "                   0\n";
 
-	enum field_type table_column_type[8] = {
-		FIELD_TYPE_GAUGE, FIELD_TYPE_GAUGE, FIELD_TYPE_GAUGE, FIELD_TYPE_GAUGE, 
-		FIELD_TYPE_GAUGE, FIELD_TYPE_GAUGE, FIELD_TYPE_GAUGE, FIELD_TYPE_GAUGE
+	enum field_metric_type table_column_type[8] = {
+		FIELD_METRIC_TYPE_GAUGE, FIELD_METRIC_TYPE_GAUGE, FIELD_METRIC_TYPE_GAUGE, FIELD_METRIC_TYPE_GAUGE, 
+		FIELD_METRIC_TYPE_GAUGE, FIELD_METRIC_TYPE_GAUGE, FIELD_METRIC_TYPE_GAUGE, FIELD_METRIC_TYPE_GAUGE
 	};
 
 	instance = fieldstat_instance_new("maat");
@@ -171,43 +171,43 @@ TEST(FeildStatOutput, OutputMaatGaugeType)
 	instance = fieldstat_instance_new("maat");
 	EXPECT_STREQ("maat", instance->name);
 
-	metric_id = fieldstat_register(instance, FIELD_TYPE_GAUGE, "version", NULL, 0);
+	metric_id = fieldstat_register(instance, FIELD_METRIC_TYPE_GAUGE, "version", NULL, 0);
 	EXPECT_EQ(0, metric_id);
-	metric_id = fieldstat_register(instance, FIELD_TYPE_GAUGE, "threads", NULL, 0);
+	metric_id = fieldstat_register(instance, FIELD_METRIC_TYPE_GAUGE, "threads", NULL, 0);
 	EXPECT_EQ(1, metric_id);
-	metric_id = fieldstat_register(instance, FIELD_TYPE_GAUGE, "tables", NULL, 0);
+	metric_id = fieldstat_register(instance, FIELD_METRIC_TYPE_GAUGE, "tables", NULL, 0);
 	EXPECT_EQ(2, metric_id);
-	metric_id = fieldstat_register(instance, FIELD_TYPE_GAUGE, "plug_cached", NULL, 0);
+	metric_id = fieldstat_register(instance, FIELD_METRIC_TYPE_GAUGE, "plug_cached", NULL, 0);
 	EXPECT_EQ(3, metric_id);
-	metric_id = fieldstat_register(instance, FIELD_TYPE_GAUGE, "plug_acc", NULL, 0);
+	metric_id = fieldstat_register(instance, FIELD_METRIC_TYPE_GAUGE, "plug_acc", NULL, 0);
 	EXPECT_EQ(4, metric_id);
-	metric_id = fieldstat_register(instance, FIELD_TYPE_GAUGE, "group", NULL, 0);
+	metric_id = fieldstat_register(instance, FIELD_METRIC_TYPE_GAUGE, "group", NULL, 0);
 	EXPECT_EQ(5, metric_id);
-	metric_id = fieldstat_register(instance, FIELD_TYPE_GAUGE, "not_grp", NULL, 0);
+	metric_id = fieldstat_register(instance, FIELD_METRIC_TYPE_GAUGE, "not_grp", NULL, 0);
 	EXPECT_EQ(6, metric_id);
-	metric_id = fieldstat_register(instance, FIELD_TYPE_GAUGE, "compile", NULL, 0);
+	metric_id = fieldstat_register(instance, FIELD_METRIC_TYPE_GAUGE, "compile", NULL, 0);
 	EXPECT_EQ(7, metric_id);
-	metric_id = fieldstat_register(instance, FIELD_TYPE_GAUGE, "garbage_num", NULL, 0);
+	metric_id = fieldstat_register(instance, FIELD_METRIC_TYPE_GAUGE, "garbage_num", NULL, 0);
 	EXPECT_EQ(8, metric_id);
-	metric_id = fieldstat_register(instance, FIELD_TYPE_GAUGE, "outer_mid", NULL, 0);
+	metric_id = fieldstat_register(instance, FIELD_METRIC_TYPE_GAUGE, "outer_mid", NULL, 0);
 	EXPECT_EQ(9, metric_id);
-	metric_id = fieldstat_register(instance, FIELD_TYPE_GAUGE, "z_stream", NULL, 0);
+	metric_id = fieldstat_register(instance, FIELD_METRIC_TYPE_GAUGE, "z_stream", NULL, 0);
 	EXPECT_EQ(10, metric_id);
-	metric_id = fieldstat_register(instance, FIELD_TYPE_GAUGE, "nt_grp_hit", NULL, 0);
+	metric_id = fieldstat_register(instance, FIELD_METRIC_TYPE_GAUGE, "nt_grp_hit", NULL, 0);
 	EXPECT_EQ(11, metric_id);
-	metric_id = fieldstat_register(instance, FIELD_TYPE_GAUGE, "scan_bytes", NULL, 0);
+	metric_id = fieldstat_register(instance, FIELD_METRIC_TYPE_GAUGE, "scan_bytes", NULL, 0);
 	EXPECT_EQ(12, metric_id);
-	metric_id = fieldstat_register(instance, FIELD_TYPE_GAUGE, "scan_times", NULL, 0);
+	metric_id = fieldstat_register(instance, FIELD_METRIC_TYPE_GAUGE, "scan_times", NULL, 0);
 	EXPECT_EQ(13, metric_id);
-	metric_id = fieldstat_register(instance, FIELD_TYPE_GAUGE, "update_err", NULL, 0);
+	metric_id = fieldstat_register(instance, FIELD_METRIC_TYPE_GAUGE, "update_err", NULL, 0);
 	EXPECT_EQ(14, metric_id);
-	metric_id = fieldstat_register(instance, FIELD_TYPE_GAUGE, "scan_error", NULL, 0);
+	metric_id = fieldstat_register(instance, FIELD_METRIC_TYPE_GAUGE, "scan_error", NULL, 0);
 	EXPECT_EQ(15, metric_id);
-	metric_id = fieldstat_register(instance, FIELD_TYPE_GAUGE, "cmd_commit", NULL, 0);
+	metric_id = fieldstat_register(instance, FIELD_METRIC_TYPE_GAUGE, "cmd_commit", NULL, 0);
 	EXPECT_EQ(16, metric_id);
-	metric_id = fieldstat_register(instance, FIELD_TYPE_GAUGE, "cmd_in_q", NULL, 0);
+	metric_id = fieldstat_register(instance, FIELD_METRIC_TYPE_GAUGE, "cmd_in_q", NULL, 0);
 	EXPECT_EQ(17, metric_id);
-	metric_id = fieldstat_register(instance, FIELD_TYPE_GAUGE, "line_cmd/s", NULL, 0);
+	metric_id = fieldstat_register(instance, FIELD_METRIC_TYPE_GAUGE, "line_cmd/s", NULL, 0);
 	EXPECT_EQ(18, metric_id);
 
 	ret = fieldstat_set_local_output(instance, output_file_path, "default");

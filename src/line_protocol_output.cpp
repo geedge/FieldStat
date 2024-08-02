@@ -103,10 +103,10 @@ static long long read_single_metric_value(struct metric *metric, int output_type
 		:is_refer = 1;
 	switch(metric->field_type)
 	{
-		case FIELD_TYPE_GAUGE:
+		case FIELD_METRIC_TYPE_GAUGE:
 			value = get_metric_unit_val(metric, FS_CALC_CURRENT, is_refer);
 			break;
-		case FIELD_TYPE_COUNTER:
+		case FIELD_METRIC_TYPE_COUNTER:
 			value = get_metric_unit_val(metric, FS_CALC_SPEED, is_refer);
 			break;
 		default:
@@ -155,12 +155,12 @@ static int add_hdr_field_set(struct metric *metric, struct hdr_histogram *h_out,
 	{
 		switch(metric->field_type)
 		{
-			case FIELD_TYPE_SUMMARY:
+			case FIELD_METRIC_TYPE_SUMMARY:
 				value = (long long)hdr_value_at_percentile(h_out, bins[i]*100);
 				used_len += snprintf(line_buf + used_len, line_buf_size - used_len, 
 									 "P%d=%lld,", (int)(bins[i]*100), value);
 				break;
-			case FILED_TYPE_HISTOGRAM:
+			case FILED_METRIC_TYPE_DISTRIBUTION:
 				value = hdr_count_le_value(h_out, (long long)bins[i]);
 				used_len += snprintf(line_buf + used_len, line_buf_size - used_len, 
 									 "le%d=%lld,", (int)bins[i], value);
@@ -391,13 +391,13 @@ static void output_line_protocol_single_metric(struct fieldstat_instance *instan
 
 		switch(metric->field_type)
 		{
-			case FIELD_TYPE_GAUGE:
-			case FIELD_TYPE_COUNTER:
+			case FIELD_METRIC_TYPE_GAUGE:
+			case FIELD_METRIC_TYPE_COUNTER:
 				used_len = build_single_metric_line_buf(instance->name, instance->output_type, 
 														metric, line_buf, sizeof(line_buf));
 				break;
-			case FIELD_TYPE_SUMMARY:
-			case FILED_TYPE_HISTOGRAM:
+			case FIELD_METRIC_TYPE_SUMMARY:
+			case FILED_METRIC_TYPE_DISTRIBUTION:
 				used_len = build_hdr_metric_line_buf(instance->name, instance->output_type, 
 													 metric, line_buf, sizeof(line_buf));
 				break;

@@ -182,12 +182,12 @@ static int prometheus_output_histogram_and_summary(struct metric *metric, char *
 	int bin_num = metric->histogram.bins_num;
 	double *bins = metric->histogram.bins;
 
-	if(metric->field_type == FILED_TYPE_HISTOGRAM)
+	if(metric->field_type == FILED_METRIC_TYPE_DISTRIBUTION)
 	{
 		output_format = (char *)"%s_bucket{%s,le=\"%0.2f\"} %lld\n";
 	}
 
-	if(metric->field_type == FIELD_TYPE_SUMMARY)
+	if(metric->field_type == FIELD_METRIC_TYPE_SUMMARY)
 	{
 		output_format = (char *)"%s{%s,quantile=\"%0.2f\"} %lld\n";
 	}
@@ -200,11 +200,11 @@ static int prometheus_output_histogram_and_summary(struct metric *metric, char *
 
 	for(i=0;i<bin_num;i++)
 	{
-		if(metric->field_type == FILED_TYPE_HISTOGRAM)
+		if(metric->field_type == FILED_METRIC_TYPE_DISTRIBUTION)
 		{
 			value = (long long)hdr_count_le_value(h_out, (long long)bins[i]);
 		}
-		if(metric->field_type == FIELD_TYPE_SUMMARY)
+		if(metric->field_type == FIELD_METRIC_TYPE_SUMMARY)
 		{
 			value=(long long)hdr_value_at_percentile(h_out, bins[i]*100);
 		}
@@ -320,8 +320,8 @@ static int prometheus_get_instance_metric_playload(struct fieldstat_instance *in
 
 		switch(metric->field_type)
 		{
-			case FIELD_TYPE_COUNTER:
-			case FIELD_TYPE_GAUGE:
+			case FIELD_METRIC_TYPE_COUNTER:
+			case FIELD_METRIC_TYPE_GAUGE:
 				instance->output_type == 1
 					?value = get_metric_unit_val(metric, FS_CALC_CURRENT, 0)
 					:value = get_metric_unit_val(metric, FS_CALC_CURRENT, 1);
@@ -333,8 +333,8 @@ static int prometheus_get_instance_metric_playload(struct fieldstat_instance *in
 											value
 										);
 				break;
-			case FIELD_TYPE_SUMMARY:
-			case FILED_TYPE_HISTOGRAM:
+			case FIELD_METRIC_TYPE_SUMMARY:
+			case FILED_METRIC_TYPE_DISTRIBUTION:
 				append_offset += prometheus_output_histogram_and_summary(metric,new_payload + append_offset,
 								new_payload_size - append_offset, instance_name, metric_name, metric_tags);
 				break;

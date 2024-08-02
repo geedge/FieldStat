@@ -251,7 +251,7 @@ void fieldstat_dynamic_instance_start(struct fieldstat_dynamic_instance *instanc
 	}
 }
 
-int fieldstat_register_dynamic_table(struct fieldstat_dynamic_instance *instance, const char *table_name, const char *column_name[], enum field_type column_type[], size_t n_column, unsigned int out_column_ids[])
+int fieldstat_register_dynamic_table(struct fieldstat_dynamic_instance *instance, const char *table_name, const char *column_name[], enum field_metric_type column_type[], size_t n_column, unsigned int out_column_ids[])
 {
 	int table_id = 0;
 	int i = 0;
@@ -269,7 +269,7 @@ int fieldstat_register_dynamic_table(struct fieldstat_dynamic_instance *instance
 		{
 			return -1;
 		}
-		if(column_type[i] != FIELD_TYPE_GAUGE && column_type[i] != FIELD_TYPE_COUNTER)
+		if(column_type[i] != FIELD_METRIC_TYPE_GAUGE && column_type[i] != FIELD_METRIC_TYPE_COUNTER)
 		{
 			return -1;
 		}
@@ -465,10 +465,10 @@ static struct metric * create_dynamic_table_metric(struct fieldstat_dynamic_inst
 		metric->is_atomic_counter = 1;
 		switch(table->column_type[i])
 		{
-			case FIELD_TYPE_COUNTER:
+			case FIELD_METRIC_TYPE_COUNTER:
 				memset(&(metric->counter), 0, sizeof(metric->counter));
 				break;
-			case FIELD_TYPE_GAUGE:
+			case FIELD_METRIC_TYPE_GAUGE:
 				memset(&(metric->gauge), 0, sizeof(metric->gauge));
 				break;
 			default:
@@ -513,7 +513,7 @@ static struct metric * create_dynamic_table_metric(struct fieldstat_dynamic_inst
 }
 
 
-static struct metric * create_dynamic_metric(struct fieldstat_dynamic_instance *instance, enum field_type type, const char *field_name, long long value, const struct field_tag tags[], size_t n_tags, int thread_id)
+static struct metric * create_dynamic_metric(struct fieldstat_dynamic_instance *instance, enum field_metric_type type, const char *field_name, long long value, const struct field_tag tags[], size_t n_tags, int thread_id)
 {
 	struct dynamic_metric **head = NULL;
 	struct dynamic_metric *insert = NULL;
@@ -544,10 +544,10 @@ static struct metric * create_dynamic_metric(struct fieldstat_dynamic_instance *
 	metric->is_atomic_counter = 1;
 	switch(metric->field_type)
 	{
-		case FIELD_TYPE_COUNTER:
+		case FIELD_METRIC_TYPE_COUNTER:
 			memset(&(metric->counter), 0, sizeof(metric->counter));
 			break;
-		case FIELD_TYPE_GAUGE:
+		case FIELD_METRIC_TYPE_GAUGE:
 			memset(&(metric->gauge), 0, sizeof(metric->gauge));
 			break;
 		default:
@@ -582,7 +582,7 @@ static struct metric * create_dynamic_metric(struct fieldstat_dynamic_instance *
 }
 
 
-static int fieldstat_dynamic_metric_value_operate(struct fieldstat_dynamic_instance *instance, enum field_op op, enum field_type type, const char *field_name, long long value, const struct field_tag tags[], size_t n_tags, int thread_id)
+static int fieldstat_dynamic_metric_value_operate(struct fieldstat_dynamic_instance *instance, enum field_op op, enum field_metric_type type, const char *field_name, long long value, const struct field_tag tags[], size_t n_tags, int thread_id)
 {
 	struct metric * metric = NULL;
 
@@ -602,17 +602,17 @@ static int fieldstat_dynamic_metric_value_operate(struct fieldstat_dynamic_insta
 }
 
 
-int fieldstat_dynamic_metric_value_incrby(struct fieldstat_dynamic_instance *instance, enum field_type type, const char *field_name, long long value, const struct field_tag tags[], size_t n_tags, int thread_id)
+int fieldstat_dynamic_metric_value_incrby(struct fieldstat_dynamic_instance *instance, enum field_metric_type type, const char *field_name, long long value, const struct field_tag tags[], size_t n_tags, int thread_id)
 {
 	return fieldstat_dynamic_metric_value_operate(instance, FS_OP_ADD, type, field_name, value, tags, n_tags, thread_id);
 }
 
-int fieldstat_dynamic_metric_value_set(struct fieldstat_dynamic_instance *instance, enum field_type type, const char *field_name, long long value, const struct field_tag tags[], size_t n_tags, int thread_id)
+int fieldstat_dynamic_metric_value_set(struct fieldstat_dynamic_instance *instance, enum field_metric_type type, const char *field_name, long long value, const struct field_tag tags[], size_t n_tags, int thread_id)
 {
 	return fieldstat_dynamic_metric_value_operate(instance, FS_OP_SET, type, field_name, value, tags, n_tags, thread_id);
 }
 
-int fieldstat_dynamic_metric_value_decrby(struct fieldstat_dynamic_instance *instance, enum field_type type, const char *field_name, long long value, const struct field_tag tags[], size_t n_tags, int thread_id)
+int fieldstat_dynamic_metric_value_decrby(struct fieldstat_dynamic_instance *instance, enum field_metric_type type, const char *field_name, long long value, const struct field_tag tags[], size_t n_tags, int thread_id)
 {
 	return fieldstat_dynamic_metric_value_operate(instance, FS_OP_SUB, type, field_name, value, tags, n_tags, thread_id);
 }
@@ -758,10 +758,10 @@ static struct metric **create_dynamic_table_row_metrics(
 		metric->is_atomic_counter = 1;
 		switch(table->column_type[i])
 		{
-			case FIELD_TYPE_COUNTER:
+			case FIELD_METRIC_TYPE_COUNTER:
 				memset(&(metric->counter), 0, sizeof(metric->counter));
 				break;
-			case FIELD_TYPE_GAUGE:
+			case FIELD_METRIC_TYPE_GAUGE:
 				memset(&(metric->gauge), 0, sizeof(metric->gauge));
 				break;
 			default:
