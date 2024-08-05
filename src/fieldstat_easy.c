@@ -130,7 +130,7 @@ struct fieldstat_easy *fieldstat_easy_new(int max_thread_num, const char *name, 
 
     if (name != NULL) {
         struct field *global_dimension_more = malloc(sizeof(struct field) * (n_dimension + 1));
-        global_dimension_more[0].key = "__name__";
+        global_dimension_more[0].key = "name";
         global_dimension_more[0].value_str = name;
         global_dimension_more[0].type = FIELD_VALUE_CSTRING;
         for (size_t i = 0; i < n_dimension; i++) {

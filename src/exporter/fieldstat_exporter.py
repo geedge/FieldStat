@@ -210,9 +210,9 @@ class PrometheusExporter:
             fcntl.flock(file, fcntl.LOCK_UN)
             for item in json_data:
                 # the item has __name__ in its global tag, move it to the name
-                if "__name__" in item["tags"]:
-                    item["name"] = item["tags"]["__name__"]
-                    item["tags"].pop("__name__", None)
+                if "name" in item["tags"]:
+                    item["name"] = item["tags"]["name"]
+                    item["tags"].pop("name", None)
                 else:
                     item["name"] = "-"
                 payload += self.__build_metrics(item)
@@ -652,9 +652,9 @@ class LocalExporter:
             try:
                 objects = json.load(fd)
                 for obj in objects:
-                    if "__name__" in obj["tags"]:
-                        obj["name"] = obj["tags"]["__name__"]
-                        obj["tags"].pop("__name__", None)
+                    if "name" in obj["tags"]:
+                        obj["name"] = obj["tags"]["name"]
+                        obj["tags"].pop("name", None)
                     else:
                         obj["name"] = "-"
 
