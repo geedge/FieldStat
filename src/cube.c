@@ -1202,9 +1202,15 @@ int cube_counter_get(const struct cube *cube, int metric_id, const struct field_
         void *exdata_dummy = NULL;
         heavy_keeper_one_point_query(cube->heavykeeper, dimension_in_string, dimension_string_len, &count, &exdata_dummy);
         *value = count;
-
         free(dimension_in_string);
-        return count == 0 ? FS_ERR_INVALID_DIMENSION : FS_OK;
+
+        if (exdata_dummy == NULL) {
+            return FS_ERR_INVALID_DIMENSION;
+        }
+        if (count == 0) {
+            return FS_ERR_INVALID_METRIC_ID;
+        }
+        return FS_OK;
     }
 
     int ret;
@@ -1231,6 +1237,8 @@ int cube_hll_get(const struct cube *cube, int metric_id, const struct field_list
         free(dimension_in_string);
         if (hll_value < 0) {
             return FS_ERR_INVALID_DIMENSION;
+        } else if (hll_value == 0.0) {
+            return FS_ERR_INVALID_METRIC_ID;
         }
 
         *value = hll_value;
@@ -1280,10 +1288,18 @@ int cube_histogram_count_le_value(const struct cube *cube, int metric_id, const 
 }
 
 int cube_get_serialization_as_base64(const struct cube *cube, int metric_id, const struct field_list *fields, char **blob, size_t *blob_size) {
+    *blob = NULL;
+    *blob_size = 0;
     if (cube->sampling_mode == SAMPLING_MODE_TOP_CARDINALITY && cube->primary_metric_id == metric_id) {
         char *dimension_in_string;
         size_t dimension_string_len;
         field_array_to_key(fields->field, fields->n_field, &dimension_in_string, &dimension_string_len);
+
+        double hll_value = spread_sketch_get_cardinality(cube->spread_sketch, dimension_in_string, dimension_string_len);
+        if (hll_value <= 0) {
+            free(dimension_in_string);
+            return hll_value == 0 ? FS_ERR_INVALID_METRIC_ID : FS_ERR_INVALID_DIMENSION;
+        }
 
         *blob = spread_sketch_get_hll_base64_serialization(cube->spread_sketch, dimension_in_string, dimension_string_len);
         *blob_size = strlen(*blob);

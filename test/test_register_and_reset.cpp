@@ -95,32 +95,6 @@ TEST(test_register, reset_and_try_to_query_cell_comprehensive)
     fieldstat_free(instance);
 }
 
-TEST(test_register, reset_and_try_to_query_metric)
-{
-    struct fieldstat *instance = fieldstat_new();
-    int cube_id = test_fieldstat_cube_create(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
-    int metric_counter = fieldstat_register_counter(instance, cube_id, "counter");
-    int metric_hll = fieldstat_register_hll(instance, cube_id, "hll", 5);
-    int metric_hist = fieldstat_register_histogram(instance, cube_id, "hist", 0, 10000, 5);
-    int metric_operated_after_reset = fieldstat_register_counter(instance, cube_id, "counter_after_reset");
-
-    fieldstat_counter_incrby(instance, cube_id, metric_counter, &TEST_FIELD_INT, 1, 1);
-    fieldstat_hll_add(instance, cube_id, metric_counter, &TEST_FIELD_INT, 1, "1", 1);
-    fieldstat_histogram_record(instance, cube_id, metric_hist, &TEST_FIELD_INT, 1, 1000);
-
-    fieldstat_reset(instance);
-    fieldstat_counter_incrby(instance, cube_id, metric_operated_after_reset, &TEST_FIELD_INT, 1, 1);
-
-    long long value;
-    double value_hll;
-    EXPECT_EQ(fieldstat_counter_get(instance, cube_id, &TEST_FIELD_LIST_INT, metric_counter, &value), FS_ERR_INVALID_METRIC_ID);
-    EXPECT_EQ(fieldstat_hll_get(instance, cube_id, &TEST_FIELD_LIST_INT, metric_hll, &value_hll), FS_ERR_INVALID_METRIC_ID);
-    EXPECT_EQ(fieldstat_histogram_value_at_percentile(instance, cube_id, &TEST_FIELD_LIST_INT, metric_hist, 0.5), FS_ERR_INVALID_METRIC_ID);
-    EXPECT_EQ(fieldstat_counter_get(instance, cube_id, &TEST_FIELD_LIST_INT, metric_operated_after_reset, &value), FS_OK);
-
-    fieldstat_free(instance);
-}
-
 TEST(test_register, reset_and_try_to_query_cell_topk)
 {
     struct fieldstat *instance = fieldstat_new();
@@ -158,6 +132,88 @@ TEST(test_register, reset_and_try_to_query_cell_spreadsketch)
     struct field_list *tag_list;
     fieldstat_cube_get_cells(instance, cube_id, &tag_list, &n_cell);
     EXPECT_EQ(n_cell, 0);
+
+    fieldstat_free(instance);
+}
+
+TEST(test_register, reset_and_try_to_query_metric_comprehensive)
+{
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = test_fieldstat_cube_create(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    int metric_counter = fieldstat_register_counter(instance, cube_id, "counter");
+    int metric_hll = fieldstat_register_hll(instance, cube_id, "hll", 5);
+    int metric_hist = fieldstat_register_histogram(instance, cube_id, "hist", 0, 10000, 5);
+    int metric_operated_after_reset = fieldstat_register_counter(instance, cube_id, "counter_after_reset");
+
+    fieldstat_counter_incrby(instance, cube_id, metric_counter, &TEST_FIELD_INT, 1, 1);
+    fieldstat_hll_add(instance, cube_id, metric_hll, &TEST_FIELD_INT, 1, "1", 1);
+    fieldstat_histogram_record(instance, cube_id, metric_hist, &TEST_FIELD_INT, 1, 1000);
+
+    fieldstat_reset(instance);
+    fieldstat_counter_incrby(instance, cube_id, metric_operated_after_reset, &TEST_FIELD_INT, 1, 1);
+
+    long long value;
+    double value_hll;
+    EXPECT_EQ(fieldstat_counter_get(instance, cube_id, &TEST_FIELD_LIST_INT, metric_counter, &value), FS_ERR_INVALID_METRIC_ID);
+    EXPECT_EQ(fieldstat_hll_get(instance, cube_id, &TEST_FIELD_LIST_INT, metric_hll, &value_hll), FS_ERR_INVALID_METRIC_ID);
+    EXPECT_EQ(fieldstat_histogram_value_at_percentile(instance, cube_id, &TEST_FIELD_LIST_INT, metric_hist, 0.5), FS_ERR_INVALID_METRIC_ID);
+    EXPECT_EQ(fieldstat_counter_get(instance, cube_id, &TEST_FIELD_LIST_INT, metric_operated_after_reset, &value), FS_OK);
+
+    fieldstat_free(instance);
+}
+
+TEST(test_register, reset_and_try_to_query_primary_metric_topk)
+{
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_cube_create(instance, &TEST_SHARED_TAG, 1);
+    int metric_counter_primary = fieldstat_register_counter(instance, cube_id, "counter");
+    int metric_hll = fieldstat_register_hll(instance, cube_id, "hll", 5);
+    int metric_operated_after_reset = fieldstat_register_counter(instance, cube_id, "counter_after_reset");
+    fieldstat_cube_set_sampling(instance, cube_id, SAMPLING_MODE_TOPK, 1, metric_counter_primary);
+
+    fieldstat_counter_incrby(instance, cube_id, metric_counter_primary, &TEST_FIELD_INT, 1, 1);
+    fieldstat_hll_add(instance, cube_id, metric_hll, &TEST_FIELD_INT, 1, "1", 1);
+
+    fieldstat_reset(instance);
+    fieldstat_counter_incrby(instance, cube_id, metric_operated_after_reset, &TEST_FIELD_INT, 1, 1);
+
+    long long value;
+    double value_hll;
+    char *value_hll_base64;
+    size_t value_hll_base64_len;
+    EXPECT_EQ(fieldstat_counter_get(instance, cube_id, &TEST_FIELD_LIST_INT, metric_counter_primary, &value), FS_ERR_INVALID_METRIC_ID);
+    EXPECT_EQ(fieldstat_hll_get(instance, cube_id, &TEST_FIELD_LIST_INT, metric_hll, &value_hll), FS_ERR_INVALID_METRIC_ID);
+    fieldstat_metric_get_serialization_as_base64(instance, cube_id,metric_hll, &TEST_FIELD_LIST_INT,&value_hll_base64, &value_hll_base64_len);
+    EXPECT_EQ(value_hll_base64, nullptr);
+    EXPECT_EQ(fieldstat_counter_get(instance, cube_id, &TEST_FIELD_LIST_INT, metric_operated_after_reset, &value), FS_OK);
+
+    fieldstat_free(instance);
+}
+
+TEST(test_register, reset_and_try_to_query_primary_metric_spreadsketch)
+{
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_cube_create(instance, &TEST_SHARED_TAG, 1);
+    int metric_counter = fieldstat_register_counter(instance, cube_id, "counter");
+    int metric_hll_primary = fieldstat_register_hll(instance, cube_id, "hll", 5);
+    int metric_operated_after_reset = fieldstat_register_counter(instance, cube_id, "counter_after_reset");
+    fieldstat_cube_set_sampling(instance, cube_id, SAMPLING_MODE_TOP_CARDINALITY, 1, metric_hll_primary);
+
+    fieldstat_counter_incrby(instance, cube_id, metric_counter, &TEST_FIELD_INT, 1, 1);
+    fieldstat_hll_add(instance, cube_id, metric_hll_primary, &TEST_FIELD_INT, 1, "1", 1);
+
+    fieldstat_reset(instance);
+    fieldstat_counter_incrby(instance, cube_id, metric_operated_after_reset, &TEST_FIELD_INT, 1, 1);
+
+    long long value;
+    double value_hll;
+    char *value_hll_base64;
+    size_t value_hll_base64_len;
+    EXPECT_EQ(fieldstat_counter_get(instance, cube_id, &TEST_FIELD_LIST_INT, metric_counter, &value), FS_ERR_INVALID_METRIC_ID);
+    EXPECT_EQ(fieldstat_hll_get(instance, cube_id, &TEST_FIELD_LIST_INT, metric_hll_primary, &value_hll), FS_ERR_INVALID_METRIC_ID);
+    EXPECT_EQ(fieldstat_counter_get(instance, cube_id, &TEST_FIELD_LIST_INT, metric_operated_after_reset, &value), FS_OK);
+    fieldstat_metric_get_serialization_as_base64(instance, cube_id,metric_hll_primary, &TEST_FIELD_LIST_INT,&value_hll_base64, &value_hll_base64_len);
+    EXPECT_EQ(value_hll_base64, nullptr);
 
     fieldstat_free(instance);
 }
@@ -830,6 +886,6 @@ TEST(calibrate, delete_first_cube)
 int main(int argc, char *argv[]) 
 {
 	testing::InitGoogleTest(&argc, argv);
-    // testing::GTEST_FLAG(filter) = "test_register.reset_and_new_cell_spreadsketch";
+    testing::GTEST_FLAG(filter) = "test_register.reset_and_try_to_query_primary*";
 	return RUN_ALL_TESTS();
 }

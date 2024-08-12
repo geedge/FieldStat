@@ -248,7 +248,6 @@ int spread_sketch_add_hash(struct spread_sketch *ss, const char *entry, size_t e
         if (ss->level0_cnt == 0) {
             return 0;
         }
-        assert(ss->level0_cnt>0);
     }
     
     // https://www.eecs.harvard.edu/~michaelm/postscripts/tr-02-05.pdf
@@ -298,7 +297,9 @@ int spread_sketch_add_hash(struct spread_sketch *ss, const char *entry, size_t e
                 in_sketch = true;
             }
         }
-        hll_add_hash(bucket->sthll_register, ss->precision, item_hash);
+        if (item_hash != DUMMY_ITEM_HASH) {
+            hll_add_hash(bucket->sthll_register, ss->precision, item_hash);
+        }
     }
 
     return in_sketch ? 1 : 0;
