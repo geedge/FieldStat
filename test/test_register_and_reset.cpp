@@ -886,6 +886,6 @@ TEST(calibrate, delete_first_cube)
 int main(int argc, char *argv[]) 
 {
 	testing::InitGoogleTest(&argc, argv);
-    testing::GTEST_FLAG(filter) = "test_register.reset_and_try_to_query_primary*";
+    // testing::GTEST_FLAG(filter) = "test_register.reset_and_try_to_query_primary*";
 	return RUN_ALL_TESTS();
 }

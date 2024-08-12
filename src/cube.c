@@ -1200,13 +1200,13 @@ int cube_counter_get(const struct cube *cube, int metric_id, const struct field_
 
         long long count = 0;
         void *exdata_dummy = NULL;
-        heavy_keeper_one_point_query(cube->heavykeeper, dimension_in_string, dimension_string_len, &count, &exdata_dummy);
+        int tmp_ret = heavy_keeper_one_point_query(cube->heavykeeper, dimension_in_string, dimension_string_len, &count, &exdata_dummy);
         *value = count;
         free(dimension_in_string);
 
-        if (exdata_dummy == NULL) {
+        if (tmp_ret < 0) {
             return FS_ERR_INVALID_DIMENSION;
-        }
+        } 
         if (count == 0) {
             return FS_ERR_INVALID_METRIC_ID;
         }

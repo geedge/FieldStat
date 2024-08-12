@@ -812,14 +812,15 @@ struct heavy_keeper *heavy_keeper_copy(const struct heavy_keeper *src) {
     return ret;
 }
 
-void heavy_keeper_one_point_query(const struct heavy_keeper *hk, const char *key, size_t key_len, long long *count_out, void **exdata_out) {
+int heavy_keeper_one_point_query(const struct heavy_keeper *hk, const char *key, size_t key_len, long long *count_out, void **exdata_out) {
     *count_out = 0;
     *exdata_out = NULL;
 
     const heap_entry *entry = sorted_set_find_entry(hk->top_K_heap, key, key_len);
-    if (entry == NULL) {
-        return;
+    if (entry == NULL || sorted_set_entry_dying(entry)) {
+        return -1;
     }
     *count_out = sorted_set_entry_get_score(entry);
     *exdata_out = sorted_set_entry_get_data(entry)->exdata;
+    return 0;
 }

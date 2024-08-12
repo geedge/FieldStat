@@ -40,7 +40,7 @@ void heavy_keeper_merge(struct heavy_keeper *dest, const struct heavy_keeper *sr
 struct heavy_keeper *heavy_keeper_copy(const struct heavy_keeper *src);
 
 // for test
-void heavy_keeper_one_point_query(const struct heavy_keeper *hk, const char *key, size_t key_len, long long *count_out, void **exdata_out);
+int heavy_keeper_one_point_query(const struct heavy_keeper *hk, const char *key, size_t key_len, long long *count_out, void **exdata_out);
 
 
 #ifdef __cplusplus
