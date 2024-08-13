@@ -106,7 +106,7 @@ class PrometheusExporter:
         self.json_paths.extend(read_json_paths_from_dirs(FieldstatExporterVars.json_dirs))
         self.n_lines     = 0
 
-    def __escape_metric_name(metric_name):
+    def __escape_metric_name(self, metric_name):
         #regex: [a-zA-Z_:][a-zA-Z0-9_:]*
         name = re.sub(r'[^a-zA-Z0-9_:]', '_', metric_name)
         # remove the last underscore
@@ -127,6 +127,10 @@ class PrometheusExporter:
 
         for key,value in src_tags.items():
             dst_key = re.sub(r'[^a-zA-Z0-9_:]', '_', key)
+            for i in range(len(dst_key) - 1, -1, -1):
+                if dst_key[i] != '_':
+                    break
+                dst_key = dst_key[:i]
             dst_val = str(value)
             dst_tags.append(f'{dst_key}="{dst_val}"')
 
@@ -186,11 +190,19 @@ class PrometheusExporter:
         self.n_lines += 1
         return  name + "{" + tags + "}" + ' ' + "{:.2f}".format(hll_value) + '\n'
 
-    def __build_metrics(self, json_dict):
+    def __build_metrics(self, json_dict): # convert one cell to payload format
         metrics      = ""
         escaped_tags = self.__escape_metric_tags(json_dict)
+
+        used_metrics = {}
         for key,value in json_dict["fields"].items():
             escaped_name = self.__escape_metric_name(key)
+            if escaped_name in used_metrics:
+                used_metrics[escaped_name] += 1
+                escaped_name = escaped_name + "_" + str(used_metrics[escaped_name])
+            else:
+                used_metrics[escaped_name] = 0
+
             if isinstance(value, int):
                 metrics += self.__build_type_counter(escaped_name, escaped_tags, value)
             else:
@@ -1069,6 +1081,7 @@ class FieldstatExporter:
     def __enable_prometheus_endpoint(self):
         server_address = ('', self.prom_listen_port)
         httpd = HTTPServer(server_address, PrometheusEndpoint)
+        print("Starting Prometheus exporter on {}:{}...".format(FieldstatExporterVars.prom_uri_path, self.prom_listen_port))
         httpd.serve_forever()
 
     def __enable_local_exporter(self):
