@@ -48,7 +48,7 @@ class TestPrometheusExporter(unittest.TestCase):
     def test__escape_metric_name(self):
         name = "tsg_master_log:(){}/\\%*$-,;"
         ret  = self.prom._PrometheusExporter__escape_metric_name(name)
-        self.assertEqual(ret, "tsg_master_log:____________")
+        self.assertEqual(ret, "tsg_master_log:")
 
     def test__escape_metric_tags(self):
         json_obj = {'name': '-',

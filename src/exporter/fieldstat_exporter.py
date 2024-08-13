@@ -127,10 +127,6 @@ class PrometheusExporter:
 
         for key,value in src_tags.items():
             dst_key = re.sub(r'[^a-zA-Z0-9_:]', '_', key)
-            for i in range(len(dst_key) - 1, -1, -1):
-                if dst_key[i] != '_':
-                    break
-                dst_key = dst_key[:i]
             dst_val = str(value)
             dst_tags.append(f'{dst_key}="{dst_val}"')
 
