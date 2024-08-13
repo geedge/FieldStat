@@ -106,9 +106,17 @@ class PrometheusExporter:
         self.json_paths.extend(read_json_paths_from_dirs(FieldstatExporterVars.json_dirs))
         self.n_lines     = 0
 
-    def __escape_metric_name(self, metric_name):
+    def __escape_metric_name(metric_name):
         #regex: [a-zA-Z_:][a-zA-Z0-9_:]*
         name = re.sub(r'[^a-zA-Z0-9_:]', '_', metric_name)
+        # remove the last underscore
+        for i in range(len(name) - 1, -1, -1):
+            if name[i] != '_':
+                break
+            name = name[:i]
+        if name == "":
+            return "_"
+
         return name
 
     def __escape_metric_tags(self, json_dict):
