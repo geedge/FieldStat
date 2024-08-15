@@ -99,13 +99,13 @@ class TestPrometheusExporter(unittest.TestCase):
 
         metrics = self.prom._PrometheusExporter__build_summary_format(name, tags, c_hist)
 
-        desired = "tsg_master_log{policy_id=\"1\",app_name=\"-\",quantile=\"10.00%\"} 9\n" \
-                  "tsg_master_log{policy_id=\"1\",app_name=\"-\",quantile=\"20.00%\"} 19\n"\
-                  "tsg_master_log{policy_id=\"1\",app_name=\"-\",quantile=\"50.00%\"} 49\n"\
-                  "tsg_master_log{policy_id=\"1\",app_name=\"-\",quantile=\"80.00%\"} 79\n"\
-                  "tsg_master_log{policy_id=\"1\",app_name=\"-\",quantile=\"90.00%\"} 89\n"\
-                  "tsg_master_log{policy_id=\"1\",app_name=\"-\",quantile=\"95.00%\"} 94\n"\
-                  "tsg_master_log{policy_id=\"1\",app_name=\"-\",quantile=\"99.00%\"} 98\n"
+        desired = "tsg_master_log{policy_id=\"1\",app_name=\"-\",quantile=\"0.10\"} 9\n" \
+                  "tsg_master_log{policy_id=\"1\",app_name=\"-\",quantile=\"0.20\"} 19\n"\
+                  "tsg_master_log{policy_id=\"1\",app_name=\"-\",quantile=\"0.50\"} 49\n"\
+                  "tsg_master_log{policy_id=\"1\",app_name=\"-\",quantile=\"0.80\"} 79\n"\
+                  "tsg_master_log{policy_id=\"1\",app_name=\"-\",quantile=\"0.90\"} 89\n"\
+                  "tsg_master_log{policy_id=\"1\",app_name=\"-\",quantile=\"0.95\"} 94\n"\
+                  "tsg_master_log{policy_id=\"1\",app_name=\"-\",quantile=\"0.99\"} 98\n"
         self.assertEqual(metrics, desired)
 
 
@@ -119,13 +119,13 @@ class TestPrometheusExporter(unittest.TestCase):
         
         metrics = self.prom._PrometheusExporter__build_type_histogram(name, tags, value)
         
-        desired = "tsg_master_log{policy_id=\"1\",app_name=\"-\",quantile=\"10.00%\"} 9\n" \
-                  "tsg_master_log{policy_id=\"1\",app_name=\"-\",quantile=\"20.00%\"} 19\n"\
-                  "tsg_master_log{policy_id=\"1\",app_name=\"-\",quantile=\"50.00%\"} 49\n"\
-                  "tsg_master_log{policy_id=\"1\",app_name=\"-\",quantile=\"80.00%\"} 79\n"\
-                  "tsg_master_log{policy_id=\"1\",app_name=\"-\",quantile=\"90.00%\"} 89\n"\
-                  "tsg_master_log{policy_id=\"1\",app_name=\"-\",quantile=\"95.00%\"} 94\n"\
-                  "tsg_master_log{policy_id=\"1\",app_name=\"-\",quantile=\"99.00%\"} 98\n"\
+        desired = "tsg_master_log{policy_id=\"1\",app_name=\"-\",quantile=\"0.10\"} 9\n" \
+                  "tsg_master_log{policy_id=\"1\",app_name=\"-\",quantile=\"0.20\"} 19\n"\
+                  "tsg_master_log{policy_id=\"1\",app_name=\"-\",quantile=\"0.50\"} 49\n"\
+                  "tsg_master_log{policy_id=\"1\",app_name=\"-\",quantile=\"0.80\"} 79\n"\
+                  "tsg_master_log{policy_id=\"1\",app_name=\"-\",quantile=\"0.90\"} 89\n"\
+                  "tsg_master_log{policy_id=\"1\",app_name=\"-\",quantile=\"0.95\"} 94\n"\
+                  "tsg_master_log{policy_id=\"1\",app_name=\"-\",quantile=\"0.99\"} 98\n"\
                   "tsg_master_log_sum{policy_id=\"1\",app_name=\"-\"} 4950\n"\
                   "tsg_master_log_count{policy_id=\"1\",app_name=\"-\"} 100\n"
         self.assertEqual(metrics, desired)
@@ -206,13 +206,13 @@ class TestPrometheusExporter(unittest.TestCase):
         self.prom.hist_format = "summary"
         metrics = self.prom._PrometheusExporter__build_metrics(hist_dict)
         
-        desired = "list_num{thread_id=\"1\",hit_rate=\"1.1\",rule_id=\"1\",action=\"deny\",app_name=\"-\",quantile=\"10.00%\"} 9\n"\
-                  "list_num{thread_id=\"1\",hit_rate=\"1.1\",rule_id=\"1\",action=\"deny\",app_name=\"-\",quantile=\"20.00%\"} 19\n"\
-                  "list_num{thread_id=\"1\",hit_rate=\"1.1\",rule_id=\"1\",action=\"deny\",app_name=\"-\",quantile=\"50.00%\"} 49\n"\
-                  "list_num{thread_id=\"1\",hit_rate=\"1.1\",rule_id=\"1\",action=\"deny\",app_name=\"-\",quantile=\"80.00%\"} 79\n"\
-                  "list_num{thread_id=\"1\",hit_rate=\"1.1\",rule_id=\"1\",action=\"deny\",app_name=\"-\",quantile=\"90.00%\"} 89\n"\
-                  "list_num{thread_id=\"1\",hit_rate=\"1.1\",rule_id=\"1\",action=\"deny\",app_name=\"-\",quantile=\"95.00%\"} 94\n"\
-                  "list_num{thread_id=\"1\",hit_rate=\"1.1\",rule_id=\"1\",action=\"deny\",app_name=\"-\",quantile=\"99.00%\"} 98\n"\
+        desired = "list_num{thread_id=\"1\",hit_rate=\"1.1\",rule_id=\"1\",action=\"deny\",app_name=\"-\",quantile=\"0.10\"} 9\n"\
+                  "list_num{thread_id=\"1\",hit_rate=\"1.1\",rule_id=\"1\",action=\"deny\",app_name=\"-\",quantile=\"0.20\"} 19\n"\
+                  "list_num{thread_id=\"1\",hit_rate=\"1.1\",rule_id=\"1\",action=\"deny\",app_name=\"-\",quantile=\"0.50\"} 49\n"\
+                  "list_num{thread_id=\"1\",hit_rate=\"1.1\",rule_id=\"1\",action=\"deny\",app_name=\"-\",quantile=\"0.80\"} 79\n"\
+                  "list_num{thread_id=\"1\",hit_rate=\"1.1\",rule_id=\"1\",action=\"deny\",app_name=\"-\",quantile=\"0.90\"} 89\n"\
+                  "list_num{thread_id=\"1\",hit_rate=\"1.1\",rule_id=\"1\",action=\"deny\",app_name=\"-\",quantile=\"0.95\"} 94\n"\
+                  "list_num{thread_id=\"1\",hit_rate=\"1.1\",rule_id=\"1\",action=\"deny\",app_name=\"-\",quantile=\"0.99\"} 98\n"\
                   "list_num_sum{thread_id=\"1\",hit_rate=\"1.1\",rule_id=\"1\",action=\"deny\",app_name=\"-\"} 4950\n"\
                   "list_num_count{thread_id=\"1\",hit_rate=\"1.1\",rule_id=\"1\",action=\"deny\",app_name=\"-\"} 100\n"
         self.assertEqual(metrics, desired)

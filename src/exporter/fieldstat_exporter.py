@@ -153,7 +153,7 @@ class PrometheusExporter:
         metrics = ""
         for i in self.hist_bins:
             value   = FieldstatAPI.libfieldstat.fieldstat_histogram_value_at_percentile_api(c_hist, float(i * 100))
-            metric  = name + "{" + tags +  ",quantile=\"{:.2f}%\"".format(i * 100) + "}" + ' ' + str(value) + '\n'
+            metric  = name + "{" + tags +  ",quantile=\"{:.2f}\"".format(i) + "}" + ' ' + str(value) + '\n'
             metrics += metric
             self.n_lines += 1
 
