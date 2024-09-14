@@ -555,8 +555,10 @@ int cube_set_sampling(struct cube *cube, enum sampling_mode mode, int max_n_cell
         break;
     case SAMPLING_MODE_TOP_CARDINALITY: {
         int width, depth;
-        unsigned char precision;
-        spread_sketch_recommend_parameters(max_n_cell, &depth, &width, &precision);
+        unsigned char precision_dummy;
+        spread_sketch_recommend_parameters(max_n_cell, &depth, &width, &precision_dummy);
+        unsigned char precision = manifest->parameters->hll.precision;
+
         cube->spread_sketch = spread_sketch_new(depth, width, precision, 0, DUMMY_TIME_VAL);
         spread_sketch_set_exdata_schema(cube->spread_sketch, exdata_new_i, exdata_free_i, exdata_merge_i, exdata_reset_i, exdata_copy_i);
         break; }
