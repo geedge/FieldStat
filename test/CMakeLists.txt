@@ -43,12 +43,12 @@ SET(TEST_UTILS_SRC
 
 function (add_unit_test file_name)
     add_executable(${file_name} ${SRC} ${TEST_UTILS_SRC} ${file_name}.cpp)
-    target_link_libraries(${file_name} gtest-static ${ZLIB_LIBRARIES} ${LFLAGS}) 
+    target_link_libraries(${file_name} gtest-static fieldstat4_shared ${ZLIB_LIBRARIES} ${LFLAGS} )
     set_property(TARGET ${file_name} PROPERTY CXX_STANDARD 17)
 endfunction()
 
 add_unit_test(test_easy_fs)
-add_unit_test(test_empty_tags)
+add_unit_test(test_special_tags)
 add_unit_test(test_exporter_json)
 add_unit_test(test_fuzz_test)
 add_unit_test(test_merge)

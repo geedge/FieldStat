@@ -10,12 +10,12 @@ set(lib_name fieldstat4)
 
 project (${lib_name})
 
-# to fix issue: cannot find pthresh
-# set(CMAKE_THREAD_LIBS_INIT "-lpthread")
-# set(CMAKE_HAVE_THREADS_LIBRARY 1)
-# set(CMAKE_USE_WIN32_THREADS_INIT 0)
-# set(CMAKE_USE_PTHREADS_INIT 1)
-# set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_library(UUID_LIB uuid)
+if(UUID_LIB)
+    message(STATUS "Found UUID library: ${UUID_LIB}")
+else()
+    message(FATAL_ERROR "Could not find the UUID library. Please install libuuid.")
+endif()
 
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 include(Version)
@@ -126,6 +126,8 @@ add_subdirectory(ctest)
 
 # Shared Library Output
 add_library(${lib_name}_shared SHARED ${SRC})
+target_link_libraries(${lib_name}_shared ${UUID_LIB})
+
 set_target_properties(${lib_name}_shared PROPERTIES LINK_FLAGS
     "-Wl,--version-script=${PROJECT_SOURCE_DIR}/src/version.map")
 if(DEFINED MESA_SHARED_INSTALL_DIR)
@@ -136,6 +138,7 @@ endif()
 
 # static Library Output
 add_library(${lib_name}_static STATIC ${SRC})
+target_link_libraries(${lib_name}_static ${UUID_LIB})
 set_target_properties(${lib_name}_static PROPERTIES OUTPUT_NAME ${lib_name})
 
 install(TARGETS ${lib_name}_shared LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib COMPONENT LIBRARIES)
