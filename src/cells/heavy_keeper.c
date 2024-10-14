@@ -19,6 +19,9 @@
             hashv = XXH3_64bits(keyptr, keylen); \
         } while (0)
 
+#define HASH_BLOOM 16 // https://troydhanson.github.io/uthash/userguide.html#_bloom_filter_faster_misses
+// Reasonable values for the size of the Bloom filter are 16-32 bits. Since heavy keeper often has items less than 1000, 16 bits is fairly enough.
+
 #include "uthash.h"
 
 #include "exdata.h"
