@@ -475,7 +475,7 @@ TEST(Fuzz_test, many_instance_random_flow_unregister_calibrate_reset_fork_merge_
             est_total += value_est;
             true_total += value_true;
         }
-        EXPECT_LE(abs(est_total - true_total) / true_total, 0.25);
+        EXPECT_LE(abs(est_total - true_total) / true_total, 0.2);
         // printf("spreadsketch Mean ratio e: %f\n", abs(est_total - true_total) / true_total);
 
         for (size_t j = 0; j < cell_num; j++) {

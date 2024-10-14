@@ -6,15 +6,6 @@
 #include <assert.h>
 
 #include "xxhash/xxhash.h"
-
-// XXHASH is faster for long string keys
-#define HASH_FUNCTION(keyptr, keylen, hashv) \
-        do { \
-            hashv = XXH3_64bits(keyptr, keylen); \
-        } while (0)
-#define HASH_BLOOM 16 // https://troydhanson.github.io/uthash/userguide.html#_bloom_filter_faster_misses
-// Reasonable values for the size of the Bloom filter are 16-32 bits. Since cube often has items less than 1000, 16 bits is fairly enough.
-
 #include "uthash.h"
 
 #include "spread_sketch.h"
