@@ -17,7 +17,7 @@ void hash_table_reset(struct hash_table *pthis);
 int hash_table_merge(struct hash_table *dest, struct hash_table *src);
 struct hash_table *hash_table_copy(const struct hash_table *src);
 
-// int hash_table_add(struct hash_table *pthis, const char *key, size_t key_len, int count, void *arg);
+// return 0 for not added, 1 for an existing item, 2 for added a new item
 int hash_table_add(struct hash_table *pthis, const char *key, size_t key_len, void *arg);
 
 // void *hash_table_get0_exdata(struct hash_table *pthis, const char *key, size_t key_len);

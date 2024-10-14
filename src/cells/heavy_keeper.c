@@ -565,9 +565,6 @@ static inline uint64_t cal_hash_val_with_seed(const char *key, size_t key_len, u
     return XXH3_64bits_withSeed(key, key_len, seed);
 }
 
-/*
-1 for newly add something. 0 for not add. -1 for unexpected cases.
-*/
 int heavy_keeper_add(struct heavy_keeper *heavy_keeper, const char *key, size_t key_len, long long count, void *arg) {
     assert(count >= 0);
     if (count == 0) {
@@ -575,11 +572,11 @@ int heavy_keeper_add(struct heavy_keeper *heavy_keeper, const char *key, size_t 
             const struct heap_entry *entry = sorted_set_find_entry(heavy_keeper->top_K_heap, key, key_len);
 
             if (entry != NULL && !sorted_set_entry_dying(entry)) {
-                return 0;
+                return 1;
             }
 
             sorted_set_insert(heavy_keeper->top_K_heap, key, key_len, count, arg);
-            return 1;
+            return 2;
         }
         return 0;
     }
@@ -631,19 +628,19 @@ int heavy_keeper_add(struct heavy_keeper *heavy_keeper, const char *key, size_t 
     if (not_in_sorted_set) {
         if (sorted_set_cardinality(summary) != heavy_keeper->K) {
             sorted_set_insert(summary, key, key_len, maxv, arg);
-            return 1;
+            return 2;
         }
         long long min_value = sorted_set_get_min_score(summary);
         if (maxv > min_value || min_value == NOT_FIND) {
             sorted_set_insert(summary, key, key_len, maxv, arg);
-            return 1;
+            return 2;
         }
         return 0;
     } else {
         if (maxv > old_cnt) {
             sorted_set_incrby(summary, key, key_len, maxv - old_cnt);
         }
-        return 1; // no popped, but the exdata definitely exists in the sorted set
+        return 1;
     }
 }
 

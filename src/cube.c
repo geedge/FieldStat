@@ -40,6 +40,12 @@ struct cell {
     struct field_list cell_dimensions;
 };
 
+struct cell_cache {
+    char *serialized_cell_dimensions;
+    size_t serialized_cell_dimensions_len;
+    struct cell *cell;
+};
+
 struct cube {
     enum sampling_mode sampling_mode;
     union {
@@ -58,6 +64,8 @@ struct cube {
     size_t serialized_dimensions_len;
     int id;
     UT_hash_handle hh;
+
+    struct cell_cache last_oper_cache;
 };
 
 static struct field *field_array_duplicate(const struct field *fields_src, size_t n_field)
@@ -87,6 +95,46 @@ static struct field *field_array_duplicate(const struct field *fields_src, size_
     }
 
     return ret;
+}
+
+bool cell_cache_check(const struct cell_cache *cache, const char *serialized_cell_dimensions, size_t serialized_cell_dimensions_len)
+{
+    if (cache->serialized_cell_dimensions == NULL) {
+        return false;
+    }
+
+    if (cache->serialized_cell_dimensions_len != serialized_cell_dimensions_len) {
+        return false;
+    }
+
+    return memcmp(cache->serialized_cell_dimensions, serialized_cell_dimensions, serialized_cell_dimensions_len) == 0;
+}
+
+struct cell *cell_cache_get(const struct cell_cache *cache)
+{
+    return cache->cell;
+}
+
+void cell_cache_replace(struct cell_cache *cache, const char *serialized_cell_dimensions, size_t serialized_cell_dimensions_len, struct cell *cell)
+{
+    if (cache->serialized_cell_dimensions != NULL) {
+        free(cache->serialized_cell_dimensions);
+    }
+
+    cache->serialized_cell_dimensions = (char *)malloc(serialized_cell_dimensions_len);
+    memcpy(cache->serialized_cell_dimensions, serialized_cell_dimensions, serialized_cell_dimensions_len);
+    cache->serialized_cell_dimensions_len = serialized_cell_dimensions_len;
+    cache->cell = cell;
+}
+
+void cell_cache_clear(struct cell_cache *cache)
+{
+    if (cache->serialized_cell_dimensions != NULL) {
+        free(cache->serialized_cell_dimensions);
+        cache->serialized_cell_dimensions = NULL;
+    }
+    cache->serialized_cell_dimensions_len = 0;
+    cache->cell = NULL;
 }
 
 void add_cube_to_position(struct cube_manager *pthis, struct cube *cube, int id)
@@ -553,6 +601,8 @@ int cube_set_sampling(struct cube *cube, enum sampling_mode mode, int max_n_cell
             assert(0);
             break;
         }
+
+        cell_cache_clear(&cube->last_oper_cache);
     }
 
     switch (mode)
@@ -615,6 +665,8 @@ void cube_free(struct cube *cube) {
     free(cube->serialized_dimensions);
     metric_manifest_manager_free(cube->manifest_manager);
 
+    cell_cache_clear(&cube->last_oper_cache);
+
     free(cube);
 }
 
@@ -634,12 +686,19 @@ void cube_reset(struct cube *cube) {
         assert(0);
         break;
     }
+
+    cell_cache_clear(&cube->last_oper_cache);
 }
 
 struct cell *get_cell_in_cube_generic(struct cube *cube, const struct field *dimensions, size_t n_dimensions) {
     char *compound_dimension;
     size_t compound_dimension_len;
     field_array_to_key(dimensions, n_dimensions, &compound_dimension, &compound_dimension_len);
+
+    if (cell_cache_check(&cube->last_oper_cache, compound_dimension, compound_dimension_len)) {
+        free(compound_dimension);
+        return cell_cache_get(&cube->last_oper_cache);
+    }
 
     struct exdata_new_args args;
     args.cell_dimensions = dimensions;
@@ -653,7 +712,7 @@ struct cell *get_cell_in_cube_generic(struct cube *cube, const struct field *dim
         cell_data = hash_table_get0_exdata(cube->table, compound_dimension, compound_dimension_len);
         if (cell_data == NULL) {
             tmp_ret = hash_table_add(cube->table, compound_dimension, compound_dimension_len, (void *)&args);
-            if (tmp_ret == 1) {
+            if (tmp_ret >= 1) {
                 cell_data = hash_table_get0_exdata(cube->table, compound_dimension, compound_dimension_len);
             }
         }
@@ -662,7 +721,7 @@ struct cell *get_cell_in_cube_generic(struct cube *cube, const struct field *dim
         cell_data = heavy_keeper_get0_exdata(cube->heavykeeper, compound_dimension, compound_dimension_len);
         if (cell_data == NULL) {
             tmp_ret = heavy_keeper_add(cube->heavykeeper, compound_dimension, compound_dimension_len, 0, (void *)&args);
-            if (tmp_ret == 1) {
+            if (tmp_ret >= 1) {
                 cell_data = heavy_keeper_get0_exdata(cube->heavykeeper, compound_dimension, compound_dimension_len);
             }
         }
@@ -671,7 +730,7 @@ struct cell *get_cell_in_cube_generic(struct cube *cube, const struct field *dim
         cell_data = spread_sketch_get0_exdata(cube->spread_sketch, compound_dimension, compound_dimension_len);
         if (cell_data == NULL) {
             tmp_ret = spread_sketch_add_hash(cube->spread_sketch,  compound_dimension, compound_dimension_len, DUMMY_ITEM_HASH, (void *)&args, DUMMY_TIME_VAL);
-            if (tmp_ret == 1) {
+            if (tmp_ret >= 1) {
                 cell_data = spread_sketch_get0_exdata(cube->spread_sketch,  compound_dimension, compound_dimension_len);
             }
         }
@@ -680,6 +739,8 @@ struct cell *get_cell_in_cube_generic(struct cube *cube, const struct field *dim
         assert(0);
         break;
     }
+
+    cell_cache_replace(&cube->last_oper_cache, compound_dimension, compound_dimension_len, cell_data);
 
     free(compound_dimension);
     return cell_data;
@@ -825,8 +886,12 @@ int cube_hll_add(struct cube *cube, int metric_id, const struct field *dimension
         args.n_dimensions = n_dimensions;
 
         int tmp_ret = spread_sketch_add(cube->spread_sketch,  compound_dimension, compound_dimension_len, key, key_len, (void *)&args, DUMMY_TIME_VAL);
+        if (tmp_ret == 2) {
+            cell_cache_clear(&cube->last_oper_cache);
+        }
+
         free(compound_dimension);
-        return tmp_ret == 1 ? FS_OK : FS_ERR_TOO_MANY_CELLS;
+        return tmp_ret == 0 ? FS_ERR_TOO_MANY_CELLS : FS_OK;
     }
 
     struct cell *cell_data = get_cell_in_cube_generic(cube, dimensions, n_dimensions);
@@ -878,8 +943,12 @@ int cube_hll_add_field(struct cube *cube, int metric_id, const struct field *dim
         uint64_t hash = field_array_to_hash(item_fields, n_item);
 
         int tmp_ret = spread_sketch_add_hash(cube->spread_sketch, compound_dimension, compound_dimension_len, hash, (void *)&args, DUMMY_TIME_VAL);
+        if (tmp_ret == 2) {
+            cell_cache_clear(&cube->last_oper_cache);
+        }
+
         free(compound_dimension);
-        return tmp_ret == 1 ? FS_OK : FS_ERR_TOO_MANY_CELLS;
+        return tmp_ret == 0 ? FS_ERR_TOO_MANY_CELLS : FS_OK;
     }
 
     struct cell *cell_data = get_cell_in_cube_generic(cube, dimensions, n_dimensions);
@@ -924,8 +993,12 @@ int cube_counter_incrby(struct cube *cube, int metric_id, const struct field *di
         args.n_dimensions = n_dimensions;
 
         int tmp_ret = heavy_keeper_add(cube->heavykeeper, compound_dimension, compound_dimension_len, increment, (void *)&args);
+        if (tmp_ret == 2) {
+            cell_cache_clear(&cube->last_oper_cache);
+        }
+
         free(compound_dimension);
-        return tmp_ret == 1 ? FS_OK : FS_ERR_TOO_MANY_CELLS;
+        return tmp_ret == 0 ? FS_ERR_TOO_MANY_CELLS : FS_OK;
     }
     
     struct cell *cell_data = get_cell_in_cube_generic(cube, dimensions, n_dimensions);
@@ -1034,6 +1107,8 @@ int cube_merge(struct cube *dest, const struct cube *src)
         assert(0);
         break;
     }
+
+    cell_cache_clear(&dest->last_oper_cache); // just clear the cache any way to avoid inconsistency
 
     return FS_OK;
 }

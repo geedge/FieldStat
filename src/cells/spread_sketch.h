@@ -21,7 +21,9 @@ struct spread_sketch *spread_sketch_new(int depth, int width, unsigned char prec
 void spread_sketch_free(struct spread_sketch *ss);
 void spread_sketch_set_exdata_schema(struct spread_sketch *ss, exdata_new_cb new_fn, exdata_free_cb free_fn, exdata_merge_cb merge_fn, exdata_reset_cb reset_fn, exdata_copy_cb copy_fn);
 
+// return 0 if not added, return 1 if the item already exists in the spread sketch, return 2 if the item is added successfully
 int spread_sketch_add_hash(struct spread_sketch *ss, const char *entry, size_t entry_length, uint64_t item_hash, void *arg, struct timeval now);
+// the same as `spread_sketch_add_hash`, but the item is a string
 int spread_sketch_add(struct spread_sketch *ss, const char *entry, size_t entry_length, const char* item, size_t item_len, void *arg, struct timeval now);
 
 // get the number of entrys stored in spread sketch
