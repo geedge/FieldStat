@@ -30,6 +30,7 @@ public:
     bool operator==(const Fieldstat_tag_list_wrapper &tag_list_wrapper) const;
 
     const struct field *get_tag() const;
+    const struct field **get_field_ptr_array() const;
     size_t get_tag_count() const;
     const struct field_list *get_c_struct() const;
     void print_tag_list() const;

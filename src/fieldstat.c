@@ -191,7 +191,7 @@ int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, co
 }
 
 // cppcheck-suppress [constParameterPointer, unmatchedSuppression]
-int fieldstat_hll_add_fields(struct fieldstat *instance, int cube_id, int metric_id, const struct field *cell_dimensions, size_t n_dimensions, const struct field *items, size_t n_items)
+int fieldstat_hll_add_fields(struct fieldstat *instance, int cube_id, int metric_id, const struct field *cell_dimensions, size_t n_dimensions, const struct field **items, size_t n_items)
 {
     struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
     if (cube == NULL) {

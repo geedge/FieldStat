@@ -425,7 +425,7 @@ TEST(Fuzz_test, many_instance_random_flow_unregister_calibrate_reset_fork_merge_
         int cube_id = rand() % CUBE_NUM;
         const Fieldstat_tag_list_wrapper *shared_tag = shared_tags[cube_id];
 
-        int ret_add = fieldstat_hll_add_fields(instance, cube_id, 0, cell_dimension.get_tag(), cell_dimension.get_tag_count(), item.get_tag(), item.get_tag_count());
+        int ret_add = fieldstat_hll_add_fields(instance, cube_id, 0, cell_dimension.get_tag(), cell_dimension.get_tag_count(), item.get_field_ptr_array(), item.get_tag_count());
         if (ret_add == FS_ERR_TOO_MANY_CELLS) {
             continue;
         }
@@ -628,7 +628,7 @@ TEST(perf, simple_one_for_perf_spreadsketch)
     getchar();
 
     for (int i = 0; i < TEST_ROUND; i++) {
-        fieldstat_hll_add_fields(instance, cube_id, 0, cell_dimension[i]->get_tag(), cell_dimension[i]->get_tag_count(), items[i]->get_tag(), items[i]->get_tag_count());
+        fieldstat_hll_add_fields(instance, cube_id, 0, cell_dimension[i]->get_tag(), cell_dimension[i]->get_tag_count(), items[i]->get_field_ptr_array(), items[i]->get_tag_count());
     }
 
     clock_t end = clock();

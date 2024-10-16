@@ -151,7 +151,7 @@ int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, co
     * @param item_len: the length of the field.
     * @return Error codes.
 */
-int fieldstat_hll_add_fields(struct fieldstat *instance, int cube_id, int metric_id, const struct field *cell_dimensions, size_t n_dimensions, const struct field *items, size_t n_items);
+int fieldstat_hll_add_fields(struct fieldstat *instance, int cube_id, int metric_id, const struct field *cell_dimensions, size_t n_dimensions, const struct field **items, size_t n_items);
 
 
 /* 

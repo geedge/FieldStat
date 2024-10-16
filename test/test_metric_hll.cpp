@@ -81,9 +81,12 @@ TEST(metric_test_hll, simple_register_and_query)
 TEST(metric_test_hll, add_with_tags) {
     struct fieldstat *instance = test_init_standard_instance_one_cube_one_metric_one_cell_hll();
 
-    fieldstat_hll_add_fields(instance, 0, 0, &TEST_FIELD_INT, 1, &TEST_FIELD_INT, 1);
-    fieldstat_hll_add_fields(instance, 0, 0, &TEST_FIELD_INT, 1, &TEST_FIELD_DOUBLE, 1);
-    fieldstat_hll_add_fields(instance, 0, 0, &TEST_FIELD_INT, 1, &TEST_FIELD_STRING, 1);
+    const struct field *f1[] = {&TEST_FIELD_INT};
+    const struct field *f2[] = {&TEST_FIELD_INT, &TEST_FIELD_STRING};
+    const struct field *f3[] = {&TEST_FIELD_INT, &TEST_FIELD_STRING, &TEST_FIELD_DOUBLE};
+    fieldstat_hll_add_fields(instance, 0, 0, &TEST_FIELD_INT, 1, f1, 1);
+    fieldstat_hll_add_fields(instance, 0, 0, &TEST_FIELD_INT, 1, f2, 2);
+    fieldstat_hll_add_fields(instance, 0, 0, &TEST_FIELD_INT, 1, f3, 3);
     
     test_assert_standard_instance(instance);
     EXPECT_NEAR(my_fieldstat_hll_get(instance, 0, 0), 3, 0.5);
@@ -247,7 +250,7 @@ TEST(metric_test_hll, spread_sketch_add_and_test_accuracy)
         Fieldstat_tag_list_wrapper dimension("src ip", f.src_ip.c_str());
         Fieldstat_tag_list_wrapper counted("dst ip", f.dst_ip.c_str());
 
-        fieldstat_hll_add_fields(instance, 0, 0, dimension.get_tag(), dimension.get_tag_count(), counted.get_tag(), counted.get_tag_count());
+        fieldstat_hll_add_fields(instance, 0, 0, dimension.get_tag(), dimension.get_tag_count(), counted.get_field_ptr_array(), counted.get_tag_count());
 
         flow_cnt[dimension.to_string()].insert(counted.to_string());
     }

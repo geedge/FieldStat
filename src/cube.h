@@ -29,7 +29,7 @@ int cube_register_hist(struct cube *cube,const char *metric_name, long long lowe
 int cube_histogram_record(struct cube *cube, int metric_id, const struct field *dimensions, size_t n_dimensions, long long value);
 int cube_histogram_merge(struct cube *cube, int metric_id, const struct field *dimensions, size_t n_dimensions, const struct hdr_histogram *src);
 int cube_hll_add(struct cube *cube, int metric_id, const struct field *dimensions, size_t n_dimensions, const char *key, size_t key_len);
-int cube_hll_add_field(struct cube *cube, int metric_id, const struct field *dimensions, size_t n_dimensions, const struct field *item_fields, size_t n_item);
+int cube_hll_add_field(struct cube *cube, int metric_id, const struct field *dimensions, size_t n_dimensions, const struct field **item_fields, size_t n_item);
 int cube_counter_incrby(struct cube *cube, int metric_id, const struct field *dimensions, size_t n_dimensions, long long increment);
 int cube_counter_set(struct cube *cube, int metric_id, const struct field *dimensions, size_t n_dimensions, long long value);
 int cube_counter_incrby_batch(struct cube *cube, const int metric_ids[], const struct field *dimensions, size_t n_dimensions, const long long increments[], size_t n_metrics);

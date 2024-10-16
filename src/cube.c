@@ -865,23 +865,23 @@ int cube_hll_add(struct cube *cube, int metric_id, const struct field *dimension
     return FS_OK;
 }
 
-uint64_t field_array_to_hash(const struct field *field, size_t n_dimensions) {
+uint64_t field_array_to_hash(const struct field **field, size_t n_dimensions) {
     XXH3_state_t state = {0};
     XXH3_64bits_reset(&state);
 
     for (int i = 0; i < n_dimensions; i++) {
-        XXH3_64bits_update(&state, field[i].key, strlen(field[i].key));
-        if (field[i].type != FIELD_VALUE_CSTRING) {
-            XXH3_64bits_update(&state, &field[i].value_longlong, sizeof(long long));
+        XXH3_64bits_update(&state, field[i]->key, strlen(field[i]->key));
+        if (field[i]->type != FIELD_VALUE_CSTRING) {
+            XXH3_64bits_update(&state, &field[i]->value_longlong, sizeof(long long));
         } else {
-            XXH3_64bits_update(&state, field[i].value_str, strlen(field[i].value_str));
+            XXH3_64bits_update(&state, field[i]->value_str, strlen(field[i]->value_str));
         }
     }
 
     return XXH3_64bits_digest(&state);
 }
 
-int cube_hll_add_field(struct cube *cube, int metric_id, const struct field *dimensions, size_t n_dimensions, const struct field *item_fields, size_t n_item) 
+int cube_hll_add_field(struct cube *cube, int metric_id, const struct field *dimensions, size_t n_dimensions, const struct field **item_fields, size_t n_item) 
 {
     if (cube->primary_metric_id == -1) {
         return FS_ERR_CUBE_SAMPLING_NOT_INITIALIZED;

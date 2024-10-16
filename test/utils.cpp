@@ -152,6 +152,13 @@ const struct field *Fieldstat_tag_list_wrapper::get_tag() const
     return tag_list_c.field;
 }
 
+const struct field **Fieldstat_tag_list_wrapper::get_field_ptr_array() const
+{
+    static const struct field *field_ptr_array[1];
+    field_ptr_array[0] = tag_list_c.field;
+    return field_ptr_array;
+}
+
 size_t Fieldstat_tag_list_wrapper::get_tag_count() const
 {
     return tag_list_c.n_field;
