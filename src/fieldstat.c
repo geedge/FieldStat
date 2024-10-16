@@ -158,7 +158,7 @@ int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric
 }
 
 // cppcheck-suppress [constParameterPointer, unmatchedSuppression]
-int fieldstat_counter_incrby_batch(struct fieldstat *instance, int cube_id, const struct field *cell_dimensions, size_t n_dimensions, int metric_ids[],  long long increments[], size_t n_metrics)
+int fieldstat_counter_incrby_batch(struct fieldstat *instance, int cube_id, const struct field *cell_dimensions, size_t n_dimensions, const int metric_ids[],  const long long increments[], size_t n_metrics)
 {
     struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
     if (cube == NULL) {

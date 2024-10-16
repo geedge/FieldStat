@@ -965,7 +965,7 @@ int cube_counter_incrby(struct cube *cube, int metric_id, const struct field *di
     return FS_OK;
 }
 
-int cube_counter_incrby_batch(struct cube *cube, int metric_ids[], const struct field *dimensions, size_t n_dimensions, long long increments[], size_t n_metrics) {
+int cube_counter_incrby_batch(struct cube *cube, const int metric_ids[], const struct field *dimensions, size_t n_dimensions, const long long increments[], size_t n_metrics) {
     if (cube->primary_metric_id == -1) {
         return FS_ERR_CUBE_SAMPLING_NOT_INITIALIZED;
     }

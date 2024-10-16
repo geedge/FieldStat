@@ -130,8 +130,7 @@ int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric
     * @param n_metrics: the length of metric_ids and increments.
     * @return Error codes. Or just assert fail if the parameters are invalid.
 */
-int fieldstat_counter_incrby_batch(struct fieldstat *instance, int cube_id, const struct field *cell_dimensions, size_t n_dimensions, int metric_ids[],  long long increments[], size_t n_metrics);
-
+int fieldstat_counter_incrby_batch(struct fieldstat *instance, int cube_id, const struct field *cell_dimensions, size_t n_dimensions, const int metric_ids[],  const long long increments[], size_t n_metrics);
 
 /*
     * @brief let the value of counter metric equal to value. Must be called on non-primary metric. Other annotations refer to fieldstat_counter_incrby.

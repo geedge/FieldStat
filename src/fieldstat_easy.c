@@ -339,6 +339,22 @@ int fieldstat_easy_counter_incrby(struct fieldstat_easy *fse, int thread_id, int
     return ret;
 }
 
+int fieldstat_easy_counter_incrby_batch(struct fieldstat_easy *fse, int thread_id, int metric_ids[], const struct field *dimensions, size_t n_dimensions, const long long *increments, size_t n_metrics)
+{
+    if (thread_id < 0) {
+        return -1;
+    }
+    if (thread_id >= fse->max_thread_num) {
+        return -1;
+    }
+
+    pthread_spin_lock(&fse->fsu[thread_id].lock);
+    int ret = fieldstat_counter_incrby_batch(fse->fsu[thread_id].active, 0, dimensions, n_dimensions, metric_ids, increments, n_metrics);
+    pthread_spin_unlock(&fse->fsu[thread_id].lock);
+
+    return ret;
+}
+
 int fieldstat_easy_counter_set(struct fieldstat_easy *fse, int thread_id, int metric_id, const struct field *dimensions, size_t n_dimensions, long long value)
 {
     if (thread_id < 0) {

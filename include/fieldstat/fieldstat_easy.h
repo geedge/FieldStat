@@ -65,10 +65,7 @@ int fieldstat_easy_output_array_and_reset(struct fieldstat_easy *fse, char ***js
 */
 
 int fieldstat_easy_counter_incrby(struct fieldstat_easy *fse, int thread_id, int metric_id, const struct field *dimensions, size_t n_dimensions, long long increment);
-
-// TODO: easy 的加速使用，跟其他人对接一下。包括如何在不改变fieldstat.h 的基础上再来一套接口。
-// int fieldstat_easy_counter_incrby(struct fieldstat_easy *fse, int thread_id, int metric_id, int cell_id, long long increment);
-// int fieldstat_easy_add_cell(struct fieldstat_easy *fse,const struct field *dimensions, size_t n_dimensions);
+int fieldstat_easy_counter_incrby_batch(struct fieldstat_easy *fse, int thread_id, int metric_ids[], const struct field *dimensions, size_t n_dimensions, const long long *increments, size_t n_metrics);
 
 /*
     * @brief let the value of counter metric of dimensions equal to `value`.
