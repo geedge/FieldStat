@@ -1017,7 +1017,6 @@ int cube_counter_incrby_batch(struct cube *cube, const int metric_ids[], const s
         const struct metric_manifest *manifest = metric_manifest_manager_get_by_id(cube->manifest_manager, metric_ids[i]);
         struct metric *metric = add_or_find_metric_in_cell(manifest, cell_data);
 
-        printf("metric: %d, increment: %lld\n", metric_ids[i], increments[i]);
         metric_counter_incrby(metric, increments[i]);
     }
 
