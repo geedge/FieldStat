@@ -191,6 +191,46 @@ TEST(metric_test_histogram, can_add_0value) // histogram only allow min_val > 0,
     fieldstat_free(instance);
 }
 
+TEST(metric_test_histogram, histogram_batch_transaction) {
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = test_fieldstat_cube_create(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
+    int metric_id = fieldstat_register_histogram(instance, cube_id, "test_histogram_metric", 1, 10000, 5);
+
+    struct histogram *histogram = fieldstat_histogram_fork(instance, cube_id, metric_id);
+    ASSERT_NE(histogram, nullptr);
+
+    long long packet_lengths[] = {1234, 1234, 123, 567, 890, 1234, 1500};
+    size_t packet_count = sizeof(packet_lengths) / sizeof(packet_lengths[0]);
+
+    for (size_t i = 0; i < packet_count; ++i) {
+        int tmp_ret = histogram_record(histogram, packet_lengths[i]);
+        EXPECT_EQ(tmp_ret, 0);
+    }
+
+    int merge_result = fieldstat_histogram_merge(instance, cube_id, metric_id, &TEST_FIELD_STRING, 1, histogram);
+    EXPECT_EQ(merge_result, 0);
+
+    double percentile_value = fieldstat_histogram_value_at_percentile(instance, cube_id, &TEST_FIELD_LIST_STRING, metric_id, 50.0);
+    EXPECT_EQ(percentile_value, 1234);
+    int count_le = fieldstat_histogram_count_le_value(instance, cube_id, &TEST_FIELD_LIST_STRING, metric_id, 1000);
+    EXPECT_EQ(count_le, 3);
+
+    // test reset
+    histogram_reset(histogram);
+    histogram_record(histogram, 2000);
+    histogram_record(histogram, 2500);
+    merge_result = fieldstat_histogram_merge(instance, cube_id, metric_id, &TEST_FIELD_STRING, 1, histogram);
+    EXPECT_EQ(merge_result, 0);
+
+    percentile_value = fieldstat_histogram_value_at_percentile(instance, cube_id, &TEST_FIELD_LIST_STRING, metric_id, 95.0);
+    EXPECT_EQ(percentile_value, 2500);
+    count_le = fieldstat_histogram_count_le_value(instance, cube_id, &TEST_FIELD_LIST_STRING, metric_id, 1000);
+    EXPECT_EQ(count_le, 3);
+
+    histogram_free(histogram);
+    fieldstat_free(instance);
+}
+
 
 int main(int argc, char *argv[]) 
 {

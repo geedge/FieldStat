@@ -368,6 +368,13 @@ int metric_histogram_record(struct metric *pthis, long long value) {
     return 0;
 }
 
+void metric_histogram_merge(struct metric *dest, const struct hdr_histogram *src) {
+    assert(dest->type == METRIC_TYPE_HISTOGRAM);
+    hdr_add(dest->data->hdr, src);
+
+    dest->operated_after_reset = true;
+}
+
 long long metric_histogram_value_at_percentile(const struct metric *pthis, double percentile) {
     return hdr_value_at_percentile(pthis->data->hdr, percentile);
 }

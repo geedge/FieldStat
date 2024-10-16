@@ -57,13 +57,7 @@ struct field {
 	};
 };
 
-struct field_t_0_fs *pst = (fields[]);
-{
-    uint64_t hashv = 0;
-    char *serialized_dimension;
-    int bucket_in_uthash;
-    struct cell *cell;
-}
+struct histogram; 
 
 struct fieldstat;
 struct fieldstat *fieldstat_new();
@@ -160,15 +154,28 @@ int fieldstat_hll_add_fields(struct fieldstat *instance, int cube_id, int metric
     * @return Error codes.
 */
 int fieldstat_histogram_record(struct fieldstat *instance, int cube_id, int metric_id, const struct field *cell_dimensions, size_t n_dimensions, long long value);
-struct histogram; 
-struct histogram *fieldstat_histogram_fork(struct fieldstat *instance, int metric_id);
-void 
-void histogram_free(struct fieldstat_histogram *histogram);
-void histogram_reset(struct fieldstat_histogram *histogram);
+
+/*
+struct histogram provides a way to update the histogram metric in batch created and updated by user.
+
+  Example:
+    struct histogram *histogram = fieldstat_histogram_fork(instance, cube_id, metric_id);
+    for (int i = 0; i < many_packet_length; i++) {
+        histogram_record(histogram, packet_length[i]);
+    }
+
+    fieldstat_histogram_merge(instance, cube_id, metric_id, cell_dimensions, n_dimensions, histogram);
+    histogram_reset(histogram);
+    
+    ...
+    // after many times of histogram_record
+    histogram_free(histogram);
+*/
+struct histogram *fieldstat_histogram_fork(const struct fieldstat *instance, int cube_id, int metric_id);
+void histogram_free(struct histogram *histogram);
+void histogram_reset(struct histogram *histogram);
 int fieldstat_histogram_merge(struct fieldstat *instance, int cube_id, int metric_id, const struct field *cell_dimensions, size_t n_dimensions, const struct histogram *src);
-
-
-struct 
+int histogram_record(struct histogram *histogram, long long value);
 
 /*
     * @brief Delete all the cells, also the content of every metrics. The cube and metrics are not deleted.

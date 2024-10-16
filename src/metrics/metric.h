@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include "fieldstat.h" // for enum metric_type
 #include "metric_manifest.h"
+#include "hdr/hdr_histogram.h"
 
 struct metric;
 
@@ -27,4 +28,4 @@ int metric_histogram_record(struct metric *pthis, long long value);
 // for the meaning of these two query method, refer to https://prometheus.io/docs/concepts/metric_types/, and search for "histogram" and "summary"
 long long metric_histogram_value_at_percentile(const struct metric *pthis, double percentile);
 long long metric_histogram_count_le_value(const struct metric *pthis, long long value);
-
+void metric_histogram_merge(struct metric *dest, const struct hdr_histogram *src);

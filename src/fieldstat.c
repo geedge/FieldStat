@@ -6,13 +6,19 @@
 
 #include "cjson/cJSON.h"
 #include "uthash.h"
+#include "hdr/hdr_histogram.h"
 
 #include "fieldstat.h"
 #include "metrics/metric.h"
 #include "cube.h"
+#include "metric_manifest.h"
 
 struct fieldstat {
     struct cube_manager *cube_manager;
+};
+
+struct histogram {
+    struct hdr_histogram *histogram;
 };
 
 
@@ -221,6 +227,65 @@ void fieldstat_calibrate(const struct fieldstat *master, struct fieldstat *repli
 }
 
 /* -------------------------------------------------------------------------- */
+/*                      histogram fast batch transaction                      */
+/* -------------------------------------------------------------------------- */
+struct histogram *fieldstat_histogram_fork(const struct fieldstat *instance, int cube_id, int metric_id) {
+    const struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
+    if (cube == NULL) {
+        return NULL;
+    }
+
+    const struct metric_manifest *manifest = cube_get_metric_manifest_by_id(cube, metric_id);
+    if (manifest == NULL || manifest->type != METRIC_TYPE_HISTOGRAM) {
+        return NULL;
+    }
+    const struct histogram_parameters *parameters = &(manifest->parameters->hdr);
+
+    struct hdr_histogram* inner = NULL;
+    int ret = hdr_init(parameters->lowest_trackable_value, parameters->highest_trackable_value, parameters->significant_figures, &inner);
+	if (ret != 0) {
+        return NULL;
+    }
+
+    struct histogram *histogram = calloc(1, sizeof(struct histogram));
+    histogram->histogram = inner;
+
+    return histogram;
+}
+
+void histogram_free(struct histogram *histogram)
+{
+    if (histogram == NULL) {
+        return;
+    }
+    hdr_close(histogram->histogram);
+    free(histogram);
+}
+
+void histogram_reset(struct histogram *histogram) {
+    hdr_reset(histogram->histogram);
+}
+
+// cppcheck-suppress [constParameterPointer, unmatchedSuppression]
+int fieldstat_histogram_merge(struct fieldstat *instance, int cube_id, int metric_id, const struct field *cell_dimensions, size_t n_dimensions, const struct histogram *src)
+{
+    struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
+    if (cube == NULL) {
+        return FS_ERR_INVALID_CUBE_ID;
+    }
+
+    return cube_histogram_merge(cube, metric_id, cell_dimensions, n_dimensions, src->histogram);
+}
+
+int histogram_record(struct histogram *histogram, long long value) {
+    bool ret = hdr_record_value(histogram->histogram, value);
+    if (!ret) {
+        return FS_ERR_INVALID_PARAM;
+    }
+    return FS_OK;
+}
+
+/* -------------------------------------------------------------------------- */
 /*                                    query                                   */
 /* -------------------------------------------------------------------------- */
 void fieldstat_get_cubes(const struct fieldstat *instance, int **cube_ids, int *n_cube)
@@ -327,7 +392,11 @@ const char *fieldstat_metric_get_name(const struct fieldstat *instance, int cube
     if (cube == NULL) {
         return NULL;
     }
-    return cube_get_metric_name(cube, metric_id);
+    const struct metric_manifest *manifest = cube_get_metric_manifest_by_id(cube, metric_id);
+    if (manifest == NULL) {
+        return NULL;
+    }
+    return manifest->name;
 }
 
 enum metric_type fieldstat_metric_get_type(const struct fieldstat *instance, int cube_id, int metric_id)
@@ -336,7 +405,13 @@ enum metric_type fieldstat_metric_get_type(const struct fieldstat *instance, int
     if (cube == NULL) {
         return (enum metric_type)(-1);
     }
-    return cube_get_metric_type(cube, metric_id);
+    
+    const struct metric_manifest *manifest = cube_get_metric_manifest_by_id(cube, metric_id);
+    if (manifest == NULL) {
+        return (enum metric_type)(-1);
+    }
+
+    return manifest->type;
 }
 
 void fieldstat_cube_get_cells(const struct fieldstat *instance, int cube_id, struct field_list **cell_dimensions, size_t *n_cell)
@@ -390,5 +465,10 @@ int fieldstat_cube_get_metric_id_by_name(const struct fieldstat *instance, int c
         return FS_ERR_INVALID_CUBE_ID;
     }
 
-    return cube_get_metric_id_by_name(cube, metric_name);
+    const struct metric_manifest *manifest = cube_get_metric_manifest_by_name(cube, metric_name);
+    if (manifest == NULL) {
+        return FS_ERR_INVALID_METRIC_NAME;
+    }
+
+    return manifest->id;
 }

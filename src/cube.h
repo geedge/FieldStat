@@ -7,6 +7,7 @@ extern "C"
 
 #include <stddef.h>
 #include <stdbool.h>
+#include "hdr/hdr_histogram.h"
 #include "fieldstat.h" // for dimensions
 #include "metric_manifest.h"
 
@@ -26,6 +27,7 @@ int cube_register_hll(struct cube *cube,const char *metric_name, unsigned char p
 int cube_register_hist(struct cube *cube,const char *metric_name, long long lowest_trackable_value, long long highest_trackable_value, int significant_figures);
 
 int cube_histogram_record(struct cube *cube, int metric_id, const struct field *dimensions, size_t n_dimensions, long long value);
+int cube_histogram_merge(struct cube *cube, int metric_id, const struct field *dimensions, size_t n_dimensions, const struct hdr_histogram *src);
 int cube_hll_add(struct cube *cube, int metric_id, const struct field *dimensions, size_t n_dimensions, const char *key, size_t key_len);
 int cube_hll_add_field(struct cube *cube, int metric_id, const struct field *dimensions, size_t n_dimensions, const struct field *item_fields, size_t n_item);
 int cube_counter_incrby(struct cube *cube, int metric_id, const struct field *dimensions, size_t n_dimensions, long long increment);
@@ -43,9 +45,9 @@ enum sampling_mode cube_get_sampling_mode(const struct cube *cube);
 void cube_get_cells(const struct cube *cube, struct field_list **cell_dimensions, size_t *n_cell);
 void cube_get_metrics_in_cell(const struct cube *cube, const struct field_list *dimensions, int **metric_id_out, size_t *n_metric_out);
 struct field_list *cube_get_identifier(const struct cube *cube);
-const char *cube_get_metric_name(const struct cube *cube, int metric_id);
-enum metric_type cube_get_metric_type(const struct cube *cube, int metric_id);
-int cube_get_metric_id_by_name(const struct cube *cube, const char *metric_name);
+const struct metric_manifest *cube_get_metric_manifest_by_id(const struct cube *cube, int metric_id);
+const struct metric_manifest *cube_get_metric_manifest_by_name(const struct cube *cube, const char *metric_name);
+
 
 /* -------------------------------------------------------------------------- */
 /*                                cube manager                                */

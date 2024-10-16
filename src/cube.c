@@ -803,6 +803,29 @@ int cube_histogram_record(struct cube *cube, int metric_id, const struct field *
     return FS_OK;
 }
 
+int cube_histogram_merge(struct cube *cube, int metric_id, const struct field *dimensions, size_t n_dimensions, const struct hdr_histogram *src) {
+    if (cube->primary_metric_id == -1) {
+        return FS_ERR_CUBE_SAMPLING_NOT_INITIALIZED;
+    }
+    assert(cube->sampling_mode == SAMPLING_MODE_COMPREHENSIVE || (cube->primary_metric_id != metric_id));
+
+    const struct metric_manifest *manifest = metric_manifest_manager_get_by_id(cube->manifest_manager, metric_id);
+    if (manifest == NULL || manifest->type != METRIC_TYPE_HISTOGRAM) {
+        printf("invalid metric id\n");
+        return FS_ERR_INVALID_METRIC_ID;
+    }
+
+    struct cell *cell_data = get_cell_in_cube_generic(cube, dimensions, n_dimensions);
+    if (cell_data == NULL) {
+        printf("too many cells\n");
+        return FS_ERR_TOO_MANY_CELLS;
+    }
+
+    struct metric *metric = add_or_find_metric_in_cell(manifest, cell_data);
+    metric_histogram_merge(metric, src);
+    return FS_OK;
+}
+
 int cube_hll_add(struct cube *cube, int metric_id, const struct field *dimensions, size_t n_dimensions, const char *key, size_t key_len) {
     if (cube->primary_metric_id == -1) {
         return FS_ERR_CUBE_SAMPLING_NOT_INITIALIZED;
@@ -1388,30 +1411,10 @@ struct field_list *cube_get_identifier(const struct cube *cube) {
     return ret;
 }
 
-const char *cube_get_metric_name(const struct cube *cube, int metric_id) {
-    const struct metric_manifest *metric = metric_manifest_manager_get_by_id(cube->manifest_manager, metric_id);
-    if (metric == NULL) {
-        return NULL;
-    }
-
-    return metric->name;
+const struct metric_manifest *cube_get_metric_manifest_by_id(const struct cube *cube, int metric_id) {
+    return metric_manifest_manager_get_by_id(cube->manifest_manager, metric_id);
 }
 
-enum metric_type cube_get_metric_type(const struct cube *cube, int metric_id) {
-    const struct metric_manifest *metric = metric_manifest_manager_get_by_id(cube->manifest_manager, metric_id);
-    if (metric == NULL) {
-        return (enum metric_type)(-1);
-    }
-
-    return metric->type;
-}
-
-int cube_get_metric_id_by_name(const struct cube *cube, const char *metric_name) 
-{
-    const struct metric_manifest *metric = metric_manifest_manager_get_by_name(cube->manifest_manager, metric_name);
-    if (metric == NULL) {
-        return FS_ERR_INVALID_METRIC_NAME;
-    }
-
-    return metric->id;
+const struct metric_manifest *cube_get_metric_manifest_by_name(const struct cube *cube, const char *metric_name) {
+    return metric_manifest_manager_get_by_name(cube->manifest_manager, metric_name);
 }

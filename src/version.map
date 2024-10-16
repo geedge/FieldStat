@@ -1,5 +1,8 @@
 {
-  global: 	*fieldstat_*, *histogram*;
-	GIT_VERSION*;
-  local: *;
+    global:
+        *fieldstat_*;
+        *histogram*;
+        GIT_VERSION*;
+    local:
+        *;
 };
