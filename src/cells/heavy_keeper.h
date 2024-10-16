@@ -24,7 +24,6 @@ void heavy_keeper_free(struct heavy_keeper *hk);
 */
 void heavy_keeper_reset(struct heavy_keeper *hk);
 
-// return -1 for error, 0 for not added, 1 for updated an existing item, 2 for added a new item
 int heavy_keeper_add(struct heavy_keeper *hk, const char *key, size_t key_len, long long count, void *arg);
 
 int heavy_keeper_set_exdata_schema(struct heavy_keeper *hk, exdata_new_cb new_fn, exdata_free_cb free_fn, exdata_merge_cb merge_fn, exdata_reset_cb reset_fn, exdata_copy_cb copy_fn);

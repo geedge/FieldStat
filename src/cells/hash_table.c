@@ -115,7 +115,7 @@ int hash_table_add(struct hash_table *pthis, const char *key, size_t key_len, vo
         assert(item->dying);
         item->dying = false;
         pthis->current_cell_num++;
-        return 2;
+        return 1;
     }
 
     item = calloc(1, sizeof(struct entry));
@@ -126,7 +126,7 @@ int hash_table_add(struct hash_table *pthis, const char *key, size_t key_len, vo
     HASH_ADD_KEYPTR(hh, pthis->key_exdata_map, item->key, key_len, item);
 
     pthis->current_cell_num++;
-    return 2;
+    return 1;
 }
 
 void hash_table_set_exdata_schema(struct hash_table *pthis, exdata_new_cb new_fn, exdata_free_cb free_fn, exdata_merge_cb merge_fn, exdata_reset_cb reset_fn, exdata_copy_cb copy_fn) {

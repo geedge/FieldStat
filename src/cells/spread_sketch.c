@@ -239,10 +239,10 @@ void move_registers_forward(struct spread_sketch *ss, const struct timeval *now)
     }
 }
 
+// return 0 if not added, return 1 if added
 int spread_sketch_add_hash(struct spread_sketch *ss, const char *entry, size_t entry_length, uint64_t item_hash, void *arg, struct timeval now) {
     uint32_t level = (uint32_t)__builtin_clzll(item_hash) + 1;
     long long now_ms = now.tv_sec * 1000 + now.tv_usec / 1000;
-    int ret_code = 0; // // return 0 if not added, return 1 if the item already exists in the spread sketch, return 2 if the item is added successfully
 
     if (item_hash == DUMMY_ITEM_HASH) {
         if (ss->level0_cnt == 0) {
@@ -257,6 +257,7 @@ int spread_sketch_add_hash(struct spread_sketch *ss, const char *entry, size_t e
     uint32_t hash_x1 = (uint32_t) (hash_x_tmp >> 32);
     uint32_t hash_x2 = (uint32_t) hash_x_tmp;
 
+    bool in_sketch = false;
     move_registers_forward(ss, &now);
     for (int i = 0; i < ss->depth; i++) {
         uint32_t hash_x = hash_x1 + i * hash_x2; 
@@ -273,9 +274,7 @@ int spread_sketch_add_hash(struct spread_sketch *ss, const char *entry, size_t e
                 }
                 bucket->level = level;
             }
-            if (ret_code < 1) {
-                ret_code = 1;
-            }
+            in_sketch = true;
         } else {
             uint32_t true_level = bucket->content == NULL ? 0: cal_true_level(ss, bucket_idx, now_ms);
 
@@ -295,7 +294,7 @@ int spread_sketch_add_hash(struct spread_sketch *ss, const char *entry, size_t e
                 bucket->last_update_ms = now_ms;
                 bucket->level = level;
 
-                ret_code = 2;
+                in_sketch = true;
             }
         }
         if (item_hash != DUMMY_ITEM_HASH) {
@@ -303,7 +302,7 @@ int spread_sketch_add_hash(struct spread_sketch *ss, const char *entry, size_t e
         }
     }
 
-    return ret_code;
+    return in_sketch ? 1 : 0;
 }
 
 int spread_sketch_add(struct spread_sketch *ss, const char *entry, size_t entry_length, const char* item, size_t item_len, void *arg, struct timeval now) {
