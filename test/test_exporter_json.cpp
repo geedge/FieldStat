@@ -303,14 +303,14 @@ TEST(export_test, cjson_export_on_one_cube_of_spreadsketch_sampling) {
         Flow flow = flow_generator.next();
         Fieldstat_tag_list_wrapper dimension = Fieldstat_tag_list_wrapper("bigger fanouts", flow.src_ip.c_str());
         Fieldstat_tag_list_wrapper item = Fieldstat_tag_list_wrapper("dummy", flow.dst_ip.c_str());
-        fieldstat_hll_add_field(instance, cube_id, metric_id, dimension.get_tag(), dimension.get_tag_count(), item.get_tag(), item.get_tag_count());
+        fieldstat_hll_add_fields(instance, cube_id, metric_id, dimension.get_tag(), dimension.get_tag_count(), item.get_tag(), item.get_tag_count());
         fieldstat_counter_incrby(instance, cube_id, metric_count, dimension.get_tag(), dimension.get_tag_count(), 1);
     }
     for (int i = 0; i < 100; i++) {
         Flow flow = flow_generator.next();
         Fieldstat_tag_list_wrapper dimension = Fieldstat_tag_list_wrapper("smaller fanouts", flow.src_ip.c_str());
         Fieldstat_tag_list_wrapper item = Fieldstat_tag_list_wrapper("dummy", flow.dst_ip.c_str());
-        fieldstat_hll_add_field(instance, cube_id, metric_id, dimension.get_tag(), dimension.get_tag_count(), item.get_tag(), item.get_tag_count());
+        fieldstat_hll_add_fields(instance, cube_id, metric_id, dimension.get_tag(), dimension.get_tag_count(), item.get_tag(), item.get_tag_count());
         fieldstat_counter_incrby(instance, cube_id, metric_count, dimension.get_tag(), dimension.get_tag_count(), 1);
     }
 

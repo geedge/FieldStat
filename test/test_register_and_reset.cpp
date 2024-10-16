@@ -65,7 +65,7 @@ TEST(test_register, delete_spreadsketch_cube_with_cells_and_metrics)
     fieldstat_cube_set_sampling(instance, cube_id, SAMPLING_MODE_TOP_CARDINALITY, 10, metric_primary);
 
     fieldstat_counter_incrby(instance, cube_id, metric_id1, &TEST_FIELD_INT, 1, 1);
-    fieldstat_hll_add_field(instance, cube_id, metric_primary, &TEST_FIELD_INT, 1, &TEST_FIELD_DOUBLE, 1);
+    fieldstat_hll_add_fields(instance, cube_id, metric_primary, &TEST_FIELD_INT, 1, &TEST_FIELD_DOUBLE, 1);
 
     fieldstat_cube_destroy(instance, cube_id);
     struct field_list *tag_list = fieldstat_cube_get_dimension(instance, cube_id);

@@ -57,6 +57,14 @@ struct field {
 	};
 };
 
+struct field_t_0_fs *pst = (fields[]);
+{
+    uint64_t hashv = 0;
+    char *serialized_dimension;
+    int bucket_in_uthash;
+    struct cell *cell;
+}
+
 struct fieldstat;
 struct fieldstat *fieldstat_new();
 void fieldstat_free(struct fieldstat *instance);
@@ -120,6 +128,8 @@ int fieldstat_register_histogram(struct fieldstat *instance, int cube_id, const 
     * @return Error codes.
 */
 int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric_id, const struct field *cell_dimensions, size_t n_dimensions, long long increment);
+int fieldstat_counter_incrby_batch(struct fieldstat *instance, int cube_id, const struct field *cell_dimensions, size_t n_dimensions, int metric_ids[],  long long increments[], size_t n_metrics);
+
 
 /*
     * @brief let the value of counter metric equal to value. Must be called on non-primary metric. Other annotations refer to fieldstat_counter_incrby.
@@ -140,7 +150,7 @@ int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, co
     * @param item_len: the length of the field.
     * @return Error codes.
 */
-int fieldstat_hll_add_field(struct fieldstat *instance, int cube_id, int metric_id, const struct field *cell_dimensions, size_t n_dimensions, const struct field *item, size_t item_len);
+int fieldstat_hll_add_fields(struct fieldstat *instance, int cube_id, int metric_id, const struct field *cell_dimensions, size_t n_dimensions, const struct field *items, size_t n_items);
 
 
 /* 
@@ -150,6 +160,15 @@ int fieldstat_hll_add_field(struct fieldstat *instance, int cube_id, int metric_
     * @return Error codes.
 */
 int fieldstat_histogram_record(struct fieldstat *instance, int cube_id, int metric_id, const struct field *cell_dimensions, size_t n_dimensions, long long value);
+struct histogram; 
+struct histogram *fieldstat_histogram_fork(struct fieldstat *instance, int metric_id);
+void 
+void histogram_free(struct fieldstat_histogram *histogram);
+void histogram_reset(struct fieldstat_histogram *histogram);
+int fieldstat_histogram_merge(struct fieldstat *instance, int cube_id, int metric_id, const struct field *cell_dimensions, size_t n_dimensions, const struct histogram *src);
+
+
+struct 
 
 /*
     * @brief Delete all the cells, also the content of every metrics. The cube and metrics are not deleted.

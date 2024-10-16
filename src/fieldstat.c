@@ -174,14 +174,14 @@ int fieldstat_hll_add(struct fieldstat *instance, int cube_id, int metric_id, co
 }
 
 // cppcheck-suppress [constParameterPointer, unmatchedSuppression]
-int fieldstat_hll_add_field(struct fieldstat *instance, int cube_id, int metric_id, const struct field *cell_dimensions, size_t n_dimensions, const struct field *item, size_t item_len)
+int fieldstat_hll_add_fields(struct fieldstat *instance, int cube_id, int metric_id, const struct field *cell_dimensions, size_t n_dimensions, const struct field *items, size_t n_items)
 {
     struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
     if (cube == NULL) {
         return FS_ERR_INVALID_CUBE_ID;
     }
 
-    return cube_hll_add_field(cube, metric_id, cell_dimensions, n_dimensions, item, item_len);
+    return cube_hll_add_field(cube, metric_id, cell_dimensions, n_dimensions, items, n_items);
 }
 
 // cppcheck-suppress [constParameterPointer, unmatchedSuppression]

@@ -634,7 +634,7 @@ TEST(unit_test_merge, gen_dest_full_all_src_inserted_given_src_flows_larger_spre
         Flow flow = flow_generator.next();
         Fieldstat_tag_list_wrapper dimension = Fieldstat_tag_list_wrapper(src_key, flow.src_ip.c_str());
         Fieldstat_tag_list_wrapper item = Fieldstat_tag_list_wrapper("dummy", flow.dst_ip.c_str());
-        fieldstat_hll_add_field(instance_src, cube_id, metric_id, dimension.get_tag(), dimension.get_tag_count(), item.get_tag(), item.get_tag_count());
+        fieldstat_hll_add_fields(instance_src, cube_id, metric_id, dimension.get_tag(), dimension.get_tag_count(), item.get_tag(), item.get_tag_count());
 
         flow_cnt[dimension.to_string()].insert(item.to_string());
     }
@@ -643,7 +643,7 @@ TEST(unit_test_merge, gen_dest_full_all_src_inserted_given_src_flows_larger_spre
         Flow flow = flow_generator.next();
         Fieldstat_tag_list_wrapper dimension = Fieldstat_tag_list_wrapper(dest_key, flow.src_ip.c_str());
         Fieldstat_tag_list_wrapper item = Fieldstat_tag_list_wrapper("dummy", flow.dst_ip.c_str());
-        fieldstat_hll_add_field(instance_dest, cube_id, metric_id, dimension.get_tag(), dimension.get_tag_count(), item.get_tag(), item.get_tag_count());
+        fieldstat_hll_add_fields(instance_dest, cube_id, metric_id, dimension.get_tag(), dimension.get_tag_count(), item.get_tag(), item.get_tag_count());
 
         flow_cnt[dimension.to_string()].insert(item.to_string());
     }
@@ -692,7 +692,7 @@ TEST(unit_test_merge, merge_accuracy_test_gen_dest_full_some_inserted_and_some_m
         const char *use_key = rand()%2? "src":"common";
         Fieldstat_tag_list_wrapper dimension = Fieldstat_tag_list_wrapper(use_key, flow.src_ip.c_str());
         Fieldstat_tag_list_wrapper item = Fieldstat_tag_list_wrapper("dummy", flow.dst_ip.c_str());
-        fieldstat_hll_add_field(instance_src, cube_id, metric_id, dimension.get_tag(), dimension.get_tag_count(), item.get_tag(), item.get_tag_count());
+        fieldstat_hll_add_fields(instance_src, cube_id, metric_id, dimension.get_tag(), dimension.get_tag_count(), item.get_tag(), item.get_tag_count());
 
         flow_cnt[dimension.to_string()].insert(item.to_string());
     }
@@ -701,7 +701,7 @@ TEST(unit_test_merge, merge_accuracy_test_gen_dest_full_some_inserted_and_some_m
         const char *use_key = rand()%2? "dest":"common";
         Fieldstat_tag_list_wrapper dimension = Fieldstat_tag_list_wrapper(use_key, flow.src_ip.c_str());
         Fieldstat_tag_list_wrapper item = Fieldstat_tag_list_wrapper("dummy", flow.dst_ip.c_str());
-        fieldstat_hll_add_field(instance_src, cube_id, metric_id, dimension.get_tag(), dimension.get_tag_count(), item.get_tag(), item.get_tag_count());
+        fieldstat_hll_add_fields(instance_src, cube_id, metric_id, dimension.get_tag(), dimension.get_tag_count(), item.get_tag(), item.get_tag_count());
 
         flow_cnt[dimension.to_string()].insert(item.to_string());
     }
