@@ -554,6 +554,9 @@ int cube_set_sampling(struct cube *cube, enum sampling_mode mode, int max_n_cell
             break;
         }
     }
+    if (mode == SAMPLING_MODE_COMPREHENSIVE) {
+        primary_metric_id = 0;
+    }
 
     switch (mode)
     {
@@ -961,6 +964,66 @@ int cube_counter_incrby(struct cube *cube, int metric_id, const struct field *di
     metric_counter_incrby(metric, increment);
     return FS_OK;
 }
+
+int cube_counter_incrby_batch(struct cube *cube, int metric_ids[], const struct field *dimensions, size_t n_dimensions, long long increments[], size_t n_metrics) {
+    if (cube->primary_metric_id == -1) {
+        return FS_ERR_CUBE_SAMPLING_NOT_INITIALIZED;
+    }
+
+    int total_increment = 0;
+    if (cube->sampling_mode == SAMPLING_MODE_TOPK) {
+        for (int i = 0; i < n_metrics; i++) {
+            assert (cube->sampling_mode != SAMPLING_MODE_TOPK || cube->primary_metric_id != metric_ids[i] || increments[i] >= 0);
+            assert (cube->sampling_mode != SAMPLING_MODE_TOP_CARDINALITY || cube->primary_metric_id != metric_ids[i]);
+            assert (metric_manifest_manager_get_by_id(cube->manifest_manager, metric_ids[i])->type == METRIC_TYPE_COUNTER);
+
+            if (cube->primary_metric_id == metric_ids[i]) {
+                total_increment += increments[i];
+            }
+        }
+    }
+
+    struct cell *cell_data = NULL;
+    if (total_increment > 0) {
+        char *compound_dimension;
+        size_t compound_dimension_len;
+        field_array_to_key(dimensions, n_dimensions, &compound_dimension, &compound_dimension_len);
+        struct exdata_new_args args;
+        args.cell_dimensions = dimensions;
+        args.n_dimensions = n_dimensions;
+
+        int tmp_ret = heavy_keeper_add(cube->heavykeeper, compound_dimension, compound_dimension_len, total_increment, (void *)&args);
+        if (tmp_ret != 1) {
+            free(compound_dimension);
+            return FS_ERR_TOO_MANY_CELLS;
+        }
+        cell_data = heavy_keeper_get0_exdata(cube->heavykeeper, compound_dimension, compound_dimension_len);
+        free(compound_dimension);
+    } else {
+        cell_data = get_cell_in_cube_generic(cube, dimensions, n_dimensions);
+    }
+    if (cell_data == NULL) {
+        return FS_ERR_TOO_MANY_CELLS;
+    }
+
+    for (int i = 0; i < n_metrics; i++) {
+        if (increments[i] == 0) {
+            continue;
+        }
+        if (cube->primary_metric_id == metric_ids[i] && cube->sampling_mode == SAMPLING_MODE_TOPK) {
+            continue; // primary metric is recorded directly in heavy keeper
+        }
+
+        const struct metric_manifest *manifest = metric_manifest_manager_get_by_id(cube->manifest_manager, metric_ids[i]);
+        struct metric *metric = add_or_find_metric_in_cell(manifest, cell_data);
+
+        printf("metric: %d, increment: %lld\n", metric_ids[i], increments[i]);
+        metric_counter_incrby(metric, increments[i]);
+    }
+
+    return FS_OK;
+}
+
 
 int cube_counter_set(struct cube *cube, int metric_id, const struct field *dimensions, size_t n_dimensions, long long value) {
     if (cube->primary_metric_id == -1) {

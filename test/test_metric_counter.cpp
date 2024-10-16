@@ -254,8 +254,77 @@ TEST(metric_test_counter, primary_counter_add_after_first)
     fieldstat_free(instance);
 }
 
+TEST(metric_test_counter, incyby_batch_topk_empty)
+{
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_cube_create(instance, &TEST_SHARED_TAG, 1);
+    int metric_id_primary = fieldstat_register_counter(instance, cube_id, "primary");
+    int metric_id2 = fieldstat_register_counter(instance, cube_id, "using");
+    fieldstat_cube_set_sampling(instance, cube_id, SAMPLING_MODE_TOPK, 10, metric_id_primary);
+
+    int metrics[] = {metric_id_primary,metric_id2,metric_id_primary,metric_id_primary,metric_id2};
+    long long increments[] = {1,2,3,4,5};
+// int fieldstat_counter_incrby_batch(struct fieldstat *instance, int cube_id, const struct field *cell_dimensions, size_t n_dimensions, int metric_ids[],  long long increments[], size_t n_metrics)
+
+    fieldstat_counter_incrby_batch(instance, cube_id, &TEST_FIELD_INT, 1, metrics, increments, 5);
+
+    EXPECT_EQ(my_fieldstat_counter_get(instance, cube_id, metric_id_primary), 1 + 3 + 4);
+    EXPECT_EQ(my_fieldstat_counter_get(instance, cube_id, metric_id2), 2 + 5);
+
+    fieldstat_free(instance);
+}
+
+TEST(metric_test_counter, incyby_batch_topk_full)
+{
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_cube_create(instance, &TEST_SHARED_TAG, 1);
+    int metric_id_primary = fieldstat_register_counter(instance, cube_id, "primary");
+    int metric_id2 = fieldstat_register_counter(instance, cube_id, "using");
+    fieldstat_cube_set_sampling(instance, cube_id, SAMPLING_MODE_TOPK, 10, metric_id_primary);
+
+    struct field field = TEST_FIELD_INT;
+    for (int i = 0; i < 10; i++) {
+        field.value_longlong = i + 123;
+        int tmp_ret = fieldstat_counter_incrby(instance, cube_id, metric_id_primary, &field, 1, 2 + i);
+        EXPECT_EQ(tmp_ret, FS_OK);
+    }
+
+    int metrics[] = {metric_id_primary,metric_id2};
+    long long increments[] = {1,2};
+    int ret = fieldstat_counter_incrby_batch(instance, cube_id, &TEST_FIELD_INT, 1, metrics, increments, 2);
+    EXPECT_EQ(ret, FS_ERR_TOO_MANY_CELLS); // ADD new cell with increment=1, less than the min element 2+0
+    int metrics2[] = {metric_id_primary,metric_id_primary,metric_id2};
+    long long increments2[] = {1,1,10};
+    ret = fieldstat_counter_incrby_batch(instance, cube_id, &TEST_FIELD_INT, 1, metrics2, increments2, 3);
+    EXPECT_EQ(ret, FS_OK);
+
+    EXPECT_EQ(my_fieldstat_counter_get(instance, cube_id, metric_id_primary), 1 + 1 + 1);
+    EXPECT_EQ(my_fieldstat_counter_get(instance, cube_id, metric_id2), 10);
+
+    fieldstat_free(instance);
+}
+
+TEST(metric_test_counter, incyby_batch_comprehensive) {
+    struct fieldstat *instance = fieldstat_new();
+    int cube_id = fieldstat_cube_create(instance, &TEST_SHARED_TAG, 1);
+    int metric_id1 = fieldstat_register_counter(instance, cube_id, "1");
+    int metric_id2 = fieldstat_register_counter(instance, cube_id, "2");
+    fieldstat_cube_set_sampling(instance, cube_id, SAMPLING_MODE_COMPREHENSIVE, 10, metric_id1);
+
+    int metrics[] = {metric_id1,metric_id2,metric_id1,metric_id1,metric_id2};
+    long long increments[] = {1,2,3,4,5};
+    fieldstat_counter_incrby_batch(instance, cube_id, &TEST_FIELD_INT, 1, metrics, increments, 5);
+
+    EXPECT_EQ(my_fieldstat_counter_get(instance, cube_id, metric_id1), 1 + 3 + 4);
+    EXPECT_EQ(my_fieldstat_counter_get(instance, cube_id, metric_id2), 2 + 5);
+
+    fieldstat_free(instance);
+}
+
 int main(int argc, char *argv[]) 
 {
 	testing::InitGoogleTest(&argc, argv);
+    // testing::GTEST_FLAG(filter) = "metric_test_counter.incyby_batch_topk_full";
+
 	return RUN_ALL_TESTS();
 }

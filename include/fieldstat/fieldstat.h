@@ -122,6 +122,14 @@ int fieldstat_register_histogram(struct fieldstat *instance, int cube_id, const 
     * @return Error codes.
 */
 int fieldstat_counter_incrby(struct fieldstat *instance, int cube_id, int metric_id, const struct field *cell_dimensions, size_t n_dimensions, long long increment);
+
+/* 
+    * @brief refer to fieldstat_counter_incrby. The difference is that the increments of multiple metrics are added in batch. It is faster than calling fieldstat_counter_incrby multiple times.
+    * @param metric_ids: metric ids, previously returned by fieldstat_register_counter, must be counters.
+    * @param increments: increments of the counter metrics. The length of increments must be equal to n_metrics. Position i of increments is the increment of metric_ids[i].
+    * @param n_metrics: the length of metric_ids and increments.
+    * @return Error codes. Or just assert fail if the parameters are invalid.
+*/
 int fieldstat_counter_incrby_batch(struct fieldstat *instance, int cube_id, const struct field *cell_dimensions, size_t n_dimensions, int metric_ids[],  long long increments[], size_t n_metrics);
 
 
