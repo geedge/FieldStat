@@ -7,7 +7,6 @@ extern "C"
 
 #include <stddef.h>
 #include <stdbool.h>
-#include <uuid/uuid.h>
 
 #define FS_OK 0
 #define FS_ERR_TOO_MANY_CELLS -1
@@ -37,7 +36,6 @@ enum field_type
 	FIELD_VALUE_INTEGER,
 	FIELD_VALUE_DOUBLE,
 	FIELD_VALUE_CSTRING,
-	FIELD_VALUE_UUID,
 };
 
 enum sampling_mode {
@@ -53,7 +51,6 @@ struct field {
 		long long value_longlong;
 		double value_double;
 		const char *value_str;
-        uuid_t value_uuid;
 	};
 };
 

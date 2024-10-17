@@ -78,9 +78,6 @@ static struct field *field_array_duplicate(const struct field *fields_src, size_
         case FIELD_VALUE_DOUBLE:
             ret[i].value_double = fields_src[i].value_double;
             break;
-        case FIELD_VALUE_UUID:
-            memcpy(ret[i].value_uuid, fields_src[i].value_uuid, sizeof(uuid_t));
-            break;
         default:
             break;
         }
@@ -145,11 +142,6 @@ void print_field_array(const struct field *fields, size_t n_field)
         case FIELD_VALUE_CSTRING:
             printf("%s\n", fields[i].value_str);
             break;
-        case FIELD_VALUE_UUID: {
-            char out[37];
-            uuid_unparse(fields[i].value_uuid, out);
-            printf("%s\n", out);
-            break;}
         default:
             break;
         }
@@ -196,10 +188,6 @@ static void field_array_to_key(const struct field fields[], size_t n_fields, cha
                 val_len = strlen(field->value_str);
                 val_position = (void *)field->value_str;
 				break;
-            case FIELD_VALUE_UUID:
-                val_len = sizeof(uuid_t);
-                val_position = (void *)field->value_uuid;
-                break;
 			default:
 				assert(0);
 				break;
