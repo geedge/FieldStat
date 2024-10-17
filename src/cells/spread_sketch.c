@@ -6,6 +6,12 @@
 #include <assert.h>
 
 #include "xxhash/xxhash.h"
+// uthash use faster murmurhash
+#include "murmurhash/murmurhash.h"
+#define HASH_FUNCTION(keyptr, keylen, hashv) \
+        do { \
+            hashv = murmurhash(keyptr, keylen, 0); \
+        } while (0)
 #include "uthash.h"
 
 #include "spread_sketch.h"

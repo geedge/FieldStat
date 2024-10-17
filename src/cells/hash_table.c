@@ -5,6 +5,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+// uthash use faster murmurhash
+#include "murmurhash/murmurhash.h"
+#define HASH_FUNCTION(keyptr, keylen, hashv) \
+        do { \
+            hashv = murmurhash(keyptr, keylen, 0); \
+        } while (0)
 #include "uthash.h"
 
 #include "fieldstat.h"

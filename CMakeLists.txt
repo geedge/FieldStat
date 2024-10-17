@@ -114,6 +114,7 @@ file(GLOB SRC
     "vendors/mpack/*.c"
     "vendors/xxhash/*.c"
     "vendors/base64/*.c"
+    "vendors/murmurhash/*.c"
 )
 
 add_subdirectory(test/deps)

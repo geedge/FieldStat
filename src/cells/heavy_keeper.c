@@ -13,12 +13,13 @@
 #include "minheap/heap.h"
 #include "mpack/mpack.h"
 #include "xxhash/xxhash.h"
-// XXHASH is faster
+
+// uthash use faster murmurhash
+#include "murmurhash/murmurhash.h"
 #define HASH_FUNCTION(keyptr, keylen, hashv) \
         do { \
-            hashv = XXH3_64bits(keyptr, keylen); \
+            hashv = murmurhash(keyptr, keylen, 0); \
         } while (0)
-
 #include "uthash.h"
 
 #include "exdata.h"
