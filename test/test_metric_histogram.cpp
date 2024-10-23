@@ -196,7 +196,7 @@ TEST(metric_test_histogram, histogram_batch_transaction) {
     int cube_id = test_fieldstat_cube_create(instance, &TEST_SHARED_TAG, 1, SAMPLING_MODE_COMPREHENSIVE, 10);
     int metric_id = fieldstat_register_histogram(instance, cube_id, "test_histogram_metric", 1, 10000, 5);
 
-    struct histogram *histogram = fieldstat_histogram_fork(instance, cube_id, metric_id);
+    struct histogram *histogram = histogram_new(1, 10000, 5);
     ASSERT_NE(histogram, nullptr);
 
     long long packet_lengths[] = {1234, 1234, 123, 567, 890, 1234, 1500};

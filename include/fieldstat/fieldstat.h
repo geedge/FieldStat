@@ -163,7 +163,7 @@ int fieldstat_histogram_record(struct fieldstat *instance, int cube_id, int metr
 struct histogram provides a way to update the histogram metric in batch created and updated by user.
 
   Example:
-    struct histogram *histogram = fieldstat_histogram_fork(instance, cube_id, metric_id);
+    struct histogram *histogram = histogram_new(1, 1000000, 3);
     for (int i = 0; i < many_packet_length; i++) {
         histogram_record(histogram, packet_length[i]);
     }
@@ -175,7 +175,8 @@ struct histogram provides a way to update the histogram metric in batch created 
     // after many times of histogram_record
     histogram_free(histogram);
 */
-struct histogram *fieldstat_histogram_fork(const struct fieldstat *instance, int cube_id, int metric_id);
+// struct histogram *fieldstat_histogram_fork(const struct fieldstat *instance, int cube_id, int metric_id);
+struct histogram *histogram_new(long long lowest_trackable_value, long long highest_trackable_value, int significant_figures);
 void histogram_free(struct histogram *histogram);
 void histogram_reset(struct histogram *histogram);
 int fieldstat_histogram_merge(struct fieldstat *instance, int cube_id, int metric_id, const struct field *cell_dimensions, size_t n_dimensions, const struct histogram *src);

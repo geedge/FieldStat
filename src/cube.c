@@ -802,13 +802,18 @@ int cube_histogram_merge(struct cube *cube, int metric_id, const struct field *d
 
     const struct metric_manifest *manifest = metric_manifest_manager_get_by_id(cube->manifest_manager, metric_id);
     if (manifest == NULL || manifest->type != METRIC_TYPE_HISTOGRAM) {
-        printf("invalid metric id\n");
         return FS_ERR_INVALID_METRIC_ID;
+    }
+
+    // check if the parameters matches
+    if (src->lowest_discernible_value != manifest->parameters->hdr.lowest_trackable_value ||
+        src->highest_trackable_value != manifest->parameters->hdr.highest_trackable_value ||
+        src->significant_figures != manifest->parameters->hdr.significant_figures) {
+        return FS_ERR_INVALID_PARAM;
     }
 
     struct cell *cell_data = get_cell_in_cube_generic(cube, dimensions, n_dimensions);
     if (cell_data == NULL) {
-        printf("too many cells\n");
         return FS_ERR_TOO_MANY_CELLS;
     }
 

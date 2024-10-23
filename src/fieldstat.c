@@ -240,21 +240,10 @@ void fieldstat_calibrate(const struct fieldstat *master, struct fieldstat *repli
 /* -------------------------------------------------------------------------- */
 /*                      histogram fast batch transaction                      */
 /* -------------------------------------------------------------------------- */
-struct histogram *fieldstat_histogram_fork(const struct fieldstat *instance, int cube_id, int metric_id) {
-    const struct cube *cube = cube_manager_get_cube_by_id(instance->cube_manager, cube_id);
-    if (cube == NULL) {
-        return NULL;
-    }
-
-    const struct metric_manifest *manifest = cube_get_metric_manifest_by_id(cube, metric_id);
-    if (manifest == NULL || manifest->type != METRIC_TYPE_HISTOGRAM) {
-        return NULL;
-    }
-    const struct histogram_parameters *parameters = &(manifest->parameters->hdr);
-
+struct histogram *histogram_new(long long lowest_trackable_value, long long highest_trackable_value, int significant_figures) {
     struct hdr_histogram* inner = NULL;
-    int ret = hdr_init(parameters->lowest_trackable_value, parameters->highest_trackable_value, parameters->significant_figures, &inner);
-	if (ret != 0) {
+    int ret = hdr_init(lowest_trackable_value, highest_trackable_value, significant_figures, &inner);
+    if (ret != 0) {
         return NULL;
     }
 
