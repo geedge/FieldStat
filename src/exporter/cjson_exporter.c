@@ -123,6 +123,9 @@ void kv_pair_fill_with_fields(struct export_kv_pair *dest, const struct field *s
 {
     dest->key = strdup(src->key);
     dest->type = src->type;
+    if (dest->type == FIELD_VALUE_UUID) {
+        dest->type = FIELD_VALUE_CSTRING;
+    }
     switch (src->type) {
         case FIELD_VALUE_INTEGER:
             dest->value_longlong = src->value_longlong;
@@ -133,6 +136,12 @@ void kv_pair_fill_with_fields(struct export_kv_pair *dest, const struct field *s
         case FIELD_VALUE_CSTRING:
             dest->value_str = strdup(src->value_str);
             break;
+        case FIELD_VALUE_UUID: {
+            char uuid_str[37];
+            uuid_unparse(src->value_uuid, uuid_str);
+            dest->value_str = strdup(uuid_str);
+            break;
+        }
         default:
             assert(0);
     }
@@ -237,6 +246,11 @@ bool field_list_cmp(const struct field_list *a, const struct field_list *b)
                 return false;
             }
             break;
+        case FIELD_VALUE_UUID:
+            if (uuid_compare(a->field[i].value_uuid, b->field[i].value_uuid) != 0) {
+                return false;
+            }
+            break;
         default:
             assert(0);
         }
@@ -263,6 +277,9 @@ struct field_list *field_list_dup(const struct field_list *src)
             break;
         case FIELD_VALUE_CSTRING:
             dest->field[i].value_str = strdup(src->field[i].value_str);
+            break;
+        case FIELD_VALUE_UUID:
+            memcpy(dest->field[i].value_uuid, src->field[i].value_uuid, sizeof(uuid_t));
             break;
         default:
             assert(0);
@@ -547,6 +564,7 @@ void kv_pair_write_to_json(const struct export_kv_pair *pairs, struct json_write
             json_writer_double_field(writer, pairs->key, pairs->value_double);
             break;
         case FIELD_VALUE_CSTRING:
+        case FIELD_VALUE_UUID:
             json_writer_str_field(writer, pairs->key, pairs->value_str, strlen(pairs->value_str));
             break;
         default:
@@ -554,33 +572,30 @@ void kv_pair_write_to_json(const struct export_kv_pair *pairs, struct json_write
     }
 }
 
+void kv_pair_free_list(struct export_kv_pair *pairs, size_t len)
+{
+    for (int i = 0; i < len; i++) {
+        struct export_kv_pair *pair = &pairs[i];
+        if (pair->type == FIELD_VALUE_CSTRING) {
+            free(pair->value_str);
+        }
+        free(pair->key);
+    }
+    free(pairs);
+}
+
 void field_list_write_to_json(const struct field_list *field_list, struct json_writer *json_obj)
 {
-    struct export_kv_pair pairs = {0};
-
+    struct export_kv_pair *pairs = malloc(sizeof(struct export_kv_pair) * field_list->n_field);
     for (int i = 0; i < field_list->n_field; i++) {
         if (field_list->n_field == 0) {
             continue;
         }
-        memset(&pairs, 0, sizeof(struct export_kv_pair));
-        pairs.key = (char *)field_list->field[i].key;
-        pairs.type = field_list->field[i].type;
-        switch (pairs.type)
-        {
-            case FIELD_VALUE_INTEGER:
-                pairs.value_longlong = field_list->field[i].value_longlong;
-                break;
-            case FIELD_VALUE_DOUBLE:
-                pairs.value_double = field_list->field[i].value_double;
-                break;
-            case FIELD_VALUE_CSTRING:
-                pairs.value_str = (char *)field_list->field[i].value_str;
-                break;
-            default:
-                break;
-        }
-        kv_pair_write_to_json(&pairs, json_obj);
+        
+        kv_pair_fill_with_fields(&pairs[i], &field_list->field[i]);
+        kv_pair_write_to_json(&pairs[i], json_obj);
     }
+    kv_pair_free_list(pairs, field_list->n_field);
 }
 
 void cell_iter_read_dimensions(const struct cell_iter *iter, struct export_kv_pair **exported_dimensions, size_t *n_dimension_out)
@@ -600,18 +615,6 @@ void cell_iter_read_dimensions(const struct cell_iter *iter, struct export_kv_pa
     for (int i = 0; i < field_list_cube->n_field; i++) {
         kv_pair_fill_with_fields(ret++, &field_list_cube->field[i]);
     }
-}
-
-void kv_pair_free_list(struct export_kv_pair *pairs, size_t len)
-{
-    for (int i = 0; i < len; i++) {
-        struct export_kv_pair *pair = &pairs[i];
-        if (pair->type == FIELD_VALUE_CSTRING) {
-            free(pair->value_str);
-        }
-        free(pair->key);
-    }
-    free(pairs);
 }
 
 // return 1 if added, 0 if not added
@@ -953,30 +956,9 @@ void fieldstat_json_exporter_set_global_dimension(struct fieldstat_json_exporter
         free(exporter->global_tag_list->field);
         free(exporter->global_tag_list);
     }
+    struct field_list tmp = {(struct field *)tag_list, n_field};
 
-    exporter->global_tag_list = malloc(sizeof(struct field_list));
-    exporter->global_tag_list->n_field = n_field;
-    exporter->global_tag_list->field = malloc(sizeof(struct field) * n_field);
-    for (size_t i = 0; i < n_field; i++) {
-        struct field *field = &exporter->global_tag_list->field[i];
-        field->key = strdup(tag_list[i].key);
-        field->type = tag_list[i].type;
-        switch (field->type)
-        {
-        case FIELD_VALUE_INTEGER:
-            field->value_longlong = tag_list[i].value_longlong;
-            break;
-        case FIELD_VALUE_CSTRING:
-            field->value_str = strdup(tag_list[i].value_str);
-            break;
-        case FIELD_VALUE_DOUBLE:
-            field->value_double = tag_list[i].value_double;
-            break;
-        
-        default:
-            break;
-        }   
-    }
+    exporter->global_tag_list = field_list_dup(&tmp);
 }
 
 void fieldstat_json_exporter_free(struct fieldstat_json_exporter *exporter)
