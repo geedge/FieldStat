@@ -1,0 +1,11 @@
+--- a/googletest/src/gtest-death-test.cc.origin	2024-11-11 16:21:17.365946156 +0800
++++ b/googletest/src/gtest-death-test.cc	2024-11-11 16:21:31.656137890 +0800
+@@ -1296,7 +1296,7 @@
+ GTEST_ATTRIBUTE_NO_SANITIZE_ADDRESS_
+ GTEST_ATTRIBUTE_NO_SANITIZE_HWADDRESS_
+ static bool StackGrowsDown() {
+-  int dummy;
++  int dummy=0;
+   bool result;
+   StackLowerThanAddress(&dummy, &result);
+   return result;
