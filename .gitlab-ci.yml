@@ -1,9 +1,9 @@
 variables:
   GIT_STRATEGY: "clone"
-  BUILD_IMAGE_CENTOS7: "git.mesalab.cn:7443/mesa_platform/build-env:master"
-  BUILD_IMAGE_CENTOS8: "git.mesalab.cn:7443/mesa_platform/build-env:rockylinux"
+  BUILD_IMAGE_X86_64_ROCKY8: "git.mesalab.cn:7443/mesa_platform/build-env:rockylinux"
+  BUILD_IMAGE_AARCH64_ROCKY9: "git.mesalab.cn:7443/mesa_platform/build-env:rocky9-aarch64"
   BUILD_PADDING_PREFIX: /tmp/padding_for_CPACK_RPM_BUILD_SOURCE_DIRS_PREFIX_PREFIX_PREFIX_PREFIX_PREFIX_PREFIX/
-  INSTALL_DEPENDENCY_LIBRARY:  libasan
+  INSTALL_DEPENDENCY_LIBRARY:  libasan zlib-devel libuuid-devel
   INSTALL_PREFIX: "/opt/MESA/"
 
 stages:
@@ -15,26 +15,24 @@ stages:
   - ln -s $CI_PROJECT_DIR $BUILD_PADDING_PREFIX/$CI_PROJECT_PATH
   - cd $BUILD_PADDING_PREFIX/$CI_PROJECT_PATH
   - chmod +x ./ci/travis.sh
-  - yum makecache
-  - yum install -y elfutils-libelf-devel
-  - yum install -y libuuid libuuid-devel
-  - yum install -y zlib
   - python3 -m pip install prettytable jinja2
 
-.build_by_travis_for_centos8:
+###############################################################################
+# build on x86_64 Rocky8
+###############################################################################
+
+.build_by_travis_for_x86_64_rocky8:
   stage: build
-  image: $BUILD_IMAGE_CENTOS8
+  image: $BUILD_IMAGE_X86_64_ROCKY8
   extends: .build_before_script
   script:
-    - dnf --enablerepo=powertools install -y libmnl-devel
-    - dnf --enablerepo=powertools install -y libnfnetlink-devel
     - ./ci/travis.sh
   tags:
-    - share
+    - tsg-os-builder-el8
 
-branch_build_debug_for_centos8:
+branch_build_debug_for_x86_64_rocky8:
   stage: build
-  extends: .build_by_travis_for_centos8
+  extends: .build_by_travis_for_x86_64_rocky8
   variables:
     BUILD_TYPE: Debug
     UNIT_TEST: 1
@@ -43,66 +41,98 @@ branch_build_debug_for_centos8:
     - /^master.*$/i
     - tags
 
-branch_build_release_for_centos8:
+branch_build_release_for_x86_64_rocky8:
   stage: build
   variables:
     BUILD_TYPE: RelWithDebInfo
     UNIT_TEST: 1
-  extends: .build_by_travis_for_centos8
+  extends: .build_by_travis_for_x86_64_rocky8
   except:
     - /^develop-*$/i
     - /^master.*$/i
     - tags
 
-develop_build_debug_for_centos8:
+
+release_build_debug_for_x86_64_rocky8:
   stage: build
-  extends: .build_by_travis_for_centos8
   variables:
     BUILD_TYPE: Debug
     UNIT_TEST: 1
     PACKAGE: 1
     UPLOAD_RPM: 1
-    ASAN_OPTION: ADDRESS
-    TESTING_VERSION_BUILD: 1
-    PULP3_REPO_NAME: framework-testing-x86_64.el8
-    PULP3_DIST_NAME: framework-testing-x86_64.el8
+    PULP3_REPO_NAME: framework-stable-x86_64.el8
+    PULP3_DIST_NAME: framework-stable-x86_64.el8
+  extends: .build_by_travis_for_x86_64_rocky8
   artifacts:
     name: "fieldstat4-$CI_COMMIT_REF_NAME-debug"
     paths:
       - build/*.rpm
   only:
-    - /^develop-*$/i
-    - /^master.*$/i
+    - tags
 
-develop_build_release_for_centos8:
+release_build_release_for_x86_64_rocky8:
   stage: build
-  extends: .build_by_travis_for_centos8
   variables:
     BUILD_TYPE: RelWithDebInfo
     UNIT_TEST: 1
     PACKAGE: 1
     UPLOAD_RPM: 1
-    TESTING_VERSION_BUILD: 1
-    PULP3_REPO_NAME: framework-testing-x86_64.el8
-    PULP3_DIST_NAME: framework-testing-x86_64.el8
+    PULP3_REPO_NAME: framework-stable-x86_64.el8
+    PULP3_DIST_NAME: framework-stable-x86_64.el8
+  extends: .build_by_travis_for_x86_64_rocky8
   artifacts:
     name: "fieldstat4-$CI_COMMIT_REF_NAME-release"
     paths:
       - build/*.rpm
   only:
+    - tags
+
+###############################################################################
+# build on aarch64 Rocky9
+###############################################################################
+
+.build_by_travis_for_aarch64_rocky9:
+  stage: build
+  image: $BUILD_IMAGE_AARCH64_ROCKY9
+  extends: .build_before_script
+  script:
+    - ./ci/travis.sh
+  tags:
+    - tsg-os-builder-aarch64
+
+branch_build_debug_for_aarch64_rocky9:
+  stage: build
+  extends: .build_by_travis_for_aarch64_rocky9
+  variables:
+    BUILD_TYPE: Debug
+    UNIT_TEST: 1
+  except:
     - /^develop-*$/i
     - /^master.*$/i
+    - tags
 
-release_build_debug_for_centos8:
+branch_build_release_for_aarch64_rocky9:
+  stage: build
+  variables:
+    BUILD_TYPE: RelWithDebInfo
+    UNIT_TEST: 1
+  extends: .build_by_travis_for_aarch64_rocky9
+  except:
+    - /^develop-*$/i
+    - /^master.*$/i
+    - tags
+
+
+release_build_debug_for_aarch64_rocky9:
   stage: build
   variables:
     BUILD_TYPE: Debug
     UNIT_TEST: 1
     PACKAGE: 1
     UPLOAD_RPM: 1
-    PULP3_REPO_NAME: framework-stable-x86_64.el8
-    PULP3_DIST_NAME: framework-stable-x86_64.el8
-  extends: .build_by_travis_for_centos8
+    PULP3_REPO_NAME: framework-stable-aarch64.el9
+    PULP3_DIST_NAME: framework-stable-aarch64.el9
+  extends: .build_by_travis_for_aarch64_rocky9
   artifacts:
     name: "fieldstat4-$CI_COMMIT_REF_NAME-debug"
     paths:
@@ -110,16 +140,16 @@ release_build_debug_for_centos8:
   only:
     - tags
 
-release_build_release_for_centos8:
+release_build_release_for_aarch64_rocky9:
   stage: build
   variables:
     BUILD_TYPE: RelWithDebInfo
     UNIT_TEST: 1
     PACKAGE: 1
     UPLOAD_RPM: 1
-    PULP3_REPO_NAME: framework-stable-x86_64.el8
-    PULP3_DIST_NAME: framework-stable-x86_64.el8
-  extends: .build_by_travis_for_centos8
+    PULP3_REPO_NAME: framework-stable-aarch64.el9
+    PULP3_DIST_NAME: framework-stable-aarch64.el9
+  extends: .build_by_travis_for_aarch64_rocky9
   artifacts:
     name: "fieldstat4-$CI_COMMIT_REF_NAME-release"
     paths:
