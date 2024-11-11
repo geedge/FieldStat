@@ -54,11 +54,20 @@ cmake3 -DCMAKE_CXX_FLAGS=$CXX_FLAGS \
 
 make
 
-
 if [ -n "${UNIT_TEST}" ]; then
-	yum install -y  https://dl.influxdata.com/telegraf/releases/telegraf-1.25.1-1.x86_64.rpm
-	/usr/bin/telegraf -config  ../test/bin/telegraf_unit_test.conf --quiet &
-	ctest --verbose
+    ARCH=$(uname -m)
+    if [ "$ARCH" = "x86_64" ]; then
+        TELEGRAF_RPM="https://dl.influxdata.com/telegraf/releases/telegraf-1.25.1-1.x86_64.rpm"
+    elif [ "$ARCH" = "aarch64" ]; then
+        TELEGRAF_RPM="https://dl.influxdata.com/telegraf/releases/telegraf-1.25.1-1.aarch64.rpm"
+    else
+        echo "Unsupported architecture: $ARCH"
+        exit 1
+    fi
+
+    yum install -y $TELEGRAF_RPM
+    /usr/bin/telegraf -config ../test/bin/telegraf_unit_test.conf --quiet &
+    ctest --verbose
 fi
 
 if [ -n "${PACKAGE}" ]; then
